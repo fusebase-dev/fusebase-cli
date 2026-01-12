@@ -1,0 +1,54 @@
+#!/usr/bin/env bun
+import { Command } from "commander";
+import { authCommand } from "./lib/commands/auth";
+import { initCommand } from "./lib/commands/init";
+import { deployCommand } from "./lib/commands/deploy";
+import { devCommand } from "./lib/commands/dev";
+import { featureCommand } from "./lib/commands/feature";
+import { envCommand } from "./lib/commands/env";
+import { skillsCommand } from "./lib/commands/skills";
+import { updateCommand } from "./lib/commands/update";
+import { configCommand } from "./lib/commands/config";
+import { secretCommand } from "./lib/commands/secret";
+import { tokenCommand } from "./lib/commands/token";
+import { remoteLogsCommand } from "./lib/commands/remote-logs";
+import { integrationsCommand } from "./lib/commands/integrations";
+import { analyzeCommand } from "./lib/commands/analyze";
+import { gitCommand } from "./lib/commands/git";
+import { checkForUpdates } from "./lib/commands/steps/update-check";
+import { VERSION } from "./lib/version";
+import { registerErrorReporter } from "./lib/error-reporter";
+
+registerErrorReporter();
+
+const program = new Command();
+
+program.name("fusebase").description("Fusebase Apps CLI").version(VERSION);
+
+program.addCommand(authCommand);
+
+program
+  .command("version")
+  .description("Print CLI version from package.json")
+  .action(() => {
+    console.log(VERSION);
+  });
+
+checkForUpdates();
+
+program.addCommand(initCommand);
+program.addCommand(gitCommand);
+program.addCommand(deployCommand);
+program.addCommand(devCommand);
+program.addCommand(featureCommand);
+program.addCommand(envCommand);
+program.addCommand(skillsCommand);
+program.addCommand(updateCommand);
+program.addCommand(configCommand);
+program.addCommand(integrationsCommand);
+program.addCommand(secretCommand);
+program.addCommand(tokenCommand);
+program.addCommand(remoteLogsCommand);
+program.addCommand(analyzeCommand, { hidden: true });
+
+program.parse();

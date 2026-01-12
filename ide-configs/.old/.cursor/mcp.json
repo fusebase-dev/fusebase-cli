@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "fusebase-dashboards": {
+      "command": "node",
+      "args": ["./scripts/mcp-stdio-bridge.cjs"]
+    }
+  }
+}

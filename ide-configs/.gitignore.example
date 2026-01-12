@@ -1,0 +1,7 @@
+# MCP config (sensitive: URL and token)
+.cursor/mcp.json
+.vscode/mcp.json
+.mcp.json
+opencode.json
+mcp_example.json
+.codex/config.toml

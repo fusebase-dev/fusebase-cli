@@ -1,0 +1,113 @@
+# Skip pipelines for dev-version tags (e.g. v2026.031116.5817) created
+# automatically by the upload:dev release job.
+workflow:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d{4}\.\d{6}\.\d{4}$/
+      when: never
+    - when: always
+
+# Shared step: clone fusebase-apps-cli-release-scripts and export RELEASE_SCRIPTS.
+# Uses CI_JOB_TOKEN for authentication (no extra CI variables needed).
+# Requires "Allow CI job token access" enabled on the apps-cli-release-scripts project.
+.clone-release-scripts: &clone-release-scripts
+  - git clone --depth 1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@gl.nimbusweb.co/cli/apps-cli-release-scripts.git" /tmp/release-scripts
+  - export RELEASE_SCRIPTS=/tmp/release-scripts
+  - export PROJECT_ROOT="$CI_PROJECT_DIR"
+
+# Validate skills with skills-ref (https://github.com/agentskills/agentskills/tree/main/skills-ref).
+# Runs on MR and branch when project-template/.claude/skills or the script change.
+validate-skills:
+  image: python:3.12-bookworm
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - project-template/.claude/skills/**/*
+        - scripts/validate-skills.ts
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - project-template/.claude/skills/**/*
+        - scripts/validate-skills.ts
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl git
+    - curl -fsSL https://bun.sh/install | bash
+    - export BUN_INSTALL=$HOME/.bun && export PATH=$BUN_INSTALL/bin:$PATH
+    - git clone --depth 1 https://github.com/agentskills/agentskills.git /tmp/agentskills
+    - pip install -e /tmp/agentskills/skills-ref
+    - bun install --frozen-lockfile
+  script:
+    - bun run skills:validate
+
+# Build CLI binaries on every commit (MR and branch pushes).
+# On the default branch, BUILD_CHANNEL=dev causes build.sh to embed a timestamp
+# version into the binary and save it to build/.dev-version for the upload jobs.
+build:
+  image: oven/bun:1
+  before_script:
+    # oven/bun image does not include zip or git; prebuild needs both
+    - apt-get update -qq && apt-get install -y -qq git zip unzip wget nsis default-jre-headless
+    # Download and install the INetC NSIS plugin
+    - wget "https://nsis.sourceforge.io/mediawiki/images/c/c9/Inetc.zip" -O inetc.zip
+    - unzip -q inetc.zip -d inetc-plugin
+    - cp inetc-plugin/Plugins/x86-unicode/INetC.dll /usr/share/nsis/Plugins/x86-unicode/
+    - rm -rf inetc.zip inetc-plugin
+    # Clone release scripts
+    - *clone-release-scripts
+    # Tag pipelines produce prod builds; everything else is dev.
+    - export BUILD_CHANNEL=$( [ -n "$CI_COMMIT_TAG" ] && echo prod || echo dev )
+    - export UPLOAD_DEV=$( [ -z "$CI_COMMIT_TAG" ] && echo 1 || echo "" )
+  script:
+    - bun install --frozen-lockfile
+    - bun run build
+    - bun "$RELEASE_SCRIPTS/installers/build-installer-win.ts"
+    - bun "$RELEASE_SCRIPTS/signing/sign-exe.ts" build/installers/win/fusebase-installer-*.exe
+  artifacts:
+    name: "fusebase-cli-$CI_COMMIT_REF_SLUG"
+    paths:
+      - build/
+    expire_in: 30 days
+
+# Upload dev artifacts to S3 on every default-branch commit.
+# Sets manifest.devVersion to a timestamp (YYYY.mmddhh.mmss).
+# manifest.version is preserved (only updated by upload:prod).
+# Also creates a GitLab Release tagged with the dev version.
+upload:dev:
+  image: oven/bun:1
+  needs: [build]
+  variables:
+    S3_BUCKET: fusebase-cli-bin
+    UPLOAD_DEV: "1"
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git python3 python3-pip python3-venv
+    - python3 -m pip install --break-system-packages awscli
+    - *clone-release-scripts
+  script:
+    - |
+      DEV_VERSION=$(cat build/.dev-version 2>/dev/null | tr -d '[:space:]')
+      if [[ -n "$DEV_VERSION" ]]; then
+        bun "$RELEASE_SCRIPTS/create-release.ts" "$DEV_VERSION"
+      fi
+    - bash "$RELEASE_SCRIPTS/upload-to-s3.sh"
+
+# Upload prod artifacts and create a GitLab Release when package.json version changes.
+# Sets manifest.version to the new semver version.
+upload:prod:
+  image: oven/bun:1
+  needs: [build]
+  rules:
+    - if: $SKIP_RELEASE == "1"
+      when: never
+    - if: $CI_COMMIT_TAG
+  variables:
+    S3_BUCKET: fusebase-cli-bin
+    UPLOAD_PROD: "1"
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq git python3 python3-pip python3-venv
+    - python3 -m pip install --break-system-packages awscli
+    - *clone-release-scripts
+  script:
+    - bun "$RELEASE_SCRIPTS/create-release.ts"
+    - bash "$RELEASE_SCRIPTS/upload-to-s3.sh"
