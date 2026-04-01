@@ -325,6 +325,32 @@ fusebase secret create --feature abc123 \
 
 After creating the secrets, the CLI prints `https://{org-domain}/dashboard/{orgId}/apps/features/{featureId}/secrets` — open that URL to fill in the actual secret values.
 
+<% if (it.scaffold) { %>
+### Scaffold a Feature
+
+Scaffold a new feature from a built-in template. Requires the `scaffold` experimental flag: `fusebase config set-flag scaffold`, then `fusebase skills update`.
+
+```bash
+# List available templates (with descriptions)
+fusebase scaffold
+
+# Scaffold a template into a directory
+fusebase scaffold --template <templateId> --dir <path>
+```
+
+Available templates:
+
+| Template | Description |
+|----------|-------------|
+| `spa` | React + Vite SPA — scaffolds directly into `<dir>` |
+| `backend` | Node.js + Hono backend — scaffolds into `<dir>/backend/` |
+
+**Rules:**
+- Errors if any files in the target directory would be overwritten (no partial writes).
+- The `backend` template can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
+- After scaffolding, run `npm install` inside the new directory and register the feature with `fusebase feature create`.
+
+<% } %>
 ### Deploy Features
 
 ```bash
