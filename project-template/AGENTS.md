@@ -11,10 +11,6 @@ This file is the **definitive guide** for AI agents and LLMs working with Fuseba
 - ✅ create/update databases/dashboards/views/columns
 - ✅ upload files if exposed as MCP tool
 - ✅ discover schemas, IDs, permissions
-- ❌ do NOT import or call SDK
-- ❌ do NOT import SDK packages in LLM-generated development code
-- ❌ do NOT write code that uses SDK "for LLM convenience"
-- ❌ do NOT "test" SDK calls during development
 - ❌ **NEVER create scripts, helper files, or workarounds to access MCP functionality**
 - ❌ **NEVER write Node.js scripts, bash scripts, or any code to "bridge" or "call" MCP tools**
 - ❌ **If MCP tools are not available, STOP and follow MCP troubleshooting steps - do NOT create workarounds**
@@ -115,11 +111,13 @@ SDK token usage in feature runtime:
 - [ ] If MCP unavailable: **STOPPED and informed user** (did NOT create scripts/workarounds); use **fusebase-dashboards** skill for troubleshooting
 - [ ] `.env` has `DASHBOARDS_MCP_TOKEN` and `DASHBOARDS_MCP_URL`
 - [ ] I will use MCP for ALL backend operations during development
-- [ ] I will NOT import or call SDK during development
 - [ ] I will NOT create any scripts, helper files, or workarounds for MCP access
-- [ ] I will insert SDK code into feature files, but NOT execute it myself
+- [ ] I will insert SDK code into feature files
 - [ ] Runtime code will use SDK / direct Fusebase API calls with feature token via `x-app-feature-token`
 - [ ] App backend handlers will read feature token from `x-app-feature-token` or cookie `fbsfeaturetoken`
+<% if (it.scaffold) { %>
+- [ ] **Scaffolded feature** (if creating a new feature): Ran `fusebase scaffold --template spa` before writing feature files
+<% } %>
 
 ## Mental Model: MCP + SDK Architecture
 
@@ -201,6 +199,12 @@ Before making changes, write a plan:
 - Rollback/mitigation notes
 
 **Plan must avoid**: SDK usage, manual REST calls, assumptions about schema.
+
+<% if (it.scaffold) { %>
+### Step 2.5: Scaffold the Feature (if creating a new feature)
+
+Before writing any feature files, scaffold using `fusebase scaffold --template spa --dir features/<name>`. For features needing a backend, also run `fusebase scaffold --template backend --dir features/<name>`. Never manually create `package.json`, `vite.config.ts`, `tsconfig.json`, `postcss.config.js`, `index.html`, or `globals.css` — scaffold generates the canonical versions.
+<% } %>
 
 ### Step 3: Execute Changes (MCP-only)
 
@@ -319,11 +323,6 @@ export function createGateTokensApi(featureToken: string): TokensApi {
 }
 ```
 
-**LLM must NOT**:
-- Test SDK calls during development
-- Add SDK calls to validate backend while planning
-- Use SDK "for convenience" during development
-
 ## Explicitly Forbidden
 
 ### ❌ Manual HTTP Requests
@@ -332,16 +331,6 @@ export function createGateTokensApi(featureToken: string): TokensApi {
 - Don't guess endpoints
 - Don't construct URLs manually
 - Use MCP tools during development, SDK methods in runtime
-
-### ❌ Calling SDK from LLM Development
-
-**DO NOT** execute SDK code during LLM development work:
-- SDK is for runtime code only (feature execution)
-- LLM may insert SDK code into feature files, but must NOT execute it
-- Use MCP tools for all development operations (discovery, reading, writing, creating)
-- Don't "test SDK calls" during planning/building
-- Don't write helper scripts that use SDK
-- Don't call SDK methods from LLM context
 
 ### ❌ Calling MCP from Runtime
 
@@ -449,6 +438,13 @@ For file upload functionality (separate service, not part of dashboard SDK).
   React 18+/19: components, hooks, state management, Server Components, performance, testing. References: `references/server-components.md`, `references/react-19-features.md`, `references/state-management.md`, `references/hooks-patterns.md`, `references/performance.md`, `references/testing-react.md`, `references/migration-class-to-modern.md`.
 
 ## Development Workflow
+
+<% if (it.scaffold) { %>
+### Scaffolding a New Feature
+
+1. **Scaffold**: `fusebase scaffold --template spa --dir features/<name>` (add `--template backend` for backend)
+2. **Install**: `npm install` in the feature directory
+<% } %>
 
 ### Starting Development
 

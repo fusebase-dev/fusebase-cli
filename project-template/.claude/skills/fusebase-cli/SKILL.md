@@ -215,6 +215,7 @@ Update settings for an existing feature.
 
 - `--access <principals>` - Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`, `visitor,orgRole:guest`)
 - `--permissions <permissions>` - Set dashboard view permissions (format: `dashboardView.dashboardId:viewId.read,write;...`)
+- `--sync-gate-permissions` - Analyze Gate SDK calls in the feature's runtime code and sync the detected operations as Gate permissions on the feature. Required before a feature that uses `@fusebase/fusebase-gate-sdk` can be considered fully published.
 
 **Access Principals:**
 
@@ -330,7 +331,7 @@ After creating the secrets, the CLI prints `https://{org-domain}/dashboard/{orgI
 <% if (it.scaffold) { %>
 ### Scaffold a Feature
 
-Scaffold a new feature from a built-in template. Requires the `scaffold` experimental flag: `fusebase config set-flag scaffold`, then `fusebase skills update`.
+Scaffold a new feature from a built-in template.
 
 ```bash
 # List available templates (with descriptions)
@@ -350,7 +351,7 @@ Available templates:
 **Rules:**
 - Errors if any files in the target directory would be overwritten (no partial writes).
 - The `backend` template can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
-- After scaffolding, run `npm install` inside the new directory and register the feature with `fusebase feature create`.
+- After scaffolding, run `npm install` inside the new directory.
 
 <% } %>
 ### Deploy Features
@@ -408,6 +409,9 @@ fusebase remote-logs runtime abc123 --type system
 
 ## Creating a New Feature
 
+<% if (it.scaffold) { %>
+1. **Scaffold** the feature: `fusebase scaffold --template spa --dir features/my-new-feature` (add `--template backend` for a backend). Run `npm install` in the new directory afterward.
+<% } else { %>
 1. **Create the feature directory** under `features/`:
    ```
    features/
@@ -418,6 +422,7 @@ fusebase remote-logs runtime abc123 --type system
          App.tsx
          main.tsx
    ```
+<% } %>
 2. **Run `fusebase feature create`** — include `--permissions` now if the feature needs dashboard access (do not save it for a separate `feature update` step later):
 
    ```bash
@@ -440,10 +445,15 @@ fusebase remote-logs runtime abc123 --type system
 
 1. `fusebase auth` - Authenticate (one-time setup)
 2. `fusebase init` - Initialize project
+<% if (it.scaffold) { %>
+3. `fusebase scaffold --template spa --dir features/<name>` - Scaffold feature files, then `npm install` inside the directory
+4. `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` - Register feature; **include `--permissions` at this step** if the feature needs dashboard access
+<% } else { %>
 3. `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` - Create and configure features; **include `--permissions` at this step** if the feature needs dashboard access
+<% } %>
 4. `fusebase dev start` - Develop and test locally
 5. `fusebase deploy` - Deploy to production
-6. `fusebase remote-logs build|runtime <featureId>` - Check logs if deployed app has issues (see `remote-logs` skill for more)
+5a. *(Gate features only)* `fusebase feature update <featureId> --sync-gate-permissions` - Sync Gate SDK operations as feature permissions before treating the feature as fully published6. `fusebase remote-logs build|runtime <featureId>` - Check logs if deployed app has issues (see `remote-logs` skill for more)
 
 ## Troubleshooting
 

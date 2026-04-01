@@ -31,7 +31,7 @@ Create a temporary script (e.g. `_test-api.ts`) to make the API calls you want t
 const token = process.env.TOKEN || "<paste-token-here>";
 
 const res = await fetch("https://api-endpoint/...", {
-  headers: { Authorization: `Bearer ${token}` },
+  headers: { "x-app-feature-token": token },
 });
 console.log(res.status);
 console.log(await res.json());
