@@ -14,10 +14,12 @@ import { tokenCommand } from "./lib/commands/token";
 import { remoteLogsCommand } from "./lib/commands/remote-logs";
 import { integrationsCommand } from "./lib/commands/integrations";
 import { analyzeCommand } from "./lib/commands/analyze";
+import { scaffoldCommand } from "./lib/commands/scaffold";
 import { gitCommand } from "./lib/commands/git";
 import { checkForUpdates } from "./lib/commands/steps/update-check";
 import { VERSION } from "./lib/version";
 import { registerErrorReporter } from "./lib/error-reporter";
+import { hasFlag } from "./lib/config";
 
 registerErrorReporter();
 
@@ -49,6 +51,9 @@ program.addCommand(integrationsCommand);
 program.addCommand(secretCommand);
 program.addCommand(tokenCommand);
 program.addCommand(remoteLogsCommand);
+if (hasFlag("scaffold")) {
+  program.addCommand(scaffoldCommand);
+}
 program.addCommand(analyzeCommand, { hidden: true });
 
 program.parse();

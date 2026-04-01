@@ -1,0 +1,21 @@
+{
+  "name": "feature-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --out-dir dist",
+    "start": "node dist/index.js",
+    "lint": "eslint . --max-warnings 0"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.x",
+    "@hono/node-ws": "^1.x",
+    "hono": "^4.x"
+  },
+  "devDependencies": {
+    "tsx": "^4.x",
+    "tsup": "^8.x",
+    "typescript": "^5.x"
+  }
+}
