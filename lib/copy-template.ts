@@ -20,7 +20,9 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 /** Skills that require a specific flag to be included. */
-const FLAG_GATED_SKILLS: Record<string, string> = {};
+const FLAG_GATED_SKILLS: Record<string, string> = {
+  "git-workflow": "git-init",
+};
 
 /**
  * Check whether a zip entry path should be skipped based on flag-gated skills.

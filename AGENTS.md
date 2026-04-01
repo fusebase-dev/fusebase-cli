@@ -65,7 +65,7 @@ bun index.ts [command]
 
 - `auth [--api-key <apiKey>]` - Start auth flow or set API key for authentication
 - `version` - Print CLI version (from package.json)
-- `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to offer initializing a local Git repo after setup)
+- `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to offer initializing a local Git repo after setup; same behavior can be enabled globally with flag `git-init`)
 - `git` - Initialize a local Git repository in the current directory (offline; add a remote and push to sync with GitHub/GitLab)
 - `deploy` - Deploy features to Fusebase (runs lint then build per feature)
 - `feature list` - List all features for the current app with their URLs
@@ -103,6 +103,8 @@ Flags enable experimental features across all projects. Managed via `config set-
 |------|--------|
 | `mcp-beta` | Unlocks optional MCP servers in the catalog that are gated behind this flag (`ide-configs/mcp-servers.ts`) |
 | `scaffold` | Enables the `fusebase scaffold` command and its documentation |
+| `git-init` | Makes `fusebase init` automatically offer local Git initialization (equivalent to `--git`) and includes Git workflow skill files in generated apps |
+| `git-debug-commits` | Enables strict traceability rules inside `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag references in debug/deploy reports |
 
 After changing flags, run `fusebase skills update` to regenerate project files (for template flags). For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 
