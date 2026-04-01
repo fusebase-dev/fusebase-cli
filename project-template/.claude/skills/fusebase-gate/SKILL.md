@@ -1,6 +1,6 @@
 ---
 name: fusebase-gate
-description: "How to use MCP for Fusebase Gate. Use when: working with gate contracts, tokens, org user listing, health, or generated MCP tools and prompts."
+description: "How to use MCP and SDK for Fusebase Gate and the broader Fusebase platform. Use when: 1. Working with Gate MCP tools (tokens, org user listing, health, generated prompts), 2. Org-scoped flows: organizations, membership, user lists, portal invitations, 3. Gate authorization scopes and JWT tokens, 4. Platform-level capabilities exposed via Gate: email campaigns, automation flows, integrations, 5. Runtime code uses @fusebase/fusebase-gate-sdk (Gate SDK patterns and --sync-gate-permissions workflow)."
 metadata:
   source: entrypoint
 ---
@@ -13,45 +13,6 @@ This document describes how to use **MCP (Model Context Protocol)** with **Fuseb
 For rules and checklists, see `AGENTS.md`.
 
 ---
-
-## References
-
-Each reference is in a separate file under `references/`. Load the file when you need that topic.
-
-
-**meta**
-
-- [Authorization and Scopes](references/authz.md)
-- [Bootstrap](references/bootstrap.md)
-- [Fusebase Gate SDK](references/sdk.md)
-- [Tooling](references/tooling.md)
-
-**specialized**
-
-- [Fusebase Gate Membership And Portal Flows](references/membership.md)
-- [Fusebase Gate Users Operations](references/users.md)
-
----
-
-
-## References
-
-Each reference is in a separate file under `references/`. Load the file when you need that topic.
-
-**meta**
-
-- [Authorization and Scopes](references/authz.md)
-- [Bootstrap](references/bootstrap.md)
-- [Fusebase Gate SDK](references/sdk.md)
-- [Tooling](references/tooling.md)
-
-**specialized**
-
-- [Fusebase Gate Membership And Portal Flows](references/membership.md)
-- [Fusebase Gate Users Operations](references/users.md)
-
----
-
 
 ## References
 
