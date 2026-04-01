@@ -204,7 +204,11 @@ export async function analyzeGateSdkOperations(
   const allowlist = new Set(opIds);
   const sdkVersion = await readSdkVersion(sdkRoot);
 
-  const loaded = loadTsProgram(options.projectRoot);
+  // Prefer feature-local tsconfig when a scoped feature root is provided.
+  // This preserves local path aliases and include/exclude settings.
+  const loaded =
+    (options.scopeRoot ? loadTsProgram(options.scopeRoot) : null) ??
+    loadTsProgram(options.projectRoot);
   if (!loaded) {
     throw new Error(
       "No tsconfig.json under current directory, or tsconfig matched zero source files. Fix tsconfig include.",
