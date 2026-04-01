@@ -98,6 +98,8 @@ Options:
 - `--ide <preset>` - IDE preset: `claude-code`, `cursor`, `vscode`, `opencode`, `codex`, or `other` (single choice; generates all supported IDE configs by default)
 - `--force` - Overwrite existing IDE config files/folders
 - `--git` - After setup, offer to initialize a local Git repository (local only until you add a `git remote` and push)
+- Global flag `git-init` also enables the same post-init Git offer automatically (`fusebase config set-flag git-init`)
+- Global flag `git-debug-commits` enables an additional debug skill in generated apps that requires commit-per-fix workflow and SHA references in debug reports
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 

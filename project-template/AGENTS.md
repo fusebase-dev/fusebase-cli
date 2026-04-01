@@ -424,6 +424,12 @@ For file upload functionality (separate service, not part of dashboard SDK).
 
 **Load when debugging a feature started with `fusebase dev start`** — covers the local per-session logs in the selected feature directory's `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`, and explains which file to inspect for browser errors, proxied API traffic, frontend dev server output, and backend output.
 
+<% if (it.flags?.includes("git-debug-commits")) { %>
+### ✅ git-debug-commits
+
+**Load when fixing generated app issues in debug mode** — after each verified fix, create a dedicated Git commit and include its SHA in the debug report so the user can roll back safely.
+<% } %>
+
 ### ✅ feature-backend
 
 **Load when a feature needs a backend API** (REST endpoints, WebSockets, custom logic). Covers when to add a backend, `backend/` folder structure, Hono setup, `/api` route reservation, and `fusebase.json` backend config. **The backend is optional** — only add when the feature genuinely needs backend logic beyond dashboard SDK calls. **No code is shared between SPA and backend** — each side defines its own types independently. **Backends are not shared among features** — only the feature that owns the `backend/` folder can access it.
@@ -463,7 +469,7 @@ See `fusebase-cli` skill for complete CLI documentation.
 The `fusebase` CLI is installed globally. **Always run it as `fusebase <command>` — never use `npx fusebase`.**
 
 Key commands:
-- `fusebase init` - Initialize new project
+- `fusebase init` - Initialize new project (`--git` offers local Git init; global flag `git-init` enables the same behavior automatically)
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `fusebase feature create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]` - Register feature (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the feature needs dashboard access — do not defer to a separate `feature update` step.
 - `fusebase deploy` - Deploy features (runs lint then build per feature)
@@ -569,7 +575,7 @@ You can only claim completion if:
 9. **Never execute SDK from LLM**: LLM may insert SDK code but must NOT execute it
 10. **Never call MCP from runtime**: MCP is development-only, features don't know about MCP
 11. **Never create scripts for MCP**: If MCP tools aren't available, fix the setup - don't work around it
-12. **Always read skills**: `fusebase-dashboards` for MCP/dashboard flow and SDK discovery; `fusebase-gate` when integrating with Gate (orgs, users, platform tokens, and related ecosystem capabilities); `feature-dev-practices` for building features, `dev-debug-logs` for local `fusebase dev start` log analysis, `feature-backend` for adding backend APIs (REST/WebSockets), `feature-secrets` for registering backend secrets, `file-upload` for file operations. For TypeScript/React implementation quality, load **dev-level skills**: `typescript-pro`, `react-expert`. When `fusebase-dashboards` is in context, `prompts_search` for domain knowledge is optional — the skill content is sufficient
+12. **Always read skills**: `fusebase-dashboards` for MCP/dashboard flow and SDK discovery; `fusebase-gate` when integrating with Gate (orgs, users, platform tokens, and related ecosystem capabilities); `feature-dev-practices` for building features, `dev-debug-logs` for local `fusebase dev start` log analysis, <% if (it.flags?.includes("git-debug-commits")) { %>`git-debug-commits` for fix-by-fix rollback-safe debug commits, <% } %>`feature-backend` for adding backend APIs (REST/WebSockets), `feature-secrets` for registering backend secrets, `file-upload` for file operations. For TypeScript/React implementation quality, load **dev-level skills**: `typescript-pro`, `react-expert`. When `fusebase-dashboards` is in context, `prompts_search` for domain knowledge is optional — the skill content is sufficient
 
 ## One-line Reminder
 

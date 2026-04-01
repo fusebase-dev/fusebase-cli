@@ -100,7 +100,12 @@ export function getUpdateChannel(): "prod" | "dev" {
 }
 
 /** Known experimental flags. */
-export const KNOWN_FLAGS = ["mcp-beta", "scaffold"] as const;
+export const KNOWN_FLAGS = [
+  "mcp-beta",
+  "scaffold",
+  "git-init",
+  "git-debug-commits",
+] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
 export function getFlags(): string[] {

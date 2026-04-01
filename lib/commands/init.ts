@@ -481,7 +481,7 @@ export const initCommand = new Command("init")
   )
   .option(
     "--git",
-    "After setup, offer to initialize a local Git repository (local only until you add a remote)",
+    "After setup, offer to initialize a local Git repository (also enabled by config flag `git-init`)",
     false,
   )
   .action(
@@ -508,6 +508,8 @@ export const initCommand = new Command("init")
         process.exit(1);
       }
 
+      const shouldOfferGitInit = options.git || hasFlag("git-init");
+
       // Check if fusebase.json already exists
       if (await fileExists(fuseJsonPath)) {
         // Just update AGENTS.md and skills folder, then replace {FUSEBASE_HOST} and {FUSEBASE_APP_HOST}
@@ -517,7 +519,7 @@ export const initCommand = new Command("init")
           //agent configs = skills, hooks, AGENTS.md, etc.
           console.log("✓ Updated app agent configs");
           printAllSetBanner();
-          await maybeOfferGitInit({ git: options.git, cwd });
+          await maybeOfferGitInit({ git: shouldOfferGitInit, cwd });
           process.exit(0);
         } catch (error) {
           console.error("Error: Failed to update agent config:", error);
@@ -754,6 +756,6 @@ export const initCommand = new Command("init")
 
       // Print next steps
       printAllSetBanner();
-      await maybeOfferGitInit({ git: options.git, cwd });
+      await maybeOfferGitInit({ git: shouldOfferGitInit, cwd });
     },
   );
