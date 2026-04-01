@@ -1,0 +1,6 @@
+{
+  "id": "spa",
+  "name": "React + Vite SPA",
+  "description": "Single-page application template using React 18 and Vite. Suitable for Fusebase feature frontend.",
+  "stack": "react, vite, typescript"
+}

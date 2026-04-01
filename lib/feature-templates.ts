@@ -113,24 +113,29 @@ export async function copyTemplate(
     throw new Error(`Template ${templateId} not found`);
   }
 
-  // Recursively copy template files
-  await copyDirectory(templateDir, targetDir, replacements);
+  // Recursively copy template files (skip metadata.json at root)
+  await copyDirectory(templateDir, targetDir, replacements, true);
 }
 
 /**
- * Recursively copy directory with string replacements
+ * Recursively copy directory with string replacements.
+ * Skips metadata.json at the template root level.
  */
 async function copyDirectory(
   srcDir: string,
   destDir: string,
-  replacements: Record<string, string>
+  replacements: Record<string, string>,
+  isRoot = false
 ): Promise<void> {
   await mkdir(destDir, { recursive: true });
 
-  const { readdir: readdirAsync, stat: statAsync } = await import('fs/promises');
+  const { readdir: readdirAsync } = await import('fs/promises');
   const entries = await readdirAsync(srcDir, { withFileTypes: true });
 
   for (const entry of entries) {
+    // Skip metadata.json at template root (it's CLI config, not a template file)
+    if (isRoot && entry.name === 'metadata.json') continue;
+
     const srcPath = join(srcDir, entry.name);
     const destPath = join(destDir, entry.name);
 
@@ -151,4 +156,64 @@ async function copyDirectory(
       await writeFileAsync(destPath, content, 'utf-8');
     }
   }
+}
+
+/**
+ * Collect files in the template that would overwrite existing files in targetDir.
+ */
+async function collectCollisions(
+  srcDir: string,
+  destDir: string,
+  relativePrefix: string,
+  isRoot = false
+): Promise<string[]> {
+  const { readdir: readdirAsync, access } = await import('fs/promises');
+  let entries: import('fs').Dirent[];
+  try {
+    entries = await readdirAsync(srcDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const collisions: string[] = [];
+  for (const entry of entries) {
+    if (isRoot && entry.name === 'metadata.json') continue;
+
+    const relativePath = relativePrefix ? `${relativePrefix}/${entry.name}` : entry.name;
+    const destPath = join(destDir, entry.name);
+
+    if (entry.isDirectory()) {
+      const sub = await collectCollisions(srcDir + '/' + entry.name, destPath, relativePath);
+      collisions.push(...sub);
+    } else {
+      try {
+        await access(destPath);
+        collisions.push(relativePath);
+      } catch {
+        // File doesn't exist — no collision
+      }
+    }
+  }
+  return collisions;
+}
+
+/**
+ * Check whether scaffolding a template into targetDir would overwrite any existing files.
+ * Returns a list of relative paths that would be overwritten (empty = safe to proceed).
+ */
+export async function checkTemplateCollisions(
+  templateId: string,
+  targetDir: string
+): Promise<string[]> {
+  const { path: templatesDir } = await getFeatureTemplatesDir();
+  const templateDir = join(templatesDir, templateId);
+
+  try {
+    const s = await stat(templateDir);
+    if (!s.isDirectory()) throw new Error();
+  } catch {
+    throw new Error(`Template '${templateId}' not found`);
+  }
+
+  return collectCollisions(templateDir, targetDir, '', true);
 }

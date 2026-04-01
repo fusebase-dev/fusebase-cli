@@ -80,6 +80,7 @@ bun index.ts [command]
 - `config flags` - List active experimental flags
 - `config ide` - Recreate IDE config in current project (optional `--ide <preset>`, `--force`)
 - `integrations` - Configure optional MCP integrations (catalog + custom HTTP MCP in `fusebase.json`); `integrations add|disable|enable|remove`; `--no-prompt` skips checkbox
+- `scaffold` *(requires `scaffold` flag — `fusebase config set-flag scaffold`)* - Scaffold a feature from a built-in template. Without options, lists available templates with descriptions. Use `--template <id> --dir <path>` to scaffold. Errors if any files would be overwritten. Templates: `spa` (React + Vite SPA, deployed directly into `<dir>`), `backend` (Node.js + Hono, deployed into `<dir>/backend/`). Backend can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
 
 ## Configuration
 
@@ -101,6 +102,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | Flag | Effect |
 |------|--------|
 | `mcp-beta` | Unlocks optional MCP servers in the catalog that are gated behind this flag (`ide-configs/mcp-servers.ts`) |
+| `scaffold` | Enables the `fusebase scaffold` command and its documentation |
 
 After changing flags, run `fusebase skills update` to regenerate project files (for template flags). For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 
