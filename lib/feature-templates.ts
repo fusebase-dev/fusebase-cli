@@ -29,9 +29,11 @@ async function getFeatureTemplatesDir(): Promise<{
   isBinaryMode: boolean;
   cleanup?: () => Promise<void>;
 }> {
-  // Check if we're in binary mode (embedded zip file)
+  // Check if we're in binary mode (embedded zip file).
+  // Bun appends a content hash to embedded filenames (e.g. "feature-templates-c7f917bq.zip"),
+  // so use includes('feature-templates') rather than includes('feature-templates.zip').
   const zipFile = embeddedFiles.find(
-    (f) => (f as any).name?.includes('feature-templates.zip')
+    (f) => (f as any).name?.includes('feature-templates')
   );
 
   if (zipFile) {
