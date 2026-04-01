@@ -43,26 +43,6 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 
 /**
- * Find an available port to start the local server
- */
-async function findAvailablePort(startPort: number = 3000): Promise<number> {
-  for (let port = startPort; port < startPort + 100; port++) {
-    try {
-      const server = Bun.serve({
-        port,
-        fetch: () => new Response("test"),
-      });
-      server.stop();
-      return port;
-    } catch {
-      // Port is in use, try next one
-      continue;
-    }
-  }
-  throw new Error("Could not find an available port");
-}
-
-/**
  * Exchange authorization code for API key
  */
 async function exchangeCodeForApiKey(
@@ -91,30 +71,6 @@ async function exchangeCodeForApiKey(
 }
 
 /**
- * Wait for server to be ready by attempting a connection
- */
-async function waitForServer(
-  port: number,
-  maxAttempts: number = 10,
-): Promise<void> {
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      const response = await fetch(`http://localhost:${port}`, {
-        method: "HEAD",
-      });
-      if (response.ok || response.status === 404) {
-        // Server is responding
-        return;
-      }
-    } catch {
-      // Server not ready yet, wait a bit
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-  }
-  throw new Error("Server failed to start");
-}
-
-/**
  * Start OAuth flow with PKCE
  */
 async function startOAuthFlow(
@@ -129,17 +85,13 @@ async function startOAuthFlow(
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  // Find available port and start local server
-  const port = await findAvailablePort();
-  const redirectUri = `http://localhost:${port}`;
+  return new Promise((resolve, reject) => {
+    let serverInstance: ReturnType<typeof Bun.serve>;
 
-  console.log(`Starting local server on port ${port}...`);
-
-  return new Promise(async (resolve, reject) => {
-    let serverInstance: any;
-
+    // Use port 0 to let the OS assign an available port atomically,
+    // avoiding any race condition between port-check and bind.
     const server = Bun.serve({
-      port,
+      port: 0,
       fetch: async (req) => {
         const url = new URL(req.url);
 
@@ -187,15 +139,11 @@ async function startOAuthFlow(
     });
 
     serverInstance = server;
+    // Bun assigns the actual port when port 0 is used
+    const port = server.port;
+    const redirectUri = `http://localhost:${port}`;
 
-    // Wait for server to be ready before opening browser
-    try {
-      await waitForServer(port);
-    } catch (error) {
-      serverInstance.stop();
-      reject(new Error("Failed to start local server"));
-      return;
-    }
+    console.log(`Starting local server on port ${port}...`);
 
     // Build authorization URL and open browser
     const authUrl = `${baseUrl}/auth/apikey/initeauth?redirect_uri=${encodeURIComponent(redirectUri)}&code_challenge=${encodeURIComponent(codeChallenge)}&r=1`;
