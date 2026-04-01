@@ -25,9 +25,24 @@ See [CLI Commands & Interactive Prompts](docs/CLI.md) for comprehensive document
 
 ## Installation
 
+> **Prerequisite: [Bun](https://bun.sh) v1.0+** — the CLI runs as a Bun script and requires Bun at runtime regardless of how you install it.
+>
+> Install Bun if you don't have it:
+> ```bash
+> curl -fsSL https://bun.sh/install | bash
+> ```
+
 The CLI is not published to npm. Install globally from this repo:
 
-**Option 1 – Link from a local clone (for development):**
+**Option 1 – Install from Git:**
+
+```bash
+npm install -g git+https://github.com/Fusebase/apps-cli.git
+```
+
+npm downloads the package and links the `fusebase` binary. Bun must be installed — it is used at runtime to execute the CLI (not npm/Node).
+
+**Option 2 – Link from a local clone (for development):**
 
 ```bash
 cd /path/to/apps-cli
@@ -35,16 +50,7 @@ bun install
 npm link
 ```
 
-Then run `fusebase` from anywhere. Requires [Bun](https://bun.sh) (to run the CLI) and Node/npm (for `npm link`). Use `npm link`, not `bun link --global`—Bun does not add the package bin to your PATH.
-
-**Option 2 – Install from Git:**
-
-```bash
-npm install -g git+https://github.com/Fusebase/apps-cli.git
-# or: bun install -g git+https://github.com/Fusebase/apps-cli.git
-```
-
-Replace the URL with your actual repo if different.
+Then run `fusebase` from anywhere. Use `npm link`, not `bun link --global` — Bun does not add the package bin to your PATH.
 
 **Run without installing:**
 
