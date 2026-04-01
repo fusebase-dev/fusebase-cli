@@ -66,36 +66,36 @@ export function loadTsProgram(projectRoot: string): {
   configPath: string;
 } | null {
   const root = resolve(projectRoot);
-  const configPath = ts.findConfigFile(
-    root,
-    ts.sys.fileExists,
-    "tsconfig.json",
-  );
-  if (!configPath) return null;
+  for (const configName of ["tsconfig.json", "tsconfig.app.json"]) {
+    const configPath = ts.findConfigFile(root, ts.sys.fileExists, configName);
+    if (!configPath) continue;
 
-  const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
-  if (configFile.error || !configFile.config) {
-    return null;
+    const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (configFile.error || !configFile.config) {
+      continue;
+    }
+
+    const parsed = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      dirname(configPath),
+      undefined,
+      configPath,
+    );
+
+    if (parsed.fileNames.length === 0) {
+      continue;
+    }
+
+    const program = ts.createProgram({
+      rootNames: parsed.fileNames,
+      options: parsed.options,
+    });
+
+    return { program, configPath };
   }
 
-  const parsed = ts.parseJsonConfigFileContent(
-    configFile.config,
-    ts.sys,
-    dirname(configPath),
-    undefined,
-    configPath,
-  );
-
-  if (parsed.fileNames.length === 0) {
-    return null;
-  }
-
-  const program = ts.createProgram({
-    rootNames: parsed.fileNames,
-    options: parsed.options,
-  });
-
-  return { program, configPath };
+  return null;
 }
 
 function isGateApiInstanceType(
@@ -143,18 +143,34 @@ export function collectUsedOperations(
     const visit = (node: ts.Node): void => {
       if (ts.isCallExpression(node)) {
         const expr = node.expression;
-        if (!ts.isPropertyAccessExpression(expr)) {
+        let receiverExpr: ts.Expression | undefined;
+        let methodName: string | undefined;
+
+        if (
+          ts.isPropertyAccessExpression(expr) ||
+          ts.isPropertyAccessChain(expr)
+        ) {
+          receiverExpr = expr.expression;
+          methodName = expr.name.text;
+        } else if (ts.isElementAccessExpression(expr)) {
+          receiverExpr = expr.expression;
+          const arg = expr.argumentExpression;
+          if (arg && ts.isStringLiteralLike(arg)) {
+            methodName = arg.text;
+          }
+        }
+
+        if (!receiverExpr || !methodName) {
           ts.forEachChild(node, visit);
           return;
         }
 
-        const methodName = expr.name.text;
         if (!allowlist.has(methodName)) {
           ts.forEachChild(node, visit);
           return;
         }
 
-        const receiverType = checker.getTypeAtLocation(expr.expression);
+        const receiverType = checker.getTypeAtLocation(receiverExpr);
         if (isGateApiInstanceType(receiverType, apiClassNames)) {
           used.add(methodName);
         }
@@ -196,38 +212,94 @@ export function defaultGateSdkRoot(projectRoot: string): string {
   return resolve(projectRoot, "node_modules/@fusebase/fusebase-gate-sdk");
 }
 
+async function resolveSdkMetadata(options: AnalyzeGateSdkOperationsOptions): Promise<{
+  sdkRoot: string;
+  opIds: string[];
+  apiClassNames: string[];
+}> {
+  const candidateRoots: string[] = [];
+  if (options.scopeRoot) {
+    candidateRoots.push(defaultGateSdkRoot(options.scopeRoot));
+  }
+  candidateRoots.push(defaultGateSdkRoot(options.projectRoot));
+
+  let lastError: Error | null = null;
+  for (const sdkRoot of candidateRoots) {
+    try {
+      const { opIds, apiClassNames } = await extractAllowlistFromSdk(sdkRoot);
+      return { sdkRoot, opIds, apiClassNames };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+  throw new Error("Could not resolve Gate SDK path.");
+}
+
+function loadScopedTsPrograms(options: AnalyzeGateSdkOperationsOptions): Array<{
+  program: ts.Program;
+  configPath: string;
+}> {
+  if (!options.scopeRoot) {
+    const single = loadTsProgram(options.projectRoot);
+    return single ? [single] : [];
+  }
+
+  const roots = [
+    resolve(options.scopeRoot),
+    resolve(options.scopeRoot, "backend"),
+    resolve(options.projectRoot),
+  ];
+  const programs: Array<{ program: ts.Program; configPath: string }> = [];
+  const seenConfigPaths = new Set<string>();
+
+  for (const root of roots) {
+    const loaded = loadTsProgram(root);
+    if (!loaded) continue;
+    if (seenConfigPaths.has(loaded.configPath)) continue;
+    seenConfigPaths.add(loaded.configPath);
+    programs.push(loaded);
+  }
+
+  return programs;
+}
+
 export async function analyzeGateSdkOperations(
   options: AnalyzeGateSdkOperationsOptions,
 ): Promise<GateOperationsResult> {
-  const sdkRoot = defaultGateSdkRoot(options.projectRoot);
-  const { opIds, apiClassNames } = await extractAllowlistFromSdk(sdkRoot);
+  const { sdkRoot, opIds, apiClassNames } = await resolveSdkMetadata(options);
   const allowlist = new Set(opIds);
   const sdkVersion = await readSdkVersion(sdkRoot);
 
-  // Prefer feature-local tsconfig when a scoped feature root is provided.
-  // This preserves local path aliases and include/exclude settings.
-  const loaded =
-    (options.scopeRoot ? loadTsProgram(options.scopeRoot) : null) ??
-    loadTsProgram(options.projectRoot);
-  if (!loaded) {
+  const loadedPrograms = loadScopedTsPrograms(options);
+  if (loadedPrograms.length === 0) {
     throw new Error(
       "No tsconfig.json under current directory, or tsconfig matched zero source files. Fix tsconfig include.",
     );
   }
 
-  const used = collectUsedOperations(
-    loaded.program,
-    allowlist,
-    new Set(apiClassNames),
-    options.scopeRoot,
-  );
+  const used = new Set<string>();
+  for (const loaded of loadedPrograms) {
+    const part = collectUsedOperations(
+      loaded.program,
+      allowlist,
+      new Set(apiClassNames),
+      options.scopeRoot,
+    );
+    for (const op of part) {
+      used.add(op);
+    }
+  }
 
   return {
     sdkOperationIds: opIds,
     usedOps: [...used].sort(),
     sdkVersion,
     sdkRoot,
-    tsconfig: loaded.configPath,
+    tsconfig: loadedPrograms[0]?.configPath,
   };
 }
 

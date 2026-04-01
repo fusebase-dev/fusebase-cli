@@ -6,6 +6,7 @@ metadata:
 ---
 
 
+
 # Fusebase Gate MCP Skill
 
 This document describes how to use **MCP (Model Context Protocol)** with **Fusebase Gate** during LLM development. Fusebase Gate is a service consumer built on top of the shared Fusebase platform runtime.
@@ -13,6 +14,26 @@ This document describes how to use **MCP (Model Context Protocol)** with **Fuseb
 For rules and checklists, see `AGENTS.md`.
 
 ---
+
+## References
+
+Each reference is in a separate file under `references/`. Load the file when you need that topic.
+
+
+**meta**
+
+- [Authorization and Scopes](references/authz.md)
+- [Bootstrap](references/bootstrap.md)
+- [Fusebase Gate SDK](references/sdk.md)
+- [Tooling](references/tooling.md)
+
+**specialized**
+
+- [Fusebase Gate Membership And Portal Flows](references/membership.md)
+- [Fusebase Gate Users Operations](references/users.md)
+
+---
+
 
 ## References
 
@@ -63,3 +84,21 @@ Before any work with gate MCP, verify that the **fusebase-gate** MCP server is c
 ## Tooling flow
 
 After connection is established: discover operations via `tools_list` / `tools_search`, get schemas via `tools_describe`, execute via `tool_call`. For prompts, use `prompts_search` with appropriate `groups` (e.g. authz, bootstrap, tooling).
+
+---
+
+
+## Gate SDK runtime patterns for reliable permission sync
+
+When runtime code uses `@fusebase/fusebase-gate-sdk`, `fusebase feature update --sync-gate-permissions` relies on static analysis of SDK method calls. Prefer these patterns so operations are detected reliably:
+
+1. Keep direct method calls on API instances:
+   - `const api = createWorkspacesApi(token)`
+   - `await api.listWorkspaces(...)`
+2. Prefer strongly typed API factories (`WorkspacesApi`, `NotesApi`, etc.), avoid `any` return types for Gate API objects.
+3. Avoid dynamic call patterns for Gate operations:
+   - avoid destructuring methods (`const { listWorkspaces } = api`)
+   - avoid computed operation names (`api[opName](...)`) unless the key is a string literal
+4. Keep a pre-publish check in your workflow:
+   - `fusebase analyze gate --operations --json --feature <featureId>`
+   - if runtime imports Gate SDK and `usedOps` is empty, treat it as a blocker and fix before publish.
