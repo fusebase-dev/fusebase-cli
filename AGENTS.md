@@ -103,8 +103,8 @@ Flags enable experimental features across all projects. Managed via `config set-
 |------|--------|
 | `mcp-beta` | Unlocks optional MCP servers in the catalog that are gated behind this flag (`ide-configs/mcp-servers.ts`) |
 | `scaffold` | Enables the `fusebase scaffold` command and its documentation |
-| `git-init` | Makes `fusebase init` automatically offer local Git initialization (equivalent to `--git`) |
-| `git-debug-commits` | Includes `git-debug-commits` skill in generated apps: each verified debug fix should be committed and referenced by SHA in debug report |
+| `git-init` | Makes `fusebase init` automatically offer local Git initialization (equivalent to `--git`) and includes Git workflow skill files in generated apps |
+| `git-debug-commits` | Enables strict traceability rules inside `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag references in debug/deploy reports |
 
 After changing flags, run `fusebase skills update` to regenerate project files (for template flags). For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 

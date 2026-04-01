@@ -473,8 +473,8 @@ Flags gate experimental features. The `skills update` command uses flags to cond
 | Flag | Effect |
 |------|--------|
 | `mcp-beta` | Unlocks optional MCP servers in the integrations catalog that are marked beta (see `ide-configs/mcp-servers.ts`) |
-| `git-init` | Makes `fusebase init` automatically offer local Git initialization (same behavior as passing `--git`) |
-| `git-debug-commits` | Adds the `git-debug-commits` skill to generated apps: during debugging, create a dedicated fix commit and include SHA in debug report |
+| `git-init` | Makes `fusebase init` automatically offer local Git initialization (same behavior as passing `--git`) and includes Git workflow skill files in generated apps |
+| `git-debug-commits` | Enables strict debug/deploy traceability section inside the `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag traceability in debug/deploy reports |
 
 ```bash
 fusebase config set-flag mcp-beta    # Enable beta-gated MCP catalog entries

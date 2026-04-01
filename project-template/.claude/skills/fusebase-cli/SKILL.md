@@ -99,7 +99,7 @@ Options:
 - `--force` - Overwrite existing IDE config files/folders
 - `--git` - After setup, offer to initialize a local Git repository (local only until you add a `git remote` and push)
 - Global flag `git-init` also enables the same post-init Git offer automatically (`fusebase config set-flag git-init`)
-- Global flag `git-debug-commits` enables an additional debug skill in generated apps that requires commit-per-fix workflow and SHA references in debug reports
+- Global flag `git-debug-commits` enables strict debug/deploy traceability section in the `git-workflow` skill (deploy preflight, commit-per-fix, SHA/tag references)
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 

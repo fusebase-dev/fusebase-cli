@@ -424,10 +424,10 @@ For file upload functionality (separate service, not part of dashboard SDK).
 
 **Load when debugging a feature started with `fusebase dev start`** — covers the local per-session logs in the selected feature directory's `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`, and explains which file to inspect for browser errors, proxied API traffic, frontend dev server output, and backend output.
 
-<% if (it.flags?.includes("git-debug-commits")) { %>
-### ✅ git-debug-commits
+<% if (it.flags?.includes("git-init")) { %>
+### ✅ git-workflow
 
-**Load when fixing generated app issues in debug mode** — after each verified fix, create a dedicated Git commit and include its SHA in the debug report so the user can roll back safely.
+**Load for everyday Git usage in generated apps** — commit hygiene, safe rollback guidance, and operation-aware commit boundaries. If `git-debug-commits` flag is enabled, this skill also applies strict debug/deploy traceability rules.
 <% } %>
 
 ### ✅ feature-backend
@@ -575,7 +575,7 @@ You can only claim completion if:
 9. **Never execute SDK from LLM**: LLM may insert SDK code but must NOT execute it
 10. **Never call MCP from runtime**: MCP is development-only, features don't know about MCP
 11. **Never create scripts for MCP**: If MCP tools aren't available, fix the setup - don't work around it
-12. **Always read skills**: `fusebase-dashboards` for MCP/dashboard flow and SDK discovery; `fusebase-gate` when integrating with Gate (orgs, users, platform tokens, and related ecosystem capabilities); `feature-dev-practices` for building features, `dev-debug-logs` for local `fusebase dev start` log analysis, <% if (it.flags?.includes("git-debug-commits")) { %>`git-debug-commits` for fix-by-fix rollback-safe debug commits, <% } %>`feature-backend` for adding backend APIs (REST/WebSockets), `feature-secrets` for registering backend secrets, `file-upload` for file operations. For TypeScript/React implementation quality, load **dev-level skills**: `typescript-pro`, `react-expert`. When `fusebase-dashboards` is in context, `prompts_search` for domain knowledge is optional — the skill content is sufficient
+12. **Always read skills**: `fusebase-dashboards` for MCP/dashboard flow and SDK discovery; `fusebase-gate` when integrating with Gate (orgs, users, platform tokens, and related ecosystem capabilities); `feature-dev-practices` for building features, `dev-debug-logs` for local `fusebase dev start` log analysis, <% if (it.flags?.includes("git-init")) { %>`git-workflow` for Git hygiene/rollback (and strict traceability when `git-debug-commits` is enabled), <% } %>`feature-backend` for adding backend APIs (REST/WebSockets), `feature-secrets` for registering backend secrets, `file-upload` for file operations. For TypeScript/React implementation quality, load **dev-level skills**: `typescript-pro`, `react-expert`. When `fusebase-dashboards` is in context, `prompts_search` for domain knowledge is optional — the skill content is sufficient
 
 ## One-line Reminder
 

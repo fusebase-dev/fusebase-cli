@@ -21,7 +21,7 @@ async function fileExists(path: string): Promise<boolean> {
 
 /** Skills that require a specific flag to be included. */
 const FLAG_GATED_SKILLS: Record<string, string> = {
-  "git-debug-commits": "git-debug-commits",
+  "git-workflow": "git-init",
 };
 
 /**
