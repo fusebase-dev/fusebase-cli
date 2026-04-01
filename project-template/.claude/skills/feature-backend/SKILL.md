@@ -253,6 +253,14 @@ if (!featureToken) {
 }
 ```
 
+### Gate security: fail closed for user-facing routes
+
+When backend routes call Gate on behalf of the current user, keep auth in feature-token context only.
+
+- Do not silently fall back to service-account/service-token auth in user-facing routes.
+- On missing/invalid feature token or Gate auth rejection, return `401/403` and require re-auth/permission sync.
+- Service-token usage is allowed only for explicitly system/admin routes, not as an automatic fallback path.
+
 For WebSockets:
 
 ```typescript

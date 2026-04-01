@@ -6,7 +6,6 @@ metadata:
 ---
 
 
-
 # Fusebase Gate MCP Skill
 
 This document describes how to use **MCP (Model Context Protocol)** with **Fusebase Gate** during LLM development. Fusebase Gate is a service consumer built on top of the shared Fusebase platform runtime.
@@ -39,6 +38,24 @@ Each reference is in a separate file under `references/`. Load the file when you
 
 Each reference is in a separate file under `references/`. Load the file when you need that topic.
 
+**meta**
+
+- [Authorization and Scopes](references/authz.md)
+- [Bootstrap](references/bootstrap.md)
+- [Fusebase Gate SDK](references/sdk.md)
+- [Tooling](references/tooling.md)
+
+**specialized**
+
+- [Fusebase Gate Membership And Portal Flows](references/membership.md)
+- [Fusebase Gate Users Operations](references/users.md)
+
+---
+
+
+## References
+
+Each reference is in a separate file under `references/`. Load the file when you need that topic.
 
 **meta**
 
@@ -102,3 +119,12 @@ When runtime code uses `@fusebase/fusebase-gate-sdk`, `fusebase feature update -
 4. Keep a pre-publish check in your workflow:
    - `fusebase analyze gate --operations --json --feature <featureId>`
    - if runtime imports Gate SDK and `usedOps` is empty, treat it as a blocker and fix before publish.
+
+
+## Security rule: no implicit service-token fallback
+
+For user-facing Gate flows (membership status, current user/org access, workspace visibility), do not silently switch from feature-token auth to service-token auth when Gate returns auth errors.
+
+- Required behavior: fail closed (`401/403`) and surface a clear runtime error.
+- Forbidden behavior: "best-effort" fallback that returns data from owner/service context.
+- If a feature truly needs service-token operations, keep them in explicit system/admin-only endpoints with audit logging and clear auth-source labeling.

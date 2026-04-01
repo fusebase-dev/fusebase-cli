@@ -94,11 +94,13 @@ SDK token usage in feature runtime:
 - LLM must never assume `.env` tokens in UI code
 - Direct SDK / Fusebase proxy calls pass the token via `x-app-feature-token`
 - Calls to the app's own backend (`/api/*`) must assume deployed platform proxies may strip `x-app-feature-token`; backend handlers must read header or fallback to cookie `fbsfeaturetoken`
+- For user-facing Gate flows, auth must stay in user context (feature token). Do not silently fall back to service-account tokens.
 
 **Rules**:
 - LLM must NOT use SDK token during development
 - Browser runtime authenticates direct SDK / Fusebase proxy calls using `x-app-feature-token`
 - App backend auth must be implemented as `header || cookie('fbsfeaturetoken')`
+- User-facing Gate endpoints must fail closed on missing/invalid feature token (`401/403`) instead of using a service-token fallback path
 
 ## LLM Checklist
 
