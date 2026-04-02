@@ -182,11 +182,9 @@ This command **always creates a new feature** on Fusebase servers and configures
 
 - `--access <principals>` - Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`, `visitor,orgRole:guest`)
 - `--permissions <permissions>` - Set dashboard view permissions (format: `dashboardView.dashboardId:viewId.read,write;...`)
-  <% if (it.server) { %>
 - `--backend-dev-command <command>` - Backend dev command (e.g., `npm run dev`). Only if the feature has a `backend/` folder.
 - `--backend-build-command <command>` - Backend build command (e.g., `npm run build`). Only if the feature has a `backend/` folder.
 - `--backend-start-command <command>` - Backend start command for production (e.g., `npm run start`). Only if the feature has a `backend/` folder.
-  <% } %>
 
 **Examples:**
 
@@ -196,11 +194,9 @@ fusebase feature create --name="Dashboard Widget" --subdomain=dashboard-widget -
 
 # Create feature with permissions for specific dashboard views
 fusebase feature create --name="Sales Report" --subdomain=sales-report --path=features/sales-report --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write;dashboardView.dash789:viewABC.read"
-<% if (it.server) { %>
 
 # Create feature with a backend
 fusebase feature create --name="My App" --subdomain=my-app --path=features/my-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --backend-dev-command="npm run dev" --backend-build-command="npm run build" --backend-start-command="npm run start"
-<% } %>
 ```
 
 ### Update Feature Settings
@@ -351,7 +347,29 @@ Available templates:
 **Rules:**
 - Errors if any files in the target directory would be overwritten (no partial writes).
 - The `backend` template can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
-- After scaffolding, run `npm install` inside the new directory.
+
+**After scaffolding, immediately run `npm install`** inside the scaffolded directory (and `backend/` if backend was also scaffolded):
+
+```bash
+npm install  # inside the scaffolded feature dir; also backend/ if scaffolded
+```
+
+Then implement the feature. **After the code is complete**, register and start dev — **execute these automatically, do NOT list them as "next steps" for the user**:
+
+```bash
+# Register the feature (derive name/subdomain from context)
+# add --permissions if dashboard access is needed
+fusebase feature create \
+  --name="<Feature Name>" \
+  --subdomain=<feature-sub> \
+  --path=features/<name> \
+  --dev-command="npm run dev" \
+  --build-command="npm run build" \
+  --output-dir=dist
+
+# Start the dev server
+fusebase dev start features/<name>
+```
 
 <% } %>
 ### Deploy Features
@@ -423,7 +441,11 @@ fusebase remote-logs runtime abc123 --type system
          main.tsx
    ```
 <% } %>
-2. **Run `fusebase feature create`** — include `--permissions` now if the feature needs dashboard access (do not save it for a separate `feature update` step later):
+2. **Implement the feature code** — write all source files, components, and logic.
+
+3. **Register and start dev** — **execute these automatically after the code is written; do NOT list them as "next steps" for the user**:
+
+   a. **Run `fusebase feature create`** — include `--permissions` now if the feature needs dashboard access (do not save it for a separate `feature update` step later):
 
    ```bash
    # Without dashboard access
@@ -431,15 +453,27 @@ fusebase remote-logs runtime abc123 --type system
 
    # With dashboard view permissions (preferred: set at creation)
    fusebase feature create --name="My New Feature" --subdomain=my-new-feature --path=features/my-new-feature --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write"
-   <% if (it.server) { %>
+
    # With a backend
    fusebase feature create --name="My New Feature" --subdomain=my-new-feature --path=features/my-new-feature --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --backend-dev-command="npm run dev" --backend-build-command="npm run build" --backend-start-command="npm run start"
-   <% } %>
    ```
 
    This will create the feature on Fusebase and add it to `fusebase.json`
 
-3. **Run `fusebase dev start`** to test locally
+   b. **Run `fusebase dev start`** to test locally
+
+## Updating an Existing Feature
+
+After changing feature code, run `fusebase feature update <featureId>` if any of these need to be updated:
+
+- `--permissions` — dashboard view access added, removed, or modified
+- `--access` — access principals (visitor / org roles) changed
+- `--sync-gate-permissions` — always include for features using `@fusebase/fusebase-gate-sdk` at runtime
+
+```bash
+# Update permissions and sync Gate permissions
+fusebase feature update <featureId> --permissions="dashboardView.dash1:view1.read,write" --sync-gate-permissions
+```
 
 ## Typical Workflow
 
@@ -447,13 +481,16 @@ fusebase remote-logs runtime abc123 --type system
 2. `fusebase init` - Initialize project
 <% if (it.scaffold) { %>
 3. `fusebase scaffold --template spa --dir features/<name>` - Scaffold feature files, then `npm install` inside the directory
-4. `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` - Register feature; **include `--permissions` at this step** if the feature needs dashboard access
+3a. Implement the feature code
+4. *(after code is written)* `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` - Register feature; **include `--permissions` at this step** if the feature needs dashboard access. **Execute automatically — do NOT list as next steps for the user.**
 <% } else { %>
-3. `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` - Create and configure features; **include `--permissions` at this step** if the feature needs dashboard access
+3. Implement the feature code under `features/<name>/`
+4. *(after code is written)* `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` - Create and configure feature; **include `--permissions` at this step** if the feature needs dashboard access. **Execute automatically — do NOT list as next steps for the user.**
 <% } %>
-4. `fusebase dev start` - Develop and test locally
-5. `fusebase deploy` - Deploy to production
-5a. *(Gate features only)* `fusebase feature update <featureId> --sync-gate-permissions` - Sync Gate SDK operations as feature permissions before treating the feature as fully published6. `fusebase remote-logs build|runtime <featureId>` - Check logs if deployed app has issues (see `remote-logs` skill for more)
+4a. *(after registering)* `fusebase dev start` - Start dev and test locally. **Execute automatically.**
+5. *(if feature settings changed)* `fusebase feature update <featureId> [--permissions="..."] [--sync-gate-permissions]` - Sync updated settings before deploying
+6. `fusebase deploy` - Deploy to production
+7. `fusebase remote-logs build|runtime <featureId>` - Check logs if deployed app has issues (see `remote-logs` skill for more)
 
 ## Troubleshooting
 
@@ -465,9 +502,9 @@ Run `fusebase auth` to set your API credentials.
 
 Ensure the feature is:
 
-- Created in Fusebase UI
+- Registered via `fusebase feature create` (so it exists in Fusebase and `fusebase.json`)
 - Added to `fusebase.json` with correct `id`
-- Has a valid `devUrl` if running locally
+- Has a running dev server (the `dev.command` process is up)
 
 ### Build fails during deploy
 

@@ -83,12 +83,10 @@ export default defineConfig({
 
 PostCSS plugins (`@tailwindcss/postcss`, `autoprefixer`) belong in `postcss.config.js` only.
 
-<% if (it.server) { %>
 ### Backend (Optional)
 
 Features may optionally include a `backend/` subfolder for a backend API (REST + WebSockets). **Do not add a backend unless the feature genuinely needs backend logic** — most features work fine with the Dashboard SDK alone. See skill **feature-backend** for when and how to add one. The backend is served at `/api`.
 
-<% } %>
 ## Authentication
 
 Features run as the main window. The platform sets a `fbsfeaturetoken` cookie automatically.
@@ -156,11 +154,11 @@ From the repo root, `npm run typecheck` runs `tsc` for each feature (see root `p
 After creating a feature, register it via `fusebase feature create` from the project root:
 
 ```bash
-fusebase feature create --name <name> --subdomain <subdomain> --dev-command <command> --build-command <command> --output-dir <dir>
+fusebase feature create --name <name> --subdomain <subdomain> --path <path> --dev-command <command> --build-command <command> --output-dir <dir>
 ```
 
 
-**Run this command yourself** after creating and building the feature — do not ask the user to run it manually.
+**Execute this command automatically** after writing the feature code — do not ask the user to run it manually.
 
 ### Access Principals
 
@@ -181,7 +179,7 @@ fusebase feature update <featureId> --access=visitor,orgRole:member
 
 ### Permissions
 
-Use `--permissions` with `fusebase feature create` or `fusebase feature update` when features interact with dashboards. Use MCP to discover dashboard/view IDs. See skill **fusebase-cli** for permission format and examples.
+Use `--permissions` with `fusebase feature create` when the feature is first registered. Only use `fusebase feature update --permissions` when changing permissions on an already-registered feature. Use MCP to discover dashboard/view IDs. See skill **fusebase-cli** for permission format and examples.
 
 ## Getting Feature URLs
 
@@ -191,7 +189,7 @@ fusebase feature list
 
 Lists all features with their deployed URLs. Use this to get actual URLs — do NOT hardcode or guess them.
 
-**Always use the full URL with domain** (e.g., `https://app.domain.com/feature-name`), never relative paths.
+**Always use the full subdomain URL** (read `FUSEBASE_APP_HOST` from `.env`, e.g. `https://my-feature.{FUSEBASE_APP_HOST}/`), never relative paths. Each feature is served from its own subdomain root — see skill **feature-routing**.
 
 ## Cross-Feature Navigation
 

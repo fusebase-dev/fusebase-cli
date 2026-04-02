@@ -192,7 +192,7 @@ When a feature has a backend, add the `backend` block to its entry in `fusebase.
 }
 ```
 
-`backend.path` is relative to the feature's `path`. `runtime` is `"node"` or `"bun"`.
+Backend commands (`dev`, `build`, `start`) run from the `backend/` subdirectory of the feature path.
 
 ## Deriving the Public Base URL from the Request
 
