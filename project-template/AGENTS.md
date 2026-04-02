@@ -203,7 +203,12 @@ Before making changes, write a plan:
 <% if (it.scaffold) { %>
 ### Step 2.5: Scaffold the Feature (if creating a new feature)
 
-Before writing any feature files, scaffold using `fusebase scaffold --template spa --dir features/<name>`. For features needing a backend, also run `fusebase scaffold --template backend --dir features/<name>`. Never manually create `package.json`, `vite.config.ts`, `tsconfig.json`, `postcss.config.js`, `index.html`, or `globals.css` — scaffold generates the canonical versions.
+Before writing any feature files, scaffold and install:
+
+1. `fusebase scaffold --template spa --dir features/<name>` (+ `--template backend` if backend needed)
+2. `npm install` in the feature directory (+ backend directory if scaffolded)
+
+Never manually create `package.json`, `vite.config.ts`, `tsconfig.json`, `postcss.config.js`, `index.html`, or `globals.css` — scaffold generates the canonical versions. Then proceed to Steps 3–4 to implement the feature. **Register and start dev after the code is written** — see Step 4.5.
 <% } %>
 
 ### Step 3: Execute Changes (MCP-only)
@@ -322,6 +327,19 @@ export function createGateTokensApi(featureToken: string): TokensApi {
   return new TokensApi(client)
 }
 ```
+
+<% if (it.scaffold) { %>
+### Step 4.5: Register the Feature and Start Dev (for new feature after code is complete)
+
+Once feature code is written and ready to run, **execute these automatically — do NOT list them as "next steps" for the user**:
+
+1. **Register**: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`
+2. **Start dev**: `fusebase dev start features/<name>`
+
+The feature must be registered before it can run. Never leave these for the user to execute manually.
+
+**When updating an existing feature**: run `fusebase feature update <featureId>` if needed. See skill **fusebase-cli** for the full update reference.
+<% } %>
 
 ## Explicitly Forbidden
 
@@ -442,8 +460,17 @@ For file upload functionality (separate service, not part of dashboard SDK).
 <% if (it.scaffold) { %>
 ### Scaffolding a New Feature
 
-1. **Scaffold**: `fusebase scaffold --template spa --dir features/<name>` (add `--template backend` for backend)
-2. **Install**: `npm install` in the feature directory
+When creating a new feature, **always scaffold first** — never manually create `package.json`, `vite.config.ts`, `tsconfig.json`, `postcss.config.js`, `index.html`, or `globals.css`.
+
+The full workflow is:
+
+1. **Scaffold**: `fusebase scaffold --template spa --dir features/<name>` (also run with `--template backend` if a backend is needed)
+2. **Install**: `npm install` inside the feature directory (and `npm install` inside `features/<name>/backend` if backend was scaffolded)
+3. **Implement**: write the feature code (Steps 3–4 of the Canonical Workflow)
+4. **Register** *(after code is written)*: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`
+5. **Start dev** *(after registering)*: `fusebase dev start features/<name>`
+
+**Steps 4 and 5 must be executed automatically — do NOT list them as "next steps" for the user.**
 <% } %>
 
 ### Starting Development
