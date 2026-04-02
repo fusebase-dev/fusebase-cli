@@ -12,13 +12,14 @@ This document describes how to use **MCP (Model Context Protocol)** for working 
 
 For rules and checklists, see `AGENTS.md`.
 
+- **For runtime SDK code** that reads or writes dashboard data (`getDashboardViewData`, `batchPutDashboardData`, etc.), **`references/data-patterns.md` is required** — it defines the real response/request shapes; use it together with `sdk_describe` (do not infer `data.rows` vs top-level `data` from memory).
+
 ---
 
 ## References
 
 Each reference is in a separate file under `references/`. Load the file when you need that topic.
 
-**For runtime SDK code** that reads or writes dashboard data (`getDashboardViewData`, `batchPutDashboardData`, etc.), **`references/data-patterns.md` is required** — it defines the real response/request shapes; use it together with `sdk_describe` (do not infer `data.rows` vs top-level `data` from memory).
 
 **meta**
 

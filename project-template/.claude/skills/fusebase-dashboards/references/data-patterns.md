@@ -1,7 +1,7 @@
 ---
 version: "1.10.0"
 mcp_prompt: domain.data
-last_synced: "2026-03-26"
+last_synced: "2026-04-02"
 title: "Dashboard Data"
 category: core
 ---
@@ -137,6 +137,19 @@ Each row in `data` is an object with `root_index_value` and **column values keye
 
 **BEST PRACTICE FOR LARGE BATCHES**: If you need to create many rows (e.g., 10+ rows), it's recommended to first create a single test row to validate the schema, format, and values. Once you confirm the first row is created successfully, you can then create the remaining rows in a single batch request. This helps catch validation errors early and avoids wasting API calls on invalid data. Example workflow: (1) Create one test row with `create_new_row: true`, (2) Verify it succeeds, (3) Create remaining rows in a batch.
 
+**FAST-SAFE SEEDING WORKFLOW**:
+- For demo/mock data seeding across related dashboards, optimize for **one schema read and one main write per dashboard/view**.
+- Fetch schema with `getDashboardView` **once per dashboard/view** and reuse it for the rest of that seeding pass. Do **not** re-read schema before every batch or verification step unless the schema actually changed.
+- Resolve `item_key` values from `schema.items[]` once, cache the name -> key mapping for the current run, and reuse it across all rows for that dashboard.
+- For CREATE-only seeding, avoid `getDashboardViewData` unless you truly need existing row IDs, file context from existing cells, or a post-write verification read.
+- Use a **single probe row only when schema risk is real**: link columns, files, date/date-time, labels, or other complex object/array values. For simple scalar-only tables, go straight to the main batch when the schema is clear.
+- After the probe row succeeds, batch all remaining rows for that dashboard in one request instead of splitting into many small batches.
+- When seeding several related dashboards, finish the full write/verify cycle for one dashboard, then move to the next; avoid repeated back-and-forth rediscovery.
+
+**SEEDING OBSERVABILITY**:
+- For seeding tasks, record a short timing breakdown per dashboard: `schema_ms`, `probe_ms` (if used), `batch_write_ms`, `verify_ms`, `retry_count`, and `rows_written`.
+- If verification needs a fallback path, log which read operation was used so slow runs can be attributed to verification rather than to the write API itself.
+
 **VALUE FORMAT AND VALIDATION**:
 Each `value` in the `values` array must be a valid JSON value: `string`, `number`, `boolean`, `object` (JSON object), `array`, or `null` (to delete). **CRITICAL**: The `value` for each `item_key` MUST be valid according to the `json_schema` for that item in the dashboard schema. The value must match the json_schema type and pass all validation rules, or the request will fail with a validation error.
 
@@ -187,6 +200,7 @@ Each `value` in the `values` array must be a valid JSON value: `string`, `number
   - Cache key: `${dashboardId}:${schema.metadata.version || schemaVersion}`
   - Cache expires at conversation scope only (not persisted across conversations)
 - This reduces redundant API calls when working with the same dashboard multiple times
+- For multi-dashboard seeding, keep a separate cache entry per `dashboardId:viewId` so one seeding pass does not rediscover the same view schema repeatedly
 
 **Using `tools_describe` for Data Operations**:
 - **ALWAYS use `schemaMode: "summary"`** when calling `tools_describe` for `batchPutDashboardData`:
@@ -583,5 +597,5 @@ batchPutDashboardData({
 
 - **Version**: 1.10.0
 - **Category**: core
-- **Last synced**: 2026-03-26
+- **Last synced**: 2026-04-02
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

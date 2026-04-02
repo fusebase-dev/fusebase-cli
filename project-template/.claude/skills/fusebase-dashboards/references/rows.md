@@ -1,7 +1,7 @@
 ---
 version: "1.2.0"
 mcp_prompt: domain.rows
-last_synced: "2026-03-06"
+last_synced: "2026-04-02"
 title: "Dashboard Rows"
 category: specialized
 ---
@@ -29,6 +29,7 @@ Custom dashboards (`rootEntity === 'custom'`) support custom row entries with pe
   - New rows are automatically added to all existing views, sections, and items.
 
 **IMPORTANT**: Use **batchPutDashboardData** with `create_new_row: true` for all row creation (empty or with data). Do not use createDashboardRow for new code.
+- **Row ID verification**: If you only need row UUIDs, `listDashboardRows` is the lightest row-listing operation. For critical live-data verification, prefer a stable read path and avoid depending on paginated row listing unless pagination behavior has already been validated in that environment.
 
 - **Delete rows**: Remove rows from a dashboard (soft delete)
   - Use `deleteDashboardRow` operation
@@ -76,11 +77,15 @@ Row ordering operations support three section types:
 2. (Optional) Update order: `updateDashboardRowOrder({ dashboardId, view_id, section_type, section_key, rowOrders: [...] })`
 3. Delete rows: `deleteDashboardRow({ dashboardId, rowUuid })`
 
+**Verification guidance**:
+- Use `listDashboardRows` when you only need row UUIDs and row existence.
+- Use `getDashboardViewData` when verification needs counts plus actual written values, or when the verification path must be as robust as possible for live/demo data.
+
 ---
 
 ## Version
 
 - **Version**: 1.2.0
 - **Category**: specialized
-- **Last synced**: 2026-03-06
+- **Last synced**: 2026-04-02
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
