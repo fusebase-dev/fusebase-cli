@@ -37,7 +37,7 @@ The CLI is not published to npm. Install globally from this repo:
 **Option 1 – Install from Git:**
 
 ```bash
-npm install -g git+https://github.com/Fusebase/apps-cli.git
+npm install -g git+https://github.com/fusebase-dev/fusebase-cli.git
 ```
 
 npm downloads the package and links the `fusebase` binary. Bun must be installed — it is used at runtime to execute the CLI (not npm/Node).
