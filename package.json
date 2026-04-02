@@ -3,6 +3,16 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "files": [
+    "index.ts",
+    "lib",
+    "dev-server",
+    "feature-templates",
+    "project-template",
+    "ide-configs",
+    "managed-template",
+    "tsconfig.json"
+  ],
   "bin": {
     "fusebase": "./index.ts"
   },
