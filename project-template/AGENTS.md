@@ -203,10 +203,9 @@ Before making changes, write a plan:
 <% if (it.scaffold) { %>
 ### Step 2.5: Scaffold the Feature (if creating a new feature)
 
-Before writing any feature files, scaffold and install:
+Before writing any feature files, scaffold:
 
 1. `fusebase scaffold --template spa --dir features/<name>` (+ `--template backend` if backend needed)
-2. `npm install` in the feature directory (+ backend directory if scaffolded)
 
 Never manually create `package.json`, `vite.config.ts`, `tsconfig.json`, `postcss.config.js`, `index.html`, or `globals.css` — scaffold generates the canonical versions. Then proceed to Steps 3–4 to implement the feature. **Register and start dev after the code is written** — see Step 4.5.
 <% } %>
@@ -465,12 +464,11 @@ When creating a new feature, **always scaffold first** — never manually create
 The full workflow is:
 
 1. **Scaffold**: `fusebase scaffold --template spa --dir features/<name>` (also run with `--template backend` if a backend is needed)
-2. **Install**: `npm install` inside the feature directory (and `npm install` inside `features/<name>/backend` if backend was scaffolded)
-3. **Implement**: write the feature code (Steps 3–4 of the Canonical Workflow)
-4. **Register** *(after code is written)*: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`
-5. **Start dev** *(after registering)*: `fusebase dev start features/<name>`
+2. **Implement**: write the feature code (Steps 3–4 of the Canonical Workflow)
+3. **Register** *(after code is written)*: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`
+4. **Start dev** *(after registering)*: `fusebase dev start features/<name>`
 
-**Steps 4 and 5 must be executed automatically — do NOT list them as "next steps" for the user.**
+**Steps 3 and 4 must be executed automatically — do NOT list them as "next steps" for the user.**
 <% } %>
 
 ### Starting Development

@@ -1,8 +1,6 @@
 ---
 name: fusebase-dashboards
 description: 'How to use MCP for working with Fusebase dashboards during LLM development. Use when: 1. Discovering dashboards, views, schema via MCP; 2. Creating or updating dashboards/views; 3. Reading/writing dashboard data; 4. Working with relations, filters, templates, child tables; 5. Working with managed databases (e.g. meetings, companies, deals) — load prompts_search({ groups: ["managedDatabases"] }) and see references/meetings.md, references/companies.md, references/deals.md.'
-metadata:
-  source: entrypoint
 ---
 
 

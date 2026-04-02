@@ -348,12 +348,6 @@ Available templates:
 - Errors if any files in the target directory would be overwritten (no partial writes).
 - The `backend` template can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
 
-**After scaffolding, immediately run `npm install`** inside the scaffolded directory (and `backend/` if backend was also scaffolded):
-
-```bash
-npm install  # inside the scaffolded feature dir; also backend/ if scaffolded
-```
-
 Then implement the feature. **After the code is complete**, register and start dev — **execute these automatically, do NOT list them as "next steps" for the user**:
 
 ```bash
@@ -428,7 +422,7 @@ fusebase remote-logs runtime abc123 --type system
 ## Creating a New Feature
 
 <% if (it.scaffold) { %>
-1. **Scaffold** the feature: `fusebase scaffold --template spa --dir features/my-new-feature` (add `--template backend` for a backend). Run `npm install` in the new directory afterward.
+1. **Scaffold** the feature: `fusebase scaffold --template spa --dir features/my-new-feature` (add `--template backend` for a backend).
 <% } else { %>
 1. **Create the feature directory** under `features/`:
    ```
@@ -480,7 +474,7 @@ fusebase feature update <featureId> --permissions="dashboardView.dash1:view1.rea
 1. `fusebase auth` - Authenticate (one-time setup)
 2. `fusebase init` - Initialize project
 <% if (it.scaffold) { %>
-3. `fusebase scaffold --template spa --dir features/<name>` - Scaffold feature files, then `npm install` inside the directory
+3. `fusebase scaffold --template spa --dir features/<name>` - Scaffold feature files (dependencies are installed automatically)
 3a. Implement the feature code
 4. *(after code is written)* `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` - Register feature; **include `--permissions` at this step** if the feature needs dashboard access. **Execute automatically — do NOT list as next steps for the user.**
 <% } else { %>

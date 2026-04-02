@@ -1,6 +1,25 @@
 import { Command } from "commander";
-import { resolve } from "path";
+import { resolve, join } from "path";
+import { spawn } from "child_process";
 import { listTemplates, copyTemplate, checkTemplateCollisions } from "../feature-templates";
+
+async function runNpmInstall(cwd: string): Promise<void> {
+  console.log(`   Installing dependencies in ${cwd}...`);
+  return new Promise((resolve, reject) => {
+    const child = spawn("npm install --include=dev", {
+      shell: true,
+      cwd,
+      stdio: "inherit",
+    });
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`npm install failed with exit code ${code} in ${cwd}`));
+      } else {
+        resolve();
+      }
+    });
+  });
+}
 
 export const scaffoldCommand = new Command("scaffold")
   .description("Scaffold a new feature from a template. Without options, lists available templates.")
@@ -57,20 +76,14 @@ export const scaffoldCommand = new Command("scaffold")
     try {
       await copyTemplate(templateId, targetDir);
       console.log(`✓ Scaffolded template '${templateId}' into ${targetDir}`);
-      if (templateId === "backend") {
-        console.log(`
-Next steps:
-  1. Install backend dependencies:
-       cd ${targetDir}/backend && npm install
 
-  2. Add the backend block to this feature's entry in fusebase.json:
-       "backend": {
-         "dev":   { "command": "npm run dev" },
-         "build": { "command": "npm run build" },
-         "start": { "command": "npm run start" }
-       }
-`);
+      // Install dependencies
+      if (templateId === "backend") {
+        await runNpmInstall(join(targetDir, "backend"));
+      } else {
+        await runNpmInstall(targetDir);
       }
+      console.log("✓ Dependencies installed");
     } catch (err: any) {
       console.error(`Error: ${err?.message ?? err}`);
       process.exit(1);
