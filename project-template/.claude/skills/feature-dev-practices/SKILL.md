@@ -93,7 +93,7 @@ Features run as the main window. The platform sets a `fbsfeaturetoken` cookie au
 
 **Startup flow:**
 
-1. Read `fbsfeaturetoken` cookie on app load
+1. Read feature token on app load: check `fbsfeaturetoken` cookie first, fall back to `window.FBS_FEATURE_TOKEN` if the cookie is absent
 2. Render app once token is available (show loading state until then)
 3. Pass token via `x-app-feature-token` for direct SDK / Fusebase proxy calls
 4. For calls to the app's own backend (`/api/*`), rely on the same-origin cookie and make backend handlers read `x-app-feature-token` or fallback to `fbsfeaturetoken`

@@ -96,7 +96,7 @@ DASHBOARDS_MCP_URL=https://dashboards-mcp.{FUSEBASE_HOST}/mcp
 SDK token usage in feature runtime:
 
 **Browser/UI runtime**:
-- Uses feature token from cookie `fbsfeaturetoken`
+- Uses feature token from cookie `fbsfeaturetoken`; if the cookie is absent, fall back to `window.FBS_FEATURE_TOKEN`
 - `.env` is NOT accessible in browser
 - LLM must never assume `.env` tokens in UI code
 - Direct SDK / Fusebase proxy calls pass the token via `x-app-feature-token`
@@ -149,7 +149,7 @@ SDK token usage in feature runtime:
 
 **When to use**: In your feature implementation code (React components, hooks, and Hono/API handlers that call `@fusebase/*` with the feature token).
 
-**Token**: Feature token from cookie `fbsfeaturetoken`; direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
+**Token**: Feature token from cookie `fbsfeaturetoken` (fallback: `window.FBS_FEATURE_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 
 **SDK Structure**:
 - `createClient()` - Single entrypoint
@@ -275,7 +275,7 @@ export function createDatabasesApi(featureToken: string): DatabasesApi {
 
 // Usage in feature code:
 // 1. Get feature token from cookie
-const featureToken = getFeatureToken() // Read from 'fbsfeaturetoken' cookie
+const featureToken = getFeatureToken() // Read from 'fbsfeaturetoken' cookie, fallback to window.FBS_FEATURE_TOKEN
 
 // 2. Create API instance
 const databasesApi = createDatabasesApi(featureToken)

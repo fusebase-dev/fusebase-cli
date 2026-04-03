@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getCookie } from './lib/api'
+import { getFeatureToken } from './lib/api'
 import { AuthExpiredModal } from './components/AuthExpiredModal'
 
 function App() {
@@ -7,7 +7,7 @@ function App() {
   const [authExpired, setAuthExpired] = useState(false)
 
   useEffect(() => {
-    setFeatureToken(getCookie('fbsfeaturetoken'))
+    setFeatureToken(getFeatureToken())
   }, [])
 
   if (!featureToken) {
