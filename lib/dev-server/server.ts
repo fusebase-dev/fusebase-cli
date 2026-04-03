@@ -1,3 +1,4 @@
+import { createServer } from "net";
 import { fetchFeatureToken } from "../api";
 import { handleBrowserDebugRequest, injectBrowserDebugScript } from "./browser-debug";
 import { getConfig, loadFuseConfig } from "../config";
@@ -27,7 +28,18 @@ export interface DevServer {
   close: () => Promise<void>;
 }
 
-export function findAvailablePort(startPort: number): number {
+function isPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.unref();
+    server.on("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+export async function findAvailablePort(startPort: number): Promise<number> {
   let port = startPort;
   let attempts = 0;
   while (attempts < 1000) {
@@ -36,14 +48,11 @@ export function findAvailablePort(startPort: number): number {
       port++;
       continue;
     }
-    try {
-      const testServer = Bun.serve({ port, fetch: () => new Response() });
-      testServer.stop();
+    if (await isPortAvailable(port)) {
       return port;
-    } catch {
-      port++;
-      attempts++;
     }
+    port++;
+    attempts++;
   }
   throw new Error(`Could not find available port starting from ${startPort}`);
 }
@@ -448,7 +457,7 @@ export async function startDevServer(
   devUrlState?: DevUrlState,
   backendPort?: number,
 ): Promise<DevServer> {
-  const actualPort = findAvailablePort(port);
+  const actualPort = await findAvailablePort(port);
   const browserDebugLogPath = logPaths.browserDebugPath;
   const appendAccessLogRecord = createJsonlAppender(
     logPaths.accessLogsPath,
