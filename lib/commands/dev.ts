@@ -140,7 +140,7 @@ async function spawnDevFeatureFrontend(
   console.log(`\n🔧 Starting feature dev server: ${feature.dev.command}`);
   console.log(`   Working directory: ${featureDir}\n`);
 
-  const devServerPort = findAvailablePort(3000);
+  const devServerPort = await findAvailablePort(3000);
 
   // On Windows, explicitly use PowerShell for better compatibility
   const isWindows = process.platform === "win32";
@@ -365,7 +365,7 @@ devCommand
 
     // Allocate a backend port if the feature has a backend
     const backendPort = selectedFeature.backend?.dev?.command
-      ? findAvailablePort(3001)
+      ? await findAvailablePort(3001)
       : undefined;
 
     // Start the backend dev process if configured
