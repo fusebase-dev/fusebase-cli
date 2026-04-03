@@ -142,6 +142,8 @@ async function spawnDevFeatureFrontend(
 
   const devServerPort = await findAvailablePort(3000);
 
+  console.log(`Dev server port: ${devServerPort}`);
+
   // On Windows, explicitly use PowerShell for better compatibility
   const isWindows = process.platform === "win32";
   if (isWindows) {
