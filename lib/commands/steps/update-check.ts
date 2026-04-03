@@ -4,6 +4,7 @@ import { CONFIG_DIR, getUpdateChannel } from "../../config";
 import { fetchManifest, compareVersions, type Manifest } from "../../remote-version";
 import { VERSION } from "../../version";
 import { logger } from "../../logger";
+import chalk from "chalk";
 
 const CACHE_FILE = join(CONFIG_DIR, "update-cache.json");
 const COMMENT_MAX_LINES = 8;
@@ -59,11 +60,17 @@ export function checkForUpdates(): void {
       : cache.manifest.version;
 
     if (compareVersions(latestVersion, VERSION) > 0) {
-      console.log(`New version of fusebase-cli found - ${latestVersion}!`);
-      console.log("Run fusebase update to update.");
+      const border = chalk.yellow("★ ══════════════════════════════════════════════ ★");
+      console.log(border);
+      console.log(chalk.yellow("★") + "  " + chalk.bold.white(`New version of fusebase-cli available: ${latestVersion}!`));
+      console.log(chalk.yellow("★") + "  " + chalk.cyan("Run: ") + chalk.bold.cyan("`fusebase update`") + chalk.cyan(" to update"));
       if (cache.manifest.comment?.trim()) {
-        console.log(formatComment(cache.manifest.comment));
+        const commentLines = formatComment(cache.manifest.comment).split("\n");
+        for (const line of commentLines) {
+          console.log(chalk.yellow("★") + "  " + chalk.gray(line));
+        }
       }
+      console.log(border);
       console.log();
     }
   }
