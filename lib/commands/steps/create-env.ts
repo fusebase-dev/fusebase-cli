@@ -207,8 +207,8 @@ async function generateGateMcpToken(apiKey: string, orgId: string): Promise<stri
       "email.write",
       "notes.read",
       "notes.write",
-      "billing.read",
-      "billing.write"
+      // "billing.read",
+      // "billing.write"
     ],
     // Gate token contract expects a different `resource_scope` shape than the
     // public API; the provided example uses an empty object.
