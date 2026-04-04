@@ -129,7 +129,7 @@ fusebase init --name="My App" --org=org_abc123
 fusebase git
 ```
 
-Runs `git init` in the current directory. This is **local version control only** — nothing is uploaded until you add a remote (e.g. GitHub/GitLab) and `git push`. If Git is missing, the CLI points to the official install page and asks you to run `fusebase git` again afterward.
+Runs `git init` in the current directory. This is **local version control only** — nothing is uploaded until you add a remote (e.g. GitHub/GitLab) and `git push`. The CLI also creates or updates **`.gitignore`** with common ignores (`node_modules/`, `dist/`, `.env` files, logs, caches, OS/IDE noise). If Git is missing, the CLI points to the official install page and asks you to run `fusebase git` again afterward.
 
 Use `fusebase init --git` to be **prompted** whether to initialize Git after app setup.
 

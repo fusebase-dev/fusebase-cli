@@ -1,5 +1,112 @@
 import chalk from "chalk";
 import { spawn } from "child_process";
+import { readFile, writeFile } from "fs/promises";
+import { join } from "path";
+
+/** Non-empty pattern lines; order matters for related rules (e.g. .env variants). */
+const BASELINE_GITIGNORE_PATTERNS: readonly string[] = [
+  "node_modules/",
+  "dist/",
+  "build/",
+  "out/",
+  ".env",
+  ".env.local",
+  ".env.development.local",
+  ".env.test.local",
+  ".env.production.local",
+  "logs/",
+  "*.log",
+  "npm-debug.log*",
+  "yarn-debug.log*",
+  "yarn-error.log*",
+  "pnpm-debug.log*",
+  ".DS_Store",
+  "Thumbs.db",
+  ".idea/",
+  "coverage/",
+  ".cache/",
+  "*.tsbuildinfo",
+  ".eslintcache",
+  "*.tgz",
+];
+
+const BASELINE_GITIGNORE_TEMPLATE = `# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+
+# Coverage & caches
+coverage/
+.cache/
+*.tsbuildinfo
+.eslintcache
+
+# Archives
+*.tgz
+`;
+
+async function ensureBaselineGitignore(cwd: string): Promise<void> {
+  const gitignorePath = join(cwd, ".gitignore");
+  let projectContent = "";
+  try {
+    projectContent = await readFile(gitignorePath, "utf-8");
+  } catch {
+    // no .gitignore
+  }
+
+  const trimmed = projectContent.trim();
+  if (!trimmed) {
+    await writeFile(gitignorePath, BASELINE_GITIGNORE_TEMPLATE, "utf-8");
+    console.log(
+      chalk.green("✓") +
+        " Created .gitignore (node_modules, dist, .env, logs, caches, …).",
+    );
+    return;
+  }
+
+  const missing = BASELINE_GITIGNORE_PATTERNS.filter(
+    (line) => !projectContent.includes(line),
+  );
+  if (missing.length === 0) {
+    return;
+  }
+
+  const suffix =
+    (projectContent.endsWith("\n") ? "" : "\n") +
+    "\n" +
+    missing.join("\n") +
+    "\n";
+  await writeFile(gitignorePath, projectContent.trimEnd() + suffix, "utf-8");
+  console.log(
+    chalk.green("✓") +
+      " Updated .gitignore (added missing baseline ignore patterns).",
+  );
+}
 
 const GIT_DOWNLOAD = "https://git-scm.com/downloads";
 
@@ -137,6 +244,7 @@ export async function runGitInitInDirectory(cwd: string): Promise<{
 
   if (await isInsideGitWorkTree(cwd)) {
     console.log(chalk.green("✓") + " Git repository already present in this tree.");
+    await ensureBaselineGitignore(cwd);
     printGitLocalGuide();
     return { ok: true, reason: "already-repo" };
   }
@@ -148,6 +256,7 @@ export async function runGitInitInDirectory(cwd: string): Promise<{
   }
 
   console.log(chalk.green("✓") + " Local Git repository initialized.");
+  await ensureBaselineGitignore(cwd);
   printGitLocalGuide();
   return { ok: true };
 }
