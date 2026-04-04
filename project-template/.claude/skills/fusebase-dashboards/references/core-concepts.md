@@ -1,7 +1,7 @@
 ---
-version: "1.4.0"
+version: "1.6.0"
 mcp_prompt: domain.overview
-last_synced: "2026-02-27"
+last_synced: "2026-04-04"
 title: "Domain Overview"
 category: core
 ---
@@ -45,6 +45,10 @@ category: core
 - **When creating a database** (createDatabase or getOrCreateDatabase when it creates):
   - If **appId** is available (e.g. from fusebase.json or runtime env), set **alias** to `app_${appId}_{name}` where **name** is a slug derived from the database title or the requested name (lowercase, valid alias chars: letters, numbers, dots, underscores, hyphens). The total alias length must be 5–64 chars. Example: title "My Feedback" with appId "abc123" → alias `app_abc123_my_feedback`.
   - If appId is not available, do NOT include the `alias` field unless the user explicitly requests it; omit it from the create request.
+- **Opening in the Thefusebase UI**: To link the user to this database in the browser, use:
+  `https://{{orgDomain}}/dashboard/{{orgId}}/tables/databases/{{databaseId}}`
+  - **orgDomain**: The organization’s **CNAME** when a custom domain is configured; otherwise **`{orgSubdomain}.{FUSEBASE_HOST}`** (org subdomain on the Fusebase tenant host; `{FUSEBASE_HOST}` is the same placeholder as in `https://app.{FUSEBASE_HOST}/...` and `https://app-api.{FUSEBASE_HOST}/...` in these prompts).
+  - **orgId** and **databaseId**: UUIDs (`global_id`) for the organization and database (same as in MCP tools and SDK).
 
 ### Dashboard
 - Effectively a "table" of rows.
@@ -212,7 +216,7 @@ erDiagram
 
 ## Version
 
-- **Version**: 1.4.0
+- **Version**: 1.6.0
 - **Category**: core
-- **Last synced**: 2026-02-27
+- **Last synced**: 2026-04-04
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
