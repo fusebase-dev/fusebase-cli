@@ -148,7 +148,7 @@ Initialize a **local** Git repository in the current directory (`git init`). Thi
 
 If Git is not installed, the CLI prints a link to the [official Git downloads](https://git-scm.com/downloads) and platform-specific pages, then suggests running `fusebase git` again after installation.
 
-After a successful init (or if the folder is already inside a Git work tree), the CLI prints a short guide: local vs remote, how to add `origin` and push, and a compact branch workflow (`main` / feature branches).
+After a successful init (or if the folder is already inside a Git work tree), the CLI creates or updates a **`.gitignore`** with common Node/TypeScript patterns (`node_modules/`, `dist/`, `.env*`, logs, caches, IDE junk, etc.; patterns apply at any depth). It then prints a short guide: local vs remote, how to add `origin` and push, and a compact branch workflow (`main` / feature branches).
 
 **Options:** None
 

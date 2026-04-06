@@ -1,7 +1,7 @@
 ---
-version: "1.1.0"
+version: "1.3.0"
 mcp_prompt: bootstrap
-last_synced: "2026-02-24"
+last_synced: "2026-04-04"
 title: "Bootstrap"
 category: meta
 ---
@@ -46,6 +46,15 @@ For **createDashboardIntent**, body.**scopes** is required. Use scope from conne
 - Tool availability already reflects your permissions.
   If a tool is not available, you are not allowed to use it.
 
+## Opening a database in the Thefusebase UI
+
+To open a database in the Thefusebase UI in the browser, use this URL pattern:
+
+`https://{{orgDomain}}/dashboard/{{orgId}}/tables/databases/{{databaseId}}`
+
+- **orgDomain**: The organization’s **CNAME** when a custom domain is configured; otherwise **`{orgSubdomain}.{FUSEBASE_HOST}`** (org subdomain on the Fusebase tenant host; `{FUSEBASE_HOST}` is the same placeholder as in `https://app.{FUSEBASE_HOST}/...` and `https://app-api.{FUSEBASE_HOST}/...` in these prompts).
+- **orgId** and **databaseId**: UUIDs (`global_id`) for the organization and database (same as in MCP tools and SDK).
+
 ## Domain knowledge before domain tool calls
 
 You must have the required domain knowledge before any domain tool call. Two options:
@@ -87,7 +96,7 @@ Proceed by loading the connection context first, then discover available tools.
 
 ## Version
 
-- **Version**: 1.1.0
+- **Version**: 1.3.0
 - **Category**: meta
-- **Last synced**: 2026-02-24
+- **Last synced**: 2026-04-04
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

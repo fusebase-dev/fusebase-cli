@@ -66,7 +66,7 @@ bun index.ts [command]
 - `auth [--api-key <apiKey>]` - Start auth flow or set API key for authentication
 - `version` - Print CLI version (from package.json)
 - `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to offer initializing a local Git repo after setup; same behavior can be enabled globally with flag `git-init`)
-- `git` - Initialize a local Git repository in the current directory (offline; add a remote and push to sync with GitHub/GitLab)
+- `git` - Initialize a local Git repository in the current directory (offline; add a remote and push to sync with GitHub/GitLab); also creates or updates `.gitignore` with baseline Node/TypeScript ignores (`node_modules/`, `dist/`, `.env`, etc.)
 - `deploy` - Deploy features to Fusebase (runs lint then build per feature)
 - `feature list` - List all features for the current app with their URLs
 - `feature create` - Create and configure a feature (requires `--name`, `--subdomain`, `--path`, `--dev-command`, `--build-command`, `--output-dir`; optional `--access` for access principals e.g. `visitor`, `orgRole:member`; `--permissions` for manual `dashboardView/database` access)

@@ -58,17 +58,15 @@ The OpenAPI-generated **`@fusebase/dashboard-service-sdk`** wraps HTTP path segm
 - **Correct (SDK):** `{ path: { dashboardId, viewId }, ... }` — plus `body`, `page`, `limit`, or other fields exactly as **`sdk_describe`** shows for that method.
 - **Wrong (SDK):** top-level `{ dashboardId, viewId, ... }` — that shape matches **MCP** `tool_call` **args**, not the TypeScript SDK. Copy-pasting from MCP examples into SDK calls without nesting **`path`** breaks requests (often only noticed after deploy in **`backend/`** if the SPA used hooks that already wrapped `path` correctly).
 
-Use the **same** SDK argument shape in **React code and in `backend/`** (Hono routes, `public.ts`, shared clients). Do not assume “backend can flatten” the object.
+Use the **same** SDK argument shape in **React code and in `backend/`** (Hono routes, `public.ts`, shared clients). Do not assume "backend can flatten" the object.
 
 **Canonical detail and examples:** `.claude/skills/fusebase-dashboards/references/data-patterns.md` (Common Patterns, envelopes) and **`references/sdk.md`** (initialization and `getDashboardViewData` example with `path`).
 
 ## MCP Connection Check (REQUIRED - MUST BE FIRST STEP)
 
-**CRITICAL**: MCP connection verification is **MANDATORY** before ANY work begins. This is not optional.
+**CRITICAL — before ANY task:** verify MCP tools (`tools_list`, `tools_search`, `tools_describe`, `tool_call`) are visible in your tool list and `tools_list()` returns a non-empty list. If unavailable: **STOP**, inform the user, do **NOT** create scripts or workarounds, and follow troubleshooting in skill **fusebase-dashboards** (for Gate MCP, see **fusebase-gate**).
 
-**Before starting ANY task:** verify that MCP tools (e.g. `tools_list`, `tools_search`, `tools_describe`, `tool_call`) are visible in your tool list and that `tools_list()` returns a non-empty list. If MCP is unavailable: **STOP**, inform the user, and **do NOT** create scripts or workarounds.
-
-**Where to find:** Verification steps and troubleshooting protocol: skill **fusebase-dashboards** (dashboard MCP). For **Fusebase Gate** MCP (orgs, users, platform tokens — see skill **fusebase-gate**), verify the gate server per that skill. Config: `.env` (`DASHBOARDS_MCP_TOKEN`, `DASHBOARDS_MCP_URL`); MCP config: `.cursor/mcp.json`, `.vscode/mcp.json`, `.mcp.json`, `.codex/config.toml` (Codex); run `fusebase init` to set up; other IDEs see `mcp/`.
+Config: `.env` (`DASHBOARDS_MCP_TOKEN`, `DASHBOARDS_MCP_URL`); MCP config: `.cursor/mcp.json`, `.vscode/mcp.json`, `.mcp.json`, `.codex/config.toml`; run `fusebase init` to set up; other IDEs see `mcp/`.
 
 ## Fusebase hosts
 
@@ -118,39 +116,23 @@ SDK token usage in feature runtime:
 
 **Before starting ANY work, verify (in this exact order):**
 
-- [ ] **MCP tools are visible in my available tools list** - **MANDATORY FIRST CHECK**
-- [ ] **MCP connection verified** (`tools_list()` or equivalent returns tools) - **REQUIRED BEFORE PROCEEDING**
+- [ ] **MCP connection verified** — see [MCP Connection Check](#mcp-connection-check-required--must-be-first-step); `tools_list()` returns a non-empty list. If unavailable: **STOP**, do NOT create scripts or workarounds.
 - [ ] **Loaded `fusebase-dashboards` skill** — read skill `fusebase-dashboards` **before any dashboard operations.** Do NOT skip; the skill contains prompts_search groups, validation rules, and intent schemas. **When this skill is in context, you do not need to call prompts_search for domain knowledge — the skill content is sufficient.**
-- [ ] **Loaded `fusebase-gate` skill when relevant** — if the task involves **Fusebase Gate** (organization users, membership, platform tokens, Gate health/bootstrap, or other Gate/platform APIs), read skill `fusebase-gate` **before** discovery or `tool_call` on the gate MCP. It explains how to work with the broader Fusebase ecosystem (orgs, user lists, email and automation flows, and related platform capabilities **as exposed via Gate**).
-- [ ] **MCP dashboards: describe before use** — before using an MCP tool or adding SDK code for an operation, call `tools_describe` (or `sdk_describe` for SDK) to know input/output format; do not guess schemas.
-- [ ] **Dashboard SDK data code** — read `fusebase-dashboards/references/data-patterns.md` **and** call `sdk_describe` for the method (e.g. `schemaMode: "output"`) before parsing responses; do not assume nested fields like `data.rows` without checking.
-- [ ] **Dashboard data SDK `path` params** — for `getDashboardViewData` / `batchPutDashboardData` / similar, use `{ path: { dashboardId, viewId } }` in **both** SPA and **`backend/`**; do not pass flat `{ dashboardId, viewId }` copied from MCP `tool_call` args ([Dashboard data SDK: path parameters](#dashboard-data-sdk-path-parameters-spa-and-backend)).
-- [ ] If MCP unavailable: **STOPPED and informed user** (did NOT create scripts/workarounds); use **fusebase-dashboards** skill for troubleshooting
-- [ ] `.env` has `DASHBOARDS_MCP_TOKEN` and `DASHBOARDS_MCP_URL`
-- [ ] I will use MCP for ALL backend operations during development
-- [ ] I will NOT create any scripts, helper files, or workarounds for MCP access
-- [ ] I will insert SDK code into feature files
-- [ ] Runtime code will use SDK / direct Fusebase API calls with feature token via `x-app-feature-token`
-- [ ] App backend handlers will read feature token from `x-app-feature-token` or cookie `fbsfeaturetoken`
+- [ ] **Loaded `fusebase-gate` skill when relevant** — if the task involves **Fusebase Gate** (organization users, membership, platform tokens, Gate health/bootstrap, or other Gate/platform APIs), read skill `fusebase-gate` **before** discovery or `tool_call` on the gate MCP.
+- [ ] **Describe before use** — before using an MCP tool or adding SDK code for an operation, call `tools_describe` (or `sdk_describe` for SDK) to know input/output format; do not guess schemas.
+- [ ] **Dashboard SDK data code** — read `fusebase-dashboards/references/data-patterns.md` **and** call `sdk_describe` for the method before parsing responses; do not assume nested fields like `data.rows` without checking.
+- [ ] **Dashboard data SDK `path` params** — for `getDashboardViewData` / `batchPutDashboardData` / similar, use `{ path: { dashboardId, viewId } }` in **both** SPA and **`backend/`**; do not pass flat `{ dashboardId, viewId }` copied from MCP `tool_call` args.
 - [ ] **Scaffolded feature** (if creating a new feature): Ran `fusebase scaffold --template spa` before writing feature files
 
 ## Mental Model: MCP + SDK Architecture
 
 ### MCP (Model Context Protocol) = Development Tool for LLMs
 
-**Purpose**: All backend operations during development and planning.
-
-**When to use**: During LLM development work (planning, building, testing backend structure).
-
 **Token**: `DASHBOARDS_MCP_TOKEN` from `.env`
 
 **What MCP provides:** tools for discovery and execution (e.g. `tools_list`, `tools_search`, `tools_describe`, `tool_call`), bootstrap/context, prompts loading, and domain operations. **MCP is used for ALL backend operations during LLM development work.** For the exact flow (bootstrap → domain knowledge → discovery → tool_call) and schemas, see the **fusebase-dashboards** skill. **When that skill is in context, prompts_search for domain knowledge is optional — the skill content is sufficient.**
 
 ### SDK = Runtime Execution (browser and optional feature backend)
-
-**Purpose**: Actual data operations in feature runtime code (browser/UI and, when present, the feature’s **`backend/`** server).
-
-**When to use**: In your feature implementation code (React components, hooks, and Hono/API handlers that call `@fusebase/*` with the feature token).
 
 **Token**: Feature token from cookie `fbsfeaturetoken` (fallback: `window.FBS_FEATURE_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 
@@ -166,38 +148,19 @@ SDK token usage in feature runtime:
 
 ### 1 MCP Tool ↔ 1 SDK Method
 
-Every MCP tool has a corresponding SDK method:
+Every MCP tool has a corresponding SDK method with the same `operationId` and request/response schemas. MCP for LLM discovery/execution during development → SDK for runtime execution in feature code.
 
-- Same `operationId`
-- Same request/response schemas
-- MCP for LLM discovery/execution during development → SDK for runtime execution in feature code
-
-**Discovery**: LLM uses MCP tools (`tools_search`, `tools_describe`) to find operations, then uses SDK discovery (`sdk_search`, `sdk_describe`) to find corresponding SDK methods for feature code. See the `fusebase-dashboards` skill for MCP flow and SDK discovery.
-
-### Describe before use (MCP dashboards)
-
-When working with MCP dashboards, **always** run a **describe** operation before using a tool or before adding SDK code for that operation — so you know the exact **input and output format**.
-
-- **Before calling an MCP tool**: call **`tools_describe`** with the operation name (from `tools_list`/`tools_search`) to get `inputSchema` and, if needed, `outputSchema`. For data operations (e.g. `batchPutDashboardData`) use `schemaMode: "summary"` when appropriate. See the **fusebase-dashboards** skill (Part II — Tooling flow, operation discovery).
-- **Before inserting SDK code** for a method: use **`sdk_describe`** to get the corresponding SDK method's argument and response shape; then generate feature code from that schema.
-- **Before parsing SDK responses for dashboard data** (`getDashboardViewData`, `batchPutDashboardData`, etc.): read **`fusebase-dashboards/references/data-patterns.md`** — it is the canonical description of envelopes, rows, and `meta`; pair it with **`sdk_describe`** so parsing matches production behavior.
-
-Do not guess argument or response shapes — always discover them via describe **and** the data-patterns reference for data operations. Details: skill **fusebase-dashboards** (references: `data-patterns.md`, tooling, SDK discovery).
+**Discovery**: LLM uses MCP tools (`tools_search`, `tools_describe`) to find operations, then uses SDK discovery (`sdk_search`, `sdk_describe`) to find corresponding SDK methods for feature code. Always **describe before use** — run `tools_describe` before calling an MCP tool, `sdk_describe` before inserting SDK code, and read **`fusebase-dashboards/references/data-patterns.md`** before parsing dashboard data responses. See the `fusebase-dashboards` skill for MCP flow and SDK discovery.
 
 ## Canonical Workflow
 
 ### Step 0: Pre-flight Check (MANDATORY - DO NOT SKIP)
 
-Verify MCP tools are available and `tools_list()` returns a non-empty list; confirm `.env` has `DASHBOARDS_MCP_TOKEN` and `DASHBOARDS_MCP_URL`. If MCP is unavailable: **STOP**, inform the user, do not create workarounds. See **fusebase-dashboards** skill for verification steps and troubleshooting.
+Complete the [LLM Checklist](#llm-checklist) above before proceeding with any work.
 
 ### Step 0.5: Load Required Skills (MANDATORY - DO NOT SKIP)
 
-**Load the `fusebase-dashboards` skill before any discovery or `tool_call` operations** on the **dashboard** MCP. This skill contains the exact `prompts_search` groups per task, validation rules, and intent schemas — without it you will call APIs by trial-and-error. **When this skill is in context, you do not need to call prompts_search for domain knowledge; the skill content is sufficient.**
-
-**If the task uses Fusebase Gate** (org users, membership, Gate tokens, or other Gate/platform flows), **also load `fusebase-gate`** before gate MCP or Gate SDK work — it covers MCP vs SDK, bootstrap, authz, users operations, and how to navigate the platform ecosystem beyond dashboards.
-
-- **How (dashboards):** Read skill `fusebase-dashboards`. For SDK method discovery when writing feature code, see `fusebase-dashboards/references/sdk.md`.
-- **How (gate):** Read skill `fusebase-gate` and its `references/*.md` (e.g. `references/users.md`, `references/authz.md`, `references/sdk.md`) as needed.
+Load skills as described in [Required Skills](#required-skills) before discovery or `tool_call` operations.
 
 ### Step 1: Discovery (MCP-only)
 
@@ -265,24 +228,15 @@ import {
 const BASE_URL =
   "https://app-api.{FUSEBASE_HOST}/v4/api/proxy/dashboard-service/v1";
 
-/**
- * Create SDK client with feature token for browser runtime
- */
 export function createSdkClient(featureToken: string) {
   return createClient({
     baseUrl: BASE_URL,
-    defaultHeaders: {
-      "x-app-feature-token": featureToken,
-    },
+    defaultHeaders: { "x-app-feature-token": featureToken },
   });
 }
 
-/**
- * Create DatabasesApi instance with feature token
- */
 export function createDatabasesApi(featureToken: string): DatabasesApi {
-  const client = createSdkClient(featureToken);
-  return new DatabasesApi(client);
+  return new DatabasesApi(createSdkClient(featureToken));
 }
 
 // Usage in feature code:
@@ -302,7 +256,6 @@ const response = await databasesApi.listDatabases({});
 // Same-origin requests automatically include the fbsfeaturetoken cookie.
 // In deployed mode, do not rely on x-app-feature-token surviving the platform proxy.
 const res = await fetch("/api/items");
-const data = await res.json();
 ```
 
 Backend handlers must read the feature token from header first and cookie second:
@@ -330,32 +283,19 @@ import {
 const GATE_BASE_URL =
   "https://app-api.{FUSEBASE_HOST}/v4/api/proxy/gate-service/v1";
 
-/**
- * Create Gate SDK client with feature token for browser runtime
- */
 export function createGateSdkClient(featureToken: string) {
   return createClient({
     baseUrl: GATE_BASE_URL,
-    defaultHeaders: {
-      "x-app-feature-token": featureToken,
-    },
+    defaultHeaders: { "x-app-feature-token": featureToken },
   });
 }
 
-/**
- * Create OrgUsersApi instance with feature token
- */
 export function createOrgUsersApi(featureToken: string): OrgUsersApi {
-  const client = createGateSdkClient(featureToken);
-  return new OrgUsersApi(client);
+  return new OrgUsersApi(createGateSdkClient(featureToken));
 }
 
-/**
- * Create TokensApi instance with feature token
- */
 export function createGateTokensApi(featureToken: string): TokensApi {
-  const client = createGateSdkClient(featureToken);
-  return new TokensApi(client);
+  return new TokensApi(createGateSdkClient(featureToken));
 }
 ```
 
@@ -390,32 +330,11 @@ The feature must be registered before it can run. Never leave these for the user
 
 ### ❌ Creating Scripts or Workarounds for MCP Access
 
-**ABSOLUTELY FORBIDDEN**: Creating any scripts, helper files, or workarounds to access MCP functionality.
+**ABSOLUTELY FORBIDDEN** — see [Golden Rule](#golden-rule) for the full list of prohibited actions.
 
-**DO NOT**:
+**How MCP MUST be called**: only through the LLM's built-in MCP tool mechanism (`tool_call` with `opId` + `args`). Never via raw HTTP, `curl`, custom shell scripts, or custom bridges.
 
-- Create Node.js scripts to call MCP tools
-- Create bash / shell scripts to call MCP tools (including via `curl`)
-- Generate `curl` commands to hit MCP HTTP endpoints directly
-- Write helper functions that "wrap" MCP calls
-- Create temporary files to "work around" missing MCP
-- Use `scripts/mcp-stdio-bridge.cjs` directly (it's for IDE integration only)
-- Attempt to manually call MCP HTTP endpoints
-- Create any code that tries to "emulate" or "proxy" MCP tools
-
-**How MCP MUST be called**:
-
-- Only through the LLM's built‑in MCP tool mechanism (`tool_call` with `opId` + `args`)
-- Never via raw HTTP, `curl`, custom shell scripts, or custom bridges
-
-**If MCP tools are not available:**
-
-- **STOP** and inform the user
-- **DO NOT** create workarounds
-- Follow the troubleshooting protocol (check config, suggest restart, verify .env)
-- Wait for MCP to be properly configured before proceeding
-
-**MCP tools must be directly available in your tool list. If they're not, the setup is incorrect - fix the setup, don't work around it.**
+**If MCP tools are not available**: **STOP**, inform the user, follow the troubleshooting protocol (check config, suggest restart, verify .env), and wait for MCP to be properly configured. Do not work around it.
 
 ### ❌ Hardcoding IDs
 
@@ -537,7 +456,7 @@ Key commands:
 
 Lint: run `npm run lint` from project root (or from a feature directory). The project template includes ESLint (TypeScript/JavaScript plus `@eslint/json` for `*.json`). Invalid JSON — including a raw line break inside a quoted string — is reported as a parse error. Deploy runs lint automatically before build for each feature that has a `lint` script.
 
-Typecheck: run `npm run typecheck` from project root. It runs TypeScript (`tsc`) for each feature that has a `typecheck` script, a `tsconfig.json`, or `tsconfig.app.json` — the same class of errors as `tsc` inside `fusebase deploy`’s build (e.g. `tsc -b && vite build`), without running Vite. ESLint does not replace this.
+Typecheck: run `npm run typecheck` from project root. It runs TypeScript (`tsc`) for each feature that has a `typecheck` script, a `tsconfig.json`, or `tsconfig.app.json` — the same class of errors as `tsc` inside `fusebase deploy`'s build (e.g. `tsc -b && vite build`), without running Vite. ESLint does not replace this.
 
 ### Publish Rule: `deploy` does not publish permissions
 
@@ -569,7 +488,7 @@ Recommended publish sequence:
 
 ### MCP fails / `tools_list()` fails / MCP tools not visible
 
-**STOP IMMEDIATELY**. **DO NOT** create scripts or workarounds. Inform the user and follow the verification/troubleshooting protocol in the **fusebase-dashboards** skill. For config (`.env`, `.cursor/mcp.json`, `fusebase init`, `mcp/`), see that skill and the [MCP Connection Check](#mcp-connection-check-required--must-be-first-step) section above.
+**STOP IMMEDIATELY**. **DO NOT** create scripts or workarounds. Inform the user and follow the verification/troubleshooting protocol in the **fusebase-dashboards** skill. For config (`.env`, `.cursor/mcp.json`, `fusebase init`, `mcp/`), see that skill and the [LLM Checklist](#llm-checklist) above.
 
 ### "I don't know which ID / column key to use"
 
@@ -617,28 +536,13 @@ You can only claim completion if:
 - ✅ MCP read/write operations succeed (for dev tasks)
 - ✅ You produced a clean handoff package for runtime (IDs + schema mapping)
 - ✅ No SDK was used during development work
-- ✅ **Secrets registered** (if backend uses `process.env`): Every `process.env.KEY` in `backend/` code has a matching `fusebase secret create --secret "KEY:description"` call. No `backend/.env` file, no `dotenv` dependency. If unsure, run the **secrets-checker** agent.
+- ✅ **Secrets registered** (if backend uses `process.env`): Every `process.env.KEY` in `backend/` code has a matching `fusebase secret create --secret "KEY:description"` call. No `backend/.env` file, no `dotenv` dependency.
 - ✅ **Lint passes**: Before you say "Done", you **must** run `npm run lint` (from project root or from the feature directory you changed). Fix any reported errors; address warnings where practical. If you leave any errors or important warnings unfixed, list them explicitly for the user. (Deploy runs lint before build—code that fails lint will fail `fusebase deploy`.)
-- ✅ **Typecheck passes**: Before you say "Done", run `npm run typecheck` from project root when the app has features with TypeScript (or rely on the same check via `fusebase deploy`’s build). Deploy’s build often runs `tsc` before Vite; type errors fail there even if lint passed. **Claude Code users**: Stop hooks in `.claude/settings.json` run lint and then typecheck when you finish; if either fails, you are blocked from stopping and given the output to fix.
+- ✅ **Typecheck passes**: Before you say "Done", run `npm run typecheck` from project root when the app has features with TypeScript (or rely on the same check via `fusebase deploy`'s build). Deploy's build often runs `tsc` before Vite; type errors fail there even if lint passed. **Claude Code users**: Stop hooks in `.claude/settings.json` run lint and then typecheck when you finish; if either fails, you are blocked from stopping and given the output to fix.
 - ✅ **Permissions were published, not just code**: If the feature uses Dashboard SDK or Gate SDK at runtime, verify that `feature update` was run with the necessary flags before considering publish complete.
 - ✅ **Gate features require `--sync-gate-permissions`**: If runtime code uses `@fusebase/fusebase-gate-sdk`, run `fusebase feature update <featureId> --sync-gate-permissions` before calling the feature published.
 - ✅ **`Permissions: none` is a blocker for runtime-integrated features**: If CLI output shows `Permissions: none`, do not present the feature as fully published unless it intentionally requires no runtime permissions.
 - ✅ **Gate analysis sanity check**: Run `fusebase analyze gate --operations --json --feature <featureId>` and verify `usedOps` is non-empty for Gate-integrated runtime code. Empty `usedOps` with active Gate SDK usage is a release blocker.
-
-## Summary
-
-1. **MCP = LLM Development**: Use MCP tools for ALL backend operations during development (discovery, read/write/create/update)
-2. **SDK = Runtime Execution**: Use SDK methods ONLY in feature runtime code (UI/browser and optional **`backend/`**). Direct SDK / Fusebase proxy calls use `x-app-feature-token`; app backend handlers must read `x-app-feature-token` or cookie `fbsfeaturetoken`. Dashboard data methods use **`path: { dashboardId, viewId }`** — not a flat object copied from MCP ([Dashboard data SDK: path parameters](#dashboard-data-sdk-path-parameters-spa-and-backend))
-3. **MCP Verification is MANDATORY**: Always check MCP tools are available BEFORE starting any work. If unavailable, STOP and troubleshoot - never create workarounds.
-4. **Discovery Flow**: LLM uses MCP tools (`tools_search`/`tools_describe`) to discover operations, then uses SDK discovery (`sdk_search`/`sdk_describe`) to find corresponding SDK methods for feature code
-5. **Describe before use (MCP dashboards)**: Before using an MCP tool or inserting SDK code for an operation, always run `tools_describe` or `sdk_describe` to know the input/output format; never guess schemas. For dashboard **data** SDK methods, also read **`fusebase-dashboards/references/data-patterns.md`** before parsing responses.
-6. **Code Insertion**: LLM inserts SDK code into feature files but does NOT execute it. Feature executes SDK at runtime.
-7. **Token Separation**: `DASHBOARDS_MCP_TOKEN` for MCP (development), feature token for SDK (runtime)
-8. **Never hardcode IDs**: Always discover via MCP first
-9. **Never execute SDK from LLM**: LLM may insert SDK code but must NOT execute it
-10. **Never call MCP from runtime**: MCP is development-only, features don't know about MCP
-11. **Never create scripts for MCP**: If MCP tools aren't available, fix the setup - don't work around it
-12. **Always read skills**: `fusebase-dashboards` for MCP/dashboard flow and SDK discovery; `fusebase-gate` when integrating with Gate (orgs, users, platform tokens, and related ecosystem capabilities); `feature-dev-practices` for building features, `dev-debug-logs` for local `fusebase dev start` log analysis, <% if (it.flags?.includes("git-init")) { %>`git-workflow` for Git hygiene/rollback (and strict traceability when `git-debug-commits` is enabled), <% } %>`feature-backend` for adding backend APIs (REST/WebSockets), `feature-secrets` for registering backend secrets, `file-upload` for file operations. For TypeScript/React implementation quality, load **dev-level skills**: `typescript-pro`, `react-expert`. When `fusebase-dashboards` is in context, `prompts_search` for domain knowledge is optional — the skill content is sufficient
 
 ## One-line Reminder
 

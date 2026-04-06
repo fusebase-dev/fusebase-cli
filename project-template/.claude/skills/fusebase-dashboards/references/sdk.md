@@ -1,7 +1,7 @@
 ---
-version: "1.5.0"
+version: "1.7.0"
 mcp_prompt: sdk
-last_synced: "2026-03-26"
+last_synced: "2026-04-04"
 title: "SDK Discovery"
 category: meta
 ---
@@ -23,6 +23,7 @@ category: meta
 - [SDK response format](#sdk-response-format)
 - [SDK initialization (runtime code)](#sdk-initialization-runtime-code)
 - [Package](#package)
+- [Opening a database in the Thefusebase UI](#opening-a-database-in-the-thefusebase-ui)
 - [Summary](#summary)
 
 ---
@@ -139,6 +140,17 @@ export function createDataApi(featureToken: string): DashboardDataApi {
 
 ---
 
+## Opening a database in the Thefusebase UI
+
+To open a database in the Thefusebase UI in the browser, use this URL pattern:
+
+`https://{{orgDomain}}/dashboard/{{orgId}}/tables/databases/{{databaseId}}`
+
+- **orgDomain**: The organization’s **CNAME** when a custom domain is configured; otherwise **`{orgSubdomain}.{FUSEBASE_HOST}`** (org subdomain on the Fusebase tenant host; `{FUSEBASE_HOST}` is the same placeholder as in `https://app.{FUSEBASE_HOST}/...` and `https://app-api.{FUSEBASE_HOST}/...` in these prompts).
+- **orgId** and **databaseId**: UUIDs (`global_id`) for the organization and database (same as in MCP tools and SDK).
+
+---
+
 ## Summary
 
 - **SDK = feature runtime only**: used in browser/UI code when the feature is running; never executed by the LLM.
@@ -149,7 +161,7 @@ export function createDataApi(featureToken: string): DashboardDataApi {
 
 ## Version
 
-- **Version**: 1.5.0
+- **Version**: 1.7.0
 - **Category**: meta
-- **Last synced**: 2026-03-26
+- **Last synced**: 2026-04-04
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
