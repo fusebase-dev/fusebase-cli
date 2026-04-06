@@ -5,11 +5,9 @@ description: "Practical guide for building Fusebase Apps features. Use when: (1)
 
 # Feature Dev Practices
 
-<% if (it.scaffold) { %>
 ## Always Scaffold First
 
 Run `fusebase scaffold --template spa --dir features/<name>` before writing any feature files. This generates the canonical React + Vite + Tailwind v4 + shadcn/ui project structure. For features needing a backend, also run `fusebase scaffold --template backend --dir features/<name>`. Customize from there — never recreate boilerplate by hand.
-<% } %>
 
 ## Multi-User by Default
 

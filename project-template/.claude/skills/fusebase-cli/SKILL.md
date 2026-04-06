@@ -324,7 +324,6 @@ fusebase secret create --feature abc123 \
 
 After creating the secrets, the CLI prints `https://{org-domain}/dashboard/{orgId}/apps/features/{featureId}/secrets` — open that URL to fill in the actual secret values.
 
-<% if (it.scaffold) { %>
 ### Scaffold a Feature
 
 Scaffold a new feature from a built-in template.
@@ -365,7 +364,6 @@ fusebase feature create \
 fusebase dev start features/<name>
 ```
 
-<% } %>
 ### Deploy Features
 
 ```bash
@@ -421,20 +419,7 @@ fusebase remote-logs runtime abc123 --type system
 
 ## Creating a New Feature
 
-<% if (it.scaffold) { %>
 1. **Scaffold** the feature: `fusebase scaffold --template spa --dir features/my-new-feature` (add `--template backend` for a backend).
-<% } else { %>
-1. **Create the feature directory** under `features/`:
-   ```
-   features/
-     my-new-feature/
-       package.json
-       vite.config.ts
-       src/
-         App.tsx
-         main.tsx
-   ```
-<% } %>
 2. **Implement the feature code** — write all source files, components, and logic.
 
 3. **Register and start dev** — **execute these automatically after the code is written; do NOT list them as "next steps" for the user**:
@@ -473,14 +458,9 @@ fusebase feature update <featureId> --permissions="dashboardView.dash1:view1.rea
 
 1. `fusebase auth` - Authenticate (one-time setup)
 2. `fusebase init` - Initialize project
-<% if (it.scaffold) { %>
 3. `fusebase scaffold --template spa --dir features/<name>` - Scaffold feature files (dependencies are installed automatically)
 3a. Implement the feature code
 4. *(after code is written)* `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` - Register feature; **include `--permissions` at this step** if the feature needs dashboard access. **Execute automatically — do NOT list as next steps for the user.**
-<% } else { %>
-3. Implement the feature code under `features/<name>/`
-4. *(after code is written)* `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` - Create and configure feature; **include `--permissions` at this step** if the feature needs dashboard access. **Execute automatically — do NOT list as next steps for the user.**
-<% } %>
 4a. *(after registering)* `fusebase dev start` - Start dev and test locally. **Execute automatically.**
 5. *(if feature settings changed)* `fusebase feature update <featureId> [--permissions="..."] [--sync-gate-permissions]` - Sync updated settings before deploying
 6. `fusebase deploy` - Deploy to production

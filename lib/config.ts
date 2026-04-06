@@ -25,10 +25,18 @@ export interface BackendStartConfig {
   command: string;
 }
 
+export interface BackendJobConfig {
+  name: string;
+  type: "cron";
+  cron: string;
+  command: string;
+}
+
 export interface BackendConfig {
   dev?: DevConfig;
   build?: BuildConfig;
   start?: BackendStartConfig;
+  jobs?: BackendJobConfig[];
 }
 
 export interface FeatureConfig {
@@ -102,7 +110,7 @@ export function getUpdateChannel(): "prod" | "dev" {
 /** Known experimental flags. */
 export const KNOWN_FLAGS = [
   "mcp-beta",
-  "scaffold",
+  "cron",
   "git-init",
   "git-debug-commits",
 ] as const;

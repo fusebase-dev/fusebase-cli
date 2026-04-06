@@ -885,6 +885,7 @@ export async function createDeploy(
   appId: string,
   appFeatureId: string,
   versionId: string,
+  jobs?: Array<{ name: string; type: "cron"; cron: string; command: string }>,
 ): Promise<Deploy> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions/${versionId}/deploy`;
@@ -894,6 +895,7 @@ export async function createDeploy(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
+    body: JSON.stringify({ jobs: jobs ?? [] }),
   });
 
   if (!response.ok) {

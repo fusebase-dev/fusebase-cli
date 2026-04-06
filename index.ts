@@ -16,6 +16,7 @@ import { integrationsCommand } from "./lib/commands/integrations";
 import { analyzeCommand } from "./lib/commands/analyze";
 import { scaffoldCommand } from "./lib/commands/scaffold";
 import { gitCommand } from "./lib/commands/git";
+import { jobCommand } from "./lib/commands/job";
 import { checkForUpdates } from "./lib/commands/steps/update-check";
 import { VERSION } from "./lib/version";
 import { registerErrorReporter } from "./lib/error-reporter";
@@ -51,8 +52,9 @@ program.addCommand(integrationsCommand);
 program.addCommand(secretCommand);
 program.addCommand(tokenCommand);
 program.addCommand(remoteLogsCommand);
-if (hasFlag("scaffold")) {
-  program.addCommand(scaffoldCommand);
+program.addCommand(scaffoldCommand);
+if (hasFlag("cron")) {
+  program.addCommand(jobCommand);
 }
 program.addCommand(analyzeCommand, { hidden: true });
 

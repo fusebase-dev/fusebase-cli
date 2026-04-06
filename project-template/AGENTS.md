@@ -7,6 +7,7 @@ This file is the **definitive guide** for AI agents and LLMs working with Fuseba
 ## Golden Rule
 
 **During development (LLM work): use MCP ONLY.**
+
 - ✅ read/write data
 - ✅ create/update databases/dashboards/views/columns
 - ✅ upload files if exposed as MCP tool
@@ -16,6 +17,7 @@ This file is the **definitive guide** for AI agents and LLMs working with Fuseba
 - ❌ **If MCP tools are not available, STOP and follow MCP troubleshooting steps - do NOT create workarounds**
 
 **Inside the app (runtime code — UI and optional feature `backend/`): use SDK ONLY.**
+
 - ✅ UI and feature backend read/write via SDK methods with the feature token — for `DashboardDataApi`, use **`path: { dashboardId, viewId }`** ([details](#dashboard-data-sdk-path-parameters-spa-and-backend))
 - ✅ SDK initialized with feature token
 - ❌ runtime code must not call MCP
@@ -33,10 +35,10 @@ All skills are located in `.claude/skills/`. When this document references a ski
 
 ## Two Concepts (SDK, MCP)
 
-| Concept | Where used | Purpose |
-|--------|------------|---------|
-| **SDK** | Runtime code **inside the generated app** (browser/UI and optional feature **`backend/`**) | Feature reads/writes data via SDK; LLM does **not** use SDK. |
-| **MCP** | **In the LLM** during development | LLM uses MCP tools to discover, create, update backend. Configure MCP in your IDE (project-level or globally per IDE instructions in `mcp/`). |
+| Concept | Where used                                                                                 | Purpose                                                                                                                                       |
+| ------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SDK** | Runtime code **inside the generated app** (browser/UI and optional feature **`backend/`**) | Feature reads/writes data via SDK; LLM does **not** use SDK.                                                                                  |
+| **MCP** | **In the LLM** during development                                                          | LLM uses MCP tools to discover, create, update backend. Configure MCP in your IDE (project-level or globally per IDE instructions in `mcp/`). |
 
 **Summary**: SDK = runtime, in app, not in LLM. MCP = in LLM, during development. Configure MCP in the IDE; for IDEs without project-level MCP, use the setup instructions in `mcp/`.
 
@@ -80,6 +82,7 @@ Read from the project **`.env`** when you need the host for links or docs:
 ### MCP Token (Development)
 
 MCP token comes from `.env`:
+
 ```bash
 DASHBOARDS_MCP_TOKEN=...
 DASHBOARDS_MCP_URL=https://dashboards-mcp.{FUSEBASE_HOST}/mcp
@@ -96,6 +99,7 @@ DASHBOARDS_MCP_URL=https://dashboards-mcp.{FUSEBASE_HOST}/mcp
 SDK token usage in feature runtime:
 
 **Browser/UI runtime**:
+
 - Uses feature token from cookie `fbsfeaturetoken`; if the cookie is absent, fall back to `window.FBS_FEATURE_TOKEN`
 - `.env` is NOT accessible in browser
 - LLM must never assume `.env` tokens in UI code
@@ -104,6 +108,7 @@ SDK token usage in feature runtime:
 - For user-facing Gate flows, auth must stay in user context (feature token). Do not silently fall back to service-account tokens.
 
 **Rules**:
+
 - LLM must NOT use SDK token during development
 - Browser runtime authenticates direct SDK / Fusebase proxy calls using `x-app-feature-token`
 - App backend auth must be implemented as `header || cookie('fbsfeaturetoken')`
@@ -127,9 +132,7 @@ SDK token usage in feature runtime:
 - [ ] I will insert SDK code into feature files
 - [ ] Runtime code will use SDK / direct Fusebase API calls with feature token via `x-app-feature-token`
 - [ ] App backend handlers will read feature token from `x-app-feature-token` or cookie `fbsfeaturetoken`
-<% if (it.scaffold) { %>
 - [ ] **Scaffolded feature** (if creating a new feature): Ran `fusebase scaffold --template spa` before writing feature files
-<% } %>
 
 ## Mental Model: MCP + SDK Architecture
 
@@ -152,6 +155,7 @@ SDK token usage in feature runtime:
 **Token**: Feature token from cookie `fbsfeaturetoken` (fallback: `window.FBS_FEATURE_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 
 **SDK Structure**:
+
 - `createClient()` - Single entrypoint
 - Dashboard API classes: `DashboardsApi`, `DatabasesApi`, `DashboardDataApi`, `CustomDashboardRowsApi`, `TemplatesApi`, `TokensApi`
 - Dashboard Base URL: `https://app-api.{FUSEBASE_HOST}/v4/api/proxy/dashboard-service/v1` (dev) or production URL
@@ -163,6 +167,7 @@ SDK token usage in feature runtime:
 ### 1 MCP Tool ↔ 1 SDK Method
 
 Every MCP tool has a corresponding SDK method:
+
 - Same `operationId`
 - Same request/response schemas
 - MCP for LLM discovery/execution during development → SDK for runtime execution in feature code
@@ -205,6 +210,7 @@ Verify MCP tools are available and `tools_list()` returns a non-empty list; conf
 ### Step 2: Plan (MCP-only)
 
 Before making changes, write a plan:
+
 - Tools you will call (by name)
 - Entities you will create/update
 - Data shape expectations
@@ -212,7 +218,6 @@ Before making changes, write a plan:
 
 **Plan must avoid**: SDK usage, manual REST calls, assumptions about schema.
 
-<% if (it.scaffold) { %>
 ### Step 2.5: Scaffold the Feature (if creating a new feature)
 
 Before writing any feature files, scaffold:
@@ -220,7 +225,6 @@ Before writing any feature files, scaffold:
 1. `fusebase scaffold --template spa --dir features/<name>` (+ `--template backend` if backend needed)
 
 Never manually create `package.json`, `vite.config.ts`, `tsconfig.json`, `postcss.config.js`, `index.html`, or `globals.css` — scaffold generates the canonical versions. Then proceed to Steps 3–4 to implement the feature. **Register and start dev after the code is written** — see Step 4.5.
-<% } %>
 
 ### Step 3: Execute Changes (MCP-only)
 
@@ -233,6 +237,7 @@ Never manually create `package.json`, `vite.config.ts`, `tsconfig.json`, `postcs
 When development is complete, provide:
 
 **Output artifacts**:
+
 - Discovered IDs (dashboardId/viewId/etc.)
 - Column keys and types (schema snapshot)
 - Mapping table: "Column Name → Column Key → Type"
@@ -243,15 +248,22 @@ When development is complete, provide:
 **Important**: LLM inserts SDK code into feature files but does NOT execute it. Feature code executes SDK methods at runtime.
 
 **Discovery**: Use MCP tools to discover SDK methods (see `fusebase-dashboards` skill and its `references/sdk.md`):
+
 1. Find MCP tool via `tools_search`/`tools_describe`
 2. Find corresponding SDK method via `sdk_search`/`sdk_describe`
 3. Insert SDK code into feature file using discovered schema
 
 **Browser/UI runtime usage** (using feature token):
-```typescript
-import { createClient, CustomDashboardRowsApi, DatabasesApi } from "@fusebase/dashboard-service-sdk";
 
-const BASE_URL = 'https://app-api.{FUSEBASE_HOST}/v4/api/proxy/dashboard-service/v1'
+```typescript
+import {
+  createClient,
+  CustomDashboardRowsApi,
+  DatabasesApi,
+} from "@fusebase/dashboard-service-sdk";
+
+const BASE_URL =
+  "https://app-api.{FUSEBASE_HOST}/v4/api/proxy/dashboard-service/v1";
 
 /**
  * Create SDK client with feature token for browser runtime
@@ -260,55 +272,63 @@ export function createSdkClient(featureToken: string) {
   return createClient({
     baseUrl: BASE_URL,
     defaultHeaders: {
-      'x-app-feature-token': featureToken,
+      "x-app-feature-token": featureToken,
     },
-  })
+  });
 }
 
 /**
  * Create DatabasesApi instance with feature token
  */
 export function createDatabasesApi(featureToken: string): DatabasesApi {
-  const client = createSdkClient(featureToken)
-  return new DatabasesApi(client)
+  const client = createSdkClient(featureToken);
+  return new DatabasesApi(client);
 }
 
 // Usage in feature code:
 // 1. Get feature token from cookie
-const featureToken = getFeatureToken() // Read from 'fbsfeaturetoken' cookie, fallback to window.FBS_FEATURE_TOKEN
+const featureToken = getFeatureToken(); // Read from 'fbsfeaturetoken' cookie, fallback to window.FBS_FEATURE_TOKEN
 
 // 2. Create API instance
-const databasesApi = createDatabasesApi(featureToken)
+const databasesApi = createDatabasesApi(featureToken);
 
 // 3. Use API
-const response = await databasesApi.listDatabases({})
+const response = await databasesApi.listDatabases({});
 ```
 
 **Custom app backend usage** (`/api/*`):
+
 ```typescript
 // Same-origin requests automatically include the fbsfeaturetoken cookie.
 // In deployed mode, do not rely on x-app-feature-token surviving the platform proxy.
-const res = await fetch('/api/items')
-const data = await res.json()
+const res = await fetch("/api/items");
+const data = await res.json();
 ```
 
 Backend handlers must read the feature token from header first and cookie second:
+
 ```typescript
-import { getCookie } from 'hono/cookie'
+import { getCookie } from "hono/cookie";
 
 const featureToken =
-  c.req.header('x-app-feature-token') || getCookie(c, 'fbsfeaturetoken')
+  c.req.header("x-app-feature-token") || getCookie(c, "fbsfeaturetoken");
 
 if (!featureToken) {
-  return c.json({ error: 'Missing feature token' }, 401)
+  return c.json({ error: "Missing feature token" }, 401);
 }
 ```
 
 **Browser/UI runtime usage for Fusebase Gate** (using feature token):
-```typescript
-import { createClient, OrgUsersApi, TokensApi } from "@fusebase/fusebase-gate-sdk";
 
-const GATE_BASE_URL = 'https://app-api.{FUSEBASE_HOST}/v4/api/proxy/gate-service/v1'
+```typescript
+import {
+  createClient,
+  OrgUsersApi,
+  TokensApi,
+} from "@fusebase/fusebase-gate-sdk";
+
+const GATE_BASE_URL =
+  "https://app-api.{FUSEBASE_HOST}/v4/api/proxy/gate-service/v1";
 
 /**
  * Create Gate SDK client with feature token for browser runtime
@@ -317,29 +337,28 @@ export function createGateSdkClient(featureToken: string) {
   return createClient({
     baseUrl: GATE_BASE_URL,
     defaultHeaders: {
-      'x-app-feature-token': featureToken,
+      "x-app-feature-token": featureToken,
     },
-  })
+  });
 }
 
 /**
  * Create OrgUsersApi instance with feature token
  */
 export function createOrgUsersApi(featureToken: string): OrgUsersApi {
-  const client = createGateSdkClient(featureToken)
-  return new OrgUsersApi(client)
+  const client = createGateSdkClient(featureToken);
+  return new OrgUsersApi(client);
 }
 
 /**
  * Create TokensApi instance with feature token
  */
 export function createGateTokensApi(featureToken: string): TokensApi {
-  const client = createGateSdkClient(featureToken)
-  return new TokensApi(client)
+  const client = createGateSdkClient(featureToken);
+  return new TokensApi(client);
 }
 ```
 
-<% if (it.scaffold) { %>
 ### Step 4.5: Register the Feature and Start Dev (for new feature after code is complete)
 
 Once feature code is written and ready to run, **execute these automatically — do NOT list them as "next steps" for the user**:
@@ -350,13 +369,13 @@ Once feature code is written and ready to run, **execute these automatically —
 The feature must be registered before it can run. Never leave these for the user to execute manually.
 
 **When updating an existing feature**: run `fusebase feature update <featureId>` if needed. See skill **fusebase-cli** for the full update reference.
-<% } %>
 
 ## Explicitly Forbidden
 
 ### ❌ Manual HTTP Requests
 
 **DO NOT** make manual HTTP requests to Fusebase APIs:
+
 - Don't guess endpoints
 - Don't construct URLs manually
 - Use MCP tools during development, SDK methods in runtime
@@ -364,6 +383,7 @@ The feature must be registered before it can run. Never leave these for the user
 ### ❌ Calling MCP from Runtime
 
 **DO NOT** call MCP tools from feature runtime code:
+
 - MCP is for LLM development only
 - Use SDK methods in runtime
 - MCP tools are not available in browser/runtime environment
@@ -373,6 +393,7 @@ The feature must be registered before it can run. Never leave these for the user
 **ABSOLUTELY FORBIDDEN**: Creating any scripts, helper files, or workarounds to access MCP functionality.
 
 **DO NOT**:
+
 - Create Node.js scripts to call MCP tools
 - Create bash / shell scripts to call MCP tools (including via `curl`)
 - Generate `curl` commands to hit MCP HTTP endpoints directly
@@ -383,10 +404,12 @@ The feature must be registered before it can run. Never leave these for the user
 - Create any code that tries to "emulate" or "proxy" MCP tools
 
 **How MCP MUST be called**:
+
 - Only through the LLM's built‑in MCP tool mechanism (`tool_call` with `opId` + `args`)
 - Never via raw HTTP, `curl`, custom shell scripts, or custom bridges
 
 **If MCP tools are not available:**
+
 - **STOP** and inform the user
 - **DO NOT** create workarounds
 - Follow the troubleshooting protocol (check config, suggest restart, verify .env)
@@ -397,6 +420,7 @@ The feature must be registered before it can run. Never leave these for the user
 ### ❌ Hardcoding IDs
 
 **DO NOT** hardcode database/dashboard/view IDs:
+
 - Always discover IDs via MCP first
 - IDs may change between environments
 - Use MCP discovery tools to find IDs dynamically
@@ -410,6 +434,7 @@ Dashboard skills are **not optional**. You **MUST** read the skill file **before
 **MUST be loaded** — read skill `fusebase-dashboards` **before any dashboard operations.** Do NOT skip this step; it contains the exact `prompts_search` groups for each operation type, validation rules, and intent schemas. Without it you will rely on trial-and-error and risk failed `tool_call`s. **When this skill is in context, you do not need to call prompts_search for domain knowledge — the skill content is sufficient.**
 
 Covers:
+
 - Mandatory check: fusebase-dashboards MCP connection (suggest user check connected servers if missing)
 - Bootstrap and connection context (resource or bootstrap + whoami, defaults)
 - Tooling flow: have domain knowledge (skill in context or load prompts) → tools_search/tools_list → tools_describe → tool_call
@@ -443,6 +468,7 @@ For file upload functionality (separate service, not part of dashboard SDK).
 **Load when debugging a feature started with `fusebase dev start`** — covers the local per-session logs in the selected feature directory's `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`, and explains which file to inspect for browser errors, proxied API traffic, frontend dev server output, and backend output.
 
 <% if (it.flags?.includes("git-init")) { %>
+
 ### ✅ git-workflow
 
 **Load for everyday Git usage in generated apps** — commit hygiene, safe rollback guidance, and operation-aware commit boundaries. If `git-debug-commits` flag is enabled, this skill also applies strict debug/deploy traceability rules.
@@ -468,7 +494,6 @@ For file upload functionality (separate service, not part of dashboard SDK).
 
 ## Development Workflow
 
-<% if (it.scaffold) { %>
 ### Scaffolding a New Feature
 
 When creating a new feature, **always scaffold first** — never manually create `package.json`, `vite.config.ts`, `tsconfig.json`, `postcss.config.js`, `index.html`, or `globals.css`.
@@ -477,11 +502,10 @@ The full workflow is:
 
 1. **Scaffold**: `fusebase scaffold --template spa --dir features/<name>` (also run with `--template backend` if a backend is needed)
 2. **Implement**: write the feature code (Steps 3–4 of the Canonical Workflow)
-3. **Register** *(after code is written)*: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`
-4. **Start dev** *(after registering)*: `fusebase dev start features/<name>`
+3. **Register** _(after code is written)_: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`
+4. **Start dev** _(after registering)_: `fusebase dev start features/<name>`
 
 **Steps 3 and 4 must be executed automatically — do NOT list them as "next steps" for the user.**
-<% } %>
 
 ### Starting Development
 
@@ -502,6 +526,7 @@ See `fusebase-cli` skill for complete CLI documentation.
 The `fusebase` CLI is installed globally. **Always run it as `fusebase <command>` — never use `npx fusebase`.**
 
 Key commands:
+
 - `fusebase init` - Initialize new project (`--git` offers local Git init; global flag `git-init` enables the same behavior automatically)
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `fusebase feature create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]` - Register feature (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the feature needs dashboard access — do not defer to a separate `feature update` step.
@@ -549,6 +574,7 @@ Recommended publish sequence:
 ### "I don't know which ID / column key to use"
 
 **STOP**. Use MCP discovery:
+
 - `getAllDatabases` → `getDashboards` → `getDashboard` / `describeDashboard` (views in response) → `getDashboardView` for a single view
 
 ### Data saves but list/UI stays empty (silent parse bug)
@@ -587,17 +613,17 @@ Load skill **dev-debug-logs** and inspect the latest session under the selected 
 
 You can only claim completion if:
 
-* ✅ MCP discovery shows the expected structure exists
-* ✅ MCP read/write operations succeed (for dev tasks)
-* ✅ You produced a clean handoff package for runtime (IDs + schema mapping)
-* ✅ No SDK was used during development work
-* ✅ **Secrets registered** (if backend uses `process.env`): Every `process.env.KEY` in `backend/` code has a matching `fusebase secret create --secret "KEY:description"` call. No `backend/.env` file, no `dotenv` dependency. If unsure, run the **secrets-checker** agent.
-* ✅ **Lint passes**: Before you say "Done", you **must** run `npm run lint` (from project root or from the feature directory you changed). Fix any reported errors; address warnings where practical. If you leave any errors or important warnings unfixed, list them explicitly for the user. (Deploy runs lint before build—code that fails lint will fail `fusebase deploy`.)
-* ✅ **Typecheck passes**: Before you say "Done", run `npm run typecheck` from project root when the app has features with TypeScript (or rely on the same check via `fusebase deploy`’s build). Deploy’s build often runs `tsc` before Vite; type errors fail there even if lint passed. **Claude Code users**: Stop hooks in `.claude/settings.json` run lint and then typecheck when you finish; if either fails, you are blocked from stopping and given the output to fix.
-* ✅ **Permissions were published, not just code**: If the feature uses Dashboard SDK or Gate SDK at runtime, verify that `feature update` was run with the necessary flags before considering publish complete.
-* ✅ **Gate features require `--sync-gate-permissions`**: If runtime code uses `@fusebase/fusebase-gate-sdk`, run `fusebase feature update <featureId> --sync-gate-permissions` before calling the feature published.
-* ✅ **`Permissions: none` is a blocker for runtime-integrated features**: If CLI output shows `Permissions: none`, do not present the feature as fully published unless it intentionally requires no runtime permissions.
-* ✅ **Gate analysis sanity check**: Run `fusebase analyze gate --operations --json --feature <featureId>` and verify `usedOps` is non-empty for Gate-integrated runtime code. Empty `usedOps` with active Gate SDK usage is a release blocker.
+- ✅ MCP discovery shows the expected structure exists
+- ✅ MCP read/write operations succeed (for dev tasks)
+- ✅ You produced a clean handoff package for runtime (IDs + schema mapping)
+- ✅ No SDK was used during development work
+- ✅ **Secrets registered** (if backend uses `process.env`): Every `process.env.KEY` in `backend/` code has a matching `fusebase secret create --secret "KEY:description"` call. No `backend/.env` file, no `dotenv` dependency. If unsure, run the **secrets-checker** agent.
+- ✅ **Lint passes**: Before you say "Done", you **must** run `npm run lint` (from project root or from the feature directory you changed). Fix any reported errors; address warnings where practical. If you leave any errors or important warnings unfixed, list them explicitly for the user. (Deploy runs lint before build—code that fails lint will fail `fusebase deploy`.)
+- ✅ **Typecheck passes**: Before you say "Done", run `npm run typecheck` from project root when the app has features with TypeScript (or rely on the same check via `fusebase deploy`’s build). Deploy’s build often runs `tsc` before Vite; type errors fail there even if lint passed. **Claude Code users**: Stop hooks in `.claude/settings.json` run lint and then typecheck when you finish; if either fails, you are blocked from stopping and given the output to fix.
+- ✅ **Permissions were published, not just code**: If the feature uses Dashboard SDK or Gate SDK at runtime, verify that `feature update` was run with the necessary flags before considering publish complete.
+- ✅ **Gate features require `--sync-gate-permissions`**: If runtime code uses `@fusebase/fusebase-gate-sdk`, run `fusebase feature update <featureId> --sync-gate-permissions` before calling the feature published.
+- ✅ **`Permissions: none` is a blocker for runtime-integrated features**: If CLI output shows `Permissions: none`, do not present the feature as fully published unless it intentionally requires no runtime permissions.
+- ✅ **Gate analysis sanity check**: Run `fusebase analyze gate --operations --json --feature <featureId>` and verify `usedOps` is non-empty for Gate-integrated runtime code. Empty `usedOps` with active Gate SDK usage is a release blocker.
 
 ## Summary
 

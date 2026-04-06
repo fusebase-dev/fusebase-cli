@@ -11,20 +11,20 @@ description: "Guide for adding a backend layer (REST API + WebSockets) to Fuseba
 
 **Per-user vs. shared state:**
 
-| Storage | Scope | Use for |
-|---------|-------|---------|
-| httpOnly cookies | Per-user (per browser) | OAuth tokens, user preferences, session data |
-| Dashboard rows (keyed by user ID) | Per-user (persistent) | User settings, saved state |
-| Fusebase secrets / env vars | Shared (all users) | API keys, service-account credentials |
-| In-memory variables | Shared (all users, lost on restart) | Short-lived caches only |
+| Storage                           | Scope                               | Use for                                      |
+| --------------------------------- | ----------------------------------- | -------------------------------------------- |
+| httpOnly cookies                  | Per-user (per browser)              | OAuth tokens, user preferences, session data |
+| Dashboard rows (keyed by user ID) | Per-user (persistent)               | User settings, saved state                   |
+| Fusebase secrets / env vars       | Shared (all users)                  | API keys, service-account credentials        |
+| In-memory variables               | Shared (all users, lost on restart) | Short-lived caches only                      |
 
 **Common mistakes:**
+
 - ❌ Storing a user's OAuth token in an env var or in-memory config → all users share one token
 - ❌ Storing a user's preference in a module-level variable → last user's preference wins for everyone
 - ❌ Using env vars for per-user settings or selections → same value for everyone
 - ✅ Store per-user data in cookies or dashboard rows keyed by user
 - ✅ Use env vars only for credentials/config shared across all users (e.g. OAuth client ID/secret)
-
 
 ## When to Add a Backend
 
@@ -33,8 +33,8 @@ A backend is **optional**. Most features work fine with the Dashboard SDK alone 
 - Custom business logic (aggregations, validations, workflows)
 - Real-time push via WebSockets
 - Server-side API composition or proxying
-- Background processing or scheduled tasks
-- Operations that cannot run in the browser (secrets, heavy computation)
+- Operations that cannot run in the browser (secrets, heavy computation)<% if (it.cron) { %>
+- Background processing or scheduled tasks<% } %>
 
 **Do NOT add a backend** just for CRUD on dashboard data — use the Dashboard SDK directly from the SPA.
 
@@ -111,50 +111,53 @@ Use **Hono** for the backend. It is TypeScript-first, lightweight, and has built
 ### backend/src/index.ts (minimal)
 
 ```typescript
-import { Hono } from 'hono'
-import { serve } from '@hono/node-server'
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
 
-const app = new Hono().basePath('/api')
+const app = new Hono().basePath("/api");
 
-app.get('/health', (c) => c.json({ ok: true }))
+app.get("/health", (c) => c.json({ ok: true }));
 
 // Add routes:
 // import { itemsRoutes } from './routes/items'
 // app.route('/items', itemsRoutes)
 
-const port = Number(process.env.BACKEND_PORT) || 3001
+const port = Number(process.env.BACKEND_PORT) || 3001;
 
 serve({ fetch: app.fetch, port }, () => {
-  console.log(`Server running on port ${port}`)
-})
+  console.log(`Server running on port ${port}`);
+});
 
-export default app
+export default app;
 ```
 
 ### Adding WebSockets
 
 ```typescript
-import { Hono } from 'hono'
-import { serve } from '@hono/node-server'
-import { createNodeWebSocket } from '@hono/node-ws'
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { createNodeWebSocket } from "@hono/node-ws";
 
-const app = new Hono().basePath('/api')
+const app = new Hono().basePath("/api");
 
-const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app })
+const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
-app.get('/ws', upgradeWebSocket((c) => ({
-  onMessage(event, ws) {
-    // handle incoming message
-    ws.send(JSON.stringify({ echo: event.data }))
-  },
-  onClose() {
-    console.log('Client disconnected')
-  },
-})))
+app.get(
+  "/ws",
+  upgradeWebSocket((c) => ({
+    onMessage(event, ws) {
+      // handle incoming message
+      ws.send(JSON.stringify({ echo: event.data }));
+    },
+    onClose() {
+      console.log("Client disconnected");
+    },
+  })),
+);
 
-const port = Number(process.env.BACKEND_PORT) || 3001
-const server = serve({ fetch: app.fetch, port })
-injectWebSocket(server)
+const port = Number(process.env.BACKEND_PORT) || 3001;
+const server = serve({ fetch: app.fetch, port });
+injectWebSocket(server);
 ```
 
 ## Routing: `/api` is Reserved for the Backend
@@ -203,32 +206,32 @@ Instead, derive the public base URL from the incoming request headers:
 ```typescript
 /** Derive the public base URL from the incoming request. */
 function getBaseUrl(req: Request): string {
-  const url = new URL(req.url)
-  const forwardedProto = req.headers.get('x-forwarded-proto')
+  const url = new URL(req.url);
+  const forwardedProto = req.headers.get("x-forwarded-proto");
   const forwardedHost =
-    req.headers.get('x-forwarded-host') ?? req.headers.get('host')
+    req.headers.get("x-forwarded-host") ?? req.headers.get("host");
   if (forwardedHost) {
-    const proto = forwardedProto ?? url.protocol.replace(':', '')
-    return `${proto}://${forwardedHost}`
+    const proto = forwardedProto ?? url.protocol.replace(":", "");
+    return `${proto}://${forwardedHost}`;
   }
-  return url.origin
+  return url.origin;
 }
 ```
 
 Usage example (OAuth redirect URI):
 
 ```typescript
-app.get('/auth/url', (c) => {
-  const baseUrl = getBaseUrl(c.req.raw)
-  const redirectUri = `${baseUrl}/api/auth/callback`
+app.get("/auth/url", (c) => {
+  const baseUrl = getBaseUrl(c.req.raw);
+  const redirectUri = `${baseUrl}/api/auth/callback`;
   // Use redirectUri when building the OAuth authorization URL
-})
+});
 ```
 
 This works in both environments:
+
 - **Local dev**: resolves to `http://localhost:<port>` (via Fusebase dev server proxy forwarding host)
 - **Deployed**: resolves to `https://<subdomain>.{FUSEBASE_APP_HOST}` (platform sets `x-forwarded-host` / `x-forwarded-proto`)
-
 
 ## Calling the Backend from the SPA
 
@@ -236,20 +239,20 @@ Use standard `fetch` with relative URLs. Same-origin requests automatically incl
 
 ```typescript
 // In SPA code
-const res = await fetch('/api/items')
-const data = await res.json()
+const res = await fetch("/api/items");
+const data = await res.json();
 ```
 
 If you still send `x-app-feature-token` from the SPA, treat it as a best-effort dev/proxy optimization only. Backend handlers must always support both sources:
 
 ```typescript
-import { getCookie } from 'hono/cookie'
+import { getCookie } from "hono/cookie";
 
 const featureToken =
-  c.req.header('x-app-feature-token') || getCookie(c, 'fbsfeaturetoken')
+  c.req.header("x-app-feature-token") || getCookie(c, "fbsfeaturetoken");
 
 if (!featureToken) {
-  return c.json({ error: 'Missing feature token' }, 401)
+  return c.json({ error: "Missing feature token" }, 401);
 }
 ```
 
@@ -264,19 +267,19 @@ When backend routes call Gate on behalf of the current user, keep auth in featur
 For WebSockets:
 
 ```typescript
-const ws = new WebSocket(`wss://${window.location.host}/api/ws`)
+const ws = new WebSocket(`wss://${window.location.host}/api/ws`);
 ws.onmessage = (event) => {
-  const msg: WsMessage = JSON.parse(event.data)
+  const msg: WsMessage = JSON.parse(event.data);
   // handle message
-}
+};
 ```
-
 
 ## Stateless Backend — No Filesystem Writes, No In-Memory Persistence
 
 **The deployed backend is stateless.** The filesystem is ephemeral and in-memory state is lost on restart/redeployment. Do not rely on either for persistent data.
 
 **NEVER:**
+
 - Write to `.env`, JSON, or any local file to persist runtime state
 - Use `fs.writeFileSync` / `fs.writeFile` for data that must survive restarts
 - Store tokens, credentials, or user data on the local filesystem
@@ -284,6 +287,7 @@ ws.onmessage = (event) => {
 - Store persistent state only in backend memory (lost on restart)
 
 **Instead, use:**
+
 - **httpOnly cookies** — for per-user credentials obtained at runtime (e.g. OAuth refresh tokens). The browser sends them automatically; the backend stays stateless. This is the **preferred approach** for user-specific tokens.
 - **Fusebase dashboards** — for persistent runtime data shared across users (via Dashboard SDK in backend code)
 - **Fusebase secrets** (env vars) — for shared credentials set at deploy time (API keys, service-account tokens). Not suitable for per-user or dynamically obtained tokens.
@@ -293,25 +297,26 @@ ws.onmessage = (event) => {
 When an OAuth callback returns a refresh token, store it in an httpOnly cookie:
 
 ```typescript
-import { setCookie, getCookie } from 'hono/cookie'
+import { setCookie, getCookie } from "hono/cookie";
 
 // In the OAuth callback handler:
-setCookie(c, 'oauth_refresh_token', tokens.refresh_token, {
+setCookie(c, "oauth_refresh_token", tokens.refresh_token, {
   httpOnly: true,
   secure: true,
-  sameSite: 'Lax',
-  path: '/',
+  sameSite: "Lax",
+  path: "/",
   maxAge: 60 * 60 * 24 * 365, // 1 year
-})
+});
 
 // In API handlers — read token from cookie, fall back to env var:
-const refreshToken = getCookie(c, 'oauth_refresh_token') ?? process.env.REFRESH_TOKEN ?? ''
+const refreshToken =
+  getCookie(c, "oauth_refresh_token") ?? process.env.REFRESH_TOKEN ?? "";
 
 // ❌ Wrong: writing to filesystem
-writeFileSync('.env', `REFRESH_TOKEN=${tokens.refresh_token}`)
+writeFileSync(".env", `REFRESH_TOKEN=${tokens.refresh_token}`);
 
 // ❌ Wrong: relying solely on in-memory state
-config.refreshToken = tokens.refresh_token  // lost on restart
+config.refreshToken = tokens.refresh_token; // lost on restart
 ```
 
 ## Dev Workflow
@@ -333,3 +338,81 @@ Before adding a backend:
 - [ ] Updated `fusebase.json` with `backend` block
 - [ ] SPA does not define routes under `/api`
 - [ ] No `.env` files or `dotenv` — secrets injected by `fusebase dev start`
+
+<% if (it.cron) { %>
+
+## Scheduled Tasks (Cron Jobs)
+
+Cron jobs run on a schedule using the **same Docker image** as the feature backend. Each job is an independent process that executes a command on a cron schedule and exits.
+
+### 1. Register the job in fusebase.json
+
+```bash
+fusebase job create \
+  --feature <featureId> \
+  --name <job-name> \
+  --cron "0 * * * *" \
+  --command "npm run cron:my-job"
+```
+
+**Job name** must be unique within the feature. Use kebab-case (e.g. `send-reports`, `cleanup-old-data`).
+
+**Cron expression** uses standard 5-field syntax: `minute hour day-of-month month day-of-week`. All times are UTC.
+
+### 2. Add the npm script to backend/package.json
+
+```json
+{
+  "scripts": {
+    // existing scripts...
+    "cron:send-reports": "node dist/jobs/send-reports.js"
+  }
+}
+```
+
+Build config must include job entry points so they are compiled to `dist/`.
+
+### 3. Implement the job script
+
+```typescript
+// backend/src/jobs/send-reports.ts
+async function main() {
+  console.log("[send-reports] Starting at", new Date().toISOString());
+
+  // Use the same SDK / secrets as the main backend
+  // Env vars injected at runtime (same as backend)
+
+  // ... business logic ...
+
+  console.log("[send-reports] Done");
+  process.exit(0);
+}
+
+main().catch((err) => {
+  console.error("[send-reports] Failed:", err);
+  process.exit(1);
+});
+```
+
+Key points:
+
+- **Always call `process.exit(0)` on success** — the container job finishes only when the process exits
+- **Call `process.exit(1)` on failure** — signals the job failed
+- Job scripts share the same `dist/` bundle as the backend — they can import from `../` freely
+- Env vars (secrets) are injected the same way as for the main backend process
+
+### Removing a Job
+
+```bash
+fusebase job delete --feature <featureId> --name <job-name>
+```
+
+This removes the job from `backend.jobs` in `fusebase.json`. On the next `fusebase deploy` the job will be automatically deleted from cloud infrastructure.
+
+### Cron Jobs Checklist
+
+- [ ] Feature already has a `backend/` folder and a `backend` block in `fusebase.json` (backend is scaffolded first)
+- [ ] Added `cron:<job-name>` npm script to `backend/package.json`
+- [ ] Ran `fusebase job create` to register the job
+
+<% } %>

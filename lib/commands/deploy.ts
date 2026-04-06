@@ -533,6 +533,7 @@ export const deployCommand = new Command("deploy")
             fuseConfig.appId,
             featureId,
             version.id,
+            featureConfig.backend?.jobs,
           );
           console.log(`   Deploy ID: ${deploy.id}`);
           console.log(`   Waiting for backend deploy to complete...\n`);
