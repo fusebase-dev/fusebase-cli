@@ -343,6 +343,8 @@ Before adding a backend:
 
 ## Scheduled Tasks (Cron Jobs)
 
+> **⚠️ Cron jobs do NOT run with `fusebase dev start`.** Local dev mode does not schedule or execute jobs. Run `fusebase deploy` to deploy the feature — jobs will be scheduled and executed in the cloud after deployment.
+
 Cron jobs run on a schedule using the **same Docker image** as the feature backend. Each job is an independent process that executes a command on a cron schedule and exits.
 
 ### 1. Register the job in fusebase.json
@@ -414,5 +416,6 @@ This removes the job from `backend.jobs` in `fusebase.json`. On the next `fuseba
 - [ ] Feature already has a `backend/` folder and a `backend` block in `fusebase.json` (backend is scaffolded first)
 - [ ] Added `cron:<job-name>` npm script to `backend/package.json`
 - [ ] Ran `fusebase job create` to register the job
+- [ ] Ran `fusebase deploy` to deploy the feature — **cron jobs only run after deployment**, not during `fusebase dev start`
 
 <% } %>
