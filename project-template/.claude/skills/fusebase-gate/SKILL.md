@@ -1,6 +1,6 @@
 ---
 name: fusebase-gate
-description: "How to use MCP and SDK for Fusebase Gate and the broader Fusebase platform. Use when: 1. Working with Gate MCP tools (tokens, org user listing, health, generated prompts), 2. Org-scoped flows: organizations, membership, user lists, portal invitations, 3. Gate authorization scopes and JWT tokens, 4. Platform-level capabilities exposed via Gate: email campaigns, automation flows, integrations, 5. Runtime code uses @fusebase/fusebase-gate-sdk (Gate SDK patterns and --sync-gate-permissions workflow)."
+description: "How to use MCP for Fusebase Gate. Use when: working with gate contracts, tokens, org user listing, health, or generated MCP tools and prompts."
 metadata:
   source: entrypoint
 ---
@@ -12,11 +12,14 @@ This document describes how to use **MCP (Model Context Protocol)** with **Fuseb
 
 For rules and checklists, see `AGENTS.md`.
 
+For **sql/postgres** isolated stores, treat **`references/isolated-sql-stores.md`** as the **production runbook** (playbooks, permissions, status/apply/409). Add **`references/isolated-sql-migration-discipline.md`** whenever you edit or apply migration bundles (anti-drift). **`references/isolated-sql.md`** is the condensed MCP-oriented SQL surface. See TOC below.
+
 ---
 
 ## References
 
 Each reference is in a separate file under `references/`. Load the file when you need that topic.
+
 
 **meta**
 
@@ -27,8 +30,16 @@ Each reference is in a separate file under `references/`. Load the file when you
 
 **specialized**
 
+- [Fusebase Gate — Isolated SQL migration discipline](references/isolated-sql-migration-discipline.md)
+- [Fusebase Gate Billing And Stripe Flows](references/billing.md)
+- [Fusebase Gate Isolated NoSQL Stores](references/isolated-nosql.md)
+- [Fusebase Gate Isolated SQL Stores](references/isolated-sql.md)
+- [Fusebase Gate Isolated Stores](references/isolated.md)
 - [Fusebase Gate Membership And Portal Flows](references/membership.md)
+- [Fusebase Gate Stripe App And Agent Integration](references/stripe-apps.md)
 - [Fusebase Gate Users Operations](references/users.md)
+- [Isolated SQL stores and migrations (Gate)](references/isolated-sql-stores.md)
+- [Stripe for apps and agents (Gate)](references/stripe-for-apps-and-agents.md)
 
 ---
 
@@ -76,7 +87,7 @@ When runtime code uses `@fusebase/fusebase-gate-sdk`, `fusebase feature update -
 2. Prefer strongly typed API factories (`WorkspacesApi`, `NotesApi`, etc.), avoid `any` return types for Gate API objects.
 3. Avoid dynamic call patterns for Gate operations:
    - avoid destructuring methods (`const { listWorkspaces } = api`)
-   - avoid computed operation names (`api[opName](...)`) unless the key is a string literal
+   - avoid computed operation names (`api[opName]` call style) unless the key is a string literal
 4. Keep a pre-publish check in your workflow:
    - `fusebase analyze gate --operations --json --feature <featureId>`
    - if runtime imports Gate SDK and `usedOps` is empty, treat it as a blocker and fix before publish.

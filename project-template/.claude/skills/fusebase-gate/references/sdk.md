@@ -1,7 +1,7 @@
 ---
-version: "1.2.0"
+version: "1.4.0"
 mcp_prompt: sdk
-last_synced: "2026-03-31"
+last_synced: "2026-04-06"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -31,6 +31,7 @@ npm: `@fusebase/fusebase-gate-sdk`. For development, install from public npm:
 
 - HealthApi
 - AccessApi
+- BillingApi
 - OrgUsersApi
 - PortalsApi
 - SystemApi
@@ -44,6 +45,8 @@ For session-backed org access checks, use AccessApi.getMyOrgAccess instead of in
 After sign-up, sign-in, or provisioning writes, re-check AccessApi.getMyOrgAccess before unlocking org content.
 Treat `result: "invite"` from addOrgUser as pending membership rather than granted access.
 Do not treat a custom /me or account endpoint as the source of truth unless it delegates to getMyOrgAccess.
+For Stripe onboarding and product flows, start with BillingApi methods such as getStripeOauth, updateStripeMode, createStripeProduct, updateStripeProduct, deleteStripeProduct, getStripePaymentLink, and getStripePaymentState.
+Use stable app-owned `kind` and `kindId` values in BillingApi so webhook-backed payment state can be checked later for the same entitlement.
 For workspace discovery, use WorkspacesApi.listWorkspaces.
 For portal discovery, use PortalsApi.listPortals.
 For portal invite flows, inspect addOrgUser because portal magic links are returned there rather than through a separate Portal invite API.
@@ -57,7 +60,7 @@ For portal invite flows, inspect addOrgUser because portal magic links are retur
 
 ## Version
 
-- **Version**: 1.2.0
+- **Version**: 1.4.0
 - **Category**: meta
-- **Last synced**: 2026-03-31
+- **Last synced**: 2026-04-06
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
