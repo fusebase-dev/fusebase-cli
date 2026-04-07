@@ -4,4 +4,8 @@
 
 **Dashboard data SDK request args:** Methods such as `getDashboardViewData` and `batchPutDashboardData` take **route parameters under `path`**, e.g. `{ path: { dashboardId, viewId }, ... }` (plus `body` / query per `sdk_describe`). **Do not** pass `{ dashboardId, viewId }` at the top level — that matches MCP `tool_call` **args**, not the TypeScript SDK. Apply the **same** SDK shape in **SPA and feature `backend/`** code.
 
+<% if (it.flags?.includes("app-business-docs")) { %>
+**Business logic docs (flag: `app-business-docs`):** Load `.claude/skills/app-business-docs/SKILL.md` when business rules or user flows change, then update `docs/en/business-logic.md`.
+<% } %>
+
 @AGENTS.md (section **Dashboard data SDK: path parameters (SPA and backend)**).
