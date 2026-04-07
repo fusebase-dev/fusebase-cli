@@ -169,48 +169,22 @@ When a feature has a backend, the `/api` path prefix is **reserved for the backe
 
 ## Webhooks (Inbound)
 
-Webhook handlers receive POST requests from external services (e.g. Monday.com, GitHub, Stripe). These requests do **not** carry a `fbsfeaturetoken` cookie — the platform proxy skips feature-token auth for any path under `/api/webhooks/`.
+Webhook handlers receive POST requests from external services (e.g. Monday.com, GitHub, Stripe). These requests neither carry a `fbsfeaturetoken` cookie nor `x-app-feature-token` header — the platform proxy skips feature-token auth for any path under `/api/webhooks/`.
 
 ### Secret path segment
 
-Use a random secret as the final path segment so only the external service that knows the URL can trigger the webhook. Store it as a feature secret:
+Try to come up with random and hard to guess path for webhooks, for example:
 
-```bash
-fusebase secret create --feature <featureId> --secret "WEBHOOK_SECRET:Random webhook path secret"
-```
-
-Set the value in the Fusebase dashboard (URL printed by the command above).
+`/api/webhooks/stripe` - bad
+`/api/webhooks/stripe-gja8dj21349asgj12n4asodgasdg` - good
 
 ### Webhook route
 
-```typescript
-const webhookSecret = process.env.WEBHOOK_SECRET;
-if (webhookSecret) {
-  app.post(`/webhooks/${webhookSecret}`, async (c) => {
-    const body = await c.req.json();
-    // Use process.env.FBS_FEATURE_TOKEN to call Fusebase services
-    return c.json({ ok: true });
-  });
-}
-```
-
-Public webhook URL: `https://<subdomain>.{FUSEBASE_APP_HOST}/api/webhooks/<WEBHOOK_SECRET>`
+Public webhook URL: `https://{FEATURE_DOMAIN}/api/webhooks/...`
 
 ### Service-account token for webhooks
 
 Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token.
-
-The platform provides a `refresh-server-token.js` script (analogous to `retrieve-token.js` for cron jobs) that wraps the backend server process: it fetches `FBS_FEATURE_TOKEN` at startup and refreshes it every 6 hours via graceful restart (SIGTERM + restart). To enable it, update the `start` command in `fusebase.json`:
-
-```json
-"backend": {
-  "dev":   { "command": "npm run dev" },
-  "build": { "command": "npm run build" },
-  "start": { "command": "node /scripts/refresh-server-token.js -- node dist/index.js" }
-}
-```
-
-All required env vars (`BACKEND_TOKEN_KEY`, `FBS_ORG_ID`, `FBS_APP_ID`, etc.) are injected automatically by the platform — no action needed.
 
 **Security rule**: use `FBS_FEATURE_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid feature token — do not fall back to the service-account token.
 
