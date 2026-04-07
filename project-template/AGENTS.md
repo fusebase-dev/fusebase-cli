@@ -22,6 +22,10 @@ This file is the **definitive guide** for AI agents and LLMs working with Fuseba
 - ✅ SDK initialized with feature token
 - ❌ runtime code must not call MCP
 
+## Type safety invariant (non-negotiable)
+
+Senior bar: **do not** “fix” errors with **`any`**, **`as any`**, **`as Record<string, unknown>`**, or **`as unknown as …`** on **SDK/API JSON** — that passes `typecheck` but hides wrong fields (e.g. `role` vs `orgRole`). Use **`@fusebase/*` exports**, **`Awaited<ReturnType<Api["method"]>>`**, **`sdk_describe`**, narrow at boundaries; extend types instead of erasing them. Non‑trivial TS → **typescript-pro** ([Required Skills](#required-skills)).
+
 ## Skills Location
 
 All skills are located in `.claude/skills/`. When this document references a skill (e.g., `fusebase-cli`), look for `SKILL.md` in that folder.
@@ -126,6 +130,7 @@ SDK token usage in feature runtime:
 - [ ] **Describe before use** — before using an MCP tool or adding SDK code for an operation, call `tools_describe` (or `sdk_describe` for SDK) to know input/output format; do not guess schemas.
 - [ ] **Dashboard SDK data code** — read `fusebase-dashboards/references/data-patterns.md` **and** call `sdk_describe` for the method before parsing responses; do not assume nested fields like `data.rows` without checking.
 - [ ] **Dashboard data SDK `path` params** — for `getDashboardViewData` / `batchPutDashboardData` / similar, use `{ path: { dashboardId, viewId } }` in **both** SPA and **`backend/`**; do not pass flat `{ dashboardId, viewId }` copied from MCP `tool_call` args.
+- [ ] **Type safety** — no `any`/broad casts on SDK JSON; see [Type safety invariant](#type-safety-invariant-non-negotiable).
 - [ ] **Scaffolded feature** (if creating a new feature): Ran `fusebase scaffold --template spa` before writing feature files
 <% if (it.flags?.includes("app-business-docs")) { %>
 - [ ] **Business logic doc** — After material domain or workflow changes, load skill **app-business-docs** and update `docs/en/business-logic.md` (English); re-run when debugging shows the story and code diverge
@@ -560,7 +565,7 @@ You can only claim completion if:
 - ✅ No SDK was used during development work
 - ✅ **Secrets registered** (if backend uses `process.env`): Every `process.env.KEY` in `backend/` code has a matching `fusebase secret create --secret "KEY:description"` call. No `backend/.env` file, no `dotenv` dependency.
 - ✅ **Lint passes**: Before you say "Done", you **must** run `npm run lint` (from project root or from the feature directory you changed). Fix any reported errors; address warnings where practical. If you leave any errors or important warnings unfixed, list them explicitly for the user. (Deploy runs lint before build—code that fails lint will fail `fusebase deploy`.)
-- ✅ **Typecheck passes**: Before you say "Done", run `npm run typecheck` from project root when the app has features with TypeScript (or rely on the same check via `fusebase deploy`'s build). Deploy's build often runs `tsc` before Vite; type errors fail there even if lint passed. **Claude Code users**: Stop hooks in `.claude/settings.json` run lint and then typecheck when you finish; if either fails, you are blocked from stopping and given the output to fix.
+- ✅ **Typecheck** (`npm run typecheck` or deploy build); **no** `any` / `as Record<…>` on SDK responses — [Type safety invariant](#type-safety-invariant-non-negotiable). **Claude Code**: `.claude/settings.json` hooks run lint+typecheck.
 - ✅ **Permissions were published, not just code**: If the feature uses Dashboard SDK or Gate SDK at runtime, verify that `feature update` was run with the necessary flags before considering publish complete.
 - ✅ **Gate features require `--sync-gate-permissions`**: If runtime code uses `@fusebase/fusebase-gate-sdk`, run `fusebase feature update <featureId> --sync-gate-permissions` before calling the feature published.
 - ✅ **`Permissions: none` is a blocker for runtime-integrated features**: If CLI output shows `Permissions: none`, do not present the feature as fully published unless it intentionally requires no runtime permissions.
