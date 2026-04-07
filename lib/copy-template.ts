@@ -22,6 +22,17 @@ async function fileExists(path: string): Promise<boolean> {
 /** Skills that require a specific flag to be included. */
 const FLAG_GATED_SKILLS: Record<string, string> = {
   "git-workflow": "git-init",
+  "app-business-docs": "app-business-docs",
+  "mcp-gate-debug": "mcp-gate-debug",
+};
+
+/** Template paths that require a specific flag to be included. */
+const FLAG_GATED_PATH_PREFIXES: Record<string, string> = {
+  ".claude/skills/fusebase-gate/references/isolated.md": "isolated-stores",
+  ".claude/skills/fusebase-gate/references/isolated-nosql.md": "isolated-stores",
+  ".claude/skills/fusebase-gate/references/isolated-sql.md": "isolated-stores",
+  ".claude/skills/fusebase-gate/references/isolated-sql-stores.md": "isolated-stores",
+  ".claude/skills/fusebase-gate/references/isolated-sql-migration-discipline.md": "isolated-stores",
 };
 
 /**
@@ -30,6 +41,11 @@ const FLAG_GATED_SKILLS: Record<string, string> = {
 function shouldSkipEntry(name: string): boolean {
   for (const [skill, flag] of Object.entries(FLAG_GATED_SKILLS)) {
     if (name.startsWith(`.claude/skills/${skill}/`) && !hasFlag(flag)) {
+      return true;
+    }
+  }
+  for (const [pathPrefix, flag] of Object.entries(FLAG_GATED_PATH_PREFIXES)) {
+    if (name.startsWith(pathPrefix) && !hasFlag(flag)) {
       return true;
     }
   }
@@ -100,6 +116,17 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
         const skillDir = join(skillsDest, skill);
         if (await fileExists(skillDir)) {
           await rm(skillDir, { recursive: true, force: true });
+        }
+      }
+    }
+
+    // Remove flag-gated files that shouldn't be present
+    for (const [pathPrefix, flag] of Object.entries(FLAG_GATED_PATH_PREFIXES)) {
+      if (!hasFlag(flag)) {
+        const relativePath = pathPrefix.replace(".claude/skills/", "");
+        const targetPath = join(skillsDest, relativePath);
+        if (await fileExists(targetPath)) {
+          await rm(targetPath, { recursive: true, force: true });
         }
       }
     }

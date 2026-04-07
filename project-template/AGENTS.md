@@ -123,6 +123,12 @@ SDK token usage in feature runtime:
 - [ ] **Dashboard SDK data code** — read `fusebase-dashboards/references/data-patterns.md` **and** call `sdk_describe` for the method before parsing responses; do not assume nested fields like `data.rows` without checking.
 - [ ] **Dashboard data SDK `path` params** — for `getDashboardViewData` / `batchPutDashboardData` / similar, use `{ path: { dashboardId, viewId } }` in **both** SPA and **`backend/`**; do not pass flat `{ dashboardId, viewId }` copied from MCP `tool_call` args.
 - [ ] **Scaffolded feature** (if creating a new feature): Ran `fusebase scaffold --template spa` before writing feature files
+<% if (it.flags?.includes("app-business-docs")) { %>
+- [ ] **Business logic doc** — After material domain or workflow changes, load skill **app-business-docs** and update `docs/en/business-logic.md` (English); re-run when debugging shows the story and code diverge
+<% } %>
+<% if (it.flags?.includes("mcp-gate-debug")) { %>
+- [ ] **MCP Gate debug** — After a batch of Gate MCP tool work (especially isolated stores), follow skill **mcp-gate-debug** and summarize what worked vs what did not plus concrete improvement targets
+<% } %>
 
 ## Mental Model: MCP + SDK Architecture
 
@@ -239,15 +245,9 @@ export function createDatabasesApi(featureToken: string): DatabasesApi {
   return new DatabasesApi(createSdkClient(featureToken));
 }
 
-// Usage in feature code:
-// 1. Get feature token from cookie
-const featureToken = getFeatureToken(); // Read from 'fbsfeaturetoken' cookie, fallback to window.FBS_FEATURE_TOKEN
-
-// 2. Create API instance
-const databasesApi = createDatabasesApi(featureToken);
-
-// 3. Use API
-const response = await databasesApi.listDatabases({});
+// Usage: read feature token from `fbsfeaturetoken` cookie (fallback `window.FBS_FEATURE_TOKEN`), then e.g.:
+// const databasesApi = createDatabasesApi(featureToken)
+// const response = await databasesApi.listDatabases({})
 ```
 
 **Custom app backend usage** (`/api/*`):
@@ -391,6 +391,16 @@ For file upload functionality (separate service, not part of dashboard SDK).
 ### ✅ git-workflow
 
 **Load for everyday Git usage in generated apps** — commit hygiene, safe rollback guidance, and operation-aware commit boundaries. If `git-debug-commits` flag is enabled, this skill also applies strict debug/deploy traceability rules.
+<% } %>
+<% if (it.flags?.includes("app-business-docs")) { %>
+### ✅ app-business-docs
+
+**Load when maintaining human-readable product behavior** — keeps `docs/en/business-logic.md` aligned with the codebase: scenarios, rules, edge cases, and a light code map. Update after business-logic changes or when revalidating during debugging.
+<% } %>
+<% if (it.flags?.includes("mcp-gate-debug")) { %>
+### ✅ mcp-gate-debug
+
+**Load after Gate MCP sessions** — produce a short debug-oriented summary (successes, friction, improvements) aimed at `.claude/skills/fusebase-gate` and MCP/prompt quality; prioritize **isolated stores** debugging.
 <% } %>
 
 ### ✅ feature-backend

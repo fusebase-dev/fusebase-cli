@@ -100,6 +100,9 @@ Options:
 - `--git` - After setup, offer to initialize a local Git repository (local only until you add a `git remote` and push)
 - Global flag `git-init` also enables the same post-init Git offer automatically (`fusebase config set-flag git-init`)
 - Global flag `git-debug-commits` enables strict debug/deploy traceability section in the `git-workflow` skill (deploy preflight, commit-per-fix, SHA/tag references)
+- Global flag `app-business-docs` includes the `app-business-docs` skill (English `docs/en/business-logic.md` maintenance)
+- Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; isolated stores emphasis)
+- Global flag `isolated-stores` includes Fusebase Gate isolated SQL/NoSQL references and enables `isolated_store.*` permissions in `fusebase env create`
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 

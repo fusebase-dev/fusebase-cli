@@ -63,6 +63,10 @@ export async function runEnvCreate(force: boolean = true): Promise<void> {
     console.error("Error: orgId not found in fusebase.json.");
     process.exit(1);
   }
+  if (!fuseConfig.appId) {
+    console.error("Error: appId not found in fusebase.json.");
+    process.exit(1);
+  }
 
   const config = await loadConfig();
   if (!config.apiKey) {
@@ -74,6 +78,7 @@ export async function runEnvCreate(force: boolean = true): Promise<void> {
     targetDir: cwd,
     apiKey: config.apiKey,
     orgId: fuseConfig.orgId,
+    appId: fuseConfig.appId,
     force,
   });
 

@@ -1,5 +1,5 @@
 ---
-version: "1.2.1"
+version: "1.2.2"
 mcp_prompt: isolatedNoSql
 last_synced: "2026-04-05"
 title: "Fusebase Gate Isolated NoSQL Stores"
@@ -60,11 +60,17 @@ These prompts cover the `nosql/mongodb_atlas` isolated store path.
 ## SQL / postgres counterpart
 
 For **`sql` / `postgres`** stores (migrations, row APIs, drift), use MCP **`isolatedSql`** + **`isolatedSqlMigrationDiscipline`** and repo **`docs/isolated-sql-stores.md`**.
+
+## UI link (store view)
+
+- Store page template: `https://<org-subdomain>.<fusebase-domain>/studio/<org-ui-id>/isolated-stores/nosql/<store-id>`.
+- Replace placeholders with real values: org subdomain and fusebase domain, org UI id, and store id.
+- After creating a NoSQL store through MCP, suggest opening the UI link for quick verification.
 ---
 
 ## Version
 
-- **Version**: 1.2.1
+- **Version**: 1.2.2
 - **Category**: specialized
 - **Last synced**: 2026-04-05
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -105,6 +105,9 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `scaffold` | Enables the `fusebase scaffold` command and its documentation |
 | `git-init` | Makes `fusebase init` automatically offer local Git initialization (equivalent to `--git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict traceability rules inside `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag references in debug/deploy reports |
+| `app-business-docs` | Includes the `app-business-docs` skill: maintain `docs/en/business-logic.md` (English) describing app business logic, flows, and scenarios; refresh after logic changes or on demand |
+| `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |
+| `isolated-stores` | Includes isolated SQL/NoSQL references for `fusebase-gate` skill and enables `isolated_store.*` permissions in `fusebase env create` Gate token |
 
 After changing flags, run `fusebase skills update` to regenerate project files (for template flags). For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 

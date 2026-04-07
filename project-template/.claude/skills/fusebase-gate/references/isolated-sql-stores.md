@@ -109,7 +109,7 @@ Apply uses a **single DB transaction**; failure → **ROLLBACK** (no partial jou
 
 ## 8. Repository discipline (source of truth)
 
-- Keep migration SQL **in a dedicated directory** in the repo — **prefer the folder name `migrations`** (e.g. `postgres/migrations/`, `db/migrations/`) so tooling and reviewers recognize it; avoid mixing with app source or ad-hoc scripts — ordering, review, and CI checksum checks stay obvious.
+- Keep migration SQL **in a dedicated directory** in the repo — use **`postgres/migrations/`** so tooling and reviewers recognize it; avoid mixing with app source or ad-hoc scripts — ordering, review, and CI checksum checks stay obvious.
 - One SQL file per **`version`**; manifest with **`version`**, **`name`**, **`checksum`** aligned with the bytes Gate sends.
 - **CI** should verify checksums vs files — prompts are not a substitute.
 

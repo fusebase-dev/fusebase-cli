@@ -673,6 +673,7 @@ export const initCommand = new Command("init")
             targetDir: cwd,
             apiKey: apiKey,
             orgId: selectedOrg.id,
+            appId: selectedApp.id,
             force: forceOverwrite,
           });
           printCreateEnvResult(envResult);

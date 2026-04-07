@@ -9,7 +9,7 @@
 import { writeFile, readFile, access } from "fs/promises";
 import { join } from "path";
 import { createDashboardsToken, createGateToken, type CreateTokenRequest } from "../../api";
-import { getFusebaseHost, getFusebaseAppHost } from "../../config";
+import { getFusebaseHost, getFusebaseAppHost, hasFlag } from "../../config";
 
 function getDashboardsMcpUrl(): string {
   return `https://dashboards-mcp.${getFusebaseHost()}/mcp`;
@@ -32,6 +32,8 @@ export interface CreateEnvOptions {
   targetDir: string;
   apiKey: string;
   orgId: string;
+  /** Gate MCP token includes `client` scope (app id) alongside org. */
+  appId: string;
   force?: boolean;
 }
 
@@ -185,12 +187,31 @@ async function generateMcpToken(apiKey: string, orgId: string): Promise<string> 
   return response.data.token;
 }
 
-async function generateGateMcpToken(apiKey: string, orgId: string): Promise<string> {
+async function generateGateMcpToken(
+  apiKey: string,
+  orgId: string,
+  appId: string,
+): Promise<string> {
+  const isolatedStorePermissions = hasFlag("isolated-stores")
+    ? [
+        "isolated_store.read",
+        "isolated_store.data.write",
+        "isolated_store.schema.write",
+        "isolated_store.control.write",
+        "isolated_store.delete",
+        "isolated_store.execute",
+      ]
+    : [];
+
   const request: CreateTokenRequest = {
     scopes: [
       {
         scope_type: "org",
         scope_id: orgId,
+      },
+      {
+        scope_type: "client",
+        scope_id: appId,
       },
     ],
     permissions: [
@@ -207,8 +228,9 @@ async function generateGateMcpToken(apiKey: string, orgId: string): Promise<stri
       "email.write",
       "notes.read",
       "notes.write",
+      ...isolatedStorePermissions,
       "billing.read",
-      "billing.write"
+      "billing.write",
     ],
     // Gate token contract expects a different `resource_scope` shape than the
     // public API; the provided example uses an empty object.
@@ -229,7 +251,7 @@ async function generateGateMcpToken(apiKey: string, orgId: string): Promise<stri
  * - If .env exists with MCP vars: skip (unless force=true)
  */
 export async function createEnvFile(options: CreateEnvOptions): Promise<CreateEnvResult> {
-  const { targetDir, apiKey, orgId, force = false } = options;
+  const { targetDir, apiKey, orgId, appId, force = false } = options;
   const envPath = join(targetDir, ".env");
 
   try {
@@ -254,7 +276,7 @@ export async function createEnvFile(options: CreateEnvOptions): Promise<CreateEn
 
     // Generate MCP tokens
     const dashboardsToken = await generateMcpToken(apiKey, orgId);
-    const gateToken = await generateGateMcpToken(apiKey, orgId);
+    const gateToken = await generateGateMcpToken(apiKey, orgId, appId);
 
     // Prepare updates
     const updates = new Map<string, string>([

@@ -481,6 +481,20 @@ Flags gate experimental features. The `skills update` command uses flags to cond
 | `mcp-beta` | Unlocks optional MCP servers in the integrations catalog that are marked beta (see `ide-configs/mcp-servers.ts`) |
 | `git-init` | Makes `fusebase init` automatically offer local Git initialization (same behavior as passing `--git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict debug/deploy traceability section inside the `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag traceability in debug/deploy reports |
+| `app-business-docs` | Copies the `app-business-docs` skill into the app: keeps **`docs/en/business-logic.md`** (English) aligned with real behavior — domain rules, main user flows, edge cases; update after business-logic changes or when debugging unclear behavior |
+| `mcp-gate-debug` | Copies the `mcp-gate-debug` skill: after Fusebase Gate MCP tool runs, summarize smooth vs rough paths and suggest improvements to `.claude/skills/fusebase-gate`, prompts, or MCP server behavior — prioritize **isolated stores** (SQL/NoSQL) flows |
+| `isolated-stores` | Enables isolated stores support in templates: includes isolated SQL/NoSQL Gate references and grants `isolated_store.*` permissions in `fusebase env create` Gate token |
+
+Enable a flag globally, then refresh the project template:
+
+```bash
+fusebase config set-flag app-business-docs   # Business-logic documentation skill
+fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summary skill
+fusebase config set-flag isolated-stores     # Isolated stores docs + Gate token permissions
+fusebase skills update                       # Copy skills + render AGENTS.md for active flags
+```
+
+Other examples:
 
 ```bash
 fusebase config set-flag mcp-beta    # Enable beta-gated MCP catalog entries

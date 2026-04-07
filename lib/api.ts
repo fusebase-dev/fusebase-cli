@@ -146,7 +146,7 @@ export interface InitUploadResponse {
 }
 
 // Token types
-export type ScopeType = "org";
+export type ScopeType = "org" | "client";
 
 export interface Scope {
   scope_type: ScopeType;

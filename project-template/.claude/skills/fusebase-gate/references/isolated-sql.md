@@ -1,5 +1,5 @@
 ---
-version: "1.8.3"
+version: "1.8.4"
 mcp_prompt: isolatedSql
 last_synced: "2026-04-06"
 title: "Fusebase Gate Isolated SQL Stores"
@@ -77,14 +77,21 @@ Do not **`apply`** throwaway SQL as **v1** on a store that must later use a real
 
 ### Manifest / checksums
 
-For **local** storage in a repo, keep migration SQL in a **dedicated folder**; **prefer naming it `migrations`** (e.g. `postgres/migrations/`, `db/migrations/`). Do not mix with application code — easier ordering, review, and CI checksum checks.
+For **local** storage in a repo, keep migration SQL in a **dedicated folder** at **`postgres/migrations/`**. Do not mix with application code — easier ordering, review, and CI checksum checks.
 
 Per migration: **`version`**, **`name`**, **`checksum`** — use **SHA-256** / **`sha256`** of the **exact** UTF-8 **`sql`** bytes Gate sends. Optional **`bundleVersion`** on the bundle. Operators often record **`orgId`** / **`storeId`** in repo manifest for CI — not required inside the bundle body.
+
+### UI links (store and table)
+
+- Store page template: **`https://<org-subdomain>.<fusebase-domain>/studio/<org-ui-id>/isolated-stores/sql/<store-id>`**.
+- Replace placeholders with real values from the environment and tool results: org subdomain and fusebase domain, org UI id, and store id.
+- Table view adds query param: **`?table=<schema.table_name>`** (example: **`?table=public.fusebase_schema_migrations`**).
+- After creating a store or creating a SQL table through MCP, suggest opening the corresponding UI link.
 ---
 
 ## Version
 
-- **Version**: 1.8.3
+- **Version**: 1.8.4
 - **Category**: specialized
 - **Last synced**: 2026-04-06
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

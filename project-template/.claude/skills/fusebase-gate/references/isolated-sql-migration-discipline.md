@@ -24,7 +24,7 @@ On apply: **HTTP 409**, **`data.errorCode`** **`isolated_sql_migration_drift`**,
 
 ## Invariants
 
-1. **Repo + manifest** own canonical SQL; store migration **`.sql`** files under a **dedicated directory** — **prefer the folder name `migrations`** (e.g. `…/migrations/`), not alongside random app code, so history stays clear. The journal records what ran — **never hand-edit** journal rows to force a match.
+1. **Repo + manifest** own canonical SQL; store migration **`.sql`** files under **`postgres/migrations/`**, not alongside random app code, so history stays clear. The journal records what ran — **never hand-edit** journal rows to force a match.
 2. **Immutable applied prefix** — do not change **`name` / `checksum` / `sql`** for versions already applied to a stage you keep.
 3. **Fixes = new tail versions** only (K+1, K+2, …), never rewrite applied files.
 4. **Prefix alignment** — first **N** bundle entries must match journal **1..N**; **pending** = tail after **N**.

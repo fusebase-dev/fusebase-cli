@@ -113,6 +113,9 @@ export const KNOWN_FLAGS = [
   "cron",
   "git-init",
   "git-debug-commits",
+  "app-business-docs",
+  "mcp-gate-debug",
+  "isolated-stores",
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
