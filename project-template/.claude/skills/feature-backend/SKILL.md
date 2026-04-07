@@ -167,6 +167,27 @@ When a feature has a backend, the `/api` path prefix is **reserved for the backe
 - Backend routes: `/api/*` (REST endpoints, WebSocket upgrades)
 - SPA routes: everything else (`/`, `/items/:id`, `/settings`, etc.)
 
+## Webhooks (Inbound)
+
+Webhook handlers receive POST requests from external services (e.g. Monday.com, GitHub, Stripe). These requests neither carry a `fbsfeaturetoken` cookie nor `x-app-feature-token` header — the platform proxy skips feature-token auth for any path under `/api/webhooks/`.
+
+### Secret path segment
+
+Try to come up with random and hard to guess path for webhooks, for example:
+
+`/api/webhooks/stripe` - bad
+`/api/webhooks/stripe-gja8dj21349asgj12n4asodgasdg` - good
+
+### Webhook route
+
+Public webhook URL: `https://{FEATURE_DOMAIN}/api/webhooks/...`
+
+### Service-account token for webhooks
+
+Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token.
+
+**Security rule**: use `FBS_FEATURE_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid feature token — do not fall back to the service-account token.
+
 ## Dev Proxy
 
 `fusebase dev start` automatically proxies `/api` HTTP requests and WebSocket upgrades to the backend dev server.
