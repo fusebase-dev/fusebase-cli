@@ -112,6 +112,10 @@ Apply uses a **single DB transaction**; failure → **ROLLBACK** (no partial jou
 - Keep migration SQL **in a dedicated directory** in the repo — use **`postgres/migrations/`** so tooling and reviewers recognize it; avoid mixing with app source or ad-hoc scripts — ordering, review, and CI checksum checks stay obvious.
 - One SQL file per **`version`**; manifest with **`version`**, **`name`**, **`checksum`** aligned with the bytes Gate sends.
 - **CI** should verify checksums vs files — prompts are not a substitute.
+- **MUST flow:** file-first for schema changes — create/update files in `postgres/migrations/`, compute checksum from file bytes, run status, then apply.
+- **MUST artifact after schema ops:** include migration file path, `version`, `name`, `checksum`, `storeId`, `stage`.
+- **Inline SQL in MCP:** only for one-off smoke/dev tests and explicitly marked temporary; not for persistent schema changes.
+- **Final gate:** do not finish if schema changed but `postgres/migrations/` has no matching new/updated migration file/manifest entry.
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-version: "1.2.7"
+version: "1.2.8"
 mcp_prompt: isolated
 last_synced: "2026-04-05"
 title: "Fusebase Gate Isolated Stores"
@@ -64,6 +64,13 @@ These prompts cover the common control-plane model for isolated low-level stores
 - SQL table view adds query param: `?table=<schema.table_name>` (example: `?table=public.fusebase_schema_migrations`).
 - After creating a store or creating a SQL table through MCP, suggest opening the matching UI link for quick verification.
 
+## SQL schema hard gate
+
+- For isolated SQL schema changes, enforce file-first order: `postgres/migrations/` file update -> checksum from file -> status -> apply.
+- Inline SQL in MCP is only for one-off smoke/dev tests and must be marked temporary.
+- Do not mark work done if schema changed but no matching new/updated migration file and manifest entry exists under `postgres/migrations/`.
+- After schema ops, include artifact fields: migration file path, `version`, `name`, `checksum`, `storeId`, `stage`.
+
 ## MCP workflow (chat-driven tool_call)
 
 - Isolated store operations declare `requiredPrompts` / prompt groups. Before the first domain calls, run `prompts_search` with the groups listed on `tools_describe` for that operation (commonly `authz`, `sdk`, `isolated`, and for SQL also `isolatedSql`).
@@ -78,7 +85,7 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 ## Version
 
-- **Version**: 1.2.7
+- **Version**: 1.2.8
 - **Category**: specialized
 - **Last synced**: 2026-04-05
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

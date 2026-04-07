@@ -12,9 +12,7 @@ This document describes how to use **MCP (Model Context Protocol)** with **Fuseb
 
 For rules and checklists, see `AGENTS.md`.
 
-<% if (it.flags?.includes("isolated-stores")) { %>
 For **sql/postgres** isolated stores, treat **`references/isolated-sql-stores.md`** as the **production runbook** (playbooks, permissions, status/apply/409). Add **`references/isolated-sql-migration-discipline.md`** whenever you edit or apply migration bundles (anti-drift). **`references/isolated-sql.md`** is the condensed MCP-oriented SQL surface. See TOC below.
-<% } %>
 
 ---
 
@@ -32,21 +30,15 @@ Each reference is in a separate file under `references/`. Load the file when you
 
 **specialized**
 
-<% if (it.flags?.includes("isolated-stores")) { %>
 - [Fusebase Gate — Isolated SQL migration discipline](references/isolated-sql-migration-discipline.md)
-<% } %>
 - [Fusebase Gate Billing And Stripe Flows](references/billing.md)
-<% if (it.flags?.includes("isolated-stores")) { %>
 - [Fusebase Gate Isolated NoSQL Stores](references/isolated-nosql.md)
 - [Fusebase Gate Isolated SQL Stores](references/isolated-sql.md)
 - [Fusebase Gate Isolated Stores](references/isolated.md)
-<% } %>
 - [Fusebase Gate Membership And Portal Flows](references/membership.md)
 - [Fusebase Gate Stripe App And Agent Integration](references/stripe-apps.md)
 - [Fusebase Gate Users Operations](references/users.md)
-<% if (it.flags?.includes("isolated-stores")) { %>
 - [Isolated SQL stores and migrations (Gate)](references/isolated-sql-stores.md)
-<% } %>
 - [Stripe for apps and agents (Gate)](references/stripe-for-apps-and-agents.md)
 
 ---

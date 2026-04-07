@@ -1,5 +1,5 @@
 ---
-version: "1.8.4"
+version: "1.8.5"
 mcp_prompt: isolatedSql
 last_synced: "2026-04-06"
 title: "Fusebase Gate Isolated SQL Stores"
@@ -78,6 +78,10 @@ Do not **`apply`** throwaway SQL as **v1** on a store that must later use a real
 ### Manifest / checksums
 
 For **local** storage in a repo, keep migration SQL in a **dedicated folder** at **`postgres/migrations/`**. Do not mix with application code — easier ordering, review, and CI checksum checks.
+- **MUST flow order:** file-first schema changes (create/update file in `postgres/migrations/` → checksum from file bytes → status → apply).
+- **Inline SQL:** MCP inline SQL allowed only for one-off smoke/dev tests and explicitly marked temporary.
+- **Final gate:** if schema changed, do not finish unless `postgres/migrations/` has matching new/updated migration file and manifest entry.
+- **Required artifact after schema ops:** migration file path, `version`, `name`, `checksum`, `storeId`, `stage`.
 
 Per migration: **`version`**, **`name`**, **`checksum`** — use **SHA-256** / **`sha256`** of the **exact** UTF-8 **`sql`** bytes Gate sends. Optional **`bundleVersion`** on the bundle. Operators often record **`orgId`** / **`storeId`** in repo manifest for CI — not required inside the bundle body.
 
@@ -91,7 +95,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — use **SHA-256** / *
 
 ## Version
 
-- **Version**: 1.8.4
+- **Version**: 1.8.5
 - **Category**: specialized
 - **Last synced**: 2026-04-06
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
