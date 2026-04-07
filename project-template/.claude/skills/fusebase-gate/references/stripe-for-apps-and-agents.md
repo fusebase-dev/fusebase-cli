@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/stripe-for-apps-and-agents.md"
-last_synced: "2026-04-06"
+last_synced: "2026-04-07"
 title: "Stripe for apps and agents (Gate)"
 category: specialized
 ---
@@ -52,9 +52,26 @@ Available Stripe operations:
 - Always call `getStripeOauth` before product or checkout flows if the org may not be connected yet.
 - Treat `stripeAccountId` as the source-of-truth connected Stripe account identifier.
 - Use stable app-owned `kind` and `kindId` values. That is how Gate maps checkout and webhook-backed payment state back to your app concept.
+- `buyerId` for `getStripePaymentLink` and `getStripePaymentState` must be a number. Pass `buyerId: user.id`, not `buyerId: String(user.id)`.
 - For `mode: "subscription"`, send both `interval` and `intervalCount`.
 - For `mode: "payment"`, omit `interval` and `intervalCount`.
 - `updateStripeMode` only changes which Stripe API key mode is used for that connected account. It does not migrate existing Stripe catalog state.
+
+## Common Checkout Mistake
+
+If Gate returns a 400 with `body.buyerId: invalid_type`, the app probably sent `buyerId` as a string.
+
+Use:
+
+```ts
+buyerId: user.id;
+```
+
+Do not use:
+
+```ts
+buyerId: String(user.id);
+```
 
 ## MCP Prompt Groups
 
@@ -193,7 +210,7 @@ const checkout = await billingApi.getStripePaymentLink({
     stripeAccountId: oauth.oauth!.stripeAccountId!,
     kind: "course",
     kindId: "course_123",
-    buyerId: memberId,
+    buyerId: memberId, // number, not String(memberId)
     successUrl: "https://app.example.com/billing/success",
     cancelUrl: "https://app.example.com/billing/cancel",
     customerEmail: "member@example.com",
@@ -213,7 +230,7 @@ const state = await billingApi.getStripePaymentState({
     mode: "payment",
     kind: "course",
     kindId: "course_123",
-    buyerId: memberId,
+    buyerId: memberId, // number, not String(memberId)
   },
 });
 
@@ -313,4 +330,4 @@ Those should still be curated Gate operations rather than a raw Stripe passthrou
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-04-06
+- **Last synced**: 2026-04-07
