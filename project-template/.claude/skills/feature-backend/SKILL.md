@@ -198,36 +198,16 @@ Public webhook URL: `https://<subdomain>.{FUSEBASE_APP_HOST}/api/webhooks/<WEBHO
 
 ### Service-account token for webhooks
 
-Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token. Refresh it at backend startup and every 6 hours:
+Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token.
 
-```typescript
-async function refreshFeatureToken(): Promise<void> {
-  const key = process.env.BACKEND_TOKEN_KEY;
-  const org = process.env.FBS_ORG_ID;
-  const appId = process.env.FBS_APP_ID;
-  const appFeatureId = process.env.FBS_APP_FEATURE_GLOBAL_ID;
-  const versionId = process.env.FBS_APP_FEATURE_VERSION_ID;
-  const appDomain = process.env.FBS_APP_DOMAIN;
+The platform provides a `refresh-server-token.js` script (analogous to `retrieve-token.js` for cron jobs) that wraps the backend server process: it fetches `FBS_FEATURE_TOKEN` at startup and refreshes it every 6 hours via graceful restart (SIGTERM + restart). To enable it, update the `start` command in `fusebase.json`:
 
-  if (!key || !org || !appId || !appFeatureId || !versionId || !appDomain) return; // not yet injected (local dev)
-
-  const url = new URL(`https://${appDomain}/_token`);
-  url.searchParams.set("org", org);
-  url.searchParams.set("appId", appId);
-  url.searchParams.set("appFeatureId", appFeatureId);
-  url.searchParams.set("appFeatureVersionId", versionId);
-
-  const res = await fetch(url.toString(), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key }),
-  });
-  const data = (await res.json()) as { token?: string };
-  if (data.token) process.env.FBS_FEATURE_TOKEN = data.token;
+```json
+"backend": {
+  "dev":   { "command": "npm run dev" },
+  "build": { "command": "npm run build" },
+  "start": { "command": "node /scripts/refresh-server-token.js -- node dist/index.js" }
 }
-
-refreshFeatureToken();
-setInterval(refreshFeatureToken, 6 * 60 * 60 * 1000); // refresh every 6 h
 ```
 
 All required env vars (`BACKEND_TOKEN_KEY`, `FBS_ORG_ID`, `FBS_APP_ID`, etc.) are injected automatically by the platform — no action needed.
