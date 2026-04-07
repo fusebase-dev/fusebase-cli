@@ -167,6 +167,73 @@ When a feature has a backend, the `/api` path prefix is **reserved for the backe
 - Backend routes: `/api/*` (REST endpoints, WebSocket upgrades)
 - SPA routes: everything else (`/`, `/items/:id`, `/settings`, etc.)
 
+## Webhooks (Inbound)
+
+Webhook handlers receive POST requests from external services (e.g. Monday.com, GitHub, Stripe). These requests do **not** carry a `fbsfeaturetoken` cookie — the platform proxy skips feature-token auth for any path under `/api/webhooks/`.
+
+### Secret path segment
+
+Use a random secret as the final path segment so only the external service that knows the URL can trigger the webhook. Store it as a feature secret:
+
+```bash
+fusebase secret create --feature <featureId> --secret "WEBHOOK_SECRET:Random webhook path secret"
+```
+
+Set the value in the Fusebase dashboard (URL printed by the command above).
+
+### Webhook route
+
+```typescript
+const webhookSecret = process.env.WEBHOOK_SECRET;
+if (webhookSecret) {
+  app.post(`/webhooks/${webhookSecret}`, async (c) => {
+    const body = await c.req.json();
+    // Use process.env.FBS_FEATURE_TOKEN to call Fusebase services
+    return c.json({ ok: true });
+  });
+}
+```
+
+Public webhook URL: `https://<subdomain>.{FUSEBASE_APP_HOST}/api/webhooks/<WEBHOOK_SECRET>`
+
+### Service-account token for webhooks
+
+Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token. Refresh it at backend startup and every 6 hours:
+
+```typescript
+async function refreshFeatureToken(): Promise<void> {
+  const key = process.env.BACKEND_TOKEN_KEY;
+  const org = process.env.FBS_ORG_ID;
+  const appId = process.env.FBS_APP_ID;
+  const appFeatureId = process.env.FBS_APP_FEATURE_GLOBAL_ID;
+  const versionId = process.env.FBS_APP_FEATURE_VERSION_ID;
+  const appDomain = process.env.FBS_APP_DOMAIN;
+
+  if (!key || !org || !appId || !appFeatureId || !versionId || !appDomain) return; // not yet injected (local dev)
+
+  const url = new URL(`https://${appDomain}/_token`);
+  url.searchParams.set("org", org);
+  url.searchParams.set("appId", appId);
+  url.searchParams.set("appFeatureId", appFeatureId);
+  url.searchParams.set("appFeatureVersionId", versionId);
+
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+  });
+  const data = (await res.json()) as { token?: string };
+  if (data.token) process.env.FBS_FEATURE_TOKEN = data.token;
+}
+
+refreshFeatureToken();
+setInterval(refreshFeatureToken, 6 * 60 * 60 * 1000); // refresh every 6 h
+```
+
+All required env vars (`BACKEND_TOKEN_KEY`, `FBS_ORG_ID`, `FBS_APP_ID`, etc.) are injected automatically by the platform — no action needed.
+
+**Security rule**: use `FBS_FEATURE_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid feature token — do not fall back to the service-account token.
+
 ## Dev Proxy
 
 `fusebase dev start` automatically proxies `/api` HTTP requests and WebSocket upgrades to the backend dev server.
