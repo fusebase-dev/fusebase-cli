@@ -133,6 +133,11 @@ SDK token usage in feature runtime:
 <% if (it.flags?.includes("mcp-gate-debug")) { %>
 - [ ] **MCP Gate debug** — After a batch of Gate MCP tool work (especially isolated stores), follow skill **mcp-gate-debug** and summarize what worked vs what did not plus concrete improvement targets
 <% } %>
+<% if (it.flags?.includes("isolated-stores")) { %>
+- [ ] **Isolated SQL schema discipline (MUST)** — for any isolated SQL schema change, follow strict order: create/update files in `postgres/migrations/` -> compute checksum from file bytes -> run `getIsolatedStoreSqlMigrationStatus` -> then `applyIsolatedStoreSqlMigrations`
+- [ ] **No persistent inline SQL for schema** — inline SQL in MCP `tool_call` is allowed only for one-off smoke/dev tests and must be explicitly marked temporary
+- [ ] **Schema ops artifact logged** — after isolated SQL schema operations, include: migration file path, `version`, `name`, `checksum`, `storeId`, `stage`
+<% } %>
 
 ## Mental Model: MCP + SDK Architecture
 
@@ -369,6 +374,9 @@ Covers:
 **Load when working with Fusebase Gate or platform-level flows** — organizations, org user lists and membership, Gate tokens and authorization scopes, health/bootstrap, and how to use the **Gate MCP** and **Gate SDK** during development vs runtime.
 
 The skill explains how to interact with the **broader Fusebase ecosystem** beyond dashboard data: for example org-scoped user operations, platform services, email and campaign-related flows, automation, and integrations **as exposed through Gate** (see `references/*.md` for each topic). **Verify the fusebase-gate MCP server** is available before gate `tool_call` work (see skill).
+<% if (it.flags?.includes("isolated-stores")) { %>
+For isolated SQL schema work, loading only `fusebase-gate/SKILL.md` is insufficient. Also load and follow `references/isolated-sql-migration-discipline.md`, `references/isolated-sql.md`, and `references/isolated-sql-stores.md` as hard invariants.
+<% } %>
 
 ### ✅ file-upload
 
@@ -557,6 +565,10 @@ You can only claim completion if:
 - ✅ **Gate features require `--sync-gate-permissions`**: If runtime code uses `@fusebase/fusebase-gate-sdk`, run `fusebase feature update <featureId> --sync-gate-permissions` before calling the feature published.
 - ✅ **`Permissions: none` is a blocker for runtime-integrated features**: If CLI output shows `Permissions: none`, do not present the feature as fully published unless it intentionally requires no runtime permissions.
 - ✅ **Gate analysis sanity check**: Run `fusebase analyze gate --operations --json --feature <featureId>` and verify `usedOps` is non-empty for Gate-integrated runtime code. Empty `usedOps` with active Gate SDK usage is a release blocker.
+<% if (it.flags?.includes("isolated-stores")) { %>
+- ✅ **Isolated SQL schema final gate**: If isolated SQL schema changed, `postgres/migrations/` must contain matching new/updated migration file(s) and manifest updates. Otherwise completion is blocked.
+- ✅ **Isolated SQL schema artifact is mandatory**: Include migration file path, `version`, `name`, `checksum`, `storeId`, and `stage` in the final handoff.
+<% } %>
 
 ## One-line Reminder
 

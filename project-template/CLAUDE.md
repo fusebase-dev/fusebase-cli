@@ -7,5 +7,8 @@
 <% if (it.flags?.includes("app-business-docs")) { %>
 **Business logic docs (flag: `app-business-docs`):** Load `.claude/skills/app-business-docs/SKILL.md` when business rules or user flows change, then update `docs/en/business-logic.md`.
 <% } %>
+<% if (it.flags?.includes("isolated-stores")) { %>
+**Isolated SQL schema discipline (flag: `isolated-stores`):** For any isolated SQL schema change, enforce this order with no exceptions: update/create migration files in `postgres/migrations/` -> compute checksum from file bytes -> run status -> then apply. Inline SQL in MCP is allowed only for one-off smoke/dev tests and must be marked temporary. Do not finish schema tasks without new/updated migration files + manifest.
+<% } %>
 
 @AGENTS.md (section **Dashboard data SDK: path parameters (SPA and backend)**).
