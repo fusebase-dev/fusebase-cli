@@ -119,6 +119,17 @@ export const KNOWN_FLAGS = [
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
+/** Short descriptions for known experimental flags (used in interactive UX/help text). */
+export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
+  "mcp-beta": "Enable beta MCP servers in integrations catalog.",
+  cron: "Enable cron-related experimental functionality.",
+  "git-init": "Offer Git initialization automatically during `fusebase init`.",
+  "git-debug-commits": "Enable strict debug/deploy traceability in git workflow skill.",
+  "app-business-docs": "Include business-logic documentation skill in project template.",
+  "mcp-gate-debug": "Include Gate MCP debug summary skill (focus on isolated stores).",
+  "isolated-stores": "Enable isolated stores functionality (SQL/NoSQL).",
+};
+
 export function getFlags(): string[] {
   return getConfig().flags ?? [];
 }

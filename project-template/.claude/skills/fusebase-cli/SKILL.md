@@ -102,7 +102,7 @@ Options:
 - Global flag `git-debug-commits` enables strict debug/deploy traceability section in the `git-workflow` skill (deploy preflight, commit-per-fix, SHA/tag references)
 - Global flag `app-business-docs` includes the `app-business-docs` skill (English `docs/en/business-logic.md` maintenance)
 - Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; isolated stores emphasis)
-- Global flag `isolated-stores` includes Fusebase Gate isolated SQL/NoSQL references and enables `isolated_store.*` permissions in `fusebase env create`
+- Global flag `isolated-stores` enables isolated stores functionality (SQL/NoSQL), including required Fusebase Gate references and `isolated_store.*` permissions in `fusebase env create`
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 

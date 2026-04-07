@@ -1,5 +1,15 @@
 import { Command } from "commander";
-import { getConfig, setConfig, getFlags, addFlag, removeFlag, KNOWN_FLAGS } from "../config";
+import {
+  getConfig,
+  setConfig,
+  getFlags,
+  addFlag,
+  removeFlag,
+  KNOWN_FLAGS,
+  KNOWN_FLAG_DESCRIPTIONS,
+} from "../config";
+import { checkbox } from "@inquirer/prompts";
+import chalk from "chalk";
 import {
   resolveIdePresets,
   setupIdeConfig,
@@ -34,7 +44,8 @@ const setFlagCommand = new Command("set-flag")
     addFlag(flag);
     console.log(`✓ Flag "${flag}" enabled`);
     console.log(`  Active flags: ${getFlags().join(", ") || "(none)"}`);
-    console.log(`  Run 'fusebase skills update' to regenerate project files.`);
+    console.log("");
+    console.log("\x1b[1mRun 'fusebase skills update' to regenerate project files.\x1b[0m");
   });
 
 const removeFlagCommand = new Command("remove-flag")
@@ -50,19 +61,78 @@ const removeFlagCommand = new Command("remove-flag")
     removeFlag(flag);
     console.log(`✓ Flag "${flag}" disabled`);
     console.log(`  Active flags: ${getFlags().join(", ") || "(none)"}`);
-    console.log(`  Run 'fusebase skills update' to regenerate project files.`);
+    console.log("");
+    console.log("\x1b[1mRun 'fusebase skills update' to regenerate project files.\x1b[0m");
   });
 
-const listFlagsCommand = new Command("flags")
-  .description("List active experimental flags")
-  .action(() => {
-    const flags = getFlags();
-    if (flags.length === 0) {
-      console.log("No active flags.");
-    } else {
-      console.log(`Active flags: ${flags.join(", ")}`);
+function printFlagsSummary(flags: string[]): void {
+  const knownFlags = [...KNOWN_FLAGS];
+  const notActiveFlags = knownFlags.filter((flag) => !flags.includes(flag));
+
+  console.log(`Known flags: ${knownFlags.join(", ")}`);
+  console.log("");
+  console.log(`Not active flags: ${notActiveFlags.join(", ") || "(none)"}`);
+  console.log("");
+  console.log(`Active flags: ${flags.join(", ") || "(none)"}`);
+}
+
+async function runInteractiveFlagsSelection(): Promise<void> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.log("Interactive mode requires a TTY. Falling back to list output.");
+    printFlagsSummary(getFlags());
+    return;
+  }
+
+  const currentFlags = getFlags();
+  const knownFlags = KNOWN_FLAGS as readonly string[];
+  const unknownActiveFlags = currentFlags.filter((flag) => !knownFlags.includes(flag));
+
+  try {
+    const selectedFlags = await checkbox<string>({
+      message: "Select experimental flags to enable",
+      choices: knownFlags.map((flag) => ({
+        name: `${chalk.bold(flag)} ${chalk.dim(`- ${KNOWN_FLAG_DESCRIPTIONS[flag]}`)}`,
+        value: flag,
+        checked: currentFlags.includes(flag),
+      })),
+    });
+
+    const nextFlags = [...selectedFlags, ...unknownActiveFlags];
+    setConfig({ flags: nextFlags.length > 0 ? nextFlags : undefined });
+
+    console.log("✓ Updated active flags");
+    printFlagsSummary(getFlags());
+    if (unknownActiveFlags.length > 0) {
+      console.log(
+        `  Preserved unknown active flags: ${unknownActiveFlags.join(", ")}`,
+      );
     }
-    console.log(`Known flags: ${KNOWN_FLAGS.join(", ")}`);
+    console.log("");
+    console.log("\x1b[1mRun 'fusebase skills update' to regenerate project files.\x1b[0m");
+  } catch (error) {
+    const name = error instanceof Error ? error.name : "";
+    if (name === "ExitPromptError" || name === "AbortPromptError") {
+      console.log("Flag selection cancelled.");
+      return;
+    }
+    throw error;
+  }
+}
+
+const listFlagsCommand = new Command("flags")
+  .description("Manage experimental flags (interactive in TTY)")
+  .option("--list", "Show flags without interactive prompt")
+  .option("-i, --interactive", "Force interactive selection prompt")
+  .action(async (options: { list?: boolean; interactive?: boolean }) => {
+    const shouldUseInteractive =
+      !options.list && (options.interactive || (process.stdin.isTTY && process.stdout.isTTY));
+
+    if (shouldUseInteractive) {
+      await runInteractiveFlagsSelection();
+      return;
+    }
+
+    printFlagsSummary(getFlags());
   });
 
 const VALID_IDE_PRESETS: IdePreset[] = ["claude-code", "cursor", "vscode", "opencode", "codex", "other"];
