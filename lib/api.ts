@@ -840,12 +840,65 @@ export interface Deploy {
   updatedAt: number;
 }
 
+export interface ActiveVersionResponse {
+  id?: number;
+  globalId?: string;
+  orgId?: string;
+  appId?: string;
+  appFeatureId?: string;
+  userId?: number;
+  deployFqdn?: string;
+  s3Path?: string;
+  backendHash?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export async function getActiveVersion(
+  apiKey: string,
+  orgId: string,
+  appId: string,
+  appFeatureId: string,
+): Promise<ActiveVersionResponse> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/active-version`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: "getActiveVersion",
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
+    });
+
+    throw new Error(
+      `Failed to get active backend version: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+
+  return (await response.json()) as ActiveVersionResponse;
+}
+
 export async function initSourceUpload(
   apiKey: string,
   orgId: string,
   appId: string,
   appFeatureId: string,
   versionId: string,
+  backendHash?: string,
 ): Promise<InitSourceUploadResponse> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions/${versionId}/init-source-upload`;
@@ -855,6 +908,7 @@ export async function initSourceUpload(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
+    body: JSON.stringify(backendHash ? { backendHash } : {}),
   });
 
   if (!response.ok) {
