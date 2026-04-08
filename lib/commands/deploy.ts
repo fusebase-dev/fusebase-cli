@@ -10,6 +10,7 @@ import {
   createAppFeatureVersion,
   initUpload,
   initSourceUpload,
+  getActiveVersion,
   createDeploy,
   getDeploy,
   fetchApp,
@@ -148,6 +149,26 @@ async function runCommand(
       reject(new Error(`Failed to run command: ${error.message}`));
     });
   });
+}
+
+/**
+ * Calculate a deterministic SHA-256 hash of all files in a directory.
+ * Files are sorted by path to ensure consistent ordering.
+ * Excludes node_modules and hidden files.
+ */
+async function calculateBackendHash(dir: string): Promise<string> {
+  const { createHash } = await import("crypto");
+  const files = await getAllFiles(dir, dir, ["node_modules"]);
+  files.sort();
+
+  const hash = createHash("sha256");
+  for (const file of files) {
+    // Include the file path in the hash to detect renames
+    hash.update(file);
+    const content = await readFile(join(dir, file));
+    hash.update(content);
+  }
+  return hash.digest("hex");
 }
 
 /**
@@ -479,6 +500,23 @@ export const deployCommand = new Command("deploy")
         if (hasBackendDir) {
           console.log(`   Deploying backend...`);
 
+          // Calculate hash of backend to detect changes
+          console.log(`   Calculating backend hash...`);
+          const backendHash = await calculateBackendHash(backendDir);
+          logger.debug("Backend hash: %s", backendHash);
+
+          // Check if the active backend version has the same hash
+          const activeBackend = await getActiveVersion(
+            config.apiKey,
+            fuseConfig.orgId,
+            fuseConfig.appId,
+            featureId,
+          ).catch(() => null);
+
+          if (activeBackend?.backendHash === backendHash) {
+            console.log(`   ✓ Backend unchanged (hash matches active version), skipping deploy\n`);
+            // Skip backend deployment - use existing active version
+          } else {
           // Create tar.gz of backend folder
           console.log(`   Archiving backend...`);
           const archivePath = await createSourceArchive(backendDir, [
@@ -495,6 +533,7 @@ export const deployCommand = new Command("deploy")
             fuseConfig.appId,
             featureId,
             version.id,
+            backendHash,
           );
 
           // Upload archive to S3
@@ -550,6 +589,7 @@ export const deployCommand = new Command("deploy")
           }
 
           console.log(`\n   ✓ Backend deployed successfully\n`);
+          } // end else (hash changed)
         }
 
         // Build feature URL
