@@ -1011,6 +1011,43 @@ export async function getDeploy(
   return (await response.json()) as Deploy;
 }
 
+export async function copyBackendParams(
+  apiKey: string,
+  orgId: string,
+  targetVersionId: string,
+  sourceVersionId: string,
+): Promise<void> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${targetVersionId}/copy-backend-params`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ sourceVersionId }),
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: "copyBackendParams",
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
+    });
+
+    throw new Error(
+      `Failed to copy backend params: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // App Feature Secrets
 // ---------------------------------------------------------------------------

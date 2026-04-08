@@ -15,6 +15,7 @@ import {
   getDeploy,
   fetchApp,
   fetchAppFeatures,
+  copyBackendParams,
   type App,
   type AppFeature,
   type Deploy,
@@ -184,8 +185,7 @@ async function createSourceArchive(
   // Get all entries at the top level of sourceDir (excluding the archive itself and hidden files)
   const entries = await readdir(sourceDir);
   const filtered = entries.filter(
-    (e) =>
-      e !== ".source.tar.gz" && !e.startsWith(".") && !exclude.includes(e),
+    (e) => e !== ".source.tar.gz" && !e.startsWith(".") && !exclude.includes(e),
   );
 
   if (filtered.length === 0) {
@@ -421,6 +421,14 @@ export const deployCommand = new Command("deploy")
         }
         console.log(`   Files: ${files.length}`);
 
+        // Check if the active backend version has the same hash
+        const activeVersion = await getActiveVersion(
+          config.apiKey,
+          fuseConfig.orgId,
+          fuseConfig.appId,
+          featureId,
+        ).catch(() => null);
+
         // Create a new version
         console.log(`   Creating version...`);
         const version = await createAppFeatureVersion(
@@ -503,92 +511,99 @@ export const deployCommand = new Command("deploy")
           // Calculate hash of backend to detect changes
           console.log(`   Calculating backend hash...`);
           const backendHash = await calculateBackendHash(backendDir);
-          logger.debug("Backend hash: %s", backendHash);
+          logger.info("Backend hash: %s", backendHash);
 
-          // Check if the active backend version has the same hash
-          const activeBackend = await getActiveVersion(
-            config.apiKey,
-            fuseConfig.orgId,
-            fuseConfig.appId,
-            featureId,
-          ).catch(() => null);
-
-          if (activeBackend?.backendHash === backendHash) {
-            console.log(`   ✓ Backend unchanged (hash matches active version), skipping deploy\n`);
-            // Skip backend deployment - use existing active version
+          if (activeVersion?.backendHash === backendHash) {
+            console.log(
+              `   ✓ Backend unchanged (hash matches active version), skipping deploy\n`,
+            );
+            // Copy backend params from the active version to the new version
+            await copyBackendParams(
+              config.apiKey,
+              fuseConfig.orgId,
+              version.id,
+              activeVersion.globalId!,
+            );
           } else {
-          // Create tar.gz of backend folder
-          console.log(`   Archiving backend...`);
-          const archivePath = await createSourceArchive(backendDir, [
-            "node_modules",
-          ]);
-          const archiveStats = await stat(archivePath);
-          console.log(`   Archive: ${formatBytes(archiveStats.size)}`);
-
-          // Get presigned upload URL
-          console.log(`   Requesting backend upload URL...`);
-          const { uploadUrl: serverUploadUrl } = await initSourceUpload(
-            config.apiKey,
-            fuseConfig.orgId,
-            fuseConfig.appId,
-            featureId,
-            version.id,
-            backendHash,
-          );
-
-          // Upload archive to S3
-          console.log(`   Uploading backend archive...`);
-          const archiveContent = await readFile(archivePath);
-          const serverUploadRes = await fetch(serverUploadUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/gzip",
-              "Content-Length": archiveStats.size.toString(),
-            },
-            body: archiveContent,
-          });
-          if (!serverUploadRes.ok) {
-            logger.error(
-              "Fail to upload backend archive to url %s: %d %s, %s",
-              serverUploadUrl,
-              serverUploadRes.status,
-              serverUploadRes.statusText,
-              await serverUploadRes.text(),
+            console.log(
+              "   Backend hash does not match active version, proceeding with deploy (local ",
+              backendHash,
+              " != remote",
+              activeVersion?.backendHash,
+              ")",
             );
-            throw new Error(
-              `Backend upload failed: ${serverUploadRes.status} ${serverUploadRes.statusText}`,
+            // Create tar.gz of backend folder
+            console.log(`   Archiving backend...`);
+            const archivePath = await createSourceArchive(backendDir, [
+              "node_modules",
+            ]);
+            const archiveStats = await stat(archivePath);
+            console.log(`   Archive: ${formatBytes(archiveStats.size)}`);
+
+            // Get presigned upload URL
+            console.log(`   Requesting backend upload URL...`);
+            const { uploadUrl: serverUploadUrl } = await initSourceUpload(
+              config.apiKey,
+              fuseConfig.orgId,
+              fuseConfig.appId,
+              featureId,
+              version.id,
+              backendHash,
             );
-          }
 
-          // Clean up temp archive
-          const { unlink } = await import("fs/promises");
-          await unlink(archivePath).catch(() => {});
+            // Upload archive to S3
+            console.log(`   Uploading backend archive...`);
+            const archiveContent = await readFile(archivePath);
+            const serverUploadRes = await fetch(serverUploadUrl, {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/gzip",
+                "Content-Length": archiveStats.size.toString(),
+              },
+              body: archiveContent,
+            });
+            if (!serverUploadRes.ok) {
+              logger.error(
+                "Fail to upload backend archive to url %s: %d %s, %s",
+                serverUploadUrl,
+                serverUploadRes.status,
+                serverUploadRes.statusText,
+                await serverUploadRes.text(),
+              );
+              throw new Error(
+                `Backend upload failed: ${serverUploadRes.status} ${serverUploadRes.statusText}`,
+              );
+            }
 
-          // Start backend deploy
-          console.log(`   Starting backend deploy...`);
-          const deploy = await createDeploy(
-            config.apiKey,
-            fuseConfig.orgId,
-            fuseConfig.appId,
-            featureId,
-            version.id,
-            featureConfig.backend?.jobs,
-          );
-          console.log(`   Deploy ID: ${deploy.id}`);
-          console.log(`   Waiting for backend deploy to complete...\n`);
+            // Clean up temp archive
+            const { unlink } = await import("fs/promises");
+            await unlink(archivePath).catch(() => {});
 
-          // Poll deploy status & stream logs
-          const finalDeploy = await pollDeployStatus(
-            config.apiKey,
-            fuseConfig.orgId,
-            deploy.id,
-          );
+            // Start backend deploy
+            console.log(`   Starting backend deploy...`);
+            const deploy = await createDeploy(
+              config.apiKey,
+              fuseConfig.orgId,
+              fuseConfig.appId,
+              featureId,
+              version.id,
+              featureConfig.backend?.jobs,
+            );
+            console.log(`   Deploy ID: ${deploy.id}`);
+            console.log(`   Waiting for backend deploy to complete...\n`);
 
-          if (finalDeploy.status === "failed") {
-            throw new Error("Backend deploy failed — see logs above");
-          }
+            // Poll deploy status & stream logs
+            const finalDeploy = await pollDeployStatus(
+              config.apiKey,
+              fuseConfig.orgId,
+              deploy.id,
+            );
 
-          console.log(`\n   ✓ Backend deployed successfully\n`);
+            if (finalDeploy.status === "failed") {
+              throw new Error("Backend deploy failed — see logs above");
+            }
+
+            console.log(`\n   ✓ Backend deployed successfully\n`);
           } // end else (hash changed)
         }
 
