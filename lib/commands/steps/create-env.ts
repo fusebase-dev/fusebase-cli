@@ -222,6 +222,8 @@ async function generateGateMcpToken(
       "org.write",
       "org.members.read",
       "org.members.write",
+      "org.groups.read",
+      "org.groups.write",
       "automation.read",
       "automation.write",
       "automation.delete",
