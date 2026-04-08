@@ -1,7 +1,13 @@
 import { Command } from "commander";
-import { resolve, join } from "path";
+import { resolve, join, relative } from "path";
 import { spawn } from "child_process";
-import { listTemplates, copyTemplate, checkTemplateCollisions } from "../feature-templates";
+import { writeFile } from "fs/promises";
+import {
+  listTemplates,
+  copyTemplate,
+  checkTemplateCollisions,
+} from "../feature-templates";
+import { loadFuseConfig } from "../config";
 
 async function runNpmInstall(cwd: string): Promise<void> {
   console.log(`   Installing dependencies in ${cwd}...`);
@@ -13,7 +19,9 @@ async function runNpmInstall(cwd: string): Promise<void> {
     });
     child.on("close", (code) => {
       if (code !== 0) {
-        reject(new Error(`npm install failed with exit code ${code} in ${cwd}`));
+        reject(
+          new Error(`npm install failed with exit code ${code} in ${cwd}`),
+        );
       } else {
         resolve();
       }
@@ -22,9 +30,17 @@ async function runNpmInstall(cwd: string): Promise<void> {
 }
 
 export const scaffoldCommand = new Command("scaffold")
-  .description("Scaffold a new feature from a template. Without options, lists available templates.")
-  .option("-t, --template <templateId>", "Template ID to scaffold (e.g. spa, backend)")
-  .option("-d, --dir <directory>", "Target directory where the template will be deployed")
+  .description(
+    "Scaffold a new feature from a template. Without options, lists available templates.",
+  )
+  .option(
+    "-t, --template <templateId>",
+    "Template ID to scaffold (e.g. spa, backend)",
+  )
+  .option(
+    "-d, --dir <directory>",
+    "Target directory where the template will be deployed",
+  )
   .action(async (options: { template?: string; dir?: string }) => {
     const { template: templateId, dir } = options;
 
@@ -65,7 +81,7 @@ export const scaffoldCommand = new Command("scaffold")
 
     if (collisions.length > 0) {
       console.error(
-        `Error: Scaffold '${templateId}' would overwrite existing files in '${targetDir}':`
+        `Error: Scaffold '${templateId}' would overwrite existing files in '${targetDir}':`,
       );
       for (const f of collisions) {
         console.error(`  ${f}`);
@@ -80,6 +96,37 @@ export const scaffoldCommand = new Command("scaffold")
       // Install dependencies
       if (templateId === "backend") {
         await runNpmInstall(join(targetDir, "backend"));
+
+        // If targetDir matches a registered feature, auto-add backend config to fusebase.json
+        const fuseJsonPath = join(process.cwd(), "fusebase.json");
+        const fuseConfig = loadFuseConfig();
+        if (fuseConfig?.features) {
+          const cwd = process.cwd();
+          const relTargetDir = relative(cwd, targetDir).replace(/\\/g, "/");
+          const feature = fuseConfig.features.find(
+            (f) =>
+              f.path &&
+              (f.path === relTargetDir || resolve(cwd, f.path) === targetDir),
+          );
+          if (feature && !feature.backend) {
+            feature.backend = {
+              dev: { command: "npm run dev" },
+              build: { command: "npm run build" },
+              start: { command: "npm run start" },
+            };
+            await writeFile(
+              fuseJsonPath,
+              JSON.stringify(fuseConfig, null, 2),
+              "utf-8",
+            );
+            console.log(
+              `✓ Added backend config to fusebase.json for feature: ${feature.path}`,
+            );
+            console.log(`    backend.dev.command:   npm run dev`);
+            console.log(`    backend.build.command: npm run build`);
+            console.log(`    backend.start.command: npm run start`);
+          }
+        }
       } else {
         await runNpmInstall(targetDir);
       }
