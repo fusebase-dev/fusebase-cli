@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-04-06"
+last_synced: "2026-04-08"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -41,6 +41,8 @@ End-to-end reference for **`sql` / `postgres`** isolated stores: MCP tools, `@fu
 | List/create stores      | Control-plane permissions on isolated-store ops                                  |
 
 Schema **never** goes through `executeIsolatedStoreSql`.
+
+For the midsize-target PostgreSQL Row-Level Security path and the recommended Gate integration model, see [isolated-sql-rls-plan.md](./isolated-sql-rls-plan.md).
 
 ---
 
@@ -155,4 +157,4 @@ For **NoSQL** stores (`nosql` / `mongodb_atlas`), use MCP prompt **`isolatedNoSq
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-04-06
+- **Last synced**: 2026-04-08

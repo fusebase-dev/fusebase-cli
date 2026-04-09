@@ -1,7 +1,7 @@
 ---
-version: "1.2.0"
+version: "1.3.0"
 mcp_prompt: billing
-last_synced: "2026-04-07"
+last_synced: "2026-04-09"
 title: "Fusebase Gate Billing And Stripe Flows"
 category: specialized
 ---
@@ -33,23 +33,29 @@ These operations manage organization-scoped Stripe setup, Stripe-backed products
 - Use `updateStripeMode` when you need a fast live/test API key switch for an existing Stripe connection. Do not assume products or prices are copied across modes.
 - Treat `stripeAccountId` as the source-of-truth Stripe connection identifier for product and checkout calls.
 - Use stable `kind` and `kindId` values from your own system so webhook-backed payment state can be mapped back to your product or entitlement.
+- Treat `stripeAccountId` + `kind` + `kindId` as the unique identity for a Gate-managed Stripe product. Use `findStripeProduct` before `createStripeProduct`, and only create when nothing already exists for that identity.
 - `buyerId` for `getStripePaymentLink` and `getStripePaymentState` must be a numeric buyer identifier. Pass `buyerId: user.id`, not `buyerId: String(user.id)`.
 - For `mode: "subscription"`, send both `interval` and `intervalCount`.
 - For `mode: "payment"`, omit `interval` and `intervalCount`.
 - `updateStripeProduct` is implemented as delete plus create. Do not assume Stripe products are edited in place.
+- Treat `createStripeProduct`, `updateStripeProduct`, and `deleteStripeProduct` as owner-admin setup flows, not end-user self-service actions for arbitrary registered users.
+- `getStripePaymentLink` expects all of: `stripeAccountId`, `kind`, `kindId`, numeric `buyerId`, `successUrl`, and `cancelUrl`.
+- If `getStripePaymentLink` returns `url: null`, first verify those checkout inputs are present, non-empty, and match an existing Gate product identity before retrying.
 - Use `getStripePaymentLink` to obtain the redirect URL. The user still pays on Stripe-hosted checkout.
+- After checkout returns to your success page, do not unlock access immediately. Poll `getStripePaymentState` in a short loop because payment activation is processed asynchronously from Stripe webhooks.
 - Use `getStripePaymentState` after checkout or webhook processing to confirm whether the buyer is currently active.
 
 ## Access Model
 
 - Read flows require `billing.read` and org access.
 - Stripe mode switching, product creation, replacement, deletion, and checkout-link generation require `billing.write` and org access.
+- Even when a caller has `billing.write`, prefer app-level policy that limits product-management flows to owner-admin actors.
 - If billing-service rejects a call, investigate org access, token permissions, and Stripe connection state before changing payload shape.
 ---
 
 ## Version
 
-- **Version**: 1.2.0
+- **Version**: 1.3.0
 - **Category**: specialized
-- **Last synced**: 2026-04-07
+- **Last synced**: 2026-04-09
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
