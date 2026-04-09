@@ -51,7 +51,7 @@ Available Stripe operations:
 
 - Always call `getStripeOauth` before product or checkout flows if the org may not be connected yet.
 - Treat `stripeAccountId` as the source-of-truth connected Stripe account identifier.
-- Use stable app-owned `kind` and `kindId` values. That is how Gate maps checkout and webhook-backed payment state back to your app concept.
+- Use stable app-owned `kind` and `kindId` values. Keep `kind` at 32 chars max and `kindId` at 64 chars max. That is how Gate maps checkout and webhook-backed payment state back to your app concept.
 - Treat `stripeAccountId` + `kind` + `kindId` as the unique identity for a Gate-managed Stripe product. Call `findStripeProduct` before `createStripeProduct`, and only create when nothing already exists for that identity.
 - `buyerId` for `getStripePaymentLink` and `getStripePaymentState` must be a number. Pass `buyerId: user.id`, not `buyerId: String(user.id)`.
 - For `mode: "subscription"`, send both `interval` and `intervalCount`.
@@ -83,8 +83,8 @@ buyerId: String(user.id);
 For `getStripePaymentLink`, always send:
 
 - `stripeAccountId`
-- `kind`
-- `kindId`
+- `kind` as a stable app-owned type key, max 32 chars
+- `kindId` as a stable app-owned object key, max 64 chars
 - `buyerId` as a number
 - `successUrl`
 - `cancelUrl`

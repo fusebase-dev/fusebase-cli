@@ -1,5 +1,5 @@
 ---
-version: "1.1.0"
+version: "1.1.1"
 mcp_prompt: stripeApps
 last_synced: "2026-04-09"
 title: "Fusebase Gate Stripe App And Agent Integration"
@@ -34,7 +34,7 @@ Use these rules when Stripe operations are called from application code, a backe
 ## Stripe Object Identity
 
 - Treat `stripeAccountId` as the source-of-truth connected account id for product and checkout calls.
-- Treat app-owned `kind` and `kindId` as stable identifiers for the commercial object in your system. Those values must remain stable across checkout and later payment-state reads.
+- Treat app-owned `kind` and `kindId` as stable identifiers for the commercial object in your system. Keep `kind` at 32 chars max and `kindId` at 64 chars max. Those values must remain stable across checkout and later payment-state reads.
 - Treat `stripeAccountId` + `kind` + `kindId` as the unique identity for a Gate-managed Stripe product. Call `findStripeProduct` before `createStripeProduct`, and only create when nothing already exists for that identity.
 - `buyerId` for `getStripePaymentLink` and `getStripePaymentState` must stay numeric. Pass `buyerId: user.id`, not `buyerId: String(user.id)`.
 - Treat `createStripeProduct`, `updateStripeProduct`, and `deleteStripeProduct` as owner-admin setup flows in your app or backend. Do not expose those operations to arbitrary registered end users.
@@ -64,7 +64,7 @@ Use these rules when Stripe operations are called from application code, a backe
 
 ## Version
 
-- **Version**: 1.1.0
+- **Version**: 1.1.1
 - **Category**: specialized
 - **Last synced**: 2026-04-09
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

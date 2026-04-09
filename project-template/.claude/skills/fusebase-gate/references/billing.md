@@ -1,5 +1,5 @@
 ---
-version: "1.3.0"
+version: "1.3.1"
 mcp_prompt: billing
 last_synced: "2026-04-09"
 title: "Fusebase Gate Billing And Stripe Flows"
@@ -32,7 +32,7 @@ These operations manage organization-scoped Stripe setup, Stripe-backed products
 - Always use `getStripeOauth` before product or checkout flows when the org may not be connected to Stripe yet.
 - Use `updateStripeMode` when you need a fast live/test API key switch for an existing Stripe connection. Do not assume products or prices are copied across modes.
 - Treat `stripeAccountId` as the source-of-truth Stripe connection identifier for product and checkout calls.
-- Use stable `kind` and `kindId` values from your own system so webhook-backed payment state can be mapped back to your product or entitlement.
+- Use stable `kind` and `kindId` values from your own system. Keep `kind` at 32 chars max and `kindId` at 64 chars max so webhook-backed payment state can be mapped back to your product or entitlement.
 - Treat `stripeAccountId` + `kind` + `kindId` as the unique identity for a Gate-managed Stripe product. Use `findStripeProduct` before `createStripeProduct`, and only create when nothing already exists for that identity.
 - `buyerId` for `getStripePaymentLink` and `getStripePaymentState` must be a numeric buyer identifier. Pass `buyerId: user.id`, not `buyerId: String(user.id)`.
 - For `mode: "subscription"`, send both `interval` and `intervalCount`.
@@ -55,7 +55,7 @@ These operations manage organization-scoped Stripe setup, Stripe-backed products
 
 ## Version
 
-- **Version**: 1.3.0
+- **Version**: 1.3.1
 - **Category**: specialized
 - **Last synced**: 2026-04-09
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
