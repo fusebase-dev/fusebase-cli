@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-rls-plan.md"
-last_synced: "2026-04-08"
+last_synced: "2026-04-09"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
 ---
@@ -12,6 +12,8 @@ category: specialized
 
 ---
 # Isolated SQL stores — PostgreSQL RLS plan for Gate
+
+Short summary for quick reading: for `gate isolated stores`, the recommended `v1` model is `org_id + user_id` RLS enforced by PostgreSQL itself, with Gate injecting trusted per-request session context into the DB connection, migrations running under a separate migrator role, and runtime queries running under an RLS-bound runtime role. The key rule is that table security is not guessed from SQL automatically: every app-owned table must be explicitly classified as `tenant`, `user`, `owner_collaborator`, `none`, or `technical`, and CI or migration validation must check that the SQL matches that declared security model.
 
 Practical security plan for adding PostgreSQL Row-Level Security (RLS) to `gate isolated stores` in a way that matches midsize customer expectations.
 
@@ -80,6 +82,21 @@ Recommended `v1` operating rule:
 - Gate injects trusted session context into PostgreSQL
 - RLS policies read only that session context
 - app code never decides the effective tenant or user by itself
+
+On one slide / in plain language:
+
+1. vibe code wants a new table
+2. it cannot silently create schema in the database
+3. it must create a migration plus a manifest entry
+4. the manifest must declare what kind of table this is:
+   - `tenant`
+   - `user`
+   - `owner_collaborator`
+   - `none`
+   - `technical`
+5. validation checks whether the SQL matches that declared security type
+6. only then Gate applies the migration
+7. later, runtime access goes through Gate, and PostgreSQL RLS filters rows by trusted `org_id` / `user_id` session context
 
 ---
 
@@ -270,6 +287,16 @@ This is enough for `v1`. Avoid more complex ACL/RBAC-in-table designs at first.
 
 ### 3.1 What should be mandatory in SQL migrations
 
+The validator should not try to infer business meaning from raw SQL alone. It needs an explicit declaration for each created table or migration target, for example:
+
+- `tenant`
+- `user`
+- `owner_collaborator`
+- `none`
+- `technical`
+
+This is also the practical difference between our recommended Gate path and a plain “write policies manually” workflow: Supabase-style SQL still relies on developer intent, but for Gate we want that intent declared and machine-validated.
+
 For app-owned tables in `v1`, require:
 
 - `org_id uuid not null`
@@ -299,6 +326,38 @@ These are practical and realistic for the current architecture:
    - migrator
    - runtime
 
+### 3.2.1 Simple example for a call
+
+Example: an e-commerce app creates these tables:
+
+- `orders`
+- `order_items`
+- `draft_carts`
+- `theme_catalog`
+- `import_orders_tmp`
+
+Where RLS is needed:
+
+- `orders`
+  - tenant business data
+  - users from one org must not see orders of another org
+- `order_items`
+  - same tenant scope as orders
+- `draft_carts`
+  - user-private data inside an org
+  - needs both `org_id` and `user_id`
+
+Where RLS is not necessarily needed:
+
+- `theme_catalog`
+  - if this is a global visual-theme catalog shared by all apps and all orgs
+  - classify as `none`
+- `import_orders_tmp`
+  - temporary technical import table not exposed to user runtime
+  - classify as `technical`
+
+The important part is that this is declared explicitly and then validated. The validator should not guess business meaning from SQL names alone.
+
 #### Next enforcement step
 
 Add a migration linter in CI for `postgres/migrations/*.sql`.
@@ -321,10 +380,11 @@ Minimal checks:
 
 For `v1`, use an explicit table annotation or manifest rule in the app repo:
 
-- `shared_by_org`
-- `private_by_user`
+- `tenant`
+- `user`
 - `owner_collaborator`
-- `reference_table_no_rls`
+- `none`
+- `technical`
 
 This matters because not every table needs the same policy.
 
@@ -333,8 +393,39 @@ Examples:
 - `event_categories` may be a tenant-shared table
 - `draft_carts` may be private by user
 - `project_comments` may be owner/collaborator
+- `visual_themes_catalog` may be `none` if global and truly context-free
+- `import_products_tmp` may be `technical`
 
 Without this annotation, a linter will produce too many false positives.
+
+Table-creation flow for vibe-coded apps:
+
+```mermaid
+flowchart TD
+  A["Vibe code wants a new table"] --> B["Create migration SQL + manifest entry"]
+  B --> C["Declare table security type"]
+  C --> C1["tenant"]
+  C --> C2["user"]
+  C --> C3["owner_collaborator"]
+  C --> C4["none"]
+  C --> C5["technical"]
+
+  C1 --> D["Validator checks required columns, indexes, RLS, and policies"]
+  C2 --> D
+  C3 --> D
+  C4 --> E["Validator checks explicit exemption is allowed"]
+  C5 --> E
+
+  D --> F{"Validation passed?"}
+  E --> F
+
+  F -- "No" --> G["Reject migration with structured errors"]
+  F -- "Yes" --> H["Gate applyIsolatedStoreSqlMigrations"]
+  H --> I["Postgres creates table and enables policies"]
+  I --> J["Runtime access goes through Gate"]
+  J --> K["Gate sets trusted org and user session context"]
+  K --> L["PostgreSQL RLS filters visible rows"]
+```
 
 ### 3.4 Which tables can be exempt
 
@@ -566,4 +657,4 @@ For `gate isolated stores`, use a combined `org_id + user_id` RLS model, with `o
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-04-08
+- **Last synced**: 2026-04-09
