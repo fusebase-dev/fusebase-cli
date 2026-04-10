@@ -1,7 +1,7 @@
 ---
-version: "1.3.1"
+version: "1.4.0"
 mcp_prompt: billing
-last_synced: "2026-04-09"
+last_synced: "2026-04-10"
 title: "Fusebase Gate Billing And Stripe Flows"
 category: specialized
 ---
@@ -14,7 +14,7 @@ category: specialized
 ---
 ## Fusebase Gate Billing And Stripe Flows
 
-These operations manage organization-scoped Stripe setup, Stripe-backed products, checkout links, and webhook-backed payment state through Gate.
+These operations manage organization-scoped Stripe setup, Stripe-backed products, subscription cancellation, checkout links, and webhook-backed payment state through Gate.
 
 ## Relevant Operations
 
@@ -25,6 +25,7 @@ These operations manage organization-scoped Stripe setup, Stripe-backed products
 - updateStripeProduct: replace a product by deleting the old record and creating a new one.
 - deleteStripeProduct: mark an existing product as deleted.
 - getStripePaymentLink: create or retrieve a checkout URL for a buyer.
+- cancelStripeSubscription: cancel a buyer subscription immediately or at the end of the billing period.
 - getStripePaymentState: read the latest active state stored from Stripe webhook processing.
 
 ## Working Rules
@@ -42,20 +43,24 @@ These operations manage organization-scoped Stripe setup, Stripe-backed products
 - `getStripePaymentLink` expects all of: `stripeAccountId`, `kind`, `kindId`, numeric `buyerId`, `successUrl`, and `cancelUrl`.
 - If `getStripePaymentLink` returns `url: null`, first verify those checkout inputs are present, non-empty, and match an existing Gate product identity before retrying.
 - Use `getStripePaymentLink` to obtain the redirect URL. The user still pays on Stripe-hosted checkout.
+- `cancelStripeSubscription` expects all of: `stripeAccountId`, `kind`, `kindId`, and numeric `buyerId` for an existing subscription identity.
+- Omitting `cancelAtPeriodEnd` or setting it to `true` is the safe default: the subscription stays active until the current billing period ends.
+- Set `cancelAtPeriodEnd: false` only when you need immediate cancellation and immediate access removal.
+- After a scheduled period-end cancellation, do not flip the buyer inactive immediately. Wait for webhook-backed payment state to turn inactive near the period boundary.
 - After checkout returns to your success page, do not unlock access immediately. Poll `getStripePaymentState` in a short loop because payment activation is processed asynchronously from Stripe webhooks.
 - Use `getStripePaymentState` after checkout or webhook processing to confirm whether the buyer is currently active.
 
 ## Access Model
 
 - Read flows require `billing.read` and org access.
-- Stripe mode switching, product creation, replacement, deletion, and checkout-link generation require `billing.write` and org access.
+- Stripe mode switching, product creation, replacement, deletion, checkout-link generation, and subscription cancellation require `billing.write` and org access.
 - Even when a caller has `billing.write`, prefer app-level policy that limits product-management flows to owner-admin actors.
 - If billing-service rejects a call, investigate org access, token permissions, and Stripe connection state before changing payload shape.
 ---
 
 ## Version
 
-- **Version**: 1.3.1
+- **Version**: 1.4.0
 - **Category**: specialized
-- **Last synced**: 2026-04-09
+- **Last synced**: 2026-04-10
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
