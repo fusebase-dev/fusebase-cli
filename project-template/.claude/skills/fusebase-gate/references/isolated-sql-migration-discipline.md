@@ -1,7 +1,7 @@
 ---
 version: "1.1.3"
 mcp_prompt: isolatedSqlMigrationDiscipline
-last_synced: "2026-04-06"
+last_synced: "2026-04-10"
 title: "Fusebase Gate — Isolated SQL migration discipline"
 category: specialized
 ---
@@ -29,13 +29,14 @@ On apply: **HTTP 409**, **`data.errorCode`** **`isolated_sql_migration_drift`**,
 3. **Fixes = new tail versions** only (K+1, K+2, …), never rewrite applied files.
 4. **Prefix alignment** — first **N** bundle entries must match journal **1..N**; **pending** = tail after **N**.
 5. **dev / prod** — same logical version line and SQL per version; **separate** DBs and journals. Prod may lag dev.
-6. **MUST flow order** — for any schema change: create/update files in **`postgres/migrations/`** first, compute checksum from file bytes, then run status, then apply.
+6. **MUST flow order** — for any schema change: create/update files in **`postgres/migrations/`** first, assemble the bundle with SDK helper **`buildSqlMigrationBundle(...)`**, then run status, then apply.
 7. **Inline SQL restriction** — inline SQL in MCP `tool_call` is allowed only for one-off smoke/dev tests and must be explicitly marked temporary.
 8. **Final gate** — do not mark work done when schema changed but no new/updated migration file or manifest entry exists under **`postgres/migrations/`**.
+9. **Manifest is app-owned, not environment state** — do not store `storeId`, `stageDevApplied`, `stageProdApplied`, or similar per-stage apply markers in the migration manifest. Stage state belongs to Gate journals and deployment logs.
 
 ## Required artifact after schema ops
 
-Always leave these fields in the handoff/log: migration file path, **`version`**, **`name`**, **`checksum`**, **`storeId`**, **`stage`**.
+Always leave these fields in the handoff/log: migration file path, **`version`**, **`name`**, **`checksum`**, **`storeId`**, **`stage`**. Keep these in handoff or operator logs, not in the manifest itself.
 
 ## Fixing drift (allowed)
 
@@ -46,6 +47,7 @@ Always leave these fields in the handoff/log: migration file path, **`version`**
 ## Checklist (every status / apply)
 
 - [ ] Versions strictly increasing; one entry per version.
+- [ ] Bundle assembled with **`buildSqlMigrationBundle(...)`** from exact file contents.
 - [ ] **`checksum`** = SHA-256 of exact UTF-8 **`sql`** you send.
 - [ ] No silent edits to already-applied files.
 - [ ] **Prod:** **`getIsolatedStoreSqlMigrationStatus`** with the **same** bundle → then **`applyIsolatedStoreSqlMigrations`**; confirm **`canApply`** / **`pendingCount`**.
@@ -69,5 +71,5 @@ Avoid **`CREATE EXTENSION pgcrypto`** on locked-down hosts; prefer **`gen_random
 
 - **Version**: 1.1.3
 - **Category**: specialized
-- **Last synced**: 2026-04-06
+- **Last synced**: 2026-04-10
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

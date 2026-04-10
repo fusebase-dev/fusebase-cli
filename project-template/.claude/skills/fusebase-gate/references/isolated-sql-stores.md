@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-04-08"
+last_synced: "2026-04-10"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -41,6 +41,7 @@ End-to-end reference for **`sql` / `postgres`** isolated stores: MCP tools, `@fu
 | List/create stores      | Control-plane permissions on isolated-store ops                                  |
 
 Schema **never** goes through `executeIsolatedStoreSql`.
+Operator migration calls do not require a session-backed user anymore: token-auth requests with the right permission can apply migrations through HTTP/SDK, and Gate records a stable token actor label in the audit fields when no concrete `userId` is present.
 
 For the midsize-target PostgreSQL Row-Level Security path and the recommended Gate integration model, see [isolated-sql-rls-plan.md](./isolated-sql-rls-plan.md).
 
@@ -50,6 +51,25 @@ For the midsize-target PostgreSQL Row-Level Security path and the recommended Ga
 
 Every call needs **`orgId`**, **`storeId`**, **`stage`** (`dev` | `prod`) exactly as Gate returned them.  
 **`dev` and `prod` are different databases** — same logical migration _sequence_ (version numbers + SQL per version), separate journals.
+
+---
+
+## 3.1 Bundle assembly in the app / agent
+
+If the app or its coding agent can read the migration `.sql` files, prefer the Gate SDK helper instead of hand-building JSON:
+
+- `buildSqlMigrationBundle({ bundleVersion?, migrations })`
+- `calculateSqlMigrationChecksum(sql)`
+
+Typical flow:
+
+1. Read ordered `.sql` files from the app repo.
+2. Pass `version`, `name`, and exact SQL text into `buildSqlMigrationBundle(...)`.
+3. Send the resulting bundle to:
+   - `getIsolatedStoreSqlMigrationStatus`
+   - `applyIsolatedStoreSqlMigrations`
+
+This keeps checksum generation canonical and avoids agent drift from ad-hoc hashing logic.
 
 ---
 
@@ -157,4 +177,4 @@ For **NoSQL** stores (`nosql` / `mongodb_atlas`), use MCP prompt **`isolatedNoSq
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-04-08
+- **Last synced**: 2026-04-10
