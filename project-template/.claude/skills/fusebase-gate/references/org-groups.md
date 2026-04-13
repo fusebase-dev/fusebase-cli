@@ -1,5 +1,5 @@
 ---
-version: "1.0.0"
+version: "1.1.0"
 mcp_prompt: org_groups
 last_synced: "2026-04-13"
 title: "Fusebase Gate Org Group Operations"
@@ -50,17 +50,24 @@ These operations manage organization groups, group members, and workspace-group 
 
 ## Workspace Assignment Rules
 
+- Workspace-group assignment payloads use a workspace `role` field. Do not confuse that field with Gate operation permissions.
 - Use `listOrgGroupWorkspaces` to inspect where one group is assigned.
 - Set `workspace: true` on `listOrgGroupWorkspaces` when you need workspace details in each workspace-group record.
 - Use `listWorkspaceGroups` or `countWorkspaceGroups` when the caller starts from one workspace.
 - `addGroupToWorkspace` requires `groupId` and `role`, and optionally accepts assignment `type` of `full` or `partial`.
 - `updateWorkspaceGroup` updates the assigned `role`; it is not a generic partial patch for every workspace-group field.
 - `deleteWorkspaceGroup` removes one group assignment from the resolved workspace.
+- Current workspace role vocabulary is `reader`, `editor`, `admin`, `no-access`, `deny`.
+- If you present role options in UI, preserve the current order: `reader`, `editor`, `admin`, `no-access`, `deny`.
+- `reader`, `editor`, and `admin` are the normal positive workspace-access roles.
+- `no-access` is a special removal role. In org-service-backed updates, it removes an existing workspace assignment rather than persisting a positive assignment.
+- `deny` is an explicit negative role. It can override other positive workspace access grants for the same user, including access inherited from another group.
 
 ## Access Model
 
 - Read operations require `org.groups.read` and org access.
 - Write operations require `org.groups.write` and org access.
+- These Gate permissions authorize the operation call itself; they are separate from the workspace `role` values used inside group assignment payloads.
 - Gate forwards these calls to org-service with user-scoped internal auth, so permission failures usually mean caller access is wrong rather than the payload shape.
 
 ## Working Rules
@@ -73,7 +80,7 @@ These operations manage organization groups, group members, and workspace-group 
 
 ## Version
 
-- **Version**: 1.0.0
+- **Version**: 1.1.0
 - **Category**: specialized
 - **Last synced**: 2026-04-13
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
