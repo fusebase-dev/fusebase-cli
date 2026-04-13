@@ -1,7 +1,7 @@
 ---
 version: "1.2.8"
 mcp_prompt: isolated
-last_synced: "2026-04-05"
+last_synced: "2026-04-13"
 title: "Fusebase Gate Isolated Stores"
 category: specialized
 ---
@@ -18,7 +18,7 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 ## Core Model
 
-- An isolated store is a logical app-owned low-level database or document store.
+- An isolated store is a logical app-owned SQL database.
 - A store belongs to an org and to a source scope such as `app`.
 - Each store has stage instances such as `dev` and `prod`.
 - Each stage instance binds to its own physical database.
@@ -28,10 +28,10 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 1. Create the isolated store.
 2. Initialize a stage such as `dev` or `prod`.
-3. Use SQL tools for `sql/postgres` stores and NoSQL tools for `nosql/mongodb_atlas` stores.
+3. Use SQL tools for `sql/postgres` stores.
 4. Create checkpoints before risky changes.
 5. Restore a revision only when the revision has a physical `file://` snapshot.
-6. Use store stats operations when you need database-level summaries instead of per-table or per-collection calls.
+6. Use store stats operations when you need database-level summaries instead of per-table calls.
 
 ## Access Rules
 
@@ -54,13 +54,12 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 - For store or stage lifecycle, use the generic isolated store operations.
 - For `sql/postgres`, load the `isolatedSql` prompt group and prefer structured row operations before raw SQL.
-- For `nosql/mongodb_atlas`, load the `isolatedNoSql` prompt group and use collection/document operations.
-- For database-level summaries, prefer `getIsolatedStoreSqlStats` or `getIsolatedStoreNoSqlStats` over manually stitching list/describe/count calls.
+- For database-level summaries, prefer `getIsolatedStoreSqlStats` over manually stitching list/describe/count calls.
 
 ## UI deep links (store view)
 
 - Store page template: `https://<org-subdomain>.<fusebase-domain>/studio/<org-ui-id>/isolated-stores/<store-type>/<store-id>`.
-- Replace placeholders with real values: org subdomain and fusebase domain, org UI id, store type (`sql` or `nosql`), and store id.
+- Replace placeholders with real values: org subdomain and fusebase domain, org UI id, store type (`sql`), and store id.
 - SQL table view adds query param: `?table=<schema.table_name>` (example: `?table=public.fusebase_schema_migrations`).
 - After creating a store or creating a SQL table through MCP, suggest opening the matching UI link for quick verification.
 
@@ -87,5 +86,5 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 - **Version**: 1.2.8
 - **Category**: specialized
-- **Last synced**: 2026-04-05
+- **Last synced**: 2026-04-13
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

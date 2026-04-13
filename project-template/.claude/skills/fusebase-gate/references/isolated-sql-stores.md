@@ -279,13 +279,11 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 ## 12. Related sources
 
-| What                       | Where                                                                                    |
-| -------------------------- | ---------------------------------------------------------------------------------------- |
-| MCP prompts (LLM)          | `src/mcp/prompts/isolated.ts`, `isolated-sql.ts`, `isolated-sql-migration-discipline.ts` |
-| Regenerated skill copies   | `npm run mcp:skills:generate` → `generated/claude_skills/fusebase-gate/references/`      |
-| Isolated SQL + NoSQL index | `docs/isolated-sql-stores.md` (this file), `AGENTS.md`                                   |
-
-For **NoSQL** stores (`nosql` / `mongodb_atlas`), use MCP prompt **`isolatedNoSql`** — different tool set (collections/documents, `mongodump`/`mongorestore`).
+| What                     | Where                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| MCP prompts (LLM)        | `src/mcp/prompts/isolated.ts`, `isolated-sql.ts`, `isolated-sql-migration-discipline.ts` |
+| Regenerated skill copies | `npm run mcp:skills:generate` → `generated/claude_skills/fusebase-gate/references/`      |
+| Isolated SQL index       | `docs/isolated-sql-stores.md` (this file), `AGENTS.md`                                   |
 ---
 
 ## Version
