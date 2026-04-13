@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-04-10"
+last_synced: "2026-04-13"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -16,18 +16,109 @@ category: specialized
 End-to-end reference for **`sql` / `postgres`** isolated stores: MCP tools, `@fusebase/fusebase-gate-sdk` (`IsolatedStoresApi`), permissions, migrations, and failure modes.  
 **Contracts:** `src/api/contracts/ops/isolated-stores/isolated-stores.ts`.
 
+Current stable baseline (2026-04-12):
+
+- new SQL apps can be bootstrapped through Gate with ordered migration bundles and read-only or read/write runtime paths;
+- Gate persists the latest applied/adopted SQL migration bundle into stage metadata;
+- Studio can render migration status from Gate metadata without local app-repo access;
+- remaining issues observed in dev are non-blocking UI/style issues, not isolated-store core flow regressions.
+
+Current rollout position (2026-04-12):
+
+- dev rollout under `isolated-stores` flag is active;
+- production pilot target is our managed apps plus selected client projects, not broad public self-serve release;
+- current baseline provider path for `postgres` remains Azure;
+- `Neon` is under evaluation as a future provider option, not as a replacement for Gate contracts or the current `v1` rollout path.
+
 ---
 
 ## 1. Quick decisions
 
-| Goal                       | Use                                                                                                |
-| -------------------------- | -------------------------------------------------------------------------------------------------- |
-| Create store + DB stage    | `createIsolatedStore` → `initIsolatedStoreStage`                                                   |
-| Change schema (DDL)        | **Only** `getIsolatedStoreSqlMigrationStatus` + `applyIsolatedStoreSqlMigrations` (ordered bundle) |
-| Insert/update/delete rows  | Structured row APIs (`insertIsolatedStoreSqlRow`, …) or read-only `queryIsolatedStoreSql`          |
-| Large seed (data, not DDL) | `importIsolatedStoreSqlRows` (CSV/TSV → `COPY`)                                                    |
-| Chat / MCP smoke test      | One small migration **or** status + dryRun; big bundles → **SDK/CI**                               |
-| Understand drift / 409     | Response `structuredIssues` / error `data.issues`; MCP prompt **`isolatedSqlMigrationDiscipline`** |
+| Goal                      | Use                                                                                                |
+| ------------------------- | -------------------------------------------------------------------------------------------------- |
+| Create store + DB stage   | `createIsolatedStore` → `initIsolatedStoreStage`                                                   |
+| Change schema (DDL)       | **Only** `getIsolatedStoreSqlMigrationStatus` + `applyIsolatedStoreSqlMigrations` (ordered bundle) |
+| Insert/update/delete rows | Structured row APIs (`insertIsolatedStoreSqlRow`, …) or read-only `queryIsolatedStoreSql`          |
+| Seed / backfill data      | Structured row APIs or `importIsolatedStoreSqlRows` (CSV/TSV → `COPY`)                             |
+| Chat / MCP smoke test     | One small migration **or** status + dryRun; big bundles → **SDK/CI**                               |
+| Understand drift / 409    | Response `structuredIssues` / error `data.issues`; MCP prompt **`isolatedSqlMigrationDiscipline`** |
+
+---
+
+## 1.1 Current managed-store capability summary
+
+For `sql/postgres`, the current managed-store path already supports:
+
+- app-bound store registration
+- dedicated `dev` / `prod` stage databases
+- migration status / dry-run / apply with a stage-local journal
+- structured row CRUD
+- batch insert and CSV/TSV import via `COPY`
+- stage stats, table introspection, counts, and query/select paths
+- checkpoints and full stage restore
+- Studio migration/status rendering via bundle metadata persisted by Gate
+
+What it does not yet fully productize:
+
+- app release pipeline delivery of migration bundles
+- first-class snapshot preview API
+- completed SQL RLS enforcement layer
+- production-grade retention / external snapshot storage policy
+
+For the next production-pilot cut, the main remaining tasks are:
+
+- backup / restore path that is safe enough for managed apps and selected client projects;
+- migration / copy flow for managed apps;
+- minimal frontend/backend execution split that does not rely only on skills;
+- a stable operator-facing path into store management (Studio path is acceptable for the pilot).
+
+Items that can wait for public-release hardening:
+
+- full frontend/backend token split;
+- public account / NX-facing store UI;
+- autoscaling / multi-instance provider work;
+- polished external snapshot UX.
+
+---
+
+## 1.2 Provider note — Neon vs current Gate path
+
+`Neon` is worth evaluating as a PostgreSQL provider option, but it does **not** replace the need for the current Gate-owned contract.
+
+What Neon brings officially that is relevant here:
+
+- serverless Postgres access over `HTTP` / `WebSockets`;
+- compute autoscaling;
+- branching / point-in-time restore primitives;
+- agent-oriented packaging;
+- AWS and Azure deployment regions.
+
+What still has to remain Gate-owned even if Neon is adopted underneath:
+
+- app/store binding;
+- token permissions and `resource_scope`;
+- stage lifecycle semantics (`dev` / `prod`);
+- migration discipline and stage-aware apply flow;
+- frontend-safe structured operations vs backend-only privileged execution;
+- store control-plane lifecycle and Studio-facing metadata.
+
+Practical comparison:
+
+- if the question is infra/provider ergonomics, `Neon` may be stronger than a self-managed path on:
+  - cost elasticity
+  - provisioning speed
+  - built-in branch/restore primitives
+- if the question is app/runtime contract, `Neon` does not remove the need for `Gate`;
+- `HTTP` transport itself is not a blocker:
+  - toolized SQL over MCP / HTTP is already a normal pattern
+  - in current tests we have not seen codegen regressions caused by the Gate HTTP path
+  - MCP agents here should not treat raw SQL as the primary contract anyway
+
+Current recommendation:
+
+- keep Azure as the near-term production-pilot baseline;
+- treat Neon as a provider experiment for a later hardening step;
+- do not let provider selection delay the current migration / backup / managed-app rollout tasks.
 
 ---
 
@@ -42,6 +133,7 @@ End-to-end reference for **`sql` / `postgres`** isolated stores: MCP tools, `@fu
 
 Schema **never** goes through `executeIsolatedStoreSql`.
 Operator migration calls do not require a session-backed user anymore: token-auth requests with the right permission can apply migrations through HTTP/SDK, and Gate records a stable token actor label in the audit fields when no concrete `userId` is present.
+After a successful SQL migration apply or baseline adoption, Gate stores the latest bundle and schema name in the stage `provisioningMetadata`. Studio can use that metadata to show migration status without access to the app repo.
 
 For the midsize-target PostgreSQL Row-Level Security path and the recommended Gate integration model, see [isolated-sql-rls-plan.md](./isolated-sql-rls-plan.md).
 
@@ -119,6 +211,28 @@ Do this **per stage** you care about (usually **dev** first, then **prod**).
 
 Apply uses a **single DB transaction**; failure → **ROLLBACK** (no partial journal rows from that attempt). A **prod checkpoint** may still exist if Gate created it before a failed apply — it is not proof migrations committed.
 
+### Gate-enforced migration contract
+
+Gate validates what it can actually see in the incoming bundle:
+
+- ordered versions;
+- `name`, `checksum`, and exact `sql` bytes per version;
+- journal drift and optimistic-lock mismatches;
+- **schema-only SQL** in migration bundles.
+
+Top-level `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `MERGE`, and `COPY` are rejected in migration bundles.  
+Use structured row APIs or `importIsolatedStoreSqlRows` for demo seeds, backfills, and large data loads.
+
+### What Gate cannot enforce from the service boundary
+
+Gate does **not** see the app repo or browser build pipeline, so it cannot prove:
+
+- that a committed `postgres/migrations/manifest.json` exists in the repo;
+- that the bundle was assembled from repo files rather than hardcoded in app code;
+- that migration SQL was kept out of the browser bundle.
+
+Those constraints should be enforced through repo templates, skills/prompts, code review, and CI checks around the app artifact itself.
+
 ---
 
 ## 7. MCP vs SDK / CI
@@ -135,6 +249,7 @@ Apply uses a **single DB transaction**; failure → **ROLLBACK** (no partial jou
 - One SQL file per **`version`**; manifest with **`version`**, **`name`**, **`checksum`** aligned with the bytes Gate sends.
 - **CI** should verify checksums vs files — prompts are not a substitute.
 - **MUST flow:** file-first for schema changes — create/update files in `postgres/migrations/`, compute checksum from file bytes, run status, then apply.
+- Bundle assembly should stay in scripts / CI / backend tooling; do not make browser runtime the source of truth for migration SQL or bundle order.
 - **MUST artifact after schema ops:** include migration file path, `version`, `name`, `checksum`, `storeId`, `stage`.
 - **Inline SQL in MCP:** only for one-off smoke/dev tests and explicitly marked temporary; not for persistent schema changes.
 - **Final gate:** do not finish if schema changed but `postgres/migrations/` has no matching new/updated migration file/manifest entry.
@@ -177,4 +292,4 @@ For **NoSQL** stores (`nosql` / `mongodb_atlas`), use MCP prompt **`isolatedNoSq
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-04-10
+- **Last synced**: 2026-04-13

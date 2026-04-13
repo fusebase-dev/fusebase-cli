@@ -1,7 +1,7 @@
 ---
 version: "1.1.3"
 mcp_prompt: isolatedSqlMigrationDiscipline
-last_synced: "2026-04-10"
+last_synced: "2026-04-13"
 title: "Fusebase Gate — Isolated SQL migration discipline"
 category: specialized
 ---
@@ -30,9 +30,11 @@ On apply: **HTTP 409**, **`data.errorCode`** **`isolated_sql_migration_drift`**,
 4. **Prefix alignment** — first **N** bundle entries must match journal **1..N**; **pending** = tail after **N**.
 5. **dev / prod** — same logical version line and SQL per version; **separate** DBs and journals. Prod may lag dev.
 6. **MUST flow order** — for any schema change: create/update files in **`postgres/migrations/`** first, assemble the bundle with SDK helper **`buildSqlMigrationBundle(...)`**, then run status, then apply.
+6a. **Schema-only bundles** — migration bundles are for schema SQL only. Top-level `INSERT` / `UPDATE` / `DELETE` / `TRUNCATE` / `MERGE` / `COPY` belong in structured seed/import flows after schema apply.
 7. **Inline SQL restriction** — inline SQL in MCP `tool_call` is allowed only for one-off smoke/dev tests and must be explicitly marked temporary.
 8. **Final gate** — do not mark work done when schema changed but no new/updated migration file or manifest entry exists under **`postgres/migrations/`**.
 9. **Manifest is app-owned, not environment state** — do not store `storeId`, `stageDevApplied`, `stageProdApplied`, or similar per-stage apply markers in the migration manifest. Stage state belongs to Gate journals and deployment logs.
+10. **Browser runtime is not the source of truth** — do not ship raw migration SQL into the browser just to compute bundle status. Assemble bundles in scripts / backend / CI and let runtime UI read Gate-owned migration status.
 
 ## Required artifact after schema ops
 
@@ -71,5 +73,5 @@ Avoid **`CREATE EXTENSION pgcrypto`** on locked-down hosts; prefer **`gen_random
 
 - **Version**: 1.1.3
 - **Category**: specialized
-- **Last synced**: 2026-04-10
+- **Last synced**: 2026-04-13
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
