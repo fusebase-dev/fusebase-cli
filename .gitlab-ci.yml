@@ -41,7 +41,7 @@ validate-skills:
 # On the default branch, BUILD_CHANNEL=dev causes build.sh to embed a timestamp
 # version into the binary and save it to build/.dev-version for the upload jobs.
 build:
-  image: oven/bun:1
+  image: oven/bun:1.3.11
   before_script:
     # oven/bun image does not include zip or git; prebuild needs both
     - apt-get update -qq && apt-get install -y -qq git zip unzip wget nsis default-jre-headless
