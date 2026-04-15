@@ -1,7 +1,7 @@
 ---
-version: "1.0.1"
+version: "1.2.0"
 mcp_prompt: stripeApps
-last_synced: "2026-04-07"
+last_synced: "2026-04-10"
 title: "Fusebase Gate Stripe App And Agent Integration"
 category: specialized
 ---
@@ -19,7 +19,7 @@ Use these rules when Stripe operations are called from application code, a backe
 ## Current Gate Stripe Surface
 
 - Gate currently exposes an org-scoped Stripe billing facade, not a generic Stripe passthrough.
-- Current Stripe operation ids are: `getStripeOauth`, `updateStripeMode`, `findStripeProduct`, `createStripeProduct`, `updateStripeProduct`, `deleteStripeProduct`, `getStripePaymentLink`, and `getStripePaymentState`.
+- Current Stripe operation ids are: `getStripeOauth`, `updateStripeMode`, `findStripeProduct`, `createStripeProduct`, `updateStripeProduct`, `deleteStripeProduct`, `getStripePaymentLink`, `cancelStripeSubscription`, and `getStripePaymentState`.
 - `getStripeOauth` returns the connected `stripeAccountId` and current `liveMode`.
 - `updateStripeMode` changes the connected account between test and live API modes only. It does not copy products or prices between modes.
 
@@ -34,22 +34,29 @@ Use these rules when Stripe operations are called from application code, a backe
 ## Stripe Object Identity
 
 - Treat `stripeAccountId` as the source-of-truth connected account id for product and checkout calls.
-- Treat app-owned `kind` and `kindId` as stable identifiers for the commercial object in your system. Those values must remain stable across checkout and later payment-state reads.
-- `buyerId` for `getStripePaymentLink` and `getStripePaymentState` must stay numeric. Pass `buyerId: user.id`, not `buyerId: String(user.id)`.
+- Treat app-owned `kind` and `kindId` as stable identifiers for the commercial object in your system. Keep `kind` at 32 chars max and `kindId` at 64 chars max. Those values must remain stable across checkout and later payment-state reads.
+- Treat `stripeAccountId` + `kind` + `kindId` as the unique identity for a Gate-managed Stripe product. Call `findStripeProduct` before `createStripeProduct`, and only create when nothing already exists for that identity.
+- `buyerId` for `getStripePaymentLink`, `cancelStripeSubscription`, and `getStripePaymentState` must stay numeric. Pass `buyerId: user.id`, not `buyerId: String(user.id)`.
+- Treat `createStripeProduct`, `updateStripeProduct`, and `deleteStripeProduct` as owner-admin setup flows in your app or backend. Do not expose those operations to arbitrary registered end users.
 - If the app changes a product materially, use `updateStripeProduct` or delete plus create. Do not assume in-place Stripe product editing is reflected in Gate billing records.
+- `getStripePaymentLink` expects `stripeAccountId`, `kind`, `kindId`, numeric `buyerId`, `successUrl`, and `cancelUrl`. If it returns `url: null`, verify those inputs first before retrying.
+- For subscription offboarding, prefer `cancelStripeSubscription` with the default `cancelAtPeriodEnd: true` behavior. Send `cancelAtPeriodEnd: false` only when your app intentionally removes access immediately.
 
 ## Recommended Runtime Flow
 
 1. Call `getStripeOauth` for the org.
 2. If needed, switch mode with `updateStripeMode` and refresh UI from the returned `oauth.liveMode`.
-3. Find or create the Gate-managed Stripe product using stable `kind` and `kindId`.
-4. Use `getStripePaymentLink` to obtain the Stripe-hosted checkout URL.
-5. After checkout or webhook processing, use `getStripePaymentState` before unlocking the entitlement.
+3. Call `findStripeProduct` using stable `stripeAccountId`, `kind`, and `kindId`.
+4. Only if missing, call `createStripeProduct` once for that identity.
+5. Use `getStripePaymentLink` to obtain the Stripe-hosted checkout URL.
+6. After the success-page return, poll `getStripePaymentState` in a short loop before unlocking the entitlement because payment activation is webhook-async.
+7. For subscription offboarding, call `cancelStripeSubscription`. Default to period-end cancellation unless the product explicitly requires immediate revocation.
 
 ## Access Model
 
 - Read-only Stripe inspection needs `billing.read` plus org access.
-- Mode switching, product writes, deletion, and checkout-link generation need `billing.write` plus org access.
+- Mode switching, product writes, deletion, checkout-link generation, and subscription cancellation need `billing.write` plus org access.
+- For app design, product-management flows should still be owner-admin only even if a broader internal credential technically has `billing.write`.
 - If a Stripe call fails, debug org scope, billing permissions, connection state, and `liveMode` before changing app payload semantics.
 
 ## Reference
@@ -59,7 +66,7 @@ Use these rules when Stripe operations are called from application code, a backe
 
 ## Version
 
-- **Version**: 1.0.1
+- **Version**: 1.2.0
 - **Category**: specialized
-- **Last synced**: 2026-04-07
+- **Last synced**: 2026-04-10
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

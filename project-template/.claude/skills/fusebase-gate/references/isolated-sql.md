@@ -1,7 +1,7 @@
 ---
 version: "1.8.5"
 mcp_prompt: isolatedSql
-last_synced: "2026-04-06"
+last_synced: "2026-04-13"
 title: "Fusebase Gate Isolated SQL Stores"
 category: specialized
 ---
@@ -26,10 +26,11 @@ Load MCP prompt **`isolatedSqlMigrationDiscipline`** (`prompts_search`, groups `
 
 1. **`listIsolatedStores`** → **`createIsolatedStore`** (`engine` `postgres`, `storeType` `sql`, `source` `{ sourceType: app, sourceId: … }`, `alias`).
 2. **`initIsolatedStoreStage`** for `dev` / `prod` (omit `bindingConfig` when Gate auto-provisions).
-3. **`getIsolatedStoreSqlMigrationStatus`** with the **exact bundle** you will apply: read **`canApply`**, **`isDrifted`**, **`pendingCount`**, **`structuredIssues`**. Optionally pass **`expectedLastAppliedVersion`** / **`expectedLastAppliedChecksum`** from a prior status → **409** if the journal tail changed.
-4. Optional: **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** — same checks, **no** SQL / journal writes.
-5. **`applyIsolatedStoreSqlMigrations`** — pending tail only when prefix matches. **409** + **`data.errorCode`** / **`data.issues`** on drift or head mismatch. Prod: automatic checkpoint may run before pending migrations.
-6. Verify: **`listIsolatedStoreSqlTables`**, **`getIsolatedStoreSqlStats`**, or **`queryIsolatedStoreSql`** (read-only, **one** statement per call).
+3. In the app repo, keep schema files under **`postgres/migrations/`** and assemble the bundle with SDK helper **`buildSqlMigrationBundle(...)`**. Do not hand-build migration JSON or copy ad-hoc checksums into chat unless this is an explicitly temporary smoke test.
+4. **`getIsolatedStoreSqlMigrationStatus`** with the **exact bundle** you will apply: read **`canApply`**, **`isDrifted`**, **`pendingCount`**, **`structuredIssues`**. Optionally pass **`expectedLastAppliedVersion`** / **`expectedLastAppliedChecksum`** from a prior status → **409** if the journal tail changed.
+5. Optional: **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** — same checks, **no** SQL / journal writes.
+6. **`applyIsolatedStoreSqlMigrations`** — pending tail only when prefix matches. **409** + **`data.errorCode`** / **`data.issues`** on drift or head mismatch. Prod: automatic checkpoint may run before pending migrations.
+7. Verify: **`listIsolatedStoreSqlTables`**, **`getIsolatedStoreSqlStats`**, or **`queryIsolatedStoreSql`** (read-only, **one** statement per call).
 
 `dev` and `prod` are **different databases** — repeat the sequence per stage with the **same logical version line**.
 
@@ -42,11 +43,13 @@ Prefer structured APIs: **`getIsolatedStoreSqlStats`**, **`countIsolatedStoreSql
 - `select` default `limit=100`, max `500`. Max **20** filters, **5** sort fields.
 - **`batchInsertIsolatedStoreSqlRows`**: at most **`floor(65535 / columnCount)`** rows per call (Postgres bind limit); e.g. **~2621** rows at **25** columns.
 - **`update`** / **`delete`** need filters unless **`allowAll=true`**.
+- Migration bundles are **schema-only**. Gate rejects top-level `INSERT` / `UPDATE` / `DELETE` / `TRUNCATE` / `MERGE` / `COPY` inside migration SQL.
 - Large **data** seeds: **`importIsolatedStoreSqlRows`** (`csv`/`tsv`, **`COPY FROM STDIN`**); default payload cap **64MiB** UTF-8 per call (`ISOLATED_SQL_IMPORT_MAX_PAYLOAD_BYTES`, hard cap **256MiB**); split larger files.
+- Small demo seeds or backfills: structured row APIs (`insert…`, `batchInsert…`) after schema apply, not inside migration SQL.
 
 ### MCP bundle size
 
-Apply sends **full SQL text** for every migration; JSON grows quickly. Many IDE MCP stacks cap a single **`tool_call`** around **~3,000** characters — parse errors or truncation. **Practical split:** small / single-file migration via MCP for smoke; **real apps → `IsolatedStoresApi` in CI or scripts** reading SQL from disk (see production guide).
+Apply sends **full SQL text** for every migration; JSON grows quickly. Many IDE MCP stacks cap a single **`tool_call`** around **~3,000** characters — parse errors or truncation. **Practical split:** small / single-file migration via MCP for smoke; **real apps → `IsolatedStoresApi` in CI or scripts** reading SQL from disk and building the bundle with **`buildSqlMigrationBundle(...)`**.
 
 ### Tokens
 
@@ -78,12 +81,14 @@ Do not **`apply`** throwaway SQL as **v1** on a store that must later use a real
 ### Manifest / checksums
 
 For **local** storage in a repo, keep migration SQL in a **dedicated folder** at **`postgres/migrations/`**. Do not mix with application code — easier ordering, review, and CI checksum checks.
-- **MUST flow order:** file-first schema changes (create/update file in `postgres/migrations/` → checksum from file bytes → status → apply).
+- **MUST flow order:** file-first schema changes (create/update file in `postgres/migrations/` → build the bundle with **`buildSqlMigrationBundle(...)`** from exact file contents → status → apply).
 - **Inline SQL:** MCP inline SQL allowed only for one-off smoke/dev tests and explicitly marked temporary.
 - **Final gate:** if schema changed, do not finish unless `postgres/migrations/` has matching new/updated migration file and manifest entry.
-- **Required artifact after schema ops:** migration file path, `version`, `name`, `checksum`, `storeId`, `stage`.
+- **Manifest scope:** manifest should describe the app bundle (bundle version + ordered migrations). Do **not** store environment state there such as `storeId`, `stageDevApplied`, `stageProdApplied`, or other per-stage apply markers.
+- Do not ship raw migration SQL in browser runtime just to render status. Runtime UI should read migration status from Gate metadata or a server-side helper, not assemble the bundle in the browser.
+- **Required handoff after schema ops:** migration file path, `version`, `name`, `checksum`, `storeId`, `stage`.
 
-Per migration: **`version`**, **`name`**, **`checksum`** — use **SHA-256** / **`sha256`** of the **exact** UTF-8 **`sql`** bytes Gate sends. Optional **`bundleVersion`** on the bundle. Operators often record **`orgId`** / **`storeId`** in repo manifest for CI — not required inside the bundle body.
+Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers **`buildSqlMigrationBundle(...)`** and **`calculateSqlMigrationChecksum(sql)`** so checksums match the exact UTF-8 **`sql`** bytes Gate receives. Checksums are **SHA-256** (`sha256`) hex digests. Optional **`bundleVersion`** on the bundle. Keep repo manifests app-owned and environment-neutral.
 
 ### UI links (store and table)
 
@@ -97,5 +102,5 @@ Per migration: **`version`**, **`name`**, **`checksum`** — use **SHA-256** / *
 
 - **Version**: 1.8.5
 - **Category**: specialized
-- **Last synced**: 2026-04-06
+- **Last synced**: 2026-04-13
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -32,13 +32,16 @@ Each reference is in a separate file under `references/`. Load the file when you
 
 - [Fusebase Gate — Isolated SQL migration discipline](references/isolated-sql-migration-discipline.md)
 - [Fusebase Gate Billing And Stripe Flows](references/billing.md)
-- [Fusebase Gate Isolated NoSQL Stores](references/isolated-nosql.md)
+- [Fusebase Gate Email Operations](references/emails.md)
 - [Fusebase Gate Isolated SQL Stores](references/isolated-sql.md)
 - [Fusebase Gate Isolated Stores](references/isolated.md)
 - [Fusebase Gate Membership And Portal Flows](references/membership.md)
+- [Fusebase Gate Notes Operations](references/notes.md)
+- [Fusebase Gate Org Group Operations](references/org-groups.md)
 - [Fusebase Gate Stripe App And Agent Integration](references/stripe-apps.md)
 - [Fusebase Gate Users Operations](references/users.md)
 - [Isolated SQL stores and migrations (Gate)](references/isolated-sql-stores.md)
+- [Isolated SQL stores PostgreSQL RLS plan (Gate)](references/isolated-sql-rls-plan.md)
 - [Stripe for apps and agents (Gate)](references/stripe-for-apps-and-agents.md)
 
 ---

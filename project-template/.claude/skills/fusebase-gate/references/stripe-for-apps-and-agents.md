@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/stripe-for-apps-and-agents.md"
-last_synced: "2026-04-07"
+last_synced: "2026-04-09"
 title: "Stripe for apps and agents (Gate)"
 category: specialized
 ---
@@ -28,7 +28,7 @@ Available Stripe operations:
 - `findStripeProduct`
   Finds a Gate-managed Stripe product or price by `stripeAccountId`, `kind`, `kindId`, or `mode`.
 - `createStripeProduct`
-  Creates a Gate-managed payment or subscription product.
+  Creates a Gate-managed payment or subscription product. Treat `stripeAccountId` + `kind` + `kindId` as the unique product identity and create only when no product already exists for that identity.
 - `updateStripeProduct`
   Replaces a product as delete plus create. Do not assume in-place Stripe edits.
 - `deleteStripeProduct`
@@ -51,11 +51,16 @@ Available Stripe operations:
 
 - Always call `getStripeOauth` before product or checkout flows if the org may not be connected yet.
 - Treat `stripeAccountId` as the source-of-truth connected Stripe account identifier.
-- Use stable app-owned `kind` and `kindId` values. That is how Gate maps checkout and webhook-backed payment state back to your app concept.
+- Use stable app-owned `kind` and `kindId` values. Keep `kind` at 32 chars max and `kindId` at 64 chars max. That is how Gate maps checkout and webhook-backed payment state back to your app concept.
+- Treat `stripeAccountId` + `kind` + `kindId` as the unique identity for a Gate-managed Stripe product. Call `findStripeProduct` before `createStripeProduct`, and only create when nothing already exists for that identity.
 - `buyerId` for `getStripePaymentLink` and `getStripePaymentState` must be a number. Pass `buyerId: user.id`, not `buyerId: String(user.id)`.
 - For `mode: "subscription"`, send both `interval` and `intervalCount`.
 - For `mode: "payment"`, omit `interval` and `intervalCount`.
 - `updateStripeMode` only changes which Stripe API key mode is used for that connected account. It does not migrate existing Stripe catalog state.
+- Treat `createStripeProduct`, `updateStripeProduct`, and `deleteStripeProduct` as owner-admin setup flows in your app or backend, not arbitrary registered-user self-service actions.
+- `getStripePaymentLink` expects `stripeAccountId`, `kind`, `kindId`, numeric `buyerId`, `successUrl`, and `cancelUrl`.
+- If `getStripePaymentLink` returns `url: null`, first verify those checkout inputs are present, non-empty, and match an existing Gate product identity.
+- After Stripe redirects to your success page, do not unlock access immediately. Poll `getStripePaymentState` in a short loop because Gate payment activation is updated asynchronously from webhook processing.
 
 ## Common Checkout Mistake
 
@@ -72,6 +77,19 @@ Do not use:
 ```ts
 buyerId: String(user.id);
 ```
+
+## Required Checkout Inputs
+
+For `getStripePaymentLink`, always send:
+
+- `stripeAccountId`
+- `kind` as a stable app-owned type key, max 32 chars
+- `kindId` as a stable app-owned object key, max 64 chars
+- `buyerId` as a number
+- `successUrl`
+- `cancelUrl`
+
+If the returned `url` is `null`, verify all six values before assuming the Stripe side failed.
 
 ## MCP Prompt Groups
 
@@ -90,6 +108,10 @@ Stripe operations are org-scoped and require org access plus billing permissions
   `getStripeOauth`, `findStripeProduct`, `getStripePaymentState`
 - `billing.write`
   `updateStripeMode`, `createStripeProduct`, `updateStripeProduct`, `deleteStripeProduct`, `getStripePaymentLink`
+
+App policy recommendation:
+
+- Keep product-management flows owner-admin only in your own UI, backend, or agent policy, even though the current Gate permission check is based on `billing.write`.
 
 ## Recommended Auth Model
 
@@ -165,40 +187,66 @@ const modeUpdate = await billingApi.updateStripeMode({
 });
 ```
 
-Create a one-time payment product:
+Find or create a one-time payment product:
 
 ```ts
-const created = await billingApi.createStripeProduct({
+const existing = await billingApi.findStripeProduct({
   path: { orgId },
   body: {
     stripeAccountId: oauth.oauth!.stripeAccountId!,
-    mode: "payment",
-    amountCents: 1999,
-    currency: "usd",
-    title: "Premium Course",
     kind: "course",
     kindId: "course_123",
   },
 });
+
+const product =
+  existing.product ??
+  (
+    await billingApi.createStripeProduct({
+      path: { orgId },
+      body: {
+        stripeAccountId: oauth.oauth!.stripeAccountId!,
+        mode: "payment",
+        amountCents: 1999,
+        currency: "usd",
+        title: "Premium Course",
+        kind: "course",
+        kindId: "course_123",
+      },
+    })
+  ).product;
 ```
 
 Create a subscription product:
 
 ```ts
-const created = await billingApi.createStripeProduct({
+const existing = await billingApi.findStripeProduct({
   path: { orgId },
   body: {
     stripeAccountId: oauth.oauth!.stripeAccountId!,
-    mode: "subscription",
-    amountCents: 9900,
-    currency: "usd",
-    title: "Pro Plan",
     kind: "plan",
     kindId: "plan_pro",
-    interval: "month",
-    intervalCount: 1,
   },
 });
+
+const product =
+  existing.product ??
+  (
+    await billingApi.createStripeProduct({
+      path: { orgId },
+      body: {
+        stripeAccountId: oauth.oauth!.stripeAccountId!,
+        mode: "subscription",
+        amountCents: 9900,
+        currency: "usd",
+        title: "Pro Plan",
+        kind: "plan",
+        kindId: "plan_pro",
+        interval: "month",
+        intervalCount: 1,
+      },
+    })
+  ).product;
 ```
 
 Get checkout URL:
@@ -239,6 +287,33 @@ if (state.active) {
 }
 ```
 
+Poll from the success page while webhook processing catches up:
+
+```ts
+async function waitForStripeActivation() {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const state = await billingApi.getStripePaymentState({
+      path: { orgId },
+      body: {
+        stripeAccountId: oauth.oauth!.stripeAccountId!,
+        mode: "payment",
+        kind: "course",
+        kindId: "course_123",
+        buyerId: memberId,
+      },
+    });
+
+    if (state.active) {
+      return true;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  return false;
+}
+```
+
 ## Recommended App Flows
 
 ### Stripe Setup Flow
@@ -250,11 +325,11 @@ if (state.active) {
 ### Product And Checkout Flow
 
 1. Call `getStripeOauth`.
-2. Call `findStripeProduct`.
-3. If missing, call `createStripeProduct`.
-4. Call `getStripePaymentLink`.
-5. Redirect the user to the Stripe-hosted checkout URL.
-6. After return or webhook processing, call `getStripePaymentState`.
+2. Call `findStripeProduct` with stable `stripeAccountId`, `kind`, and `kindId`.
+3. If missing, call `createStripeProduct` once for that identity.
+4. Call `getStripePaymentLink` with `stripeAccountId`, `kind`, `kindId`, numeric `buyerId`, `successUrl`, and `cancelUrl`.
+5. Redirect the user to the Stripe-hosted checkout URL only when `checkout.url` is present.
+6. After return to the success page, poll `getStripePaymentState` until active or timeout because webhook processing is async.
 
 ### Mode Switch Flow
 
@@ -275,6 +350,7 @@ If an agent needs to prepare checkout or manage products:
 
 - org-scoped token
 - `billing.write`
+- owner-admin app policy for product-management actions
 
 If an agent needs both:
 
@@ -330,4 +406,4 @@ Those should still be curated Gate operations rather than a raw Stripe passthrou
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-04-07
+- **Last synced**: 2026-04-09

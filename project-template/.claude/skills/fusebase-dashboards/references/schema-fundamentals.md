@@ -1,7 +1,7 @@
 ---
-version: "1.4.0"
+version: "1.4.1"
 mcp_prompt: domain.dashboardSchema
-last_synced: "2026-03-26"
+last_synced: "2026-04-15"
 title: "Dashboard Schema"
 category: core
 ---
@@ -23,6 +23,7 @@ category: core
 - [Intent-Based Workflow (MANDATORY)](#intent-based-workflow-mandatory)
   - [IMPORTANT: Use Intent Endpoints Only](#important-use-intent-endpoints-only)
   - [Intent vs Full Schema Requests](#intent-vs-full-schema-requests)
+  - [Date columns (`type: "date"`): format options](#date-columns-type-date-format-options)
   - [Text columns (`type: "string"`): single-line vs multi-line](#text-columns-type-string-single-line-vs-multi-line)
   - [Intent Workflow](#intent-workflow)
 - [Key Generation Rules](#key-generation-rules)
@@ -116,7 +117,16 @@ category: core
 **CRITICAL: Intent `type` vs render `edit_type`**
 - In items_intent use **`type`** from the allowed enum: `string`, `number`, `boolean`, `email`, `phone`, `date`, `currency`, `label`, `link`, `files`, `time`, `lookup`, `child-table-link`, etc.
 - The API does **not** accept `edit_type` values for `type`. Use `type: "string"` for any text column (not `type: "string-single-line"`).
-**Overrides only for selected item types**: In MCP, use **overrides** for **label** columns (`overrides.render`, e.g. labels), **lookup/relation** columns (`overrides.source` required), and **string columns that must be multi-line** (`overrides.render` with `multi_line: true` — see Text columns below). For number, boolean, date, email, etc., do not use overrides — use only `type` and `name` (unless you need string multi-line).
+### Date columns (`type: "date"`): format options
+
+- Date columns use render settings to control how the same column is displayed/input in UI.
+- Use `render.date_format` with one of: `"date"`, `"date-time"`, `"time"`.
+- `"date"`: date only (calendar date).
+- `"date-time"`: date + time in one column.
+- `"time"`: time only in one column (still the same date-type column, not a separate column).
+- If not overridden, backend defaults apply. For writes, always validate against `schema.items[].json_schema` from getDashboardView/describeDashboard.
+
+**Overrides only for selected item types**: In MCP, use **overrides** for **label** columns (`overrides.render`, e.g. labels), **lookup/relation** columns (`overrides.source` required), **string columns that must be multi-line** (`overrides.render` with `multi_line: true` — see Text columns below). and **date** (when you need to change display format). For number, boolean, date, email, etc., do not use overrides — use only `type` and `name` (unless you need string multi-line).
 
 ### Text columns (`type: "string"`): single-line vs multi-line
 
@@ -480,7 +490,7 @@ Use updateViewIntent with schema_patch.add. New columns appear in the view and a
 
 ## Version
 
-- **Version**: 1.4.0
+- **Version**: 1.4.1
 - **Category**: core
-- **Last synced**: 2026-03-26
+- **Last synced**: 2026-04-15
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

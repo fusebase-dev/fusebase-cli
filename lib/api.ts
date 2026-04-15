@@ -1151,6 +1151,31 @@ export async function fetchAppFeatureSecrets(
   return (await response.json()) as AppFeatureSecretsResponse;
 }
 
+const MAX_API_ERROR_BODY_CHARS = 6000;
+
+/** Full response body for failed HTTP responses (JSON pretty-printed when possible). */
+async function readFailedResponseBodySnippet(
+  response: Response,
+): Promise<string> {
+  const raw = await response.text();
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "(empty response body)";
+  }
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    const serialized =
+      typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2);
+    return serialized.length > MAX_API_ERROR_BODY_CHARS
+      ? `${serialized.slice(0, MAX_API_ERROR_BODY_CHARS)}…`
+      : serialized;
+  } catch {
+    return trimmed.length > MAX_API_ERROR_BODY_CHARS
+      ? `${trimmed.slice(0, MAX_API_ERROR_BODY_CHARS)}…`
+      : trimmed;
+  }
+}
+
 export async function createDashboardsToken(
   apiKey: string,
   request: CreateTokenRequest,
@@ -1167,23 +1192,20 @@ export async function createDashboardsToken(
   });
 
   if (!response.ok) {
-    const errorBody = (await response.json().catch(() => ({}))) as {
-      message?: string;
-      name?: string;
-    };
+    const bodySnippet = await readFailedResponseBodySnippet(response);
 
     logger.error({
       msg: "API request failed",
       endpoint: "/v1/tokens/dashboards",
       status: response.status,
       statusText: response.statusText,
-      errorBody,
+      bodySnippet,
       url: `${baseUrl}/v1/tokens/dashboards`,
       timestamp: new Date().toISOString(),
     });
 
     throw new Error(
-      `Failed to create dashboards token: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      `Failed to create dashboards token: ${response.status} ${response.statusText}\n${bodySnippet}`,
     );
   }
 
@@ -1209,23 +1231,20 @@ export async function createGateToken(
   });
 
   if (!response.ok) {
-    const errorBody = (await response.json().catch(() => ({}))) as {
-      message?: string;
-      name?: string;
-    };
+    const bodySnippet = await readFailedResponseBodySnippet(response);
 
     logger.error({
       msg: "API request failed",
       endpoint: "/v1/tokens/gate",
       status: response.status,
       statusText: response.statusText,
-      errorBody,
+      bodySnippet,
       url: `${baseUrl}/v1/tokens/gate`,
       timestamp: new Date().toISOString(),
     });
 
     throw new Error(
-      `Failed to create Gate MCP token: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      `Failed to create Gate MCP token: ${response.status} ${response.statusText}\n${bodySnippet}`,
     );
   }
 
