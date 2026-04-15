@@ -1,7 +1,7 @@
 ---
-version: "1.7.0"
+version: "1.8.0"
 mcp_prompt: sdk
-last_synced: "2026-04-04"
+last_synced: "2026-04-15"
 title: "SDK Discovery"
 category: meta
 ---
@@ -85,6 +85,8 @@ The SDK returns the **HTTP response body directly** (no extra wrapper). There is
 - For **getDashboardViewData** (and getRelatedDashboardData): the return value is `{ data: row[], meta?: { page, limit, total, ... } }`.
   - **response.data** = array of rows (objects with `root_index_value` and column keys).
   - **response.meta** = pagination info (if present).
+- **Important runtime rule**: For `getDashboardViewData`, treat runtime JSON as source of truth. Cells are returned as raw values on the row object (`row[item_key]`), not guaranteed `{ value }` wrappers.
+- **Type mismatch guard**: Some generated SDK types may still suggest `DashboardValueExtended`-style wrapped cells. Do not assume `.value` exists; read cells defensively as `unknown` and narrow by runtime type.
 - Do **not** double-unwrap: use **response.data** for the rows, not response.data.data. Writing response.data.data is wrong and yields undefined.
 - **Schema item fields**: API and SDK types use **snake_case** for schema items (e.g. `source.custom_type`, `_type_custom`). Do not use camelCase (e.g. customType) when reading getDashboardView/describeDashboard response.
 
@@ -161,7 +163,7 @@ To open a database in the Thefusebase UI in the browser, use this URL pattern:
 
 ## Version
 
-- **Version**: 1.7.0
+- **Version**: 1.8.0
 - **Category**: meta
-- **Last synced**: 2026-04-04
+- **Last synced**: 2026-04-15
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

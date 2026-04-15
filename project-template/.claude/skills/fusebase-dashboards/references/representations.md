@@ -1,7 +1,7 @@
 ---
 version: "1.1.0"
 mcp_prompt: domain.representations
-last_synced: "2026-02-13"
+last_synced: "2026-04-09"
 title: "Dashboard View Representations"
 category: specialized
 ---
@@ -34,7 +34,7 @@ Each template has a `type` field:
 
 ### Representation Instance
 When a template is assigned to a view, it creates a **representation instance** with:
-- `representationTemplateId`: The template being used (UUID)
+- `representationTemplateId`: The template being used. For kanban it's "kanban"
 - `is_default`: Whether this is the default representation for the view
 - `settings`: Custom configuration for the representation
 - `fields_map`: Optional mapping of dashboard fields to representation-specific field roles
@@ -69,5 +69,5 @@ Representation assignment and updates are not in MCP; use SDK or REST.
 
 - **Version**: 1.1.0
 - **Category**: specialized
-- **Last synced**: 2026-02-13
+- **Last synced**: 2026-04-09
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

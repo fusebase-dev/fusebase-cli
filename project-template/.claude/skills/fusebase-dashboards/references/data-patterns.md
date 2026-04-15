@@ -1,7 +1,7 @@
 ---
-version: "1.10.0"
+version: "1.11.0"
 mcp_prompt: domain.data
-last_synced: "2026-04-02"
+last_synced: "2026-04-15"
 title: "Dashboard Data"
 category: core
 ---
@@ -354,6 +354,7 @@ batchPutDashboardData({
 **getDashboardViewData** returns rows where **each cell is the raw value** keyed by `item_key` on the row object. There is **no** nested `values` object and **no** `{ value, value_type }` wrapper.
 - **Row shape**: `{ root_index_value: string, [item_key]: value }` — column values are **directly** on the row (e.g. `row["price_key"]` is the number 249, not `{ value: 249, value_type: "number" }`).
 - **Value types**: Each cell can be `string`, `number`, `boolean`, `object`, or `array` (or undefined if empty). Use `row[item_key]` as-is for display or logic.
+- **If SDK typings disagree** (for example, suggesting wrapped `DashboardValueExtended` cells), treat that as a typing artifact. Runtime `getDashboardViewData` JSON remains the source of truth.
 
 **Reading cell values safely**: The value at `row[item_key]` may be a **primitive** (string, number, boolean) or an **object/array**. Do **not** use the `in` operator (e.g. `'value' in cell`) on primitives — it throws. Prefer: if `cell == null` return null; if `typeof cell !== 'object'` return cell as-is (primitive); if object and `'value' in cell` return cell.value; else return cell (e.g. files, link, raw objects).
 
@@ -595,7 +596,7 @@ batchPutDashboardData({
 
 ## Version
 
-- **Version**: 1.10.0
+- **Version**: 1.11.0
 - **Category**: core
-- **Last synced**: 2026-04-02
+- **Last synced**: 2026-04-15
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
