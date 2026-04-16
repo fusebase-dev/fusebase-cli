@@ -1,7 +1,7 @@
 ---
-version: "1.4.0"
+version: "1.5.0"
 mcp_prompt: billing
-last_synced: "2026-04-10"
+last_synced: "2026-04-16"
 title: "Fusebase Gate Billing And Stripe Flows"
 category: specialized
 ---
@@ -19,7 +19,7 @@ These operations manage organization-scoped Stripe setup, Stripe-backed products
 ## Relevant Operations
 
 - getStripeOauth: verify whether the organization has a connected Stripe OAuth account.
-- updateStripeMode: switch the connected Stripe account between test and live API modes without copying Stripe products or prices.
+- updateStripeMode: Gate billing currently operates in live mode only, so do not treat this endpoint as a user-facing live/test mode switch.
 - findStripeProduct: look up the current Stripe product/link by Stripe account, mode, or kind identity.
 - createStripeProduct: create a one-time payment or subscription product.
 - updateStripeProduct: replace a product by deleting the old record and creating a new one.
@@ -31,7 +31,8 @@ These operations manage organization-scoped Stripe setup, Stripe-backed products
 ## Working Rules
 
 - Always use `getStripeOauth` before product or checkout flows when the org may not be connected to Stripe yet.
-- Use `updateStripeMode` when you need a fast live/test API key switch for an existing Stripe connection. Do not assume products or prices are copied across modes.
+- Gate billing currently runs in live mode only. Do not build product, checkout, or admin flows that depend on switching Stripe between test and live modes through Gate.
+- Treat `oauth.liveMode` as informational state for now and expect connected accounts to be live-mode only.
 - Treat `stripeAccountId` as the source-of-truth Stripe connection identifier for product and checkout calls.
 - Use stable `kind` and `kindId` values from your own system. Keep `kind` at 32 chars max and `kindId` at 64 chars max so webhook-backed payment state can be mapped back to your product or entitlement.
 - Treat `stripeAccountId` + `kind` + `kindId` as the unique identity for a Gate-managed Stripe product. Use `findStripeProduct` before `createStripeProduct`, and only create when nothing already exists for that identity.
@@ -53,14 +54,14 @@ These operations manage organization-scoped Stripe setup, Stripe-backed products
 ## Access Model
 
 - Read flows require `billing.read` and org access.
-- Stripe mode switching, product creation, replacement, deletion, checkout-link generation, and subscription cancellation require `billing.write` and org access.
+- The `updateStripeMode` endpoint, product creation, replacement, deletion, checkout-link generation, and subscription cancellation require `billing.write` and org access.
 - Even when a caller has `billing.write`, prefer app-level policy that limits product-management flows to owner-admin actors.
 - If billing-service rejects a call, investigate org access, token permissions, and Stripe connection state before changing payload shape.
 ---
 
 ## Version
 
-- **Version**: 1.4.0
+- **Version**: 1.5.0
 - **Category**: specialized
-- **Last synced**: 2026-04-10
+- **Last synced**: 2026-04-16
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

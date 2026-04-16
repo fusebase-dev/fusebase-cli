@@ -1,7 +1,7 @@
 ---
-version: "1.2.0"
+version: "1.3.0"
 mcp_prompt: stripeApps
-last_synced: "2026-04-10"
+last_synced: "2026-04-16"
 title: "Fusebase Gate Stripe App And Agent Integration"
 category: specialized
 ---
@@ -20,8 +20,8 @@ Use these rules when Stripe operations are called from application code, a backe
 
 - Gate currently exposes an org-scoped Stripe billing facade, not a generic Stripe passthrough.
 - Current Stripe operation ids are: `getStripeOauth`, `updateStripeMode`, `findStripeProduct`, `createStripeProduct`, `updateStripeProduct`, `deleteStripeProduct`, `getStripePaymentLink`, `cancelStripeSubscription`, and `getStripePaymentState`.
-- `getStripeOauth` returns the connected `stripeAccountId` and current `liveMode`.
-- `updateStripeMode` changes the connected account between test and live API modes only. It does not copy products or prices between modes.
+- `getStripeOauth` returns the connected `stripeAccountId` and current `liveMode`, which should currently be treated as informational live-only state.
+- Gate billing currently runs in live mode only. Do not build app or agent flows that depend on `updateStripeMode` switching the connected Stripe account between test and live modes.
 
 ## App Integration Rules
 
@@ -45,7 +45,7 @@ Use these rules when Stripe operations are called from application code, a backe
 ## Recommended Runtime Flow
 
 1. Call `getStripeOauth` for the org.
-2. If needed, switch mode with `updateStripeMode` and refresh UI from the returned `oauth.liveMode`.
+2. Treat `oauth.liveMode` as read-only informational state and assume Gate billing is live-mode only for now.
 3. Call `findStripeProduct` using stable `stripeAccountId`, `kind`, and `kindId`.
 4. Only if missing, call `createStripeProduct` once for that identity.
 5. Use `getStripePaymentLink` to obtain the Stripe-hosted checkout URL.
@@ -55,7 +55,7 @@ Use these rules when Stripe operations are called from application code, a backe
 ## Access Model
 
 - Read-only Stripe inspection needs `billing.read` plus org access.
-- Mode switching, product writes, deletion, checkout-link generation, and subscription cancellation need `billing.write` plus org access.
+- The `updateStripeMode` endpoint, product writes, deletion, checkout-link generation, and subscription cancellation need `billing.write` plus org access.
 - For app design, product-management flows should still be owner-admin only even if a broader internal credential technically has `billing.write`.
 - If a Stripe call fails, debug org scope, billing permissions, connection state, and `liveMode` before changing app payload semantics.
 
@@ -66,7 +66,7 @@ Use these rules when Stripe operations are called from application code, a backe
 
 ## Version
 
-- **Version**: 1.2.0
+- **Version**: 1.3.0
 - **Category**: specialized
-- **Last synced**: 2026-04-10
+- **Last synced**: 2026-04-16
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
