@@ -27,6 +27,7 @@ import {
 import { detectDevServerUrl } from "../framework-detect";
 import { fetchAppFeatureSecrets } from "../api";
 import packageJson from "../../package.json";
+import { logger } from "../logger";
 
 const FUSE_JSON = "fusebase.json";
 
@@ -142,7 +143,7 @@ async function spawnDevFeatureFrontend(
 
   const devServerPort = await findAvailablePort(3000);
 
-  console.log(`Dev server port: ${devServerPort}`);
+  logger.info('Starting Vite dev server for feature %s on port %d', feature.id, devServerPort);
 
   // On Windows, explicitly use PowerShell for better compatibility
   const isWindows = process.platform === "win32";
@@ -223,7 +224,8 @@ async function spawnDevFeatureBackend(
     `\n🔧 Starting backend dev process: ${feature.backend.dev.command}`,
   );
   console.log(`   Working directory: ${backendDir}`);
-  console.log(`   BACKEND_PORT: ${backendPort}\n`);
+
+  logger.info(`Starting backend dev process for feature ${feature.id} on port ${backendPort}`);
 
   const isWindows = process.platform === "win32";
   const child = spawn(feature.backend.dev.command, [], {

@@ -125,11 +125,21 @@ export function attachBackendOutputLogging(
   return appendBackendOutputRecord;
 }
 
+/**
+ *
+ * @param child
+ * @param featureId
+ * @param outputPath
+ * @param context
+ * @param printOutput - if true, the output will also be printed to the console in real time, otherwise it will only be saved to the log file
+ * @returns
+ */
 function attachProcessOutputLogging(
   child: ChildProcess,
   featureId: string,
   outputPath: string,
   context: string,
+  printOutput = false,
 ): JsonlAppender {
   const appendOutputRecord = createJsonlAppender(outputPath, context);
   const appendLine = (rawLine: string): void => {
@@ -146,6 +156,9 @@ function attachProcessOutputLogging(
   };
   const bufferedLineStream = createBufferedLineStream({
     onWrite(text, stream) {
+      if (!printOutput) {
+        return;
+      }
       if (stream === "stderr") {
         process.stderr.write(text);
         return;
@@ -185,6 +198,11 @@ export function attachFrontendDevServerOutputLogging(
   frontendDevServerPath: string,
   options?: {
     onData?: (text: string, stream: ProcessOutputStream) => void;
+    /**
+     * Whether to print the output to the console in real time.
+     * If false, the output will only be saved to the log file. Default is false.
+     */
+    printOutput?: boolean;
   },
 ): JsonlAppender {
   const logs = createJsonlAppender(
@@ -204,6 +222,9 @@ export function attachFrontendDevServerOutputLogging(
 
   const bufferedLineStream = createBufferedLineStream({
     onWrite(text, stream) {
+      if (!options?.printOutput) {
+        return;
+      }
       if (stream === "stderr") {
         process.stderr.write(text);
       } else {
