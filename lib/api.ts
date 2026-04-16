@@ -1619,6 +1619,7 @@ export async function getRuntimeLogsByVersion(
 
 export interface CommandLogPayload {
   command: string;
+  commandArgs?: string;
   cliVersion: string;
   os: string;
   osVersion?: string;
@@ -1658,6 +1659,7 @@ export async function sendCommandLog(
     });
   }
 }
+
 
 export async function sendCodingStats(
   apiKey: string,

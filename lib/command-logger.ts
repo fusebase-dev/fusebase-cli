@@ -16,6 +16,22 @@ function getFullCommandName(cmd: Command): string {
   return names.join(" ");
 }
 
+const MAX_COMMAND_ARGS_LENGTH = 4096;
+
+function getCommandArgs(commandName: string): string | undefined {
+  const allArgs = process.argv.slice(2);
+  const commandParts = commandName.split(" ");
+
+  let startIdx = 0;
+  for (const part of commandParts) {
+    if (allArgs[startIdx] === part) startIdx++;
+  }
+
+  const args = allArgs.slice(startIdx).join(" ");
+  if (!args) return undefined;
+  return args.substring(0, MAX_COMMAND_ARGS_LENGTH);
+}
+
 function instrumentCommand(cmd: Command): void {
   for (const sub of cmd.commands) {
     instrumentCommand(sub);
@@ -54,6 +70,7 @@ function instrumentCommand(cmd: Command): void {
           if (config.apiKey) {
             sendCommandLog(config.apiKey, {
               command: commandName,
+              commandArgs: getCommandArgs(commandName),
               cliVersion: VERSION,
               os: os.platform(),
               osVersion: os.release(),
