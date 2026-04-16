@@ -26,6 +26,7 @@ category: specialized
   - [2. Update Optional Filters](#2-update-optional-filters)
   - [3. Apply Multiple Conditions](#3-apply-multiple-conditions)
   - [4. Use Array Filters](#4-use-array-filters)
+  - [5. Portal-Scoped Data (`{{CurrentPortal}}`)](#5-portal-scoped-data-currentportal)
 - [Notes](#notes)
 
 ---
@@ -35,7 +36,7 @@ category: specialized
 
 ### Filter Structure
 View filters are composed of **required** and **optional** sections:
-- **Required filters**: Cannot be removed or overridden by users; always applied to queries
+- **Required filters**: Cannot be removed or overridden by users; always applied to queries. **Important!** Never add any filters to the `required` section, since they will be ignored.
 - **Optional filters**: Can be adjusted, added, or removed by users
 
 ### Filter Layers
@@ -132,6 +133,23 @@ Combine conditions with AND or OR logic:
 Filter by multiple values:
 ```typescript
 {  key: "tags", operator: "has_any_of", value: ["urgent", "bug", "feature"] }
+```
+
+### 5. Portal-Scoped Data (`{{CurrentPortal}}`)
+`{{CurrentPortal}}` is a special dynamic value that is resolved automatically in each request for data.
+Use it when a feature must display different information depending on the portal it is embedded in. This way, the feature will only "see" data for the current portal.
+The filtered column must be either a text column with a portal ID, or, ideally, a relation to the portals dashboard.
+```typescript
+{
+  optional: {
+    filters: {
+      logic: "AND",
+      conditions: [
+        { key: "portalId", operator: "is", value: "{{CurrentPortal}}" }
+      ]
+    }
+  }
+}
 ```
 
 ## Notes

@@ -233,6 +233,7 @@ For guidance on developing Fusebase Apps features, see:
 - **`project-template/AGENTS.md`** - Single source of truth for feature development
 - **`project-template/.claude/skills/app-ui-design/SKILL.md`** - UI/UX and visual design for generated app features (shadcn/ui + Tailwind CSS v4)
 - **`project-template/.claude/skills/fusebase-dashboards/SKILL.md`** - Dashboard MCP flow, dashboard data, and SDK discovery for runtime code
+- **`project-template/.claude/skills/fusebase-portal-specific-features/SKILL.md`** - Guide for developing features that depend on the portal they are embedded in
 - **`project-template/.claude/skills/fusebase-gate/SKILL.md`** - Fusebase Gate MCP/SDK; orgs, user lists, tokens, and broader platform capabilities (e.g. email, automation) as exposed via Gate
 - **`project-template/.claude/skills/file-upload/SKILL.md`** - File upload guide
 
