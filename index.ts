@@ -22,6 +22,7 @@ import { checkForUpdates } from "./lib/commands/steps/update-check";
 import { VERSION } from "./lib/version";
 import { registerErrorReporter } from "./lib/error-reporter";
 import { hasFlag } from "./lib/config";
+import { instrumentAllCommands } from "./lib/command-logger";
 
 registerErrorReporter();
 
@@ -59,5 +60,7 @@ if (hasFlag("sidecar")) {
   program.addCommand(sidecarCommand);
 }
 program.addCommand(analyzeCommand, { hidden: true });
+
+instrumentAllCommands(program);
 
 program.parse();
