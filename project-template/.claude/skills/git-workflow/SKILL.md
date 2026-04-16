@@ -61,6 +61,8 @@ Always review `git status --short` after these operations.
 
 When `git-debug-commits` is enabled, apply these stricter rules.
 
+These are **mandatory** rules (not recommendations).
+
 ### Deploy Preflight (Required)
 
 Before `fusebase deploy`:
@@ -80,6 +82,8 @@ For each verified debug fix:
 3. record `git rev-parse --short HEAD`
 
 Do not batch unrelated fixes.
+Do not continue to the next fix until the current verified fix is committed.
+If a fix was verified but not committed, deploy is blocked until the commit exists.
 
 ### Deploy Trace Marker
 

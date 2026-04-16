@@ -40,6 +40,13 @@ const FLAG_GATED_PATH_PREFIXES: Record<string, string> = {
  */
 function shouldSkipEntry(name: string): boolean {
   for (const [skill, flag] of Object.entries(FLAG_GATED_SKILLS)) {
+    if (skill === "git-workflow") {
+      const enabled = hasFlag("git-init") || hasFlag("git-debug-commits");
+      if (name.startsWith(`.claude/skills/${skill}/`) && !enabled) {
+        return true;
+      }
+      continue;
+    }
     if (name.startsWith(`.claude/skills/${skill}/`) && !hasFlag(flag)) {
       return true;
     }
@@ -112,6 +119,16 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
 
     // Remove flag-gated skill directories that shouldn't be present
     for (const [skill, flag] of Object.entries(FLAG_GATED_SKILLS)) {
+      if (skill === "git-workflow") {
+        const enabled = hasFlag("git-init") || hasFlag("git-debug-commits");
+        if (!enabled) {
+          const skillDir = join(skillsDest, skill);
+          if (await fileExists(skillDir)) {
+            await rm(skillDir, { recursive: true, force: true });
+          }
+        }
+        continue;
+      }
       if (!hasFlag(flag)) {
         const skillDir = join(skillsDest, skill);
         if (await fileExists(skillDir)) {

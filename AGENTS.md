@@ -65,8 +65,8 @@ bun index.ts [command]
 
 - `auth [--api-key <apiKey>]` - Start auth flow or set API key for authentication
 - `version` - Print CLI version (from package.json)
-- `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to offer initializing a local Git repo after setup; same behavior can be enabled globally with flag `git-init`)
-- `git` - Initialize a local Git repository in the current directory (offline; add a remote and push to sync with GitHub/GitLab); also creates or updates `.gitignore` with baseline Node/TypeScript ignores (`node_modules/`, `dist/`, `.env`, etc.)
+- `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to initialize local Git and sync with configured GitLab remote; optional `--git-tag-managed` to set `managed` topic in GitLab when app is managed; in interactive mode shows editable suggested repo name before sync; same behavior can be enabled globally with flag `git-init`)
+- `git` - Initialize a local Git repository in the current directory (`fusebase git`) and sync an existing local repo with configured GitLab remote (`fusebase git sync` or `fusebase git --git-sync`); requires global config keys `gitlabHost`, `gitlabToken`, `gitlabGroup`; baseline `.gitignore` rules are ensured automatically
 - `deploy` - Deploy features to Fusebase (runs lint then build per feature)
 - `feature list` - List all features for the current app with their URLs
 - `feature create` - Create and configure a feature (requires `--name`, `--subdomain`, `--path`, `--dev-command`, `--build-command`, `--output-dir`; optional `--access` for access principals e.g. `visitor`, `orgRole:member`; `--permissions` for manual `dashboardView/database` access)
@@ -79,6 +79,7 @@ bun index.ts [command]
 - `config remove-flag <flag>` - Disable an experimental flag
 - `config flags` - Manage experimental flags (interactive selector in TTY; use `--list` for non-interactive output)
 - `config ide` - Recreate IDE config in current project (optional `--ide <preset>`, `--force`)
+- `config gitlab` - Get/set GitLab sync config in `~/.fusebase/config.json` (`gitlabHost`, `gitlabGroup`, `gitlabToken`); supports interactive setup, `--show`, and direct flags (`--host`, `--group`, `--token`)
 - `integrations` - Configure optional MCP integrations (catalog + custom HTTP MCP in `fusebase.json`); `integrations add|disable|enable|remove`; `--no-prompt` skips checkbox
 - `scaffold` *(requires `scaffold` flag — `fusebase config set-flag scaffold`)* - Scaffold a feature from a built-in template. Without options, lists available templates with descriptions. Use `--template <id> --dir <path>` to scaffold. Errors if any files would be overwritten. Templates: `spa` (React + Vite SPA, deployed directly into `<dir>`), `backend` (Node.js + Hono, deployed into `<dir>/backend/`). Backend can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
 
@@ -103,7 +104,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 |------|--------|
 | `mcp-beta` | Unlocks optional MCP servers in the catalog that are gated behind this flag (`ide-configs/mcp-servers.ts`) |
 | `scaffold` | Enables the `fusebase scaffold` command and its documentation |
-| `git-init` | Makes `fusebase init` automatically offer local Git initialization (equivalent to `--git`) and includes Git workflow skill files in generated apps |
+| `git-init` | Makes `fusebase init` automatically run Git initialization + GitLab sync flow (equivalent to `--git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict traceability rules inside `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag references in debug/deploy reports |
 | `app-business-docs` | Includes the `app-business-docs` skill: maintain `docs/en/business-logic.md` (English) describing app business logic, flows, and scenarios; refresh after logic changes or on demand |
 | `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |

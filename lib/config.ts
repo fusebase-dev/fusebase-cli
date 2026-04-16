@@ -10,6 +10,9 @@ export interface Config {
   env?: string;
   updateChannel?: "prod" | "dev";
   flags?: string[];
+  gitlabHost?: string;
+  gitlabToken?: string;
+  gitlabGroup?: string;
 }
 
 export interface DevConfig {
@@ -123,8 +126,8 @@ export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
   "mcp-beta": "Enable beta MCP servers in integrations catalog.",
   cron: "Enable cron-related experimental functionality.",
-  "git-init": "Offer Git initialization automatically during `fusebase init`.",
-  "git-debug-commits": "Enable strict debug/deploy traceability in git workflow skill.",
+  "git-init": "Run Git initialization + GitLab sync automatically during `fusebase init`.",
+  "git-debug-commits": "Enable mandatory commit-per-fix and strict debug/deploy traceability in git workflow skill.",
   "app-business-docs": "Include business-logic documentation skill in project template.",
   "mcp-gate-debug": "Include Gate MCP debug summary skill (focus on isolated stores).",
   "isolated-stores": "Enable isolated stores functionality (SQL/NoSQL).",

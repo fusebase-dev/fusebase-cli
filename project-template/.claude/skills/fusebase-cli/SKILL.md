@@ -97,7 +97,9 @@ Options:
 - `--org <orgId>` - Organization ID (skips org selection if provided)
 - `--ide <preset>` - IDE preset: `claude-code`, `cursor`, `vscode`, `opencode`, `codex`, or `other` (single choice; generates all supported IDE configs by default)
 - `--force` - Overwrite existing IDE config files/folders
-- `--git` - After setup, offer to initialize a local Git repository (local only until you add a `git remote` and push)
+- `--git` - After setup, initialize local Git and sync with configured GitLab remote (creates/uses remote project, configures `origin`, pushes current branch)
+- `--git-tag-managed` - If app is managed, add `managed` topic in GitLab during sync
+- In interactive init, CLI also shows a suggested GitLab repository name and lets you edit it before sync
 - Global flag `git-init` also enables the same post-init Git offer automatically (`fusebase config set-flag git-init`)
 - Global flag `git-debug-commits` enables strict debug/deploy traceability section in the `git-workflow` skill (deploy preflight, commit-per-fix, SHA/tag references)
 - Global flag `app-business-docs` includes the `app-business-docs` skill (English `docs/en/business-logic.md` maintenance)
@@ -126,15 +128,38 @@ fusebase init --name="My App"
 fusebase init --name="My App" --org=org_abc123
 ```
 
-### Local Git (optional)
+### Local Git and GitLab sync (optional)
 
 ```bash
 fusebase git
+fusebase git sync [--git-tag-managed]
 ```
 
-Runs `git init` in the current directory. This is **local version control only** — nothing is uploaded until you add a remote (e.g. GitHub/GitLab) and `git push`. The CLI also creates or updates **`.gitignore`** with common ignores (`node_modules/`, `dist/`, `.env` files, logs, caches, OS/IDE noise). If Git is missing, the CLI points to the official install page and asks you to run `fusebase git` again afterward.
+`fusebase git` runs local `git init` and ensures a baseline **`.gitignore`** with common ignores (`node_modules/`, `dist/`, `.env` files, logs, caches, OS/IDE noise).  
+`fusebase git sync` connects the current local repo to GitLab (from global config in `~/.fusebase/config.json`) and pushes the current branch.
+Equivalent flag form: `fusebase git --git-sync` (with optional `--git-tag-managed`).
 
-Use `fusebase init --git` to be **prompted** whether to initialize Git after app setup.
+To configure GitLab values in global CLI config:
+
+```bash
+fusebase config gitlab
+fusebase config gitlab --show
+fusebase config gitlab --host gl.nimbusweb.co --group vibecode --token glpat_xxx
+fusebase config gitlab --clear-token
+```
+
+Required global config keys in `~/.fusebase/config.json`:
+
+- `gitlabHost`
+- `gitlabToken`
+- `gitlabGroup`
+
+GitLab repo naming:
+
+- Format: `app-<base>-<env>`
+- Base priority: app title (with Cyrillic transliteration fallback) → current folder name → app subdomain
+
+Use `fusebase init --git` to run the same flow automatically after app setup.
 
 ### Development Mode
 

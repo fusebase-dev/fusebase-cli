@@ -9,7 +9,7 @@ import {
   cp,
   constants,
 } from "fs/promises";
-import { join, dirname } from "path";
+import { join, dirname, basename } from "path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
 import { select, confirm, input } from "@inquirer/prompts";
@@ -40,7 +40,11 @@ import {
 } from "../config";
 import { MCP_SERVERS_CATALOG, type McpServerCatalogEntry } from "../../ide-configs/mcp-servers";
 import { isMcpCatalogEntryActive } from "../mcp-catalog";
-import { runGitInitInDirectory } from "../git-local";
+import {
+  isManagedAppInCurrentProject,
+  previewGitLabRepoName,
+  runGitInitAndSync,
+} from "../git-sync";
 
 // @ts-ignore
 const __filename = fileURLToPath(import.meta.url);
@@ -259,28 +263,24 @@ function allSetBoxLine(content: string): string {
   return content + " ".repeat(ALL_SET_BOX_INNER_WIDTH - len);
 }
 
-async function maybeOfferGitInit(options: {
+async function maybeRunGitInitAndSync(options: {
   git?: boolean;
   cwd: string;
+  gitTagManaged?: boolean;
+  isManagedApp: boolean;
+  appSubdomain?: string;
+  appTitle?: string;
+  explicitRepoName?: string;
 }): Promise<void> {
   if (!options.git) return;
-  const { cwd } = options;
-  if (!process.stdin.isTTY) {
-    console.log();
-    console.log(
-      chalk.dim(
-        "Tip: run `fusebase git` to initialize a local Git repository when you are in a TTY.",
-      ),
-    );
-    return;
-  }
-  const should = await confirm({
-    message:
-      "Initialize a local Git repository here? (offline until you add a remote and push)",
-    default: true,
+  await runGitInitAndSync({
+    cwd: options.cwd,
+    tagManaged: Boolean(options.gitTagManaged && options.isManagedApp),
+    appSubdomain: options.appSubdomain,
+    appTitle: options.appTitle,
+    explicitRepoName: options.explicitRepoName,
+    compactOutput: true,
   });
-  if (!should) return;
-  await runGitInitInDirectory(cwd);
 }
 
 function printAllSetBanner(): void {
@@ -481,7 +481,12 @@ export const initCommand = new Command("init")
   )
   .option(
     "--git",
-    "After setup, offer to initialize a local Git repository (also enabled by config flag `git-init`)",
+    "After setup, initialize local Git and sync with configured GitLab remote",
+    false,
+  )
+  .option(
+    "--git-tag-managed",
+    "When app is managed, add managed tag on the GitLab project during git sync",
     false,
   )
   .action(
@@ -492,6 +497,7 @@ export const initCommand = new Command("init")
       force: boolean;
       managed?: boolean;
       git?: boolean;
+      gitTagManaged?: boolean;
     }) => {
       await warnIfProductionNodeEnv();
 
@@ -508,7 +514,7 @@ export const initCommand = new Command("init")
         process.exit(1);
       }
 
-      const shouldOfferGitInit = options.git || hasFlag("git-init");
+      const shouldSetupGit = options.git || hasFlag("git-init");
 
       // Check if fusebase.json already exists
       if (await fileExists(fuseJsonPath)) {
@@ -519,7 +525,12 @@ export const initCommand = new Command("init")
           //agent configs = skills, hooks, AGENTS.md, etc.
           console.log("✓ Updated app agent configs");
           printAllSetBanner();
-          await maybeOfferGitInit({ git: shouldOfferGitInit, cwd });
+          await maybeRunGitInitAndSync({
+            git: shouldSetupGit,
+            cwd,
+            gitTagManaged: options.gitTagManaged,
+            isManagedApp: options.managed === true || isManagedAppInCurrentProject(),
+          });
           process.exit(0);
         } catch (error) {
           console.error("Error: Failed to update agent config:", error);
@@ -641,6 +652,27 @@ export const initCommand = new Command("init")
         process.exit(1);
       }
 
+      let explicitRepoName: string | undefined;
+      if (shouldSetupGit && process.stdin.isTTY && !options.name) {
+        const env = getEnv() === "dev" ? "dev" : "prod";
+        const preview = previewGitLabRepoName({
+          env,
+          appSubdomain: selectedApp.sub,
+          appTitle: selectedApp.title,
+          fallbackName: basename(cwd),
+        });
+        explicitRepoName = await input({
+          message: "GitLab repository name (you can edit):",
+          default: preview,
+          validate: (value) => {
+            if (!String(value ?? "").trim()) {
+              return "Repository name is required";
+            }
+            return true;
+          },
+        });
+      }
+
       // Generate app name for package.json from the app title
       const appName = sanitizePackageName(appTitle);
 
@@ -757,6 +789,14 @@ export const initCommand = new Command("init")
 
       // Print next steps
       printAllSetBanner();
-      await maybeOfferGitInit({ git: shouldOfferGitInit, cwd });
+      await maybeRunGitInitAndSync({
+        git: shouldSetupGit,
+        cwd,
+        gitTagManaged: options.gitTagManaged,
+        isManagedApp: options.managed === true || isManagedAppInCurrentProject(),
+        appSubdomain: selectedApp.sub,
+        appTitle: selectedApp.title,
+        explicitRepoName,
+      });
     },
   );

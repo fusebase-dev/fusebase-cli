@@ -12,5 +12,8 @@
 <% if (it.flags?.includes("isolated-stores")) { %>
 **Isolated SQL schema discipline (flag: `isolated-stores`):** For any isolated SQL schema change, enforce this order with no exceptions: update/create migration files in `postgres/migrations/` -> compute checksum from file bytes -> run status -> then apply. Inline SQL in MCP is allowed only for one-off smoke/dev tests and must be marked temporary. Do not finish schema tasks without new/updated migration files + manifest.
 <% } %>
+<% if (it.flags?.includes("git-debug-commits")) { %>
+**Git debug traceability (flag: `git-debug-commits`):** Treat commit-per-fix as mandatory. After every verified debug fix, create a dedicated commit (`fix(debug): <why>`) before moving to the next fix. Before `fusebase deploy`, run git preflight (`status`, branch, SHA) and stop on dirty tree unless the user explicitly approves. Every debug/deploy report must include commit SHA and rollback command (`git revert <sha>`).
+<% } %>
 
 @AGENTS.md (section **Dashboard data SDK: path parameters (SPA and backend)**).

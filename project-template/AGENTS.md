@@ -403,11 +403,20 @@ For file upload functionality (separate service, not part of dashboard SDK).
 
 **Load when debugging a feature started with `fusebase dev start`** — covers the local per-session logs in the selected feature directory's `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`, and explains which file to inspect for browser errors, proxied API traffic, frontend dev server output, and backend output.
 
-<% if (it.flags?.includes("git-init")) { %>
+<% if (it.flags?.includes("git-init") || it.flags?.includes("git-debug-commits")) { %>
 
 ### ✅ git-workflow
 
-**Load for everyday Git usage in generated apps** — commit hygiene, safe rollback guidance, and operation-aware commit boundaries. If `git-debug-commits` flag is enabled, this skill also applies strict debug/deploy traceability rules.
+**Load for everyday Git usage in generated apps** — commit hygiene, safe rollback guidance, and operation-aware commit boundaries.
+
+<% if (it.flags?.includes("git-debug-commits")) { %>
+When `git-debug-commits` is enabled, these rules are mandatory:
+
+- **Commit per verified fix** — each confirmed fix must be committed immediately (`fix(debug): ...`) before starting the next fix.
+- **No mixed commits** — do not bundle unrelated fixes/debug attempts in one commit.
+- **Deploy preflight guard** — before `fusebase deploy`, run git preflight; if tree is dirty, stop unless user explicitly approves.
+- **Traceability in report** — every fix/deploy must include commit SHA and rollback command (`git revert <sha>`).
+<% } %>
 <% } %>
 <% if (it.flags?.includes("app-business-docs")) { %>
 ### ✅ app-business-docs
@@ -473,7 +482,8 @@ The `fusebase` CLI is installed globally. **Always run it as `fusebase <command>
 
 Key commands:
 
-- `fusebase init` - Initialize new project (`--git` offers local Git init; global flag `git-init` enables the same behavior automatically)
+- `fusebase init` - Initialize new project (`--git` initializes local Git and syncs with configured GitLab remote; `--git-tag-managed` adds managed topic; interactive mode previews and allows editing suggested GitLab repo name; existing repos can be synced via `fusebase git sync` / `fusebase git --git-sync`; global flag `git-init` enables automatic post-init git flow)
+- `fusebase config gitlab` - Configure GitLab sync settings in `~/.fusebase/config.json` (`gitlabHost`, `gitlabGroup`, `gitlabToken`), including interactive setup and `--show`
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `fusebase feature create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]` - Register feature (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the feature needs dashboard access — do not defer to a separate `feature update` step.
 - `fusebase deploy` - Deploy features (runs lint then build per feature)

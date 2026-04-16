@@ -1,34 +1,13 @@
 import chalk from "chalk";
 import { spawn } from "child_process";
 import { readFile, writeFile } from "fs/promises";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { embeddedFiles } from "bun";
 
-/** Non-empty pattern lines; order matters for related rules (e.g. .env variants). */
-const BASELINE_GITIGNORE_PATTERNS: readonly string[] = [
-  "node_modules/",
-  "dist/",
-  "build/",
-  "out/",
-  ".env",
-  ".env.local",
-  ".env.development.local",
-  ".env.test.local",
-  ".env.production.local",
-  "logs/",
-  "*.log",
-  "npm-debug.log*",
-  "yarn-debug.log*",
-  "yarn-error.log*",
-  "pnpm-debug.log*",
-  ".DS_Store",
-  "Thumbs.db",
-  ".idea/",
-  "coverage/",
-  ".cache/",
-  "*.tsbuildinfo",
-  ".eslintcache",
-  "*.tgz",
-];
+// @ts-ignore
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const BASELINE_GITIGNORE_TEMPLATE = `# Dependencies
 node_modules/
@@ -70,7 +49,37 @@ coverage/
 *.tgz
 `;
 
+const BASELINE_GITIGNORE_TEMPLATE_PATH = "project-template/.gitignore";
+
+function parseGitignorePatterns(content: string): string[] {
+  return content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"));
+}
+
+async function loadBaselineGitignoreTemplate(): Promise<string> {
+  const embedded = embeddedFiles.find((f) => {
+    const name = ((f as { name?: string }).name ?? "").replace(/\\/g, "/");
+    return name.includes(BASELINE_GITIGNORE_TEMPLATE_PATH);
+  });
+  if (embedded) {
+    const buf = await (
+      embedded as { arrayBuffer(): Promise<ArrayBuffer> }
+    ).arrayBuffer();
+    return Buffer.from(buf).toString("utf-8");
+  }
+  const devPath = join(__dirname, "..", BASELINE_GITIGNORE_TEMPLATE_PATH);
+  try {
+    return await readFile(devPath, "utf-8");
+  } catch {
+    return BASELINE_GITIGNORE_TEMPLATE;
+  }
+}
+
 async function ensureBaselineGitignore(cwd: string): Promise<void> {
+  const baselineTemplate = await loadBaselineGitignoreTemplate();
+  const baselinePatterns = parseGitignorePatterns(baselineTemplate);
   const gitignorePath = join(cwd, ".gitignore");
   let projectContent = "";
   try {
@@ -81,7 +90,7 @@ async function ensureBaselineGitignore(cwd: string): Promise<void> {
 
   const trimmed = projectContent.trim();
   if (!trimmed) {
-    await writeFile(gitignorePath, BASELINE_GITIGNORE_TEMPLATE, "utf-8");
+    await writeFile(gitignorePath, baselineTemplate, "utf-8");
     console.log(
       chalk.green("✓") +
         " Created .gitignore (node_modules, dist, .env, logs, caches, …).",
@@ -89,7 +98,7 @@ async function ensureBaselineGitignore(cwd: string): Promise<void> {
     return;
   }
 
-  const missing = BASELINE_GITIGNORE_PATTERNS.filter(
+  const missing = baselinePatterns.filter(
     (line) => !projectContent.includes(line),
   );
   if (missing.length === 0) {

@@ -8,7 +8,7 @@ import {
   KNOWN_FLAGS,
   KNOWN_FLAG_DESCRIPTIONS,
 } from "../config";
-import { checkbox } from "@inquirer/prompts";
+import { checkbox, input, password } from "@inquirer/prompts";
 import chalk from "chalk";
 import {
   resolveIdePresets,
@@ -160,10 +160,104 @@ const ideCommand = new Command("ide")
     printIdeSetupResults(result, presets);
   });
 
+function maskToken(value?: string): string {
+  const v = String(value ?? "").trim();
+  if (!v) return "(not set)";
+  if (v.startsWith("glpat-")) {
+    const suffix = v.slice(-4);
+    return `glpat-***${suffix}`;
+  }
+  if (v.length <= 8) return "*".repeat(v.length);
+  return `${v.slice(0, 4)}***${v.slice(-4)}`;
+}
+
+function printGitLabConfig(): void {
+  const config = getConfig();
+  console.log("GitLab configuration:");
+  console.log(`  gitlabHost:  ${config.gitlabHost?.trim() || "(not set)"}`);
+  console.log(`  gitlabGroup: ${config.gitlabGroup?.trim() || "(not set)"}`);
+  console.log(`  gitlabToken: ${maskToken(config.gitlabToken)}`);
+}
+
+const gitlabCommand = new Command("gitlab")
+  .description("Get or set GitLab sync configuration")
+  .option("--host <host>", "GitLab host, e.g. gl.nimbusweb.co")
+  .option("--group <group>", "Base GitLab group, e.g. vibecode")
+  .option("--token <token>", "GitLab personal access token")
+  .option("--show", "Show current GitLab configuration")
+  .option("--clear-token", "Remove stored GitLab token")
+  .action(async (options: {
+    host?: string;
+    group?: string;
+    token?: string;
+    show?: boolean;
+    clearToken?: boolean;
+  }) => {
+    const hasCliUpdates =
+      Boolean(options.host) ||
+      Boolean(options.group) ||
+      Boolean(options.token) ||
+      options.clearToken === true;
+
+    if (options.show || (!hasCliUpdates && !process.stdin.isTTY)) {
+      printGitLabConfig();
+      return;
+    }
+
+    const current = getConfig();
+    let host = options.host?.trim() ?? current.gitlabHost?.trim() ?? "";
+    let group = options.group?.trim() ?? current.gitlabGroup?.trim() ?? "";
+    let token = options.token?.trim() ?? current.gitlabToken?.trim() ?? "";
+
+    if (!hasCliUpdates && process.stdin.isTTY && process.stdout.isTTY) {
+      host = String(
+        await input({
+          message: "GitLab host",
+          default: host || "gitlab.example.com",
+          validate: (v) => (String(v ?? "").trim() ? true : "Host is required"),
+        }),
+      ).trim();
+      group = String(
+        await input({
+          message: "GitLab group",
+          default: group,
+          validate: (v) => (String(v ?? "").trim() ? true : "Group is required"),
+        }),
+      ).trim();
+      const maskedCurrentToken = maskToken(token);
+      const enteredToken = String(
+        await password({
+          message:
+            maskedCurrentToken === "(not set)"
+              ? "GitLab token"
+              : `GitLab token (leave empty to keep current: ${maskedCurrentToken})`,
+          mask: "*",
+        }),
+      ).trim();
+      if (enteredToken) {
+        token = enteredToken;
+      }
+    }
+
+    if (options.clearToken) {
+      token = "";
+    }
+
+    setConfig({
+      gitlabHost: host || undefined,
+      gitlabGroup: group || undefined,
+      gitlabToken: token || undefined,
+    });
+
+    console.log("✓ GitLab configuration updated");
+    printGitLabConfig();
+  });
+
 export const configCommand = new Command("config")
   .description("Manage CLI configuration")
   .addCommand(updateChannelCommand)
   .addCommand(setFlagCommand)
   .addCommand(removeFlagCommand)
   .addCommand(listFlagsCommand)
-  .addCommand(ideCommand);
+  .addCommand(ideCommand)
+  .addCommand(gitlabCommand);

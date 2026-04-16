@@ -15,6 +15,7 @@ For deeper understanding of:
 See:
 - [Architecture Documentation](docs/ARCHITECTURE.md)
 - [CLI Flows](docs/CLI-FLOWS.md)
+- [Git Configuration Guide](docs/guides/git-config.md)
 - [Conceptual Model](docs/CONCEPTS.md)
 - [Feature Permissions](docs/PERMISSIONS.md) — canonical model for `dashboardView`, `database`, `gate`, and `feature update`
 - [Fusebase Gate meta (`fusebaseGateMeta`)](docs/FUSEBASE_GATE_META.md) — Gate SDK analyze flow and `fusebase.json` snapshot
@@ -109,8 +110,10 @@ Initialize a new Fusebase app in the current directory. This command will:
 - `--org <orgId>` - Organization ID (skips org selection)
 - `--ide <preset>` - IDE preset: `claude-code`, `cursor`, `vscode`, `opencode`, `codex`, or `other` (single choice; generates all IDE configs by default)
 - `--force` - Overwrite existing IDE config files/folders
-- `--git` - After setup, **offer** to run `git init` (local only; use `git remote add` + `git push` to sync with a host)
+- `--git` - After setup, initialize local Git and sync with configured GitLab remote (creates/uses repo in `<gitlabGroup>/<dev|prod>/...`, sets `origin`, pushes current branch)
   - Also enabled automatically if global flag `git-init` is active (`fusebase config set-flag git-init`)
+- `--git-tag-managed` - If app is managed, add `managed` topic to the GitLab project during sync
+  - In interactive init, CLI shows a suggested GitLab repo name and lets you edit it before sync
 
 **Interactive Prompts:**
 
@@ -144,19 +147,43 @@ Creates a `fusebase.json` file with the following structure:
 
 ### `fusebase git`
 
-Initialize a **local** Git repository in the current directory (`git init`). This does **not** connect to GitHub, GitLab, or any remote — it only creates `.git` on your machine.
+Initialize a **local** Git repository in the current directory (`git init`), ensure baseline `.gitignore`, and print local workflow hints.
 
-If Git is not installed, the CLI prints a link to the [official Git downloads](https://git-scm.com/downloads) and platform-specific pages, then suggests running `fusebase git` again after installation.
+### `fusebase git sync [--git-tag-managed]`
 
-After a successful init (or if the folder is already inside a Git work tree), the CLI creates or updates a **`.gitignore`** with common Node/TypeScript patterns (`node_modules/`, `dist/`, `.env*`, logs, caches, IDE junk, etc.; patterns apply at any depth). It then prints a short guide: local vs remote, how to add `origin` and push, and a compact branch workflow (`main` / feature branches).
+Sync the current local repository with GitLab using global config from `~/.fusebase/config.json`:
 
-**Options:** None
+- `gitlabHost` (for example `gl.nimbusweb.co`)
+- `gitlabToken`
+- `gitlabGroup` (base namespace; env subgroup `dev`/`prod` is selected from current auth env)
 
-**Example:**
+Behavior:
+
+- Creates/uses GitLab project with visibility `private`
+- Project name is generated as `app-<base>-<env>` (for example `app-workspace-tools-dev`)
+- Base priority: Fusebase app title (with transliteration fallback for Cyrillic) → current folder name → app `subdomain`
+- Configures local `origin` (without overwriting existing different origin)
+- Pushes current branch to remote
+- With `--git-tag-managed`, applies topic `managed` for managed apps
+- Equivalent short form: `fusebase git --git-sync [--git-tag-managed]`
+
+**Config example:**
+
+```json
+{
+  "gitlabHost": "gl.nimbusweb.co",
+  "gitlabToken": "glpat-xxxxxxxxxxxxxxxx",
+  "gitlabGroup": "vibecode"
+}
+```
+
+**Examples:**
 
 ```bash
 cd my-app
 fusebase git
+fusebase git sync
+fusebase git sync --git-tag-managed
 ```
 
 ---
@@ -468,7 +495,10 @@ Global configuration stored in your home directory:
 {
   "apiKey": "your-api-key",
   "env": "dev",
-  "flags": ["mcp-beta"]
+  "flags": ["mcp-beta"],
+  "gitlabHost": "gl.nimbusweb.co",
+  "gitlabGroup": "vibecode",
+  "gitlabToken": "glpat-xxxxxxxxxxxxxxxx"
 }
 ```
 
@@ -512,6 +542,17 @@ Re-run IDE MCP setup in the current project (same logic as during `fusebase init
 fusebase config ide                # Generate MCP config for all IDEs
 fusebase config ide --ide cursor   # Use Cursor preset
 fusebase config ide --ide cursor --force   # Overwrite existing files
+```
+
+#### GitLab sync config
+
+Configure the GitLab settings used by `fusebase init --git` and `fusebase git sync`:
+
+```bash
+fusebase config gitlab                 # Interactive setup/update
+fusebase config gitlab --show          # Print current values (token masked)
+fusebase config gitlab --host gl.nimbusweb.co --group vibecode --token glpat_xxx
+fusebase config gitlab --clear-token   # Remove stored token
 ```
 
 #### MCP Integrations
