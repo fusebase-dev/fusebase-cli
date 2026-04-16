@@ -139,6 +139,14 @@ const addCommand = new Command("add")
         process.exit(1);
       }
 
+      if (opts.port === 3000) {
+        console.warn(
+          `Warning: Port 3000 is reserved for the backend app. ` +
+            `Sidecar "${opts.name}" will crash with EADDRINUSE if it binds to port 3000. ` +
+            `Use --env to override the sidecar's default port (e.g. --env PORT=9222).`,
+        );
+      }
+
       const newSidecar: SidecarConfig = {
         name: opts.name,
         image: opts.image,

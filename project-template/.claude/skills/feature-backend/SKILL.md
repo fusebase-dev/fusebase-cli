@@ -58,6 +58,8 @@ fusebase sidecar add --feature <featureId> --name chromium --image browserless/c
 
 The sidecar is accessible from the backend at `http://localhost:<port>`. Max 3 sidecars per feature.
 
+**Important:** Port 3000 is reserved for the backend app. If a sidecar image defaults to port 3000, override it via env vars (e.g. `--env PORT=9222` for browserless).
+
 ### Communicating with Sidecars
 
 Since sidecars share the same network namespace, use `localhost` to reach them:
