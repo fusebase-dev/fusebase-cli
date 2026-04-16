@@ -285,7 +285,9 @@ async function runBuildCommand(featureConfig: FeatureConfig): Promise<void> {
 
 export const deployCommand = new Command("deploy")
   .description("Deploy features to Fusebase")
-  .action(async () => {
+  .option("--force", "Force backend deploy even if source has not changed")
+  .action(async (opts: { force?: boolean }) => {
+    const forceBackend = opts.force ?? false;
     // Check if app is initialized
     const fuseConfig = await loadFuseConfig();
     if (!fuseConfig) {
@@ -514,7 +516,7 @@ export const deployCommand = new Command("deploy")
           const backendHash = await calculateBackendHash(backendDir);
           logger.info("Backend hash: %s", backendHash);
 
-          if (activeVersion?.backendHash === backendHash) {
+          if (activeVersion?.backendHash === backendHash && !forceBackend) {
             console.log(
               `   ✓ Backend unchanged (hash matches active version), skipping deploy\n`,
             );
