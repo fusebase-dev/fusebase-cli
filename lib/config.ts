@@ -137,7 +137,11 @@ export function getFlags(): string[] {
   return getConfig().flags ?? [];
 }
 
+/** Flags that are always considered enabled regardless of user config. */
+const ALWAYS_ON_FLAGS: readonly string[] = ["cron"];
+
 export function hasFlag(flag: string): boolean {
+  if (ALWAYS_ON_FLAGS.includes(flag)) return true;
   return getFlags().includes(flag);
 }
 
