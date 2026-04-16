@@ -933,6 +933,14 @@ export async function initSourceUpload(
   return (await response.json()) as InitSourceUploadResponse;
 }
 
+export interface DeploySidecarDefinition {
+  name: string;
+  image: string;
+  port?: number;
+  env?: Array<{ key: string; value: string }>;
+  tier?: "small" | "medium" | "large";
+}
+
 export async function createDeploy(
   apiKey: string,
   orgId: string,
@@ -940,16 +948,23 @@ export async function createDeploy(
   appFeatureId: string,
   versionId: string,
   jobs?: Array<{ name: string; type: "cron"; cron: string; command: string }>,
+  sidecars?: DeploySidecarDefinition[],
 ): Promise<Deploy> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions/${versionId}/deploy`;
+
+  const body: Record<string, unknown> = { jobs: jobs ?? [] };
+  if (sidecars && sidecars.length > 0) {
+    body.sidecars = sidecars;
+  }
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ jobs: jobs ?? [] }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

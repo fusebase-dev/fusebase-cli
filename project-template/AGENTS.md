@@ -437,6 +437,12 @@ When `git-debug-commits` is enabled, these rules are mandatory:
 
 **Load when a feature backend reads `process.env` for API keys, passwords, or other sensitive config.** Covers creating secrets via `fusebase secret create`, accessing them at runtime, local development, and the checklist for verifying all secrets are registered. **After writing backend code that uses secrets from `process.env`**, you **must** run `fusebase secret create` to register every secret key — otherwise the backend will fail at runtime.
 
+<% if (it.flags?.includes("sidecar")) { %>
+### ✅ feature-sidecar
+
+**Load when a feature backend needs auxiliary sidecar containers** (headless browsers, caches, specialized services). Covers sidecar CLI commands (`fusebase sidecar add/remove/list`), `fusebase.json` configuration format, inter-container networking (localhost), resource tiers, environment variables, debugging with remote-logs, and limitations. Requires the `sidecar` CLI flag.
+<% } %>
+
 ### Dev-level skills (TypeScript & React)
 
 **Load when writing or reviewing TypeScript/React code** — language and framework reference skills for implementation quality. Read the skill's `SKILL.md` and, when relevant, the listed references.

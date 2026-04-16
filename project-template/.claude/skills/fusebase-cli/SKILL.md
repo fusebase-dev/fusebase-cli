@@ -407,6 +407,38 @@ Deploys all features to Fusebase:
 
 The project template includes ESLint (`npm run lint`) and root `npm run typecheck` (TypeScript across features — catches errors ESLint does not). Run both before saying "Done" so deploy succeeds; see AGENTS.md "Final Gate". Claude Code runs lint and typecheck on Stop via `.claude/settings.json` hooks.
 
+<% if (it.sidecar) { %>
+### Manage Sidecar Containers *(requires `sidecar` flag)*
+
+Sidecar containers are pre-built Docker images deployed alongside a feature's backend container, sharing the localhost network namespace. Max 3 sidecars per feature. Enable with `fusebase config set-flag sidecar`.
+
+```bash
+# Add a sidecar to a feature backend
+fusebase sidecar add \
+  --feature <featureId> \
+  --name <name> \
+  --image <image> \
+  [--port <port>] \
+  [--tier small|medium|large] \
+  [--env KEY=VALUE ...]
+
+# Remove a sidecar by name
+fusebase sidecar remove --feature <featureId> --name <name>
+
+# List configured sidecars
+fusebase sidecar list --feature <featureId>
+```
+
+**Options for `sidecar add`:**
+- `--name` — unique name within the feature (used for log filtering and identification)
+- `--image` — Docker image reference (e.g. `browserless/chrome:latest`)
+- `--port` — port the sidecar listens on (accessible via localhost from the backend)
+- `--tier` — resource tier: `small` (default), `medium`, or `large`
+- `--env` — environment variables as KEY=VALUE pairs (repeatable)
+
+Sidecars are stored in `fusebase.json` under `features[].backend.sidecars[]` and deployed on the next `fusebase deploy`.
+<% } %>
+
 ### Remote Logs (Deployed Backends)
 
 Fetch logs from deployed feature backends. **Only applicable to features with a `backend/` folder.** Use this for production issues, NOT for local development (for local dev, see the `dev-debug-logs` skill).
