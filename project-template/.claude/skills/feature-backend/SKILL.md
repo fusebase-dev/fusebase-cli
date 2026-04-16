@@ -1,6 +1,6 @@
 ---
 name: feature-backend
-description: "Guide for adding a backend layer (REST API + WebSockets) to Fusebase Apps features. Use when: (1) A feature needs a server-side API beyond the Dashboard SDK, (2) Adding REST endpoints or WebSocket support, (3) Setting up the backend/ folder structure. The backend is OPTIONAL — only add when the feature genuinely requires server-side logic."
+description: "Guide for adding a backend layer (REST API, WebSockets, cron jobs) to Fusebase Apps features. Use when: (1) A feature needs a server-side API beyond the Dashboard SDK, (2) Adding REST endpoints or WebSocket support, (3) Setting up the backend/ folder structure, (4) Scheduling cron jobs for periodic tasks. The backend is OPTIONAL — only add when the feature genuinely requires server-side logic."
 ---
 
 # Feature Backend
