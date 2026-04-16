@@ -121,6 +121,7 @@ export function getUpdateChannel(): "prod" | "dev" {
 
 /** Known experimental flags. */
 export const KNOWN_FLAGS = [
+  "analytics",
   "mcp-beta",
   "git-init",
   "git-debug-commits",
@@ -134,6 +135,7 @@ export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
 /** Short descriptions for known experimental flags (used in interactive UX/help text). */
 export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
+  analytics: "Enable anonymous usage analytics (coding agent, model, OS stats).",
   "mcp-beta": "Enable beta MCP servers in integrations catalog.",
   "git-init": "Run Git initialization + GitLab sync automatically during `fusebase init`.",
   "git-debug-commits": "Enable mandatory commit-per-fix and strict debug/deploy traceability in git workflow skill.",

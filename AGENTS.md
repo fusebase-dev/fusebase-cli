@@ -105,6 +105,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 
 | Flag | Effect |
 |------|--------|
+| `analytics` | Enable anonymous usage analytics (coding agent, model, OS stats). All stats/command logging is disabled by default and requires this flag. |
 | `mcp-beta` | Unlocks optional MCP servers in the catalog that are gated behind this flag (`ide-configs/mcp-servers.ts`) |
 | `scaffold` | Enables the `fusebase scaffold` command and its documentation |
 | `git-init` | Makes `fusebase init` automatically run Git initialization + GitLab sync flow (equivalent to `--git`) and includes Git workflow skill files in generated apps |

@@ -1616,3 +1616,79 @@ export async function getRuntimeLogsByVersion(
 
   return (await response.json()) as RuntimeLogsResponse;
 }
+
+export interface CommandLogPayload {
+  command: string;
+  cliVersion: string;
+  os: string;
+  osVersion?: string;
+  appId?: string;
+  orgId: string;
+  duration: number;
+  success: boolean;
+  errorMessage?: string;
+  errorStackTrace?: string;
+}
+
+export async function sendCommandLog(
+  apiKey: string,
+  body: CommandLogPayload,
+): Promise<void> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/v1/cli-command-logs`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+
+    logger.error({
+      msg: "Failed to send command log",
+      endpoint: "/v1/cli-command-logs",
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+    });
+  }
+}
+
+export async function sendCodingStats(
+  apiKey: string,
+  orgId: string,
+  appId: string,
+  body: { codingAgent?: string; model?: string; appFeatureId?: string },
+): Promise<void> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(
+    `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/coding-stats`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+
+    logger.error({
+      msg: "Failed to send coding stats",
+      endpoint: `/v1/orgs/${orgId}/apps/${appId}/coding-stats`,
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+    });
+  }
+}

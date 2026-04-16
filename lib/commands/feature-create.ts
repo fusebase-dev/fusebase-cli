@@ -4,10 +4,11 @@ import { join, relative, isAbsolute } from "path";
 import {
   createAppFeature,
   updateAppFeature,
+  sendCodingStats,
   type AppFeature,
   type AppFeaturePermissions,
 } from "../api.ts";
-import { getConfig, loadFuseConfig, type FeatureConfig } from "../config.ts";
+import { getConfig, hasFlag, loadFuseConfig, type FeatureConfig } from "../config.ts";
 import {
   formatPermissionItem,
   mergeFeaturePermissions,
@@ -87,6 +88,8 @@ export const featureCreateCommand = new Command("create")
     "--backend-start-command <command>",
     "Backend start command for production (e.g., npm run start). Only if the feature has a backend/ folder.",
   )
+  .option("--coding-agent <name>", "Coding agent identifier (e.g. claude_code, cursor, copilot, codex)")
+  .option("--model <name>", "Model identifier (e.g. claude-opus-4-6, gpt-5)")
   .action(
     async (options: {
       name: string;
@@ -100,6 +103,8 @@ export const featureCreateCommand = new Command("create")
       backendDevCommand?: string;
       backendBuildCommand?: string;
       backendStartCommand?: string;
+      codingAgent?: string;
+      model?: string;
     }) => {
       const fuseJsonPath = join(process.cwd(), FUSE_JSON);
 
@@ -186,6 +191,15 @@ export const featureCreateCommand = new Command("create")
           console.error("Error: Failed to create feature.");
         }
         process.exit(1);
+      }
+
+      // Fire-and-forget: send coding stats if analytics enabled and agent or model provided
+      if (hasFlag("analytics") && (options.codingAgent || options.model)) {
+        sendCodingStats(config.apiKey, fuseConfig.orgId, fuseConfig.appId, {
+          codingAgent: options.codingAgent,
+          model: options.model,
+          appFeatureId: selectedFeature.id,
+        }).catch(() => {});
       }
 
       // Handle access principals and permissions if specified
