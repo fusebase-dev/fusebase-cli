@@ -128,6 +128,7 @@ export const KNOWN_FLAGS = [
   "mcp-gate-debug",
   "isolated-stores",
   "sidecar",
+  "api-exploration",
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
@@ -141,6 +142,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
   "isolated-stores": "Enable isolated stores functionality (SQL/NoSQL).",
   sidecar:
     "Enable sidecar container management for feature backends (add/remove/list).",
+  "api-exploration":
+    "Include api-exploration skill for verifying API endpoints with temporary tokens and test scripts.",
 };
 
 export function getFlags(): string[] {

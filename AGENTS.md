@@ -113,6 +113,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); includes supporting `fusebase-gate` references and `isolated_store.*` permissions in `fusebase env create` |
 | `sidecar` | Enables sidecar container management for feature backends (`fusebase sidecar add/remove/list`). Sidecars are pre-built Docker images deployed alongside the backend container, sharing localhost networking. Max 3 per feature. |
+| `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing feature code. Complements MCP discovery. |
 
 After changing flags, run `fusebase skills update` to regenerate project files (for template flags). For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 
