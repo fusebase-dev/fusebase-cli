@@ -54,9 +54,7 @@ program.addCommand(secretCommand);
 program.addCommand(tokenCommand);
 program.addCommand(remoteLogsCommand);
 program.addCommand(scaffoldCommand);
-if (hasFlag("cron")) {
-  program.addCommand(jobCommand);
-}
+program.addCommand(jobCommand);
 if (hasFlag("sidecar")) {
   program.addCommand(sidecarCommand);
 }

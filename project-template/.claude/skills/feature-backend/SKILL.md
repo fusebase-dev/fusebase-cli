@@ -87,8 +87,7 @@ fusebase remote-logs runtime <featureId> --container chromium
 For full sidecar documentation, see the **feature-sidecar** skill.
 
 <% } %>
-<% if (it.cron) { %>
-- Background processing or scheduled tasks<% } %>
+- Background processing or scheduled tasks
 
 **Do NOT add a backend** just for CRUD on dashboard data — use the Dashboard SDK directly from the SPA.
 
@@ -416,8 +415,6 @@ Before adding a backend:
 
 
 
-<% if (it.cron) { %>
-
 ## Scheduled Tasks (Cron Jobs)
 
 > **⚠️ Cron jobs do NOT run with `fusebase dev start`.** Local dev mode does not schedule or execute jobs. Run `fusebase deploy` to deploy the feature — jobs will be scheduled and executed in the cloud after deployment.
@@ -494,5 +491,3 @@ This removes the job from `backend.jobs` in `fusebase.json`. On the next `fuseba
 - [ ] Added `cron:<job-name>` npm script to `backend/package.json`
 - [ ] Ran `fusebase job create` to register the job
 - [ ] Ran `fusebase deploy` to deploy the feature — **cron jobs only run after deployment**, not during `fusebase dev start`
-
-<% } %>

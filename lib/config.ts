@@ -122,7 +122,6 @@ export function getUpdateChannel(): "prod" | "dev" {
 /** Known experimental flags. */
 export const KNOWN_FLAGS = [
   "mcp-beta",
-  "cron",
   "git-init",
   "git-debug-commits",
   "app-business-docs",
@@ -135,7 +134,6 @@ export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 /** Short descriptions for known experimental flags (used in interactive UX/help text). */
 export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
   "mcp-beta": "Enable beta MCP servers in integrations catalog.",
-  cron: "Enable cron-related experimental functionality.",
   "git-init": "Run Git initialization + GitLab sync automatically during `fusebase init`.",
   "git-debug-commits": "Enable mandatory commit-per-fix and strict debug/deploy traceability in git workflow skill.",
   "app-business-docs": "Include business-logic documentation skill in project template.",
@@ -156,7 +154,7 @@ export function getFlags(): string[] {
 }
 
 /** Flags that are always considered enabled regardless of user config. */
-export const ALWAYS_ON_FLAGS: readonly string[] = ["cron"];
+export const ALWAYS_ON_FLAGS: readonly string[] = [];
 
 export function hasFlag(flag: string): boolean {
   return getFlags().includes(flag);

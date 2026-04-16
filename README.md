@@ -534,6 +534,12 @@ fusebase config flags --list       # List active flags (non-interactive)
 fusebase skills update             # Regenerate project files
 ```
 
+To permanently graduate a flag (remove gating and enable the feature forever), use the `/remove-flag` skill in your coding agent:
+
+```
+/remove-flag <flag-name>
+```
+
 #### Recreate IDE config
 
 Re-run IDE MCP setup in the current project (same logic as during `fusebase init`): copy config for the chosen IDE and substitute URL/token from `.env`.
