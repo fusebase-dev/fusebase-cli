@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/stripe-for-apps-and-agents.md"
-last_synced: "2026-04-09"
+last_synced: "2026-04-16"
 title: "Stripe for apps and agents (Gate)"
 category: specialized
 ---
@@ -24,7 +24,7 @@ Available Stripe operations:
 - `getStripeOauth`
   Checks whether the org has a connected Stripe account and returns `stripeAccountId` plus `liveMode`.
 - `updateStripeMode`
-  Switches the connected Stripe account between test and live mode. This is a fast key-mode switch only. It does not copy products or prices between modes.
+  Gate billing currently operates in live mode only, so do not treat this as a user-facing test/live switch.
 - `findStripeProduct`
   Finds a Gate-managed Stripe product or price by `stripeAccountId`, `kind`, `kindId`, or `mode`.
 - `createStripeProduct`
@@ -41,6 +41,7 @@ Available Stripe operations:
 ## What Gate Does Not Support Yet
 
 - A generic Stripe API proxy
+- Test/live mode switching through the current Gate billing backend
 - Direct Stripe product administration outside the Gate `kind` and `kindId` model
 - Stripe customer list endpoints
 - Stripe invoice history endpoints
@@ -56,7 +57,8 @@ Available Stripe operations:
 - `buyerId` for `getStripePaymentLink` and `getStripePaymentState` must be a number. Pass `buyerId: user.id`, not `buyerId: String(user.id)`.
 - For `mode: "subscription"`, send both `interval` and `intervalCount`.
 - For `mode: "payment"`, omit `interval` and `intervalCount`.
-- `updateStripeMode` only changes which Stripe API key mode is used for that connected account. It does not migrate existing Stripe catalog state.
+- Gate billing should currently be treated as live-mode only. Do not build UI or agent flows that depend on switching Stripe between test and live modes through Gate.
+- Treat `liveMode` as read-only informational state for now and expect connected accounts to be live-mode only.
 - Treat `createStripeProduct`, `updateStripeProduct`, and `deleteStripeProduct` as owner-admin setup flows in your app or backend, not arbitrary registered-user self-service actions.
 - `getStripePaymentLink` expects `stripeAccountId`, `kind`, `kindId`, numeric `buyerId`, `successUrl`, and `cancelUrl`.
 - If `getStripePaymentLink` returns `url: null`, first verify those checkout inputs are present, non-empty, and match an existing Gate product identity.
@@ -126,7 +128,7 @@ Recommended pattern:
 3. Your backend calls Gate using the current user context or a short-lived scoped token.
 4. Your backend returns the result the UI needs, such as Stripe connection state, checkout URL, or payment state.
 
-This keeps Stripe mode-switching and product management behind your application boundary.
+This keeps Stripe connection state and product management behind your application boundary.
 
 ### Backend Or BFF
 
@@ -175,16 +177,12 @@ if (!oauth.oauth?.stripeAccountId) {
 }
 ```
 
-Switch live or test mode:
+Read Stripe connection state:
 
 ```ts
-const modeUpdate = await billingApi.updateStripeMode({
-  path: { orgId },
-  body: {
-    stripeAccountId: oauth.oauth.stripeAccountId,
-    liveMode: true,
-  },
-});
+if (oauth.oauth?.liveMode !== true) {
+  throw new Error("Gate Stripe billing is expected to run in live mode");
+}
 ```
 
 Find or create a one-time payment product:
@@ -320,7 +318,7 @@ async function waitForStripeActivation() {
 
 1. Call `getStripeOauth`.
 2. If `oauth` is `null`, show Stripe connection UI in your app.
-3. If connected, use returned `stripeAccountId` and `liveMode` for display.
+3. If connected, use returned `stripeAccountId` for billing flows and treat `liveMode` as read-only informational status that should currently be `true`.
 
 ### Product And Checkout Flow
 
@@ -331,13 +329,12 @@ async function waitForStripeActivation() {
 5. Redirect the user to the Stripe-hosted checkout URL only when `checkout.url` is present.
 6. After return to the success page, poll `getStripePaymentState` until active or timeout because webhook processing is async.
 
-### Mode Switch Flow
+### Connection State Display
 
 1. Call `getStripeOauth`.
-2. Show current `liveMode`.
-3. If user confirms switch, call `updateStripeMode`.
-4. Refresh UI from the returned `oauth.liveMode`.
-5. Do not assume Gate copied test products to live or live products to test.
+2. Show current `liveMode` as read-only status.
+3. Do not build a user-facing live/test toggle through Gate for now.
+4. Treat product setup, checkout, and payment-state flows as live-mode only.
 
 ## Agent Pattern
 
@@ -384,7 +381,7 @@ Use Gate when the flow needs:
 
 - org-scoped auth and permissions
 - app-owned `kind` and `kindId`
-- mode-aware Stripe account handling
+- live Stripe account handling through Gate
 - checkout creation
 - webhook-backed payment state
 
@@ -406,4 +403,4 @@ Those should still be curated Gate operations rather than a raw Stripe passthrou
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-04-09
+- **Last synced**: 2026-04-16

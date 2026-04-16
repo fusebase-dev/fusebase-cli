@@ -1,7 +1,7 @@
 ---
-version: "1.4.2"
+version: "1.5.0"
 mcp_prompt: sdk
-last_synced: "2026-04-10"
+last_synced: "2026-04-16"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -45,7 +45,8 @@ For session-backed org access checks, use AccessApi.getMyOrgAccess instead of in
 After sign-up, sign-in, or provisioning writes, re-check AccessApi.getMyOrgAccess before unlocking org content.
 Treat `result: "invite"` from addOrgUser as pending membership rather than granted access.
 Do not treat a custom /me or account endpoint as the source of truth unless it delegates to getMyOrgAccess.
-For Stripe onboarding, product, checkout, and subscription-cancel flows, start with BillingApi methods such as getStripeOauth, updateStripeMode, createStripeProduct, updateStripeProduct, deleteStripeProduct, getStripePaymentLink, cancelStripeSubscription, and getStripePaymentState.
+For Stripe onboarding, product, checkout, and subscription-cancel flows, start with BillingApi methods such as getStripeOauth, createStripeProduct, updateStripeProduct, deleteStripeProduct, getStripePaymentLink, cancelStripeSubscription, and getStripePaymentState.
+Treat BillingApi.updateStripeMode as a compatibility surface for now rather than a normal app workflow: Gate billing should currently be considered live-mode only.
 Use stable app-owned `kind` and `kindId` values in BillingApi. Keep `kind` at 32 chars max and `kindId` at 64 chars max so webhook-backed payment state can be checked later for the same entitlement.
 For subscription offboarding, BillingApi.cancelStripeSubscription defaults to cancel-at-period-end when `cancelAtPeriodEnd` is omitted. Send `cancelAtPeriodEnd: false` only for immediate cancellation.
 For workspace discovery, use WorkspacesApi.listWorkspaces.
@@ -62,7 +63,7 @@ For isolated SQL schema work, keep migration files in the app repo and use SDK h
 
 ## Version
 
-- **Version**: 1.4.2
+- **Version**: 1.5.0
 - **Category**: meta
-- **Last synced**: 2026-04-10
+- **Last synced**: 2026-04-16
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

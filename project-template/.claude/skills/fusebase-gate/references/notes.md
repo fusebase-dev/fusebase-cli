@@ -1,7 +1,7 @@
 ---
-version: "1.0.0"
+version: "1.0.1"
 mcp_prompt: notes
-last_synced: "2026-04-10"
+last_synced: "2026-04-16"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -35,6 +35,7 @@ These operations manage workspace note folders, workspace notes, note reads, and
 - Use `listWorkspaceNoteFolders` before browsing nested folders when the caller does not already know a folder id.
 - `listWorkspaceNotes` returns notes for one parent folder at a time. Omit `parentId` to read the root folder.
 - `getWorkspaceNote` is the operation that returns note body content through `note.md`.
+- Workspace attachment image links inside `note.md` are rewritten to presigned file URLs when Gate can resolve them.
 - Portal-shared and trashed notes are filtered out from these workspace note list operations.
 
 ## Create Flow Rules
@@ -60,7 +61,7 @@ These operations manage workspace note folders, workspace notes, note reads, and
 
 ## Version
 
-- **Version**: 1.0.0
+- **Version**: 1.0.1
 - **Category**: specialized
-- **Last synced**: 2026-04-10
+- **Last synced**: 2026-04-16
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
