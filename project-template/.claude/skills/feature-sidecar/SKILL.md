@@ -103,6 +103,14 @@ const redis = await fetch("http://localhost:6379");
 
 Each sidecar should expose a different port. The `port` field is informational for documentation; the actual port is determined by the sidecar image configuration.
 
+**Port 3000 is reserved for the backend app** — do not configure sidecars to listen on port 3000. If a sidecar image defaults to port 3000 (e.g. `browserless/chrome`), override it via environment variables. For example, browserless uses `PORT` env var:
+
+```bash
+fusebase sidecar add --feature my-scraper --name chromium \
+  --image browserless/chrome:latest --port 9222 \
+  --env PORT=9222
+```
+
 ## Resource Tiers
 
 Each sidecar can have its own resource tier:
@@ -132,6 +140,7 @@ Backend secrets (created via `fusebase secret create`) are NOT injected into sid
 - **Pre-built images only** — sidecars use existing Docker images, no custom builds from source
 - **Sidecar names must be unique** within a feature
 - **Sidecars do not run locally** — `fusebase dev start` does not start sidecar containers. For local development, run the sidecar image manually with Docker
+- **Port 3000 is reserved** — the backend app listens on port 3000; sidecars must not bind to it or they will crash with `EADDRINUSE`
 - **No shared volumes** — sidecars and backend communicate only via network
 
 ## Debugging
