@@ -19,6 +19,7 @@ import {
   type App,
   type AppFeature,
   type Deploy,
+  type DeploySidecarDefinition,
 } from "../api";
 import { getFusebaseAppHost } from "../config";
 import { logger } from "../logger";
@@ -579,6 +580,29 @@ export const deployCommand = new Command("deploy")
             const { unlink } = await import("fs/promises");
             await unlink(archivePath).catch(() => {});
 
+            // Transform sidecar config for API (env Record -> key/value array)
+            const sidecars: DeploySidecarDefinition[] | undefined =
+              featureConfig.backend?.sidecars?.map((sc) => ({
+                name: sc.name,
+                image: sc.image,
+                ...(sc.port != null ? { port: sc.port } : {}),
+                ...(sc.env
+                  ? {
+                      env: Object.entries(sc.env).map(([key, value]) => ({
+                        key,
+                        value,
+                      })),
+                    }
+                  : {}),
+                ...(sc.tier ? { tier: sc.tier } : {}),
+              }));
+
+            if (sidecars && sidecars.length > 0) {
+              console.log(
+                `   Sidecars: ${sidecars.map((s) => s.name).join(", ")}`,
+              );
+            }
+
             // Start backend deploy
             console.log(`   Starting backend deploy...`);
             const deploy = await createDeploy(
@@ -588,6 +612,7 @@ export const deployCommand = new Command("deploy")
               featureId,
               version.id,
               featureConfig.backend?.jobs,
+              sidecars,
             );
             console.log(`   Deploy ID: ${deploy.id}`);
             console.log(`   Waiting for backend deploy to complete...\n`);

@@ -17,6 +17,7 @@ import { analyzeCommand } from "./lib/commands/analyze";
 import { scaffoldCommand } from "./lib/commands/scaffold";
 import { gitCommand } from "./lib/commands/git";
 import { jobCommand } from "./lib/commands/job";
+import { sidecarCommand } from "./lib/commands/sidecar";
 import { checkForUpdates } from "./lib/commands/steps/update-check";
 import { VERSION } from "./lib/version";
 import { registerErrorReporter } from "./lib/error-reporter";
@@ -55,6 +56,9 @@ program.addCommand(remoteLogsCommand);
 program.addCommand(scaffoldCommand);
 if (hasFlag("cron")) {
   program.addCommand(jobCommand);
+}
+if (hasFlag("sidecar")) {
+  program.addCommand(sidecarCommand);
 }
 program.addCommand(analyzeCommand, { hidden: true });
 

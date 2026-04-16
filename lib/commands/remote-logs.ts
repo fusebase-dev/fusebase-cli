@@ -5,7 +5,7 @@ import {
   getRuntimeLogsByFeature,
   type RuntimeLogType,
 } from "../api";
-import { getConfig, loadFuseConfig } from "../config";
+import { getConfig, hasFlag, loadFuseConfig } from "../config";
 
 /**
  * Print build logs with status indicator.
@@ -33,20 +33,37 @@ function printBuildLogs(log: string | undefined, status: string): void {
 }
 
 /**
+ * Filter log lines to only those from a specific container.
+ * Log lines from nimbus-ai are prefixed with `[container]: `.
+ */
+function filterLogsByContainer(logs: string, container: string): string {
+  const prefix = `[${container}]: `;
+  return logs
+    .split("\n")
+    .filter((line) => line.startsWith(prefix))
+    .map((line) => line.slice(prefix.length))
+    .join("\n");
+}
+
+/**
  * Print runtime logs with formatting.
  */
 function printRuntimeLogs(
   logs: string,
   tail: number,
   type: RuntimeLogType,
+  container?: string,
 ): void {
-  console.log(
-    `\n${chalk.bold("Runtime Logs")} (${chalk.cyan(type)}, last ${chalk.cyan(String(tail))} entries)\n`,
-  );
+  const header = container
+    ? `\n${chalk.bold("Runtime Logs")} (${chalk.cyan(type)}, container ${chalk.cyan(container)}, last ${chalk.cyan(String(tail))} entries)\n`
+    : `\n${chalk.bold("Runtime Logs")} (${chalk.cyan(type)}, last ${chalk.cyan(String(tail))} entries)\n`;
+  console.log(header);
   console.log("─".repeat(60));
 
-  if (logs.trim()) {
-    console.log(logs);
+  const displayLogs = container ? filterLogsByContainer(logs, container) : logs;
+
+  if (displayLogs.trim()) {
+    console.log(displayLogs);
   } else {
     console.log(chalk.gray("No runtime logs available."));
   }
@@ -124,8 +141,16 @@ const runtimeCommand = new Command("runtime")
     "--type <type>",
     "Type of logs: console (stdout/stderr) or system (Container Apps service logs)",
     "console",
-  )
-  .action(async (featureId: string, options) => {
+  );
+
+if (hasFlag("sidecar")) {
+  runtimeCommand.option(
+    "--container <name>",
+    "Filter logs to a specific container (e.g. api, or a sidecar name)",
+  );
+}
+
+runtimeCommand.action(async (featureId: string, options) => {
     try {
       const { orgId, apiKey } = await getOrgAndApiKey();
 
@@ -150,7 +175,12 @@ const runtimeCommand = new Command("runtime")
         type,
       });
 
-      printRuntimeLogs(response.logs, response.tail, response.type);
+      printRuntimeLogs(
+        response.logs,
+        response.tail,
+        response.type,
+        options.container,
+      );
 
       console.log(`\n${chalk.gray(`Deploy ID: ${response.deployId}`)}\n`);
     } catch (error) {

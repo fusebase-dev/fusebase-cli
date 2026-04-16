@@ -35,11 +35,20 @@ export interface BackendJobConfig {
   command: string;
 }
 
+export interface SidecarConfig {
+  name: string;
+  image: string;
+  port?: number;
+  env?: Record<string, string>;
+  tier?: "small" | "medium" | "large";
+}
+
 export interface BackendConfig {
   dev?: DevConfig;
   build?: BuildConfig;
   start?: BackendStartConfig;
   jobs?: BackendJobConfig[];
+  sidecars?: SidecarConfig[];
 }
 
 export interface FeatureConfig {
@@ -119,6 +128,7 @@ export const KNOWN_FLAGS = [
   "app-business-docs",
   "mcp-gate-debug",
   "isolated-stores",
+  "sidecar",
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
@@ -131,6 +141,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
   "app-business-docs": "Include business-logic documentation skill in project template.",
   "mcp-gate-debug": "Include Gate MCP debug summary skill (focus on isolated stores).",
   "isolated-stores": "Enable isolated stores functionality (SQL/NoSQL).",
+  sidecar:
+    "Enable sidecar container management for feature backends (add/remove/list).",
 };
 
 export function getFlags(): string[] {

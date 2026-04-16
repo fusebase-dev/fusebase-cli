@@ -33,7 +33,61 @@ A backend is **optional**. Most features work fine with the Dashboard SDK alone 
 - Custom business logic (aggregations, validations, workflows)
 - Real-time push via WebSockets
 - Server-side API composition or proxying
-- Operations that cannot run in the browser (secrets, heavy computation)<% if (it.cron) { %>
+- Operations that cannot run in the browser (secrets, heavy computation)
+<% if (it.sidecar) { %>
+
+## Sidecar Containers
+
+Sidecars are pre-built Docker images that run alongside the feature backend in the same network namespace, sharing localhost. They are useful for auxiliary services like headless browsers (Chromium, Lightpanda), caches (Redis), or other tools the backend needs to communicate with over HTTP.
+
+### When to Use Sidecars
+
+- The backend needs a headless browser for web scraping or PDF generation
+- The backend needs a local cache or queue
+- The backend needs a specialized service (image processing, ML inference) available over localhost
+
+### Adding a Sidecar
+
+```bash
+# Enable the sidecar flag first
+fusebase config set-flag sidecar
+
+# Add a sidecar to a feature backend
+fusebase sidecar add --feature <featureId> --name chromium --image browserless/chrome:latest --port 9222
+```
+
+The sidecar is accessible from the backend at `http://localhost:<port>`. Max 3 sidecars per feature.
+
+### Communicating with Sidecars
+
+Since sidecars share the same network namespace, use `localhost` to reach them:
+
+```typescript
+// In backend code — call sidecar on localhost
+const response = await fetch("http://localhost:9222/json");
+const data = await response.json();
+```
+
+### Sidecar Environment Variables
+
+Each sidecar can have its own env vars (not shared with the backend):
+
+```bash
+fusebase sidecar add --feature <featureId> --name redis --image redis:7 --port 6379 --env REDIS_MAXMEMORY=256mb
+```
+
+### Debugging Sidecars
+
+Use `fusebase remote-logs runtime <featureId>` to see logs from all containers. Filter to a specific sidecar:
+
+```bash
+fusebase remote-logs runtime <featureId> --container chromium
+```
+
+For full sidecar documentation, see the **feature-sidecar** skill.
+
+<% } %>
+<% if (it.cron) { %>
 - Background processing or scheduled tasks<% } %>
 
 **Do NOT add a backend** just for CRUD on dashboard data — use the Dashboard SDK directly from the SPA.
@@ -359,6 +413,8 @@ Before adding a backend:
 - [ ] Updated `fusebase.json` with `backend` block
 - [ ] SPA does not define routes under `/api`
 - [ ] No `.env` files or `dotenv` — secrets injected by `fusebase dev start`
+
+
 
 <% if (it.cron) { %>
 

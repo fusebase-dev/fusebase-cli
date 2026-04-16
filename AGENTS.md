@@ -82,6 +82,9 @@ bun index.ts [command]
 - `config gitlab` - Get/set GitLab sync config in `~/.fusebase/config.json` (`gitlabHost`, `gitlabGroup`, `gitlabToken`); supports interactive setup, `--show`, and direct flags (`--host`, `--group`, `--token`)
 - `integrations` - Configure optional MCP integrations (catalog + custom HTTP MCP in `fusebase.json`); `integrations add|disable|enable|remove`; `--no-prompt` skips checkbox
 - `scaffold` *(requires `scaffold` flag — `fusebase config set-flag scaffold`)* - Scaffold a feature from a built-in template. Without options, lists available templates with descriptions. Use `--template <id> --dir <path>` to scaffold. Errors if any files would be overwritten. Templates: `spa` (React + Vite SPA, deployed directly into `<dir>`), `backend` (Node.js + Hono, deployed into `<dir>/backend/`). Backend can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
+- `sidecar add` *(requires `sidecar` flag — `fusebase config set-flag sidecar`)* - Add a sidecar container to a feature backend (`--feature <id> --name <name> --image <image> [--port <port>] [--tier small|medium|large] [--env KEY=VALUE...]`). Max 3 sidecars per feature.
+- `sidecar remove` *(requires `sidecar` flag)* - Remove a sidecar container by name (`--feature <id> --name <name>`)
+- `sidecar list` *(requires `sidecar` flag)* - List configured sidecar containers for a feature (`--feature <id>`)
 
 ## Configuration
 
@@ -109,6 +112,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `app-business-docs` | Includes the `app-business-docs` skill: maintain `docs/en/business-logic.md` (English) describing app business logic, flows, and scenarios; refresh after logic changes or on demand |
 | `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); includes supporting `fusebase-gate` references and `isolated_store.*` permissions in `fusebase env create` |
+| `sidecar` | Enables sidecar container management for feature backends (`fusebase sidecar add/remove/list`). Sidecars are pre-built Docker images deployed alongside the backend container, sharing localhost networking. Max 3 per feature. |
 
 After changing flags, run `fusebase skills update` to regenerate project files (for template flags). For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 

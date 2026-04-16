@@ -49,11 +49,41 @@ fusebase remote-logs runtime <featureId> --tail 200
 
 # Get system logs instead of console logs
 fusebase remote-logs runtime <featureId> --type system
+
+<% if (it.sidecar) { %>
+# Filter to a specific container (backend or sidecar)
+fusebase remote-logs runtime <featureId> --container api
+fusebase remote-logs runtime <featureId> --container my-sidecar
+<% } %>
 ```
 
 Options:
 - `--tail <n>` - Number of log entries (0-300, default: 100)
 - `--type <type>` - Log type: `console` (stdout/stderr) or `system` (service/infrastructure logs)
+<% if (it.sidecar) { %>
+- `--container <name>` - Filter logs to a specific container. Use `api` for the main backend, or the sidecar name for sidecar containers
+
+### Log Format with Sidecars
+
+When a feature backend has sidecar containers, runtime logs include output from all containers. Each log line is prefixed with the container name:
+
+```
+[api]: Backend server started on port 3000
+[api]: GET /health 200
+[chromium]: Browser ready on port 9222
+[chromium]: New page created
+```
+
+Use `--container` to filter to a single container output:
+
+```bash
+# Show only sidecar logs
+fusebase remote-logs runtime <featureId> --container chromium
+
+# Show only backend logs
+fusebase remote-logs runtime <featureId> --container api
+```
+<% } %>
 
 ## When to Use Each Log Type
 
@@ -74,6 +104,9 @@ Use for:
 - Unhandled exceptions/rejections
 - `console.log` debug output from the backend
 - Server crash diagnostics
+<% if (it.sidecar) { %>
+- Sidecar container output (prefixed by container name)
+<% } %>
 
 ### Runtime Logs (system)
 
@@ -120,3 +153,10 @@ Use for:
    ```bash
    fusebase remote-logs runtime --tail 300
    ```
+
+<% if (it.sidecar) { %>
+5. Sidecar misbehaving -> Check sidecar-specific logs:
+   ```bash
+   fusebase remote-logs runtime <featureId> --container my-sidecar --tail 200
+   ```
+<% } %>
