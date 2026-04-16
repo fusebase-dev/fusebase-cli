@@ -134,14 +134,19 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
 };
 
 export function getFlags(): string[] {
-  return getConfig().flags ?? [];
+  const flags = getConfig().flags ?? [];
+  for (const flag of ALWAYS_ON_FLAGS) {
+    if (!flags.includes(flag)) {
+      flags.push(flag);
+    }
+  }
+  return flags
 }
 
 /** Flags that are always considered enabled regardless of user config. */
-const ALWAYS_ON_FLAGS: readonly string[] = ["cron"];
+export const ALWAYS_ON_FLAGS: readonly string[] = ["cron"];
 
 export function hasFlag(flag: string): boolean {
-  if (ALWAYS_ON_FLAGS.includes(flag)) return true;
   return getFlags().includes(flag);
 }
 

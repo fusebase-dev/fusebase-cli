@@ -7,6 +7,7 @@ import {
   removeFlag,
   KNOWN_FLAGS,
   KNOWN_FLAG_DESCRIPTIONS,
+  ALWAYS_ON_FLAGS,
 } from "../config";
 import { checkbox, input, password } from "@inquirer/prompts";
 import chalk from "chalk";
@@ -67,9 +68,15 @@ const removeFlagCommand = new Command("remove-flag")
 
 function printFlagsSummary(flags: string[]): void {
   const knownFlags = [...KNOWN_FLAGS];
-  const notActiveFlags = knownFlags.filter((flag) => !flags.includes(flag));
+  const alwaysOn = ALWAYS_ON_FLAGS.filter((f) => (knownFlags as string[]).includes(f));
+  const notActiveFlags = knownFlags.filter(
+    (flag) => !flags.includes(flag) && !(ALWAYS_ON_FLAGS as readonly string[]).includes(flag),
+  );
 
   console.log(`Known flags: ${knownFlags.join(", ")}`);
+  if (alwaysOn.length > 0) {
+    console.log(`Always on:   ${alwaysOn.join(", ")}`);
+  }
   console.log("");
   console.log(`Not active flags: ${notActiveFlags.join(", ") || "(none)"}`);
   console.log("");
@@ -90,11 +97,17 @@ async function runInteractiveFlagsSelection(): Promise<void> {
   try {
     const selectedFlags = await checkbox<string>({
       message: "Select experimental flags to enable",
-      choices: knownFlags.map((flag) => ({
-        name: `${chalk.bold(flag)} ${chalk.dim(`- ${KNOWN_FLAG_DESCRIPTIONS[flag]}`)}`,
-        value: flag,
-        checked: currentFlags.includes(flag),
-      })),
+      choices: knownFlags.map((flag) => {
+        const isAlwaysOn = (ALWAYS_ON_FLAGS as readonly string[]).includes(flag);
+        return {
+          name: isAlwaysOn
+            ? `${chalk.bold(flag)} ${chalk.dim(`- ${KNOWN_FLAG_DESCRIPTIONS[flag as keyof typeof KNOWN_FLAG_DESCRIPTIONS]}`)} ${chalk.green("(always on)")}`
+            : `${chalk.bold(flag)} ${chalk.dim(`- ${KNOWN_FLAG_DESCRIPTIONS[flag as keyof typeof KNOWN_FLAG_DESCRIPTIONS]}`)}`,
+          value: flag,
+          checked: currentFlags.includes(flag) || isAlwaysOn,
+          disabled: isAlwaysOn ? "always on" : false,
+        };
+      }),
     });
 
     const nextFlags = [...selectedFlags, ...unknownActiveFlags];
