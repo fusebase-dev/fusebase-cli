@@ -7,6 +7,12 @@ import { readFile, access } from "fs/promises";
 import { join } from "path";
 import { homedir } from "os";
 import { createEnvFile, printCreateEnvResult } from "./steps/create-env";
+import { confirm } from "@inquirer/prompts";
+import {
+  printIdeSetupResults,
+  setupIdeConfig,
+  type IdePreset,
+} from "./steps/ide-setup";
 
 const CONFIG_DIR = join(homedir(), ".fusebase");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
@@ -20,6 +26,8 @@ interface FuseConfig {
   orgId?: string;
   appId?: string;
 }
+
+const ALL_IDE_PRESETS: IdePreset[] = ["claude-code", "cursor", "vscode", "opencode", "codex", "other"];
 
 async function fileExists(path: string): Promise<boolean> {
   try {
@@ -87,6 +95,39 @@ export async function runEnvCreate(force: boolean = true): Promise<void> {
   if (result.error) {
     process.exit(1);
   }
+
+  const shouldOfferMcpRefresh =
+    (result.created || result.updated) &&
+    process.stdin.isTTY &&
+    process.stdout.isTTY;
+
+  if (!shouldOfferMcpRefresh) {
+    return;
+  }
+
+  let shouldRunIdeRefresh = false;
+  try {
+    shouldRunIdeRefresh = await confirm({
+      message: "Tokens updated. Update MCP configs for all IDEs now? (runs `fusebase config ide --force`)",
+      default: true,
+    });
+  } catch {
+    // Prompt can be interrupted; treat as refusal and show manual step.
+    shouldRunIdeRefresh = false;
+  }
+
+  if (!shouldRunIdeRefresh) {
+    console.log("Next step: run `fusebase config ide --force` to refresh MCP tokens in all IDE MCP configs.");
+    return;
+  }
+
+  const presets = new Set<IdePreset>(ALL_IDE_PRESETS);
+  const ideResult = await setupIdeConfig({
+    targetDir: cwd,
+    presets,
+    force: true,
+  });
+  printIdeSetupResults(ideResult, presets);
 }
 
 export const envCommand = new Command("env")
