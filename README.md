@@ -469,9 +469,61 @@ To validate skills (e.g. when adding or editing skills in `project-template/.cla
 
 ---
 
+### `fusebase app update`
+
+One command to refresh a generated app after a CLI or template upgrade:
+
+1. **Agent assets** — same as `fusebase skills update` (`AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`).
+2. **MCP + IDE** — regenerates **both** Dashboards and Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh regardless.
+3. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **feature** `package.json` files are updated only if those deps already exist (nothing new is injected into features).
+4. **`npm install`** — runs **only** in directories where a managed dependency version actually changed.
+
+**Pre-update Git checkpoint:** In a TTY, you are prompted for an optional commit before changes (empty commit if the tree is clean). If current branch tracks a remote (upstream configured), the pre-update commit is pushed immediately. Without Git, you are warned about rollback risk and can initialize a repo first. Use **`--no-commit`** to skip, or **`--commit`** to run the checkpoint in CI/non-interactive mode without prompts.
+
+**Prerequisites:** `fusebase.json` with `orgId` and `appId`; `fusebase auth` for stages that touch MCP tokens.
+
+**Examples:**
+
+```bash
+fusebase app update
+fusebase app update --dry-run
+fusebase app update --no-skills --force-mcp
+fusebase app update --no-install
+fusebase app update --no-commit
+```
+
+**Flags (stages default on; use `no-*` to disable):**
+
+| Flag | Effect |
+|------|--------|
+| `--no-skills` | Skip agent asset refresh |
+| `--no-mcp` | Skip MCP token + IDE refresh |
+| `--force-mcp` | Always refresh MCP tokens + IDE configs |
+| `--no-deps` | Skip managed dependency version sync |
+| `--no-install` | After dep sync, do not run `npm install` |
+| `--no-commit` | Skip pre-update Git checkpoint |
+| `--commit` | Run Git checkpoint without prompts (non-interactive) |
+| `--dry-run` | Print planned work only |
+
+`fusebase update` is a direct alias for this command.
+
+---
+
+### `fusebase cli update`
+
+Update the Fusebase CLI binary itself (download and replace/install latest release for your platform).
+
+```bash
+fusebase cli update
+```
+
+---
+
 ### `fusebase env create`
 
 Create or overwrite `.env` in the current app with MCP token and URL. Use this after `fusebase init` or when the token has expired.
+
+When `.env` is created/updated, the command refreshes both Dashboards and Gate MCP tokens. In interactive terminals, it then offers to immediately run `fusebase config ide --force` for all IDE MCP configs; if declined, it prints that command as the next step.
 
 **Options:** `--no-force` — only create .env if missing; do not overwrite existing file.
 

@@ -148,7 +148,7 @@ export async function isInsideGitWorkTree(cwd: string): Promise<boolean> {
   return code === 0;
 }
 
-function runGit(
+export function runGit(
   cwd: string,
   args: string[],
   options: { stdio?: "pipe" | "inherit" | "ignore" } = {},
@@ -168,6 +168,37 @@ function runGit(
     });
     child.on("close", (code) => {
       resolve(code ?? 1);
+    });
+  });
+}
+
+/** Run git with stdout captured; code -1 means git binary missing (ENOENT). */
+export function runGitCapture(
+  cwd: string,
+  args: string[],
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const out: Buffer[] = [];
+    const err: Buffer[] = [];
+    const child = spawn("git", args, {
+      cwd,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    child.stdout?.on("data", (d: Buffer) => out.push(d));
+    child.stderr?.on("data", (d: Buffer) => err.push(d));
+    child.on("error", (e: NodeJS.ErrnoException) => {
+      if (e.code === "ENOENT") {
+        resolve({ code: -1, stdout: "", stderr: "" });
+        return;
+      }
+      reject(e);
+    });
+    child.on("close", (code) => {
+      resolve({
+        code: code ?? 1,
+        stdout: Buffer.concat(out).toString("utf-8"),
+        stderr: Buffer.concat(err).toString("utf-8"),
+      });
     });
   });
 }

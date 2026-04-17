@@ -63,7 +63,7 @@ export function checkForUpdates(): void {
       const border = chalk.yellow("★ ══════════════════════════════════════════════ ★");
       console.log(border);
       console.log(chalk.yellow("★") + "  " + chalk.bold.white(`New version of fusebase-cli available: ${latestVersion}!`));
-      console.log(chalk.yellow("★") + "  " + chalk.cyan("Run: ") + chalk.bold.cyan("`fusebase update`") + chalk.cyan(" to update"));
+      console.log(chalk.yellow("★") + "  " + chalk.cyan("Run: ") + chalk.bold.cyan("`fusebase cli update`") + chalk.cyan(" to update"));
       if (cache.manifest.comment?.trim()) {
         const commentLines = formatComment(cache.manifest.comment).split("\n");
         for (const line of commentLines) {

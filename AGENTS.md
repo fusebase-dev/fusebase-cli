@@ -72,9 +72,12 @@ bun index.ts [command]
 - `feature create` - Create and configure a feature (requires `--name`, `--subdomain`, `--path`, `--dev-command`, `--build-command`, `--output-dir`; optional `--access` for access principals e.g. `visitor`, `orgRole:member`; `--permissions` for manual `dashboardView/database` access)
 - `feature update <featureId>` - Update feature settings (`--access`, `--permissions` for manual `dashboardView/database`, `--sync-gate-permissions` for Gate analyze + sync)
 - `dev start` - Start the development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
-- `env create` - Create or overwrite .env with MCP token
+- `env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
 - `secret create` - Create feature secrets with empty values (`--feature <id> --secret KEY:description`); prints URL to set values
 - `skills update` - Overwrite AGENTS.md and .claude/skills/ in the app with latest from project-template. To validate skills: `npm run skills:validate` (uses [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref); requires `skills-ref` on PATH)
+- `app update` - Refresh agent assets, MCP tokens/IDE configs when `.env` **policy fingerprints** (`DASHBOARDS_MCP_POLICY_FP` / `GATE_MCP_POLICY_FP`) are stale vs CLI or with `--force-mcp`, managed `@fusebase/*` SDK versions from `project-template/package.json`, and run `npm install` only where versions changed; optional pre-update Git checkpoint (`fusebase app update`, see README)
+- `update` - Alias of `app update` (`fusebase update` == `fusebase app update`)
+- `cli update` - Update the Fusebase CLI binary itself (`fusebase cli update`)
 - `config set-flag <flag>` - Enable an experimental flag (e.g. `server`, `mcp-beta`)
 - `config remove-flag <flag>` - Disable an experimental flag
 - `config flags` - Manage experimental flags (interactive selector in TTY; use `--list` for non-interactive output)

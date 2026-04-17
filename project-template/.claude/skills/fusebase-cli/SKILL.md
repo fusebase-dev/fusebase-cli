@@ -300,6 +300,24 @@ fusebase skills update
 
 Overwrites `AGENTS.md` and the `.claude/skills/` folder in the project with the latest from the Fusebase CLI project template. Use this to refresh agent rules and skill documentation without re-running `fusebase init`. Requires `fusebase.json` in the project root.
 
+### One-step project refresh (`fusebase app update`)
+
+```bash
+fusebase app update
+```
+
+Runs the skills refresh above, then (when **`.env`** `DASHBOARDS_MCP_POLICY_FP` / `GATE_MCP_POLICY_FP` are missing/out of date vs the CLI, or MCP vars are missing, or with `--force-mcp`) regenerates **both** MCP tokens in `.env`, updates those FP markers, and refreshes IDE MCP configs, then syncs managed `@fusebase/*` SDK versions from `project-template/package.json` (`fusebaseCli.managedDependencies`) into the root `package.json` and into each feature `package.json` that already lists those packages. Runs `npm install` only in directories where a managed version changed. Optional Git checkpoint before changes (see CLI README). Use `--dry-run` to preview.
+
+`fusebase update` is a direct alias for `fusebase app update`.
+
+### Update the CLI binary (`fusebase cli update`)
+
+```bash
+fusebase cli update
+```
+
+Updates the installed Fusebase CLI binary itself (not project files).
+
 ### Create or update .env (MCP token)
 
 ```bash
@@ -307,6 +325,8 @@ fusebase env create
 ```
 
 Creates or overwrites `.env` with `DASHBOARDS_MCP_TOKEN` and `DASHBOARDS_MCP_URL`. Use after `fusebase init` or when the MCP token has expired. Requires `fusebase.json` (with `orgId`) and `fusebase auth` to be set.
+
+On successful create/update, CLI refreshes both Dashboards and Gate MCP tokens. In interactive terminals, it offers to run `fusebase config ide --force` immediately for all IDE MCP configs; if declined, it prints that command as the next step.
 
 ### Configure optional MCP integrations
 
