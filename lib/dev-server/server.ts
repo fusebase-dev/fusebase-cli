@@ -28,14 +28,36 @@ export interface DevServer {
   close: () => Promise<void>;
 }
 
-function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = createServer();
-    server.on("error", () => resolve(false));
-    server.listen(port, () => {
-      server.close(() => resolve(true));
-    });
-  });
+async function isPortAvailable(port: number): Promise<boolean> {
+  // trying to start server on the port on different hosts
+  // if a single host is failed then port is busy
+  const hosts = [undefined, '::', '::1', '0.0.0.0', '127.0.0.1', 'localhost']
+
+  const checkHost = (host?: string) => {
+    return new Promise<boolean>((resolve) => {
+      const server = createServer();
+      server.on("error", (err) => {
+        resolve(false)
+      });
+      const callback = () => {
+        server.close(() => resolve(true));
+      }
+      if (host) {
+        server.listen(port, host, callback);
+      } else {
+        server.listen(port, callback);
+      }
+    })
+  }
+
+  for (const host of hosts) {
+    const result = await checkHost(host)
+    if (!result) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export async function findAvailablePort(startPort: number): Promise<number> {
