@@ -112,6 +112,7 @@ Initialize a new Fusebase app in the current directory. This command will:
 - `--force` - Overwrite existing IDE config files/folders
 - `--git` - After setup, initialize local Git and sync with configured GitLab remote (creates/uses repo in `<gitlabGroup>/<dev|prod>/...`, sets `origin`, pushes current branch)
   - Also enabled automatically if global flag `git-init` is active (`fusebase config set-flag git-init`)
+- `--skip-git` - Skip local Git initialization and GitLab sync (overrides both `--git` and global `git-init`)
 - `--git-tag-managed` - If app is managed, add `managed` topic to the GitLab project during sync
   - In interactive init, CLI shows a suggested GitLab repo name and lets you edit it before sync
 
@@ -473,12 +474,13 @@ To validate skills (e.g. when adding or editing skills in `project-template/.cla
 
 One command to refresh a generated app after a CLI or template upgrade:
 
-1. **Agent assets** — same as `fusebase skills update` (`AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`).
-2. **MCP + IDE** — regenerates **both** Dashboards and Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh regardless.
-3. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **feature** `package.json` files are updated only if those deps already exist (nothing new is injected into features).
-4. **`npm install`** — runs **only** in directories where a managed dependency version actually changed.
+1. **CLI binary update** — runs `fusebase cli update` first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage.
+2. **Agent assets** — same as `fusebase skills update` (`AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`).
+3. **MCP + IDE** — selectively regenerates Dashboards and/or Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh both regardless.
+4. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **feature** `package.json` files are updated only if those deps already exist (nothing new is injected into features).
+5. **`npm install`** — runs **only** in directories where a managed dependency version actually changed.
 
-**Pre-update Git checkpoint:** In a TTY, you are prompted for an optional commit before changes (empty commit if the tree is clean). If current branch tracks a remote (upstream configured), the pre-update commit is pushed immediately. Without Git, you are warned about rollback risk and can initialize a repo first. Use **`--no-commit`** to skip, or **`--commit`** to run the checkpoint in CI/non-interactive mode without prompts.
+**Pre-update Git checkpoint:** In a TTY, you are prompted for an optional commit before changes (empty commit if the tree is clean). If current branch tracks a remote (upstream configured), the pre-update commit is pushed immediately. Without Git, you are warned about rollback risk and can initialize a repo first. Use **`--skip-commit`** to skip, or **`--commit`** to run the checkpoint in CI/non-interactive mode without prompts.
 
 **Prerequisites:** `fusebase.json` with `orgId` and `appId`; `fusebase auth` for stages that touch MCP tokens.
 
@@ -487,21 +489,22 @@ One command to refresh a generated app after a CLI or template upgrade:
 ```bash
 fusebase app update
 fusebase app update --dry-run
-fusebase app update --no-skills --force-mcp
-fusebase app update --no-install
-fusebase app update --no-commit
+fusebase app update --skip-skills --force-mcp
+fusebase app update --skip-install
+fusebase app update --skip-commit
 ```
 
 **Flags (stages default on; use `no-*` to disable):**
 
 | Flag | Effect |
 |------|--------|
-| `--no-skills` | Skip agent asset refresh |
-| `--no-mcp` | Skip MCP token + IDE refresh |
+| `--skip-cli-update` | Skip automatic `fusebase cli update` stage |
+| `--skip-skills` | Skip agent asset refresh |
+| `--skip-mcp` | Skip MCP token + IDE refresh |
 | `--force-mcp` | Always refresh MCP tokens + IDE configs |
-| `--no-deps` | Skip managed dependency version sync |
-| `--no-install` | After dep sync, do not run `npm install` |
-| `--no-commit` | Skip pre-update Git checkpoint |
+| `--skip-deps` | Skip managed dependency version sync |
+| `--skip-install` | After dep sync, do not run `npm install` |
+| `--skip-commit` | Skip pre-update Git checkpoint |
 | `--commit` | Run Git checkpoint without prompts (non-interactive) |
 | `--dry-run` | Print planned work only |
 
@@ -561,7 +564,7 @@ Flags gate experimental features. The `skills update` command uses flags to cond
 | Flag | Effect |
 |------|--------|
 | `mcp-beta` | Unlocks optional MCP servers in the integrations catalog that are marked beta (see `ide-configs/mcp-servers.ts`) |
-| `git-init` | Makes `fusebase init` automatically offer local Git initialization (same behavior as passing `--git`) and includes Git workflow skill files in generated apps |
+| `git-init` | Makes `fusebase init` automatically offer local Git initialization (same behavior as passing `--git`; can be disabled per run with `--skip-git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict debug/deploy traceability section inside the `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag traceability in debug/deploy reports |
 | `app-business-docs` | Copies the `app-business-docs` skill into the app: keeps **`docs/en/business-logic.md`** (English) aligned with real behavior — domain rules, main user flows, edge cases; update after business-logic changes or when debugging unclear behavior |
 | `mcp-gate-debug` | Copies the `mcp-gate-debug` skill: after Fusebase Gate MCP tool runs, summarize smooth vs rough paths and suggest improvements to `.claude/skills/fusebase-gate`, prompts, or MCP server behavior — prioritize **isolated stores** (SQL/NoSQL) flows |

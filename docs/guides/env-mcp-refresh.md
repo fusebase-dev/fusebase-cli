@@ -16,7 +16,7 @@ These are SHA-256 fingerprints for canonical token policy descriptors from `lib/
 
 ## When `app update` refreshes MCP tokens
 
-In MCP stage (`--no-mcp` not used), `fusebase app update` refreshes relevant token(s) + IDE MCP configs when **any** of these is true:
+In MCP stage (`--skip-mcp` not used), `fusebase app update` refreshes relevant token(s) + IDE MCP configs when **any** of these is true:
 
 - `--force-mcp` is provided
 - MCP keys are missing in `.env`

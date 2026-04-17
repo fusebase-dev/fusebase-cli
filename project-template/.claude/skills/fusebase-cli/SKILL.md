@@ -98,6 +98,7 @@ Options:
 - `--ide <preset>` - IDE preset: `claude-code`, `cursor`, `vscode`, `opencode`, `codex`, or `other` (single choice; generates all supported IDE configs by default)
 - `--force` - Overwrite existing IDE config files/folders
 - `--git` - After setup, initialize local Git and sync with configured GitLab remote (creates/uses remote project, configures `origin`, pushes current branch)
+- `--skip-git` - Skip local Git initialization and GitLab sync (overrides both `--git` and global `git-init`)
 - `--git-tag-managed` - If app is managed, add `managed` topic in GitLab during sync
 - In interactive init, CLI also shows a suggested GitLab repository name and lets you edit it before sync
 - Global flag `git-init` also enables the same post-init Git offer automatically (`fusebase config set-flag git-init`)
@@ -307,6 +308,7 @@ fusebase app update
 ```
 
 Runs the skills refresh above, then (when **`.env`** `DASHBOARDS_MCP_POLICY_FP` / `GATE_MCP_POLICY_FP` are missing/out of date vs the CLI, or MCP vars are missing, or with `--force-mcp`) regenerates **both** MCP tokens in `.env`, updates those FP markers, and refreshes IDE MCP configs, then syncs managed `@fusebase/*` SDK versions from `project-template/package.json` (`fusebaseCli.managedDependencies`) into the root `package.json` and into each feature `package.json` that already lists those packages. Runs `npm install` only in directories where a managed version changed. Optional Git checkpoint before changes (see CLI README). Use `--dry-run` to preview.
+Runs `fusebase cli update` first (skip with `--skip-cli-update`; local linked/source mode auto-skips), then runs the skills refresh above, then (when **`.env`** `DASHBOARDS_MCP_POLICY_FP` / `GATE_MCP_POLICY_FP` are missing/out of date vs the CLI, or MCP vars are missing, or with `--force-mcp`) selectively regenerates Dashboards and/or Gate MCP tokens in `.env`, updates those FP markers, and refreshes IDE MCP configs, then syncs managed `@fusebase/*` SDK versions from `project-template/package.json` (`fusebaseCli.managedDependencies`) into the root `package.json` and into each feature `package.json` that already lists those packages. Runs `npm install` only in directories where a managed version changed. Optional Git checkpoint before changes (see CLI README). Use `--dry-run` to preview.
 
 `fusebase update` is a direct alias for `fusebase app update`.
 

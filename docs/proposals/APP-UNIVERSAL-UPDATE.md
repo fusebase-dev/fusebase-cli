@@ -47,12 +47,12 @@ Running `fusebase app update` with no flags performs all update stages in this o
 
 Use one boolean style everywhere: `--<stage>` / `--no-<stage>`.
 
-- `--skills` / `--no-skills` - enable/disable AGENTS/skills/hooks/settings refresh.
-- `--mcp` / `--no-mcp` - enable/disable MCP stage (`.env` token + IDE refresh).
+- `--skills` / `--skip-skills` - enable/disable AGENTS/skills/hooks/settings refresh.
+- `--mcp` / `--skip-mcp` - enable/disable MCP stage (`.env` token + IDE refresh).
 - `--force-mcp` - force MCP token + IDE refresh even when version trigger says "no update needed".
-- `--deps` / `--no-deps` - enable/disable managed dependency sync in `package.json`.
-- `--install` / `--no-install` - enable/disable `npm install` after deps sync.
-- `--commit` / `--no-commit` - enable/disable pre-update commit prompt.
+- `--deps` / `--skip-deps` - enable/disable managed dependency sync in `package.json`.
+- `--install` / `--skip-install` - enable/disable `npm install` after deps sync.
+- `--commit` / `--skip-commit` - enable/disable pre-update commit prompt.
 - `--dry-run` - print planned actions and target files without writing.
 
 Default values:
@@ -205,7 +205,7 @@ This prevents overwriting user-specific dependencies and avoids full manifest re
 
 ## 6) Install Step
 
-If `--no-install` is not set:
+If `--skip-install` is not set:
 
 - Run `npm install` only in directories where managed dependency versions were actually changed.
 - Default to sequential execution for predictable logs and easier failure diagnostics.

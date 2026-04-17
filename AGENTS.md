@@ -65,7 +65,7 @@ bun index.ts [command]
 
 - `auth [--api-key <apiKey>]` - Start auth flow or set API key for authentication
 - `version` - Print CLI version (from package.json)
-- `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to initialize local Git and sync with configured GitLab remote; optional `--git-tag-managed` to set `managed` topic in GitLab when app is managed; in interactive mode shows editable suggested repo name before sync; same behavior can be enabled globally with flag `git-init`)
+- `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to initialize local Git and sync with configured GitLab remote; `--skip-git` to force-disable git init/sync for this run; optional `--git-tag-managed` to set `managed` topic in GitLab when app is managed; in interactive mode shows editable suggested repo name before sync; same behavior can be enabled globally with flag `git-init`)
 - `git` - Initialize a local Git repository in the current directory (`fusebase git`) and sync an existing local repo with configured GitLab remote (`fusebase git sync` or `fusebase git --git-sync`); requires global config keys `gitlabHost`, `gitlabToken`, `gitlabGroup`; baseline `.gitignore` rules are ensured automatically
 - `deploy` - Deploy features to Fusebase (runs lint then build per feature)
 - `feature list` - List all features for the current app with their URLs
@@ -75,7 +75,7 @@ bun index.ts [command]
 - `env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
 - `secret create` - Create feature secrets with empty values (`--feature <id> --secret KEY:description`); prints URL to set values
 - `skills update` - Overwrite AGENTS.md and .claude/skills/ in the app with latest from project-template. To validate skills: `npm run skills:validate` (uses [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref); requires `skills-ref` on PATH)
-- `app update` - Refresh agent assets, MCP tokens/IDE configs when `.env` **policy fingerprints** (`DASHBOARDS_MCP_POLICY_FP` / `GATE_MCP_POLICY_FP`) are stale vs CLI or with `--force-mcp`, managed `@fusebase/*` SDK versions from `project-template/package.json`, and run `npm install` only where versions changed; optional pre-update Git checkpoint (`fusebase app update`, see README)
+- `app update` - Run `cli update` first (skip with `--skip-cli-update`), then refresh agent assets, MCP tokens/IDE configs when `.env` **policy fingerprints** (`DASHBOARDS_MCP_POLICY_FP` / `GATE_MCP_POLICY_FP`) are stale vs CLI or with `--force-mcp`, managed `@fusebase/*` SDK versions from `project-template/package.json`, and run `npm install` only where versions changed; optional pre-update Git checkpoint (`fusebase app update`, see README)
 - `update` - Alias of `app update` (`fusebase update` == `fusebase app update`)
 - `cli update` - Update the Fusebase CLI binary itself (`fusebase cli update`)
 - `config set-flag <flag>` - Enable an experimental flag (e.g. `server`, `mcp-beta`)
@@ -111,7 +111,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `analytics` | Enable anonymous usage analytics (coding agent, model, OS stats). All stats/command logging is disabled by default and requires this flag. |
 | `mcp-beta` | Unlocks optional MCP servers in the catalog that are gated behind this flag (`ide-configs/mcp-servers.ts`) |
 | `scaffold` | Enables the `fusebase scaffold` command and its documentation |
-| `git-init` | Makes `fusebase init` automatically run Git initialization + GitLab sync flow (equivalent to `--git`) and includes Git workflow skill files in generated apps |
+| `git-init` | Makes `fusebase init` automatically run Git initialization + GitLab sync flow (equivalent to `--git`; can be disabled per run with `--skip-git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict traceability rules inside `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag references in debug/deploy reports |
 | `app-business-docs` | Includes the `app-business-docs` skill: maintain `docs/en/business-logic.md` (English) describing app business logic, flows, and scenarios; refresh after logic changes or on demand |
 | `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |

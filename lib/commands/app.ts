@@ -21,6 +21,7 @@ import {
   getExpectedMcpPolicyFingerprints,
   matchesCurrentOrLegacyFallback,
 } from "../mcp-token-policy";
+import { runCliSelfUpdate } from "./cli";
 
 const FUSE_JSON = "fusebase.json";
 const ALL_IDE_PRESETS: IdePreset[] = [
@@ -99,6 +100,7 @@ function runNpmInstall(cwd: string): Promise<number> {
 }
 
 function printUpdateSummary(summary: {
+  cliUpdate: string;
   preUpdateCommit: string;
   agentAssets: string;
   mcpDashboards: string;
@@ -108,6 +110,12 @@ function printUpdateSummary(summary: {
   installs: string;
 }, installTargets: string[]): void {
   const rows: Array<{ key: string; value: string; renderedValue: string }> = [
+    {
+      key: "cli binary",
+      value: summary.cliUpdate,
+      renderedValue:
+        summary.cliUpdate === "updated" ? chalk.green.bold(summary.cliUpdate) : summary.cliUpdate,
+    },
     {
       key: "pre-update commit",
       value: summary.preUpdateCommit,
@@ -196,33 +204,37 @@ function printUpdateSummary(summary: {
 export const appCommand = new Command("app").description("App project maintenance");
 
 export interface AppUpdateOptions {
+  cliUpdate?: boolean;
+  skipCliUpdate?: boolean;
   skills?: boolean;
-  noSkills?: boolean;
+  skipSkills?: boolean;
   mcp?: boolean;
-  noMcp?: boolean;
+  skipMcp?: boolean;
   forceMcp?: boolean;
   deps?: boolean;
-  noDeps?: boolean;
+  skipDeps?: boolean;
   install?: boolean;
-  noInstall?: boolean;
+  skipInstall?: boolean;
   commit?: boolean;
-  noCommit?: boolean;
+  skipCommit?: boolean;
   dryRun?: boolean;
 }
 
 export async function runAppUpdate(opts: AppUpdateOptions): Promise<void> {
   const cwd = process.cwd();
   const dryRun = opts.dryRun === true;
-  const doSkills = opts.noSkills !== true;
-  const doMcp = opts.noMcp !== true;
+  const doSkills = opts.skipSkills !== true;
+  const doCliUpdate = opts.skipCliUpdate !== true;
+  const doMcp = opts.skipMcp !== true;
   const forceMcp = opts.forceMcp === true;
-  const doDeps = opts.noDeps !== true;
-  const doInstall = opts.noInstall !== true && doDeps;
+  const doDeps = opts.skipDeps !== true;
+  const doInstall = opts.skipInstall !== true && doDeps;
   const isTty = Boolean(process.stdin.isTTY && process.stdout.isTTY);
   let doCommit = isTty;
-  if (opts.noCommit === true) doCommit = false;
+  if (opts.skipCommit === true) doCommit = false;
   if (opts.commit === true) doCommit = true;
   const summary: {
+    cliUpdate: string;
     preUpdateCommit: string;
     agentAssets: string;
     mcpDashboards: string;
@@ -231,6 +243,7 @@ export async function runAppUpdate(opts: AppUpdateOptions): Promise<void> {
     managedDeps: string;
     installs: string;
   } = {
+    cliUpdate: doCliUpdate ? "pending" : "skipped (--skip-cli-update)",
     preUpdateCommit: doCommit ? "requested" : "skipped",
     agentAssets: doSkills ? "pending" : "skipped",
     mcpDashboards: doMcp ? "pending" : "skipped",
@@ -239,6 +252,27 @@ export async function runAppUpdate(opts: AppUpdateOptions): Promise<void> {
     managedDeps: doDeps ? "pending" : "skipped",
     installs: doInstall ? "pending" : "skipped",
   };
+
+      if (doCliUpdate) {
+        if (dryRun) {
+          console.log("[dry-run] Would run `fusebase cli update` first.");
+          summary.cliUpdate = "dry-run (would run)";
+        } else {
+          try {
+            const cliUpdateResult = await runCliSelfUpdate();
+            if (cliUpdateResult.status === "updated") {
+              summary.cliUpdate = "updated";
+            } else if (cliUpdateResult.status === "already-up-to-date") {
+              summary.cliUpdate = "no changes";
+            } else {
+              summary.cliUpdate = "skipped (local linked mode)";
+            }
+          } catch (e) {
+            console.error("Error: CLI self-update failed:", e);
+            process.exit(1);
+          }
+        }
+      }
 
       const fuseConfig = loadFuseConfig();
       if (!fuseConfig?.orgId || !fuseConfig?.appId) {
@@ -423,8 +457,8 @@ export async function runAppUpdate(opts: AppUpdateOptions): Promise<void> {
           }
         }
       } else if (doDeps && !doInstall) {
-        console.log("(skipped) npm install (--no-install)");
-        summary.installs = "skipped (--no-install)";
+        console.log("(skipped) npm install (--skip-install)");
+        summary.installs = "skipped (--skip-install)";
       } else if (doInstall && installRoots.length === 0) {
         summary.installs = "skipped (no dependency changes)";
       }
@@ -440,12 +474,13 @@ appCommand
   .description(
     "Refresh agent assets, MCP tokens/IDE configs, and managed @fusebase SDK versions (see README)",
   )
-  .option("--no-skills", "Skip AGENTS.md and .claude assets refresh")
-  .option("--no-mcp", "Skip MCP token and IDE config refresh")
+  .option("--skip-cli-update", "Skip automatic `fusebase cli update` step")
+  .option("--skip-skills", "Skip AGENTS.md and .claude assets refresh")
+  .option("--skip-mcp", "Skip MCP token and IDE config refresh")
   .option("--force-mcp", "Force MCP token and IDE refresh (ignore version marker)")
-  .option("--no-deps", "Skip managed dependency version sync in package.json files")
-  .option("--no-install", "Do not run npm install after dependency changes")
-  .option("--no-commit", "Skip pre-update Git checkpoint")
+  .option("--skip-deps", "Skip managed dependency version sync in package.json files")
+  .option("--skip-install", "Do not run npm install after dependency changes")
+  .option("--skip-commit", "Skip pre-update Git checkpoint")
   .option("--commit", "Run pre-update Git checkpoint in non-interactive mode (no prompt)")
   .option("--dry-run", "Print planned work without writing files or running installs", false)
   .action(runAppUpdate);

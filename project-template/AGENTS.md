@@ -504,13 +504,13 @@ The `fusebase` CLI is installed globally. **Always run it as `fusebase <command>
 
 Key commands:
 
-- `fusebase init` - Initialize new project (`--git` initializes local Git and syncs with configured GitLab remote; `--git-tag-managed` adds managed topic; interactive mode previews and allows editing suggested GitLab repo name; existing repos can be synced via `fusebase git sync` / `fusebase git --git-sync`; global flag `git-init` enables automatic post-init git flow)
+- `fusebase init` - Initialize new project (`--git` initializes local Git and syncs with configured GitLab remote; `--skip-git` force-disables git init/sync for this run; `--git-tag-managed` adds managed topic; interactive mode previews and allows editing suggested GitLab repo name; existing repos can be synced via `fusebase git sync` / `fusebase git --git-sync`; global flag `git-init` enables automatic post-init git flow)
 - `fusebase config gitlab` - Configure GitLab sync settings in `~/.fusebase/config.json` (`gitlabHost`, `gitlabGroup`, `gitlabToken`), including interactive setup and `--show`
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `fusebase feature create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]`<% if (it.analytics) { %> `[--coding-agent=<agent> --model=<model>]`<% } %> - Register feature (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the feature needs dashboard access — do not defer to a separate `feature update` step.<% if (it.analytics) { %> **Always include `--coding-agent` and `--model`** to report anonymous usage stats.<% } %>
 - `fusebase deploy` - Deploy features (runs lint then build per feature)
 - `fusebase skills update` - Update AGENTS.md and skills from template
-- `fusebase app update` - One-step refresh: skills + MCP/IDE (when `.env` policy FP markers are stale) + managed SDK deps + targeted `npm install`; see root README
+- `fusebase app update` - One-step refresh: `cli update` (first, skip with `--skip-cli-update`) + skills + MCP/IDE (when `.env` policy FP markers are stale) + managed SDK deps + targeted `npm install`; see root README
 - `fusebase update` - Alias of `fusebase app update`
 - `fusebase cli update` - Update the Fusebase CLI binary itself
 - `fusebase env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `fusebase config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)

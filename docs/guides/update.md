@@ -34,36 +34,38 @@ fusebase update --dry-run
 4. Refresh only MCP tokens/configs:
 
 ```bash
-fusebase update --no-skills --no-deps
+fusebase update --skip-skills --skip-deps
 ```
 
 5. Refresh project but skip checkpoint commit:
 
 ```bash
-fusebase update --no-commit
+fusebase update --skip-commit
 ```
 
 ## `fusebase app update` Stages
 
 Default flow:
 
-1. Pre-update Git checkpoint commit (optional prompt in TTY).
-2. Agent assets refresh (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`).
-3. MCP refresh (Dashboards/Gate tokens in `.env`) + IDE MCP config refresh.
-4. Managed dependency sync in root + feature `package.json`.
-5. `npm install` only where managed dependency versions changed.
-6. End-of-run summary block.
+1. CLI binary self-update (`fusebase cli update`), unless disabled or local linked mode.
+2. Pre-update Git checkpoint commit (optional prompt in TTY).
+3. Agent assets refresh (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`).
+4. MCP refresh (Dashboards/Gate tokens in `.env`) + IDE MCP config refresh.
+5. Managed dependency sync in root + feature `package.json`.
+6. `npm install` only where managed dependency versions changed.
+7. End-of-run summary block.
 
 ## `fusebase app update` Parameters
 
 | Flag | Effect |
 |---|---|
-| `--no-skills` | Skip agent assets refresh |
-| `--no-mcp` | Skip MCP token + IDE refresh stage |
+| `--skip-cli-update` | Skip automatic `fusebase cli update` stage |
+| `--skip-skills` | Skip agent assets refresh |
+| `--skip-mcp` | Skip MCP token + IDE refresh stage |
 | `--force-mcp` | Force MCP refresh even if policy markers are up to date |
-| `--no-deps` | Skip managed dependency sync |
-| `--no-install` | Skip `npm install` after dependency sync |
-| `--no-commit` | Skip pre-update checkpoint commit |
+| `--skip-deps` | Skip managed dependency sync |
+| `--skip-install` | Skip `npm install` after dependency sync |
+| `--skip-commit` | Skip pre-update checkpoint commit |
 | `--commit` | Force checkpoint in non-interactive mode |
 | `--dry-run` | Print plan only, no writes |
 
