@@ -324,7 +324,7 @@ export function createGateTokensApi(featureToken: string): TokensApi {
 
 Once feature code is written and ready to run, **execute these automatically — do NOT list them as "next steps" for the user**:
 
-1. **Register**: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`
+1. **Register**: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`<% if (it.analytics) { %> `--coding-agent=<agent> --model=<model>`<% } %>
 2. **Start dev**: `fusebase dev start features/<name>`
 
 The feature must be registered before it can run. Never leave these for the user to execute manually.
@@ -479,7 +479,7 @@ The full workflow is:
 
 1. **Scaffold**: `fusebase scaffold --template spa --dir features/<name>` (also run with `--template backend` if a backend is needed)
 2. **Implement**: write the feature code (Steps 3–4 of the Canonical Workflow)
-3. **Register** _(after code is written)_: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`
+3. **Register** _(after code is written)_: `fusebase feature create --name="<Feature Name>" --subdomain=<feature-sub> --path=features/<name> --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist`<% if (it.analytics) { %> `--coding-agent=<agent> --model=<model>`<% } %>
 4. **Start dev** _(after registering)_: `fusebase dev start features/<name>`
 
 **Steps 3 and 4 must be executed automatically — do NOT list them as "next steps" for the user.**
@@ -507,7 +507,7 @@ Key commands:
 - `fusebase init` - Initialize new project (`--git` initializes local Git and syncs with configured GitLab remote; `--git-tag-managed` adds managed topic; interactive mode previews and allows editing suggested GitLab repo name; existing repos can be synced via `fusebase git sync` / `fusebase git --git-sync`; global flag `git-init` enables automatic post-init git flow)
 - `fusebase config gitlab` - Configure GitLab sync settings in `~/.fusebase/config.json` (`gitlabHost`, `gitlabGroup`, `gitlabToken`), including interactive setup and `--show`
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
-- `fusebase feature create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]` - Register feature (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the feature needs dashboard access — do not defer to a separate `feature update` step.
+- `fusebase feature create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]`<% if (it.analytics) { %> `[--coding-agent=<agent> --model=<model>]`<% } %> - Register feature (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the feature needs dashboard access — do not defer to a separate `feature update` step.<% if (it.analytics) { %> **Always include `--coding-agent` and `--model`** to report anonymous usage stats.<% } %>
 - `fusebase deploy` - Deploy features (runs lint then build per feature)
 - `fusebase skills update` - Update AGENTS.md and skills from template
 - `fusebase env create` - Create or overwrite .env with MCP token
