@@ -4,19 +4,16 @@ This is the canonical update guide for Fusebase Apps CLI.
 
 ## Command Map
 
-- `fusebase cli update` - update the CLI binary itself.
-- `fusebase app update` - update the current app project.
-- `fusebase update` - alias of `fusebase app update`.
-
-Use `fusebase cli update` when you want newer CLI behavior.
-Use `fusebase app update`/`fusebase update` when you want to refresh project files/config/deps.
+- `fusebase update` - single smart update command:
+  - in app directory (`fusebase.json` exists): runs full update flow,
+  - outside app directory: runs CLI binary update only.
 
 ## Main Scenarios
 
-1. Upgrade CLI only:
+1. Upgrade CLI only (works from any directory):
 
 ```bash
-fusebase cli update
+fusebase update --skip-app
 ```
 
 2. Full project refresh (recommended after CLI/template changes):
@@ -43,11 +40,11 @@ fusebase update --skip-skills --skip-deps
 fusebase update --skip-commit
 ```
 
-## `fusebase app update` Stages
+## `fusebase update` Stages
 
 Default flow:
 
-1. CLI binary self-update (`fusebase cli update`), unless disabled or local linked mode.
+1. CLI binary self-update, unless disabled or local linked mode.
 2. Pre-update Git checkpoint commit (optional prompt in TTY).
 3. Agent assets refresh (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`).
 4. MCP refresh (Dashboards/Gate tokens in `.env`) + IDE MCP config refresh.
@@ -55,11 +52,12 @@ Default flow:
 6. `npm install` only where managed dependency versions changed.
 7. End-of-run summary block.
 
-## `fusebase app update` Parameters
+## `fusebase update` Parameters
 
 | Flag | Effect |
 |---|---|
-| `--skip-cli-update` | Skip automatic `fusebase cli update` stage |
+| `--skip-app` | Skip app stages entirely (CLI update only) |
+| `--skip-cli-update` | Skip automatic CLI self-update stage |
 | `--skip-skills` | Skip agent assets refresh |
 | `--skip-mcp` | Skip MCP token + IDE refresh stage |
 | `--force-mcp` | Force MCP refresh even if policy markers are up to date |

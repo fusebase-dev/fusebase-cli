@@ -293,32 +293,17 @@ fusebase feature update аgjg851jguanadi41 --permissions="dashboardView.dash1:vi
 fusebase feature update аgjg851jguanadi41 --access=visitor --permissions="dashboardView.dash1:view1.read"
 ```
 
-### Update AGENTS.md and Skills
+### Smart update (`fusebase update`)
 
 ```bash
-fusebase skills update
+fusebase update
 ```
 
-Overwrites `AGENTS.md` and the `.claude/skills/` folder in the project with the latest from the Fusebase CLI project template. Use this to refresh agent rules and skill documentation without re-running `fusebase init`. Requires `fusebase.json` in the project root.
+Single update command for both CLI and app:
 
-### One-step project refresh (`fusebase app update`)
-
-```bash
-fusebase app update
-```
-
-Runs the skills refresh above, then (when **`.env`** `DASHBOARDS_MCP_POLICY_FP` / `GATE_MCP_POLICY_FP` are missing/out of date vs the CLI, or MCP vars are missing, or with `--force-mcp`) regenerates **both** MCP tokens in `.env`, updates those FP markers, and refreshes IDE MCP configs, then syncs managed `@fusebase/*` SDK versions from `project-template/package.json` (`fusebaseCli.managedDependencies`) into the root `package.json` and into each feature `package.json` that already lists those packages. Runs `npm install` only in directories where a managed version changed. Optional Git checkpoint before changes (see CLI README). Use `--dry-run` to preview.
-Runs `fusebase cli update` first (skip with `--skip-cli-update`; local linked/source mode auto-skips), then runs the skills refresh above, then (when **`.env`** `DASHBOARDS_MCP_POLICY_FP` / `GATE_MCP_POLICY_FP` are missing/out of date vs the CLI, or MCP vars are missing, or with `--force-mcp`) selectively regenerates Dashboards and/or Gate MCP tokens in `.env`, updates those FP markers, and refreshes IDE MCP configs, then syncs managed `@fusebase/*` SDK versions from `project-template/package.json` (`fusebaseCli.managedDependencies`) into the root `package.json` and into each feature `package.json` that already lists those packages. Runs `npm install` only in directories where a managed version changed. Optional Git checkpoint before changes (see CLI README). Use `--dry-run` to preview.
-
-`fusebase update` is a direct alias for `fusebase app update`.
-
-### Update the CLI binary (`fusebase cli update`)
-
-```bash
-fusebase cli update
-```
-
-Updates the installed Fusebase CLI binary itself (not project files).
+- in app directory (`fusebase.json` exists): runs CLI self-update first (skip with `--skip-cli-update`; local linked/source mode auto-skips), then refreshes agent assets (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`), then runs selective MCP token refresh + IDE MCP config refresh, then syncs managed SDK deps and runs targeted `npm install`;
+- outside app directory: runs only CLI self-update;
+- use `--skip-app` to force CLI-only mode even inside an app directory.
 
 ### Create or update .env (MCP token)
 

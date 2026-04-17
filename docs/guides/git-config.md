@@ -72,7 +72,7 @@ fusebase config flags --list
 If you changed template-related flags, refresh project guidance files:
 
 ```bash
-fusebase skills update
+fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit
 ```
 
 ## 3) Three Supported Scenarios

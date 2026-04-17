@@ -452,30 +452,12 @@ For custom app backends (`/api/*`), treat `x-app-feature-token` as optional in d
 
 ---
 
-### `fusebase skills update`
-
-Overwrite `AGENTS.md` and `.claude/skills/` in the current app with the latest versions from the project template. Use this to refresh agent rules and skill docs without re-running `fusebase init`.
-
-**Prerequisites:** App must be initialized (`fusebase.json` must exist in the current directory).
-
-**Example:**
-
-```bash
-fusebase skills update
-```
-
-**Output:** `✓ Updated AGENTS.md and .claude/skills`
-
-To validate skills (e.g. when adding or editing skills in `project-template/.claude/skills`), use **`npm run skills:validate`**. It runs [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref) for each skill. Requires `skills-ref` on PATH. On macOS (Homebrew Python) use a venv or pipx: e.g. `pipx install -e /path/to/agentskills/skills-ref`, or create a venv in that directory and activate it before running. CI runs this when skills or the script change.
-
----
-
-### `fusebase app update`
+### `fusebase update`
 
 One command to refresh a generated app after a CLI or template upgrade:
 
-1. **CLI binary update** — runs `fusebase cli update` first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage.
-2. **Agent assets** — same as `fusebase skills update` (`AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`).
+1. **CLI binary update** — runs first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage.
+2. **Agent assets** — refreshes `AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`.
 3. **MCP + IDE** — selectively regenerates Dashboards and/or Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh both regardless.
 4. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **feature** `package.json` files are updated only if those deps already exist (nothing new is injected into features).
 5. **`npm install`** — runs **only** in directories where a managed dependency version actually changed.
@@ -484,21 +466,29 @@ One command to refresh a generated app after a CLI or template upgrade:
 
 **Prerequisites:** `fusebase.json` with `orgId` and `appId`; `fusebase auth` for stages that touch MCP tokens.
 
+Behavior by directory:
+
+- In an app directory (`fusebase.json` exists): runs full flow (CLI + app stages).
+- Outside an app directory: runs only CLI binary update.
+- Use `--skip-app` to force CLI-only mode even inside an app directory.
+
 **Examples:**
 
 ```bash
-fusebase app update
-fusebase app update --dry-run
-fusebase app update --skip-skills --force-mcp
-fusebase app update --skip-install
-fusebase app update --skip-commit
+fusebase update
+fusebase update --dry-run
+fusebase update --skip-app
+fusebase update --skip-skills --force-mcp
+fusebase update --skip-install
+fusebase update --skip-commit
 ```
 
 **Flags (stages default on; use `no-*` to disable):**
 
 | Flag | Effect |
 |------|--------|
-| `--skip-cli-update` | Skip automatic `fusebase cli update` stage |
+| `--skip-app` | Skip app stages and run only CLI update |
+| `--skip-cli-update` | Skip automatic CLI self-update stage |
 | `--skip-skills` | Skip agent asset refresh |
 | `--skip-mcp` | Skip MCP token + IDE refresh |
 | `--force-mcp` | Always refresh MCP tokens + IDE configs |
@@ -508,17 +498,7 @@ fusebase app update --skip-commit
 | `--commit` | Run Git checkpoint without prompts (non-interactive) |
 | `--dry-run` | Print planned work only |
 
-`fusebase update` is a direct alias for this command.
-
----
-
-### `fusebase cli update`
-
-Update the Fusebase CLI binary itself (download and replace/install latest release for your platform).
-
-```bash
-fusebase cli update
-```
+`fusebase update` is the single update command.
 
 ---
 
@@ -559,7 +539,7 @@ Global configuration stored in your home directory:
 
 #### Experimental Flags
 
-Flags gate experimental features. The `skills update` command uses flags to conditionally include/exclude content via Eta templates.
+Flags gate experimental features. The `update` command uses flags to conditionally include/exclude template assets via Eta templates.
 
 | Flag | Effect |
 |------|--------|
@@ -576,7 +556,7 @@ Enable a flag globally, then refresh the project template:
 fusebase config set-flag app-business-docs   # Business-logic documentation skill
 fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summary skill
 fusebase config set-flag isolated-stores     # Isolated stores functionality (SQL/NoSQL)
-fusebase skills update                       # Copy skills + render AGENTS.md for active flags
+fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```
 
 Other examples:
@@ -586,7 +566,7 @@ fusebase config set-flag mcp-beta    # Enable beta-gated MCP catalog entries
 fusebase config remove-flag mcp-beta # Disable
 fusebase config flags              # Interactive flag selector (TTY)
 fusebase config flags --list       # List active flags (non-interactive)
-fusebase skills update             # Regenerate project files
+fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Regenerate project files
 ```
 
 To permanently graduate a flag (remove gating and enable the feature forever), use the `/remove-flag` skill in your coding agent:

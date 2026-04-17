@@ -509,10 +509,7 @@ Key commands:
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `fusebase feature create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]`<% if (it.analytics) { %> `[--coding-agent=<agent> --model=<model>]`<% } %> - Register feature (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the feature needs dashboard access — do not defer to a separate `feature update` step.<% if (it.analytics) { %> **Always include `--coding-agent` and `--model`** to report anonymous usage stats.<% } %>
 - `fusebase deploy` - Deploy features (runs lint then build per feature)
-- `fusebase skills update` - Update AGENTS.md and skills from template
-- `fusebase app update` - One-step refresh: `cli update` (first, skip with `--skip-cli-update`) + skills + MCP/IDE (when `.env` policy FP markers are stale) + managed SDK deps + targeted `npm install`; see root README
-- `fusebase update` - Alias of `fusebase app update`
-- `fusebase cli update` - Update the Fusebase CLI binary itself
+- `fusebase update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed SDK deps/install), outside app directory runs CLI update only; use `--skip-app` for CLI-only mode even inside app
 - `fusebase env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `fusebase config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
 - `fusebase secret create --feature=FEATURE_ID --secret "KEY:description"` - Create feature secrets (empty values), prints URL to set values
 
