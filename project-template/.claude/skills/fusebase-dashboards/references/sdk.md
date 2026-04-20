@@ -1,7 +1,7 @@
 ---
 version: "1.8.0"
 mcp_prompt: sdk
-last_synced: "2026-04-15"
+last_synced: "2026-04-17"
 title: "SDK Discovery"
 category: meta
 ---
@@ -148,7 +148,7 @@ To open a database in the Thefusebase UI in the browser, use this URL pattern:
 
 `https://{{orgDomain}}/dashboard/{{orgId}}/tables/databases/{{databaseId}}`
 
-- **orgDomain**: The organization’s **CNAME** when a custom domain is configured; otherwise **`{orgSubdomain}.{FUSEBASE_HOST}`** (org subdomain on the Fusebase tenant host; `{FUSEBASE_HOST}` is the same placeholder as in `https://app.{FUSEBASE_HOST}/...` and `https://app-api.{FUSEBASE_HOST}/...` in these prompts).
+- **orgDomain**: The organization’s **CNAME** when a custom domain is configured; otherwise **`{orgSubdomain}.{FUSEBASE_APP_HOST}`** (org subdomain on the Fusebase tenant host; pay attention that `{FUSEBASE_APP_HOST}` may be different from `{FUSEBASE_HOST}`, used in `https://app.{FUSEBASE_HOST}/...` and `https://app-api.{FUSEBASE_HOST}/...` in these prompts). Ensure you know the exact value of `FUSEBASE_APP_HOST`.
 - **orgId** and **databaseId**: UUIDs (`global_id`) for the organization and database (same as in MCP tools and SDK).
 
 ---
@@ -165,5 +165,5 @@ To open a database in the Thefusebase UI in the browser, use this URL pattern:
 
 - **Version**: 1.8.0
 - **Category**: meta
-- **Last synced**: 2026-04-15
+- **Last synced**: 2026-04-17
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

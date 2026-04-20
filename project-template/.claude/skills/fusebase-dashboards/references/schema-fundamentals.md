@@ -1,7 +1,7 @@
 ---
-version: "1.4.1"
+version: "1.4.2"
 mcp_prompt: domain.dashboardSchema
-last_synced: "2026-04-15"
+last_synced: "2026-04-17"
 title: "Dashboard Schema"
 category: core
 ---
@@ -126,7 +126,7 @@ category: core
 - `"time"`: time only in one column (still the same date-type column, not a separate column).
 - If not overridden, backend defaults apply. For writes, always validate against `schema.items[].json_schema` from getDashboardView/describeDashboard.
 
-**Overrides only for selected item types**: In MCP, use **overrides** for **label** columns (`overrides.render`, e.g. labels), **lookup/relation** columns (`overrides.source` required), **string columns that must be multi-line** (`overrides.render` with `multi_line: true` — see Text columns below). and **date** (when you need to change display format). For number, boolean, date, email, etc., do not use overrides — use only `type` and `name` (unless you need string multi-line).
+**Overrides only for selected item types**: In MCP, use **overrides** for **label** columns (`overrides.render`, e.g. labels), **lookup/relation** columns (`overrides.source` required), **string columns that must be multi-line** (`overrides.render` with `multi_line: true` — see Text columns below), and **date** (when you need to change display format). For number, boolean, email, etc., do not use overrides — use only `type` and `name` (unless you need string multi-line).
 
 ### Text columns (`type: "string"`): single-line vs multi-line
 
@@ -245,10 +245,11 @@ updateViewIntent({
 ### Overrides Only for Selected Item Types
 - In MCP, **overrides** are allowed only for:
   - **Label columns** (`type: "label"`): use `overrides.render` (e.g. `labels` array with nanoid, name, color).
-  - **Lookup/relation columns** (`type: "lookup"`): use `overrides.source` (required; see Lookup Columns below).
+  - **Lookup/relation columns** (`type: "lookup"`): relation binding must be in `overrides.source` (required; see Lookup Columns below); use `overrides.render` for render config when needed.
+  - **Date columns** (`type: "date"`): use `overrides.render` to control display/input format (`date_format`, `date_render`, etc.).
   - **String columns** (`type: "string"`): use **`overrides.render` only** to enable **multi-line** long text (`multi_line: true`, `edit_type: "string-multi-line"`); see **Text columns** above. Do not add arbitrary `overrides.render` for string for other reasons.
-- For column types other than label, lookup, and string-multi-line (number, boolean, date, email, etc.) do **not** use overrides — use only `type` and `name` (and optional key, required, hidden, etc.).
-- Do not use `overrides.render` or `overrides.source` except for label, lookup, or string multi-line as above.
+- For column types other than label, lookup, date, and string-multi-line (number, boolean, email, etc.) do **not** use overrides — use only `type` and `name` (and optional key, required, hidden, etc.).
+- Do not use `overrides.render` or `overrides.source` except for label, lookup, date, or string multi-line as above.
 
 ### Lookup Columns (type: "lookup"): Relation vs Lookup (UX)
 
@@ -490,7 +491,7 @@ Use updateViewIntent with schema_patch.add. New columns appear in the view and a
 
 ## Version
 
-- **Version**: 1.4.1
+- **Version**: 1.4.2
 - **Category**: core
-- **Last synced**: 2026-04-15
+- **Last synced**: 2026-04-17
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
