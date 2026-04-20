@@ -25,8 +25,28 @@ export function extractAppTokenValidationReason(error: unknown): string | undefi
   return undefined
 }
 
+/**
+ * Optional platform `hint` on AppTokenValidationError (e.g. from nx gate-service proxy).
+ */
+export function extractAppTokenValidationHint(error: unknown): string | undefined {
+  for (const e of collectErrorObjects(error)) {
+    if (e['name'] !== 'AppTokenValidationError') continue
+    const h = e['hint']
+    return typeof h === 'string' && h.length > 0 ? h : undefined
+  }
+  return undefined
+}
+
+/** Map a caught API error to the modal error type (reason + optional server hint). */
+export function authErrorFromAppTokenFailure(error: unknown): AuthTokenExpiredError {
+  return new AuthTokenExpiredError(extractAppTokenValidationReason(error), extractAppTokenValidationHint(error))
+}
+
 /** User-facing title + body for the auth modal; driven by platform `reason`, not only clock expiry. */
-export function authUiForAppTokenReason(reason: string | undefined): { title: string; body: string } {
+export function authUiForAppTokenReason(
+  reason: string | undefined,
+  serverHint?: string,
+): { title: string; body: string } {
   if (reason === 'expired') {
     return {
       title: 'Session expired',
@@ -34,11 +54,11 @@ export function authUiForAppTokenReason(reason: string | undefined): { title: st
     }
   }
   if (reason === 'missing_gate_service_token') {
-    return {
-      title: 'Could not authorize this app',
-      body:
-        'The app token is missing the Gate authorization part — this is not a timed session expiry in your browser. Try refreshing the page. If it keeps happening, the feature token may be incomplete for your role; check with support and mention the request id from the failed network call.',
-    }
+    const title = 'Gate access missing from feature token'
+    const base =
+      'This is not a browser session timeout. The platform issued a feature token without the Gate (gst) part, so every Gate API call is rejected. Refresh once; if it persists, the feature likely declares Gate permissions that your org role cannot receive together — review fusebaseGateMeta.permissions and org role matrix, or contact support with the x-request-id from the failed response.'
+    const body = serverHint ? `${serverHint}\n\n${base}` : base
+    return { title, body }
   }
   if (reason) {
     return {
@@ -58,11 +78,14 @@ export function authUiForAppTokenReason(reason: string | undefined): { title: st
  */
 export class AuthTokenExpiredError extends Error {
   readonly appTokenReason: string | undefined
+  readonly serverHint: string | undefined
 
-  constructor(appTokenReason?: string) {
-    super(authUiForAppTokenReason(appTokenReason).title)
+  constructor(appTokenReason?: string, serverHint?: string) {
+    const ui = authUiForAppTokenReason(appTokenReason, serverHint)
+    super(ui.title)
     this.name = 'AuthTokenExpiredError'
     this.appTokenReason = appTokenReason
+    this.serverHint = serverHint
   }
 }
 

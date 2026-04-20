@@ -24,7 +24,8 @@ function App() {
         {/*
           Feature content goes here.
           Pass featureToken to child components that make API calls.
-          On AppTokenValidationError, map with extractAppTokenValidationReason and throw new AuthTokenExpiredError(reason),
+          On AppTokenValidationError, use authErrorFromAppTokenFailure(err) (reason + optional server `hint`),
+          or extractAppTokenValidationReason / extractAppTokenValidationHint with new AuthTokenExpiredError(...),
           then call onAuthError(err) from the catch block.
 
           Example:

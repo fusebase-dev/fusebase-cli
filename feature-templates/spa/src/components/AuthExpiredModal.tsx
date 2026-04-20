@@ -12,8 +12,8 @@ interface AuthExpiredModalProps {
  */
 export function AuthExpiredModal({ onClose, authError }: AuthExpiredModalProps) {
   const { title, body } = useMemo(
-    () => authUiForAppTokenReason(authError.appTokenReason),
-    [authError.appTokenReason],
+    () => authUiForAppTokenReason(authError.appTokenReason, authError.serverHint),
+    [authError.appTokenReason, authError.serverHint],
   )
 
   return (
