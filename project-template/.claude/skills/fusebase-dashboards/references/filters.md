@@ -1,7 +1,7 @@
 ---
 version: "1.1.0"
 mcp_prompt: domain.filters
-last_synced: "2026-03-07"
+last_synced: "2026-04-17"
 title: "Dashboard View Filters"
 category: specialized
 ---
@@ -164,5 +164,5 @@ The filtered column must be either a text column with a portal ID, or, ideally, 
 
 - **Version**: 1.1.0
 - **Category**: specialized
-- **Last synced**: 2026-03-07
+- **Last synced**: 2026-04-17
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
