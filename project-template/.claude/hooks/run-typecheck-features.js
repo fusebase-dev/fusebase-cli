@@ -40,7 +40,7 @@ function decideCommand(featureDir) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
       if (pkg.scripts?.typecheck) {
-        return { cmd: "npm run typecheck", label: "typecheck script" };
+        return { command: npmCommand(), args: ["run", "typecheck"], label: "typecheck script" };
       }
     } catch {
       // ignore
@@ -51,18 +51,38 @@ function decideCommand(featureDir) {
     try {
       const ts = JSON.parse(fs.readFileSync(tsRoot, "utf8"));
       if (Array.isArray(ts.references) && ts.references.length > 0) {
-        return { cmd: "npx tsc -b --noEmit", label: "tsc -b" };
+        return {
+          command: npxCommand(),
+          args: ["tsc", "-b", "--noEmit"],
+          label: "tsc -b",
+        };
       }
     } catch {
       // ignore
     }
-    return { cmd: "npx tsc --noEmit -p tsconfig.json", label: "tsc" };
+    return {
+      command: npxCommand(),
+      args: ["tsc", "--noEmit", "-p", "tsconfig.json"],
+      label: "tsc",
+    };
   }
   const tsApp = path.join(featureDir, "tsconfig.app.json");
   if (fs.existsSync(tsApp)) {
-    return { cmd: "npx tsc --noEmit -p tsconfig.app.json", label: "tsc app" };
+    return {
+      command: npxCommand(),
+      args: ["tsc", "--noEmit", "-p", "tsconfig.app.json"],
+      label: "tsc app",
+    };
   }
   return null;
+}
+
+function npmCommand() {
+  return process.platform === "win32" ? "npm.cmd" : "npm";
+}
+
+function npxCommand() {
+  return process.platform === "win32" ? "npx.cmd" : "npx";
 }
 
 function main() {
@@ -78,14 +98,14 @@ function main() {
     if (!decision) continue;
 
     const rel = path.relative(projectDir, featureDir);
-    const result = spawnSync(decision.cmd, {
-      shell: true,
+    const result = spawnSync(decision.command, decision.args, {
       cwd: featureDir,
       encoding: "utf-8",
     });
     const code = result.status ?? 1;
     if (code !== 0) {
-      const out = [result.stdout, result.stderr].filter(Boolean).join("");
+      const errorLine = result.error ? `${result.error.message}\n` : "";
+      const out = [errorLine, result.stdout, result.stderr].filter(Boolean).join("");
       failures.push(
         `Feature "${rel}" (${decision.label}):\n${out || "(no output)"}`,
       );
