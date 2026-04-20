@@ -1,4 +1,5 @@
 {
+  "enabledMcpjsonServers": ["fusebase-dashboards", "fusebase-gate"],
   "hooks": {
     "Stop": [
       {

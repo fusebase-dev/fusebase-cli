@@ -14,7 +14,10 @@ import { embeddedFiles } from "bun";
 import AdmZip from "adm-zip";
 import { getFusebaseHost, hasFlag } from "../../config";
 import { isMcpCatalogEntryActive } from "../../mcp-catalog";
-import { applyMcpServersToIdeConfigJson } from "../../ide-mcp-config";
+import {
+  applyMcpServersToIdeConfigJson,
+  mergeProjectClaudeCodeMcpJsonAllowlistInSettings,
+} from "../../ide-mcp-config";
 import { applyMcpServersToCodexConfigToml } from "../../codex-mcp-config";
 import { pathToFileURL } from "url";
 import type { McpServerCatalogEntry } from "../../../ide-configs/mcp-servers";
@@ -506,6 +509,14 @@ async function copyIdeAssets(
       if (config.instructions && !instructions.includes(config.instructions)) {
         instructions.push(config.instructions);
       }
+    }
+  }
+
+  if (presets.has("claude-code")) {
+    try {
+      await mergeProjectClaudeCodeMcpJsonAllowlistInSettings(targetDir);
+    } catch (err) {
+      console.warn("⚠ Could not sync Claude Code MCP allowlist (.claude/settings.json):", err);
     }
   }
 

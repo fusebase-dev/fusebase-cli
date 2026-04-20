@@ -272,6 +272,10 @@ export async function updateIdeMcpServers(options: {
   await writeFile(targetPath, formatJson(applied.json), "utf-8");
   await ensureMcpConfigInGitignore(targetDir);
 
+  if (ide === "claude-code") {
+    await mergeProjectClaudeCodeMcpJsonAllowlistInSettings(targetDir);
+  }
+
   return {
     targetPath,
     containerKey: applied.containerKey,
@@ -281,5 +285,71 @@ export async function updateIdeMcpServers(options: {
     ignoredRemove: applied.ignoredRemove,
     createdFile,
   };
+}
+
+/**
+ * Claude Code only loads project-root `.mcp.json` servers that appear in
+ * `.claude/settings.json` → `enabledMcpjsonServers` (or after interactive approval).
+ * Merge every server name currently present in `.mcp.json` into that allowlist,
+ * preserving the rest of `settings.json` and any existing allowlist entries.
+ */
+export async function mergeProjectClaudeCodeMcpJsonAllowlistInSettings(targetDir: string): Promise<void> {
+  const mcpPath = join(targetDir, ".mcp.json");
+  if (!(await fileExists(mcpPath))) {
+    return;
+  }
+
+  let mcpJson: unknown;
+  try {
+    mcpJson = JSON.parse(await readFile(mcpPath, "utf-8"));
+  } catch {
+    return;
+  }
+
+  if (!mcpJson || typeof mcpJson !== "object") {
+    return;
+  }
+
+  const servers = (mcpJson as { mcpServers?: unknown }).mcpServers;
+  if (!servers || typeof servers !== "object") {
+    return;
+  }
+
+  const fromMcp = Object.keys(servers as Record<string, unknown>).filter((k) => k.length > 0);
+  if (fromMcp.length === 0) {
+    return;
+  }
+
+  const settingsPath = join(targetDir, ".claude", "settings.json");
+  let settings: Record<string, unknown> = {};
+
+  if (await fileExists(settingsPath)) {
+    try {
+      const raw = await readFile(settingsPath, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        settings = { ...parsed } as Record<string, unknown>;
+      }
+    } catch {
+      console.warn("⚠ Could not parse .claude/settings.json; skipping Claude Code MCP allowlist merge.");
+      return;
+    }
+  }
+
+  const prev = settings["enabledMcpjsonServers"];
+  const allow = new Set<string>();
+  if (Array.isArray(prev)) {
+    for (const x of prev) {
+      if (typeof x === "string" && x.length > 0) allow.add(x);
+    }
+  }
+  for (const name of fromMcp) {
+    allow.add(name);
+  }
+
+  settings["enabledMcpjsonServers"] = [...allow].sort();
+
+  await mkdir(dirname(settingsPath), { recursive: true });
+  await writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
 }
 
