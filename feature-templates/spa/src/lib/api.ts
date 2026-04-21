@@ -96,9 +96,8 @@ export function getCookie(name: string): string | null {
 }
 
 /**
- * Read the feature token. Checks the `fbsfeaturetoken` cookie first;
- * falls back to `window.FBS_FEATURE_TOKEN` if the cookie is absent.
+ * Read the feature token from global runtime variable first, then cookie fallback.
  */
 export function getFeatureToken(): string | null {
-  return getCookie('fbsfeaturetoken') ?? (window as Window & { FBS_FEATURE_TOKEN?: string }).FBS_FEATURE_TOKEN ?? null
+  return (window as Window & { FBS_FEATURE_TOKEN?: string }).FBS_FEATURE_TOKEN ?? getCookie('fbsfeaturetoken') ?? null
 }

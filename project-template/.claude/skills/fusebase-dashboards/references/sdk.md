@@ -137,7 +137,7 @@ export function createDataApi(featureToken: string): DashboardDataApi {
   return new DashboardDataApi(client)
 }
 
-// Usage: get feature token from postMessage or cookie, then create API and call methods.
+// Usage: get feature token from window.FBS_FEATURE_TOKEN (fallback: fbsfeaturetoken cookie), then create API and call methods.
 ```
 
 ---

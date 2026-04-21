@@ -87,11 +87,11 @@ Features may optionally include a `backend/` subfolder for a backend API (REST +
 
 ## Authentication
 
-Features run as the main window. The platform sets a `fbsfeaturetoken` cookie automatically.
+Features run as the main window. The platform provides a feature token via `window.FBS_FEATURE_TOKEN` (with `fbsfeaturetoken` cookie fallback when needed).
 
 **Startup flow:**
 
-1. Read feature token on app load: check `fbsfeaturetoken` cookie first, fall back to `window.FBS_FEATURE_TOKEN` if the cookie is absent
+1. Read feature token on app load from `window.FBS_FEATURE_TOKEN` first; if missing, fall back to `fbsfeaturetoken` cookie
 2. Render app once token is available (show loading state until then)
 3. Pass token via `x-app-feature-token` for direct SDK / Fusebase proxy calls
 4. For calls to the app's own backend (`/api/*`), rely on the same-origin cookie and make backend handlers read `x-app-feature-token` or fallback to `fbsfeaturetoken`
