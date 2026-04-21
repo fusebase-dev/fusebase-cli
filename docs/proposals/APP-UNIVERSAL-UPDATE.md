@@ -116,7 +116,7 @@ Safety:
 
 Reuse existing implementation:
 
-- Call `copyAgentsAndSkills(cwd)` (current `fusebase skills update` behavior).
+- Call `copyAgentsAndSkills(cwd)` (agent assets refresh behavior now available through `fusebase update` stage).
 - This preserves current flag gating logic and Eta rendering.
 
 Targets:

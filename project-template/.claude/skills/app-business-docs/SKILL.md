@@ -47,4 +47,4 @@ Use clear headings, for example:
 
 ## Flag
 
-This skill is copied into the project only when the global CLI flag `app-business-docs` is enabled (`fusebase config set-flag app-business-docs` then `fusebase skills update`).
+This skill is copied into the project only when the global CLI flag `app-business-docs` is enabled (`fusebase config set-flag app-business-docs` then `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit`).

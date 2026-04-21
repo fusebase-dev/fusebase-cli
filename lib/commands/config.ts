@@ -46,7 +46,9 @@ const setFlagCommand = new Command("set-flag")
     console.log(`✓ Flag "${flag}" enabled`);
     console.log(`  Active flags: ${getFlags().join(", ") || "(none)"}`);
     console.log("");
-    console.log("\x1b[1mRun 'fusebase skills update' to regenerate project files.\x1b[0m");
+    console.log(
+      "\x1b[1mRun 'fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit' to regenerate project files.\x1b[0m",
+    );
   });
 
 const removeFlagCommand = new Command("remove-flag")
@@ -63,7 +65,9 @@ const removeFlagCommand = new Command("remove-flag")
     console.log(`✓ Flag "${flag}" disabled`);
     console.log(`  Active flags: ${getFlags().join(", ") || "(none)"}`);
     console.log("");
-    console.log("\x1b[1mRun 'fusebase skills update' to regenerate project files.\x1b[0m");
+    console.log(
+      "\x1b[1mRun 'fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit' to regenerate project files.\x1b[0m",
+    );
   });
 
 function printFlagsSummary(flags: string[]): void {
@@ -121,7 +125,9 @@ async function runInteractiveFlagsSelection(): Promise<void> {
       );
     }
     console.log("");
-    console.log("\x1b[1mRun 'fusebase skills update' to regenerate project files.\x1b[0m");
+    console.log(
+      "\x1b[1mRun 'fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit' to regenerate project files.\x1b[0m",
+    );
   } catch (error) {
     const name = error instanceof Error ? error.name : "";
     if (name === "ExitPromptError" || name === "AbortPromptError") {
