@@ -31,6 +31,23 @@ Senior bar: **do not** “fix” errors with **`any`**, **`as any`**, **`as Reco
 
 All skills are located in `.claude/skills/`. When this document references a skill (e.g., `fusebase-cli`), look for `SKILL.md` in that folder.
 
+## Custom additions in skill docs (update-safe rule)
+
+When adding project-specific guidance to skill markdown files (`SKILL.md` and `references/*.md`), append it only at the end of the file inside this block:
+
+```md
+<!-- CUSTOM:SKILL:BEGIN -->
+...your custom content...
+<!-- CUSTOM:SKILL:END -->
+```
+
+Rules:
+
+- Place the block at the very end of the file.
+- Keep base template content above the block unchanged.
+- Never put custom additions outside this block in managed skill files.
+- If the block already exists, update only content inside it.
+
 <% if (it.flags?.includes("app-business-docs")) { %>
 **Quick flag note — `app-business-docs`:** Load `.claude/skills/app-business-docs/SKILL.md` when implementing or changing business logic so `docs/en/business-logic.md` stays aligned with actual behavior.
 <% } %>

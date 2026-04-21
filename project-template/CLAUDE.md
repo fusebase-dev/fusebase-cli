@@ -6,6 +6,10 @@
 
 **Dashboard data SDK request args:** Methods such as `getDashboardViewData` and `batchPutDashboardData` take **route parameters under `path`**, e.g. `{ path: { dashboardId, viewId }, ... }` (plus `body` / query per `sdk_describe`). **Do not** pass `{ dashboardId, viewId }` at the top level — that matches MCP `tool_call` **args**, not the TypeScript SDK. Apply the **same** SDK shape in **SPA and feature `backend/`** code.
 
+**Custom skill-doc additions (required format):** When adding project-specific notes to managed skill markdown files (`.claude/skills/**/SKILL.md` and `.claude/skills/**/references/*.md`), write them only in a tail block:
+`<!-- CUSTOM:SKILL:BEGIN --> ... <!-- CUSTOM:SKILL:END -->`.
+Keep this block at the end of the file and do not add custom content outside it.
+
 <% if (it.flags?.includes("app-business-docs")) { %>
 **Business logic docs (flag: `app-business-docs`):** Load `.claude/skills/app-business-docs/SKILL.md` when business rules or user flows change, then update `docs/en/business-logic.md`.
 <% } %>

@@ -1,5 +1,5 @@
-import { cp, access, rm } from "fs/promises";
-import { join, dirname } from "path";
+import { cp, access, rm, readdir, readFile, writeFile } from "fs/promises";
+import { join, dirname, relative } from "path";
 import { fileURLToPath } from "url";
 import { embeddedFiles } from "bun";
 import AdmZip from "adm-zip";
@@ -16,6 +16,86 @@ async function fileExists(path: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+const CUSTOM_BLOCK_BEGIN = "<!-- CUSTOM:SKILL:BEGIN -->";
+const CUSTOM_BLOCK_END = "<!-- CUSTOM:SKILL:END -->";
+
+async function collectMarkdownFilesRecursively(root: string): Promise<string[]> {
+  if (!(await fileExists(root))) return [];
+  const entries = await readdir(root, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const full = join(root, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectMarkdownFilesRecursively(full)));
+    } else if (entry.isFile() && full.endsWith(".md")) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+function extractCustomBlock(content: string): string | null {
+  const begin = content.indexOf(CUSTOM_BLOCK_BEGIN);
+  if (begin < 0) return null;
+  const end = content.indexOf(CUSTOM_BLOCK_END, begin + CUSTOM_BLOCK_BEGIN.length);
+  if (end < 0) return null;
+  return content.slice(begin, end + CUSTOM_BLOCK_END.length);
+}
+
+function stripCustomBlock(content: string): string {
+  const begin = content.indexOf(CUSTOM_BLOCK_BEGIN);
+  if (begin < 0) return content;
+  const end = content.indexOf(CUSTOM_BLOCK_END, begin + CUSTOM_BLOCK_BEGIN.length);
+  if (end < 0) return content;
+  const before = content.slice(0, begin).trimEnd();
+  const after = content.slice(end + CUSTOM_BLOCK_END.length).trim();
+  if (after.length > 0) {
+    return `${before}\n\n${after}\n`;
+  }
+  return `${before}\n`;
+}
+
+function appendCustomBlock(content: string, block: string): string {
+  const base = stripCustomBlock(content).trimEnd();
+  return `${base}\n\n${block}\n`;
+}
+
+async function captureCustomBlocks(targetDir: string): Promise<Map<string, string>> {
+  const blocks = new Map<string, string>();
+  const agentsPath = join(targetDir, "AGENTS.md");
+  if (await fileExists(agentsPath)) {
+    const agents = await readFile(agentsPath, "utf-8");
+    const block = extractCustomBlock(agents);
+    if (block) {
+      blocks.set("AGENTS.md", block);
+    }
+  }
+
+  const skillsRoot = join(targetDir, ".claude", "skills");
+  const mdFiles = await collectMarkdownFilesRecursively(skillsRoot);
+  for (const file of mdFiles) {
+    const content = await readFile(file, "utf-8");
+    const block = extractCustomBlock(content);
+    if (!block) continue;
+    const rel = relative(targetDir, file).replace(/\\/g, "/");
+    blocks.set(rel, block);
+  }
+
+  return blocks;
+}
+
+async function restoreCustomBlocks(targetDir: string, blocks: Map<string, string>): Promise<void> {
+  for (const [relPath, block] of blocks.entries()) {
+    const absPath = join(targetDir, relPath);
+    if (!(await fileExists(absPath))) continue;
+    const current = await readFile(absPath, "utf-8");
+    const next = appendCustomBlock(current, block);
+    if (next !== current) {
+      await writeFile(absPath, next, "utf-8");
+    }
   }
 }
 
@@ -66,6 +146,8 @@ function shouldSkipEntry(name: string): boolean {
  * After copying, renders Eta templates based on active flags.
  */
 export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
+  const customBlocks = await captureCustomBlocks(targetDir);
+
   // Check for obsolete ./skills folder
   const obsoleteSkillsPath = join(targetDir, "skills");
   if (await fileExists(obsoleteSkillsPath)) {
@@ -154,4 +236,8 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
   const context = buildTemplateContext();
   renderTemplateFile(join(targetDir, "AGENTS.md"), context);
   renderTemplatesInDir(join(targetDir, ".claude", "skills"), context);
+
+  if (customBlocks.size > 0) {
+    await restoreCustomBlocks(targetDir, customBlocks);
+  }
 }
