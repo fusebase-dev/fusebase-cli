@@ -33,7 +33,7 @@ All skills are located in `.claude/skills/`. When this document references a ski
 
 ## Custom additions in skill docs (update-safe rule)
 
-When adding project-specific guidance to skill markdown files (`SKILL.md` and `references/*.md`), append it only at the end of the file inside this block:
+When adding project-specific guidance to skill markdown files (`SKILL.md` and `references/*.md`), place it only inside custom blocks:
 
 ```md
 <!-- CUSTOM:SKILL:BEGIN -->
@@ -43,10 +43,11 @@ When adding project-specific guidance to skill markdown files (`SKILL.md` and `r
 
 Rules:
 
-- Place the block at the very end of the file.
-- Keep base template content above the block unchanged.
+- You may use one or multiple custom blocks in a file.
+- Custom blocks can be placed anywhere in the file.
+- Keep base template content outside custom blocks unchanged.
 - Never put custom additions outside this block in managed skill files.
-- If the block already exists, update only content inside it.
+- If blocks already exist, update only content inside them.
 
 <% if (it.flags?.includes("app-business-docs")) { %>
 **Quick flag note — `app-business-docs`:** Load `.claude/skills/app-business-docs/SKILL.md` when implementing or changing business logic so `docs/en/business-logic.md` stays aligned with actual behavior.

@@ -21,6 +21,8 @@ async function fileExists(path: string): Promise<boolean> {
 
 const CUSTOM_BLOCK_BEGIN = "<!-- CUSTOM:SKILL:BEGIN -->";
 const CUSTOM_BLOCK_END = "<!-- CUSTOM:SKILL:END -->";
+const CUSTOM_BLOCK_REGEX =
+  /<!-- CUSTOM:SKILL:BEGIN -->[\s\S]*?<!-- CUSTOM:SKILL:END -->/g;
 
 async function collectMarkdownFilesRecursively(root: string): Promise<string[]> {
   if (!(await fileExists(root))) return [];
@@ -37,40 +39,110 @@ async function collectMarkdownFilesRecursively(root: string): Promise<string[]> 
   return files;
 }
 
-function extractCustomBlock(content: string): string | null {
-  const begin = content.indexOf(CUSTOM_BLOCK_BEGIN);
-  if (begin < 0) return null;
-  const end = content.indexOf(CUSTOM_BLOCK_END, begin + CUSTOM_BLOCK_BEGIN.length);
-  if (end < 0) return null;
-  return content.slice(begin, end + CUSTOM_BLOCK_END.length);
+function stripAllCustomBlocks(content: string): string {
+  return content.replace(CUSTOM_BLOCK_REGEX, "").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
 }
 
-function stripCustomBlock(content: string): string {
-  const begin = content.indexOf(CUSTOM_BLOCK_BEGIN);
-  if (begin < 0) return content;
-  const end = content.indexOf(CUSTOM_BLOCK_END, begin + CUSTOM_BLOCK_BEGIN.length);
-  if (end < 0) return content;
-  const before = content.slice(0, begin).trimEnd();
-  const after = content.slice(end + CUSTOM_BLOCK_END.length).trim();
-  if (after.length > 0) {
-    return `${before}\n\n${after}\n`;
+function nonEmptyLineBefore(content: string, index: number): string | null {
+  const before = content.slice(0, index);
+  const lines = before.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]?.trim();
+    if (line) return line;
   }
-  return `${before}\n`;
+  return null;
 }
 
-function appendCustomBlock(content: string, block: string): string {
-  const base = stripCustomBlock(content).trimEnd();
-  return `${base}\n\n${block}\n`;
+function nonEmptyLineAfter(content: string, index: number): string | null {
+  const after = content.slice(index);
+  const lines = after.split("\n");
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line) return line;
+  }
+  return null;
 }
 
-async function captureCustomBlocks(targetDir: string): Promise<Map<string, string>> {
-  const blocks = new Map<string, string>();
+type CapturedCustomBlock = {
+  content: string;
+  beforeLine: string | null;
+  afterLine: string | null;
+};
+
+function extractCustomBlocks(content: string): CapturedCustomBlock[] {
+  const matches = [...content.matchAll(CUSTOM_BLOCK_REGEX)];
+  return matches.map((match) => {
+    const start = match.index ?? 0;
+    const block = match[0];
+    const end = start + block.length;
+    return {
+      content: block,
+      beforeLine: nonEmptyLineBefore(content, start),
+      afterLine: nonEmptyLineAfter(content, end),
+    };
+  });
+}
+
+function insertBlockBetweenAnchors(
+  baseContent: string,
+  block: CapturedCustomBlock,
+): { content: string; inserted: boolean } {
+  const { beforeLine, afterLine } = block;
+  if (!beforeLine && !afterLine) return { content: baseContent, inserted: false };
+
+  const beforeIdx = beforeLine ? baseContent.indexOf(beforeLine) : -1;
+  const afterIdx = afterLine ? baseContent.indexOf(afterLine) : -1;
+
+  if (beforeIdx >= 0 && afterIdx >= 0 && beforeIdx < afterIdx) {
+    const insertAt = beforeIdx + beforeLine!.length;
+    const next =
+      baseContent.slice(0, insertAt) +
+      `\n\n${block.content}\n\n` +
+      baseContent.slice(insertAt);
+    return { content: next, inserted: true };
+  }
+
+  if (beforeIdx >= 0) {
+    const insertAt = beforeIdx + beforeLine!.length;
+    const next =
+      baseContent.slice(0, insertAt) +
+      `\n\n${block.content}\n` +
+      baseContent.slice(insertAt);
+    return { content: next, inserted: true };
+  }
+
+  if (afterIdx >= 0) {
+    const next =
+      baseContent.slice(0, afterIdx) +
+      `${block.content}\n\n` +
+      baseContent.slice(afterIdx);
+    return { content: next, inserted: true };
+  }
+
+  return { content: baseContent, inserted: false };
+}
+
+function mergeCustomBlocks(content: string, blocks: CapturedCustomBlock[]): string {
+  let merged = stripAllCustomBlocks(content).trimEnd();
+  for (const block of blocks) {
+    const attempt = insertBlockBetweenAnchors(merged, block);
+    if (attempt.inserted) {
+      merged = attempt.content.trimEnd();
+      continue;
+    }
+    merged = `${merged}\n\n${block.content}`.trimEnd();
+  }
+  return `${merged}\n`;
+}
+
+async function captureCustomBlocks(targetDir: string): Promise<Map<string, CapturedCustomBlock[]>> {
+  const blocks = new Map<string, CapturedCustomBlock[]>();
   const agentsPath = join(targetDir, "AGENTS.md");
   if (await fileExists(agentsPath)) {
     const agents = await readFile(agentsPath, "utf-8");
-    const block = extractCustomBlock(agents);
-    if (block) {
-      blocks.set("AGENTS.md", block);
+    const extracted = extractCustomBlocks(agents);
+    if (extracted.length > 0) {
+      blocks.set("AGENTS.md", extracted);
     }
   }
 
@@ -78,21 +150,24 @@ async function captureCustomBlocks(targetDir: string): Promise<Map<string, strin
   const mdFiles = await collectMarkdownFilesRecursively(skillsRoot);
   for (const file of mdFiles) {
     const content = await readFile(file, "utf-8");
-    const block = extractCustomBlock(content);
-    if (!block) continue;
+    const extracted = extractCustomBlocks(content);
+    if (extracted.length === 0) continue;
     const rel = relative(targetDir, file).replace(/\\/g, "/");
-    blocks.set(rel, block);
+    blocks.set(rel, extracted);
   }
 
   return blocks;
 }
 
-async function restoreCustomBlocks(targetDir: string, blocks: Map<string, string>): Promise<void> {
-  for (const [relPath, block] of blocks.entries()) {
+async function restoreCustomBlocks(
+  targetDir: string,
+  blocks: Map<string, CapturedCustomBlock[]>,
+): Promise<void> {
+  for (const [relPath, fileBlocks] of blocks.entries()) {
     const absPath = join(targetDir, relPath);
     if (!(await fileExists(absPath))) continue;
     const current = await readFile(absPath, "utf-8");
-    const next = appendCustomBlock(current, block);
+    const next = mergeCustomBlocks(current, fileBlocks);
     if (next !== current) {
       await writeFile(absPath, next, "utf-8");
     }
