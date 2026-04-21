@@ -1,7 +1,7 @@
 ---
-version: "1.5.0"
+version: "1.6.0"
 mcp_prompt: sdk
-last_synced: "2026-04-16"
+last_synced: "2026-04-21"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -59,11 +59,26 @@ For isolated SQL schema work, keep migration files in the app repo and use SDK h
 - Do not guess client names or method names. Discover them through sdk_search or sdk_describe.
 - Treat sdk_describe as the source of truth for params shape and response shape.
 - Keep MCP and SDK roles separate: MCP is for discovery and execution in chat, SDK is for product code.
+
+## Tokens permissions behavior
+
+When creating or updating API tokens, permission handling is soft by default (`strictPermissionValidation = false`).
+- If requested permissions exceed caller role or granted permissions, token permissions are degraded to the allowed subset.
+- If requested permissions are unknown or not allowed for the service, they are ignored in soft mode.
+- Do not enable strict mode unless there is a clear product or compliance requirement for fail-fast behavior.
+
+## SDK error handling
+
+Always handle SDK operation failures explicitly.
+- Wrap Gate SDK calls in try/catch and branch by HTTP status and operation context.
+- Treat 401/403 as authorization outcomes: surface clear user-facing guidance and avoid privileged fallback paths.
+- For token and permission-sensitive flows, include actionable diagnostics (requested permissions, caller role/context, and denied operation).
+- For create/update token flows, treat permission reductions as expected in soft mode and only fail hard when strict mode is intentionally enabled.
 ---
 
 ## Version
 
-- **Version**: 1.5.0
+- **Version**: 1.6.0
 - **Category**: meta
-- **Last synced**: 2026-04-16
+- **Last synced**: 2026-04-21
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

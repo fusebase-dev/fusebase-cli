@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-04-13"
+last_synced: "2026-04-21"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -15,6 +15,7 @@ category: specialized
 
 End-to-end reference for **`sql` / `postgres`** isolated stores: MCP tools, `@fusebase/fusebase-gate-sdk` (`IsolatedStoresApi`), permissions, migrations, and failure modes.  
 **Contracts:** `src/api/contracts/ops/isolated-stores/isolated-stores.ts`.
+For a hierarchy-focused reference, see [isolated-store-hierarchy.md](./isolated-store-hierarchy.md).
 
 Current stable baseline (2026-04-12):
 
@@ -267,6 +268,7 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 ## 10. Managed PostgreSQL (e.g. Azure)
 
 - **`CREATE EXTENSION pgcrypto`** is often blocked — first **`apply`** fails if migration creates it. Remove it; prefer **`DEFAULT gen_random_uuid()`** on PostgreSQL **13+** when the server exposes **`gen_random_uuid()`** without that extension; else allow-listed **`uuid-ossp`** or app-generated UUIDs.
+- `pgvector` / `CREATE EXTENSION vector` is provider-dependent too. Azure Flexible Server docs support it in principle, but only after adding `vector` to the server allowlist (`azure.extensions`) and only if the current managed server exposes it. If `CREATE EXTENSION vector` returns `extension "vector" is not allow-listed`, that is an Azure server configuration/support issue, not a Gate contract issue.
 
 ---
 
@@ -290,4 +292,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-04-13
+- **Last synced**: 2026-04-21
