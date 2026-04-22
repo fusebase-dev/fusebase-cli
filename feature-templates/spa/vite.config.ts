@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   server: {
+    port: process.env.PORT,
     watch: {
       // Prevent unnecessary reloads from debug logs written by fusebase dev start
       ignored: ['**/logs/**'],
