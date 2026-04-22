@@ -222,9 +222,11 @@ When a feature has a backend, the `/api` path prefix is **reserved for the backe
 - Backend routes: `/api/*` (REST endpoints, WebSocket upgrades)
 - SPA routes: everything else (`/`, `/items/:id`, `/settings`, etc.)
 
-## Webhooks (Inbound)
+## Webhooks and External WebSocket Callbacks (Inbound)
 
-Webhook handlers receive POST requests from external services (e.g. Monday.com, GitHub, Stripe). These requests neither carry a `fbsfeaturetoken` cookie nor `x-app-feature-token` header — the platform proxy skips feature-token auth for any path under `/api/webhooks/`.
+Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsfeaturetoken` cookie or `x-app-feature-token` header.
+
+The platform proxy skips feature-token auth for any path under `/api/webhooks/`, including both HTTP routes and WebSocket upgrade routes.
 
 ### Secret path segment
 
@@ -236,6 +238,8 @@ Try to come up with random and hard to guess path for webhooks, for example:
 ### Webhook route
 
 Public webhook URL: `https://{FEATURE_DOMAIN}/api/webhooks/...`
+
+For external WebSocket integrations, use a path under `/api/webhooks/...` as well (example: `/api/webhooks/twilio-stream-<random-secret>`).
 
 ### Service-account token for webhooks
 
