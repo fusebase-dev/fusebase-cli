@@ -1,7 +1,7 @@
 ---
-version: "1.6.0"
+version: "1.6.1"
 mcp_prompt: sdk
-last_synced: "2026-04-21"
+last_synced: "2026-04-22"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -53,6 +53,9 @@ For workspace discovery, use WorkspacesApi.listWorkspaces.
 For portal discovery, use PortalsApi.listPortals.
 For portal invite flows, inspect addOrgUser because portal magic links are returned there rather than through a separate Portal invite API.
 For isolated SQL schema work, keep migration files in the app repo and use SDK helpers `buildSqlMigrationBundle(...)` and `calculateSqlMigrationChecksum(...)` before calling IsolatedStoresApi.getIsolatedStoreSqlMigrationStatus / applyIsolatedStoreSqlMigrations.
+For isolated store runtime wiring in external apps, do not hardcode `storeId` values and do not store them as long-lived app secrets. Treat this as an anti-pattern.
+Preferred isolated store discovery flow in SDK code: call IsolatedStoresApi.listIsolatedStores with `orgId` + `clientId`, filter by stable store alias (or `aliasLike`), then use the resolved `storeId` for stage and SQL operations.
+Store app-level alias/client binding in config; resolve physical/logical store ids at runtime from Gate.
 
 ## Usage Rules
 
@@ -78,7 +81,7 @@ Always handle SDK operation failures explicitly.
 
 ## Version
 
-- **Version**: 1.6.0
+- **Version**: 1.6.1
 - **Category**: meta
-- **Last synced**: 2026-04-21
+- **Last synced**: 2026-04-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

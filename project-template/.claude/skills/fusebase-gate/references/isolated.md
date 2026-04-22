@@ -1,7 +1,7 @@
 ---
-version: "1.2.8"
+version: "1.2.9"
 mcp_prompt: isolated
-last_synced: "2026-04-13"
+last_synced: "2026-04-22"
 title: "Fusebase Gate Isolated Stores"
 category: specialized
 ---
@@ -36,6 +36,9 @@ These prompts cover the common control-plane model for isolated low-level stores
 ## Access Rules
 
 - Always send `orgId`, `storeId`, and `stage` exactly as returned by previous operations.
+- Treat hardcoded isolated `storeId` values in external app code, env files, or app secrets as an anti-pattern.
+- Resolve the target store at runtime via `listIsolatedStores` with `clientId`, then filter by stable app-level `alias` (or `aliasLike`) and use the returned `storeId`.
+- Persist app-owned alias and client binding (`clientId`) as configuration; do not persist provider/runtime store ids as long-lived app secrets.
 - `listIsolatedStores` accepts optional query `clientId` to narrow stores by `app` source scope `sourceId`; token callers must use their own client scope id when setting it.
 - **Empty `listIsolatedStores`** is expected until at least one `createIsolatedStore` for that `orgId`. Flow: create store → `initIsolatedStoreStage` (`dev` / `prod`) → then SQL/NoSQL ops. If the list stays empty after create, check **wrong `orgId`**, or **`clientId` filter** (omit the query to list all org stores, or pass the exact app client id matching the store’s `source.sourceId`).
 - Token control-plane ownership is checked through the `client` scope of the token.
@@ -84,7 +87,7 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 ## Version
 
-- **Version**: 1.2.8
+- **Version**: 1.2.9
 - **Category**: specialized
-- **Last synced**: 2026-04-13
+- **Last synced**: 2026-04-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

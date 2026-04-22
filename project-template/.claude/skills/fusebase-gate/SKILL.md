@@ -43,6 +43,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 - [Fusebase Gate Users Operations](references/users.md)
 - [Isolated SQL stores and migrations (Gate)](references/isolated-sql-stores.md)
 - [Isolated SQL stores PostgreSQL RLS plan (Gate)](references/isolated-sql-rls-plan.md)
+- [Isolated stores hierarchy: Gate vs Neon](references/isolated-store-hierarchy.md)
 - [Stripe for apps and agents (Gate)](references/stripe-for-apps-and-agents.md)
 
 ---

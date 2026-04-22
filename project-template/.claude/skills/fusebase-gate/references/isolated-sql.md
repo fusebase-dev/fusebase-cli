@@ -1,7 +1,7 @@
 ---
-version: "1.8.5"
+version: "1.8.6"
 mcp_prompt: isolatedSql
-last_synced: "2026-04-13"
+last_synced: "2026-04-22"
 title: "Fusebase Gate Isolated SQL Stores"
 category: specialized
 ---
@@ -77,6 +77,7 @@ Do not **`apply`** throwaway SQL as **v1** on a store that must later use a real
 - **`tools_search`**: parameter **`queries`** (string array, typically 1–10), not a single `query` field.
 - Use **`tools_describe`** on **`initIsolatedStoreStage`**, **`getIsolatedStoreSqlMigrationStatus`**, **`applyIsolatedStoreSqlMigrations`** when schemas are unclear.
 - Session: **`whoami`** / **`bootstrap`**; context prompts: groups **`authz`**, **`isolated`**, **`isolatedSql`**, **`sdk`** when mirroring in code.
+- For external apps, treat hardcoded `storeId` values (including app secrets) as an anti-pattern. Discovery flow: `listIsolatedStores` with app `clientId` -> filter by stable alias/aliasLike -> use returned `storeId` for stage/data calls.
 
 ### Manifest / checksums
 
@@ -100,7 +101,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 ## Version
 
-- **Version**: 1.8.5
+- **Version**: 1.8.6
 - **Category**: specialized
-- **Last synced**: 2026-04-13
+- **Last synced**: 2026-04-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
