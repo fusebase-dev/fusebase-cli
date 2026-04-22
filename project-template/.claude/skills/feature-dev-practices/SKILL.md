@@ -19,6 +19,10 @@ Run `fusebase scaffold --template spa --dir features/<name>` before writing any 
 - **In-memory backend variables** are shared across all requests from all users — never store per-user data in module-level variables
 - When integrating third-party APIs with OAuth, each user must go through their own auth flow and get their own tokens
 
+- **Stable partition keys only:** when storing per-user rows, the partition key must come from a **stable identity** (`userId`, `orgUserId`, email if immutable), not from session/token artifacts.
+- **Never use token-derived keys** (e.g. `ft:*`, JWT fragments, rotating session IDs) as persistent `user_key`/partition keys — they change between sessions and split one user's data into multiple buckets.
+- **Recommended format:** normalize once in backend (`user:<userId>`) and reuse the same key for both read and write paths.
+
 **Ask yourself:** "If two users open this feature at the same time, will they interfere with each other?" If yes, the design is wrong.
 
 

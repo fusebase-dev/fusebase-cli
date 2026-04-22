@@ -517,12 +517,19 @@ So Gate is close enough for the target architecture, but not yet a drop-in opera
 
 ## 15. Target Managed Flow via Gate Isolated Stores
 
-The clean replacement is not "let the app talk directly to provider Postgres". The clean replacement is:
+Important v1 rule:
+
+- managed stores are added alongside managed dashboards
+- `dashboard-service` provisioning for managed dashboards stays in place
+- deprecation of managed dashboards is a separate future track, not part of this rollout
+
+So the target v1 is:
 
 - keep `app-wrapper` and `nimbus-ai` as the managed bootstrap/orchestration layer
-- replace dashboard template DB copies with Gate-managed isolated store provisioning
+- keep dashboard template DB copies for managed dashboards
+- add Gate-managed isolated store provisioning next to them
 - keep aliases as the stable app contract
-- keep runtime tokens scoped to the consumer org, but point data access at Gate isolated store stages
+- keep runtime tokens scoped to the consumer org across both surfaces
 
 Target flow:
 
@@ -532,6 +539,7 @@ sequenceDiagram
     participant Wrap as nx app-wrapper
     participant Org as org-service
     participant NAI as nimbus-ai
+    participant Dash as dashboard-service
     participant Gate as fusebase-gate
 
     Studio->>Wrap: open managed feature with ?roid={consumerOrgId}
@@ -540,31 +548,38 @@ sequenceDiagram
 
     alt first launch in consumer org
         NAI->>NAI: lookup ManagedAppOrgSetup(appId, targetOrgId)
-        NAI->>Gate: POST getOrIsolatedStore(orgId, clientId, alias, source)
-        alt store does not exist
-            Gate->>Gate: resolve template store/stage from owner org
-            Gate->>Gate: create target store
-            Gate->>Gate: init target stage
-            Gate->>Gate: clone template snapshot or stage contents
-            Gate->>Gate: persist template lineage + stage metadata
+        par managed dashboards
+            NAI->>Dash: getOrCreateDatabase(alias, scope, template_alias)
+            Dash->>Dash: copy dashboard database resources if absent
+        and managed stores
+            NAI->>Gate: POST getOrIsolatedStore(orgId, clientId, alias, source)
+            alt store does not exist
+                Gate->>Gate: resolve template store/stage from owner org
+                Gate->>Gate: create target store
+                Gate->>Gate: init target stage
+                Gate->>Gate: clone template snapshot or stage contents
+                Gate->>Gate: persist template lineage + stage metadata
+            end
         end
-        NAI->>NAI: save ManagedAppOrgSetup with store mapping + app version
+        NAI->>NAI: save ManagedAppOrgSetup with dashboard mappings + store mappings + app version
     else subsequent launch
         NAI-->>Wrap: reuse existing setup
     end
 
     Wrap->>NAI: request feature token with runOrgId
+    NAI->>NAI: issue dashboard token scoped to consumer org
     NAI->>NAI: issue Gate token scoped to consumer org + app client + target stage
-    NAI-->>Wrap: app token bundle
+    NAI-->>Wrap: app token bundle with both downstream tokens
     Wrap-->>Studio: redirect into runtime
 ```
 
 Recommended resource model:
 
 - keep alias as the primary app-level reference
+- keep dashboard resources in `appResources.databases` for the dashboard-service path
 - add managed isolated-store resources explicitly, instead of overloading `appResources.databases`
 - keep owner-org template stores separate from consumer-org provisioned stores
-- record target stage ids in `ManagedAppOrgSetup` or a linked setup table
+- record both dashboard mappings and target stage ids in `ManagedAppOrgSetup` or a linked setup table
 
 ## 16. Implementation Plan
 
@@ -583,7 +598,11 @@ Recommended fields:
 - `schemaName`
 - `copyStrategy`
 
-Do not rely on dashboard-style database resources for the Gate path long-term. Keep both temporarily only during migration.
+V1 coexistence rule:
+
+- continue using `appResources.databases` for managed dashboard provisioning
+- add `appResources.isolatedStores` as a parallel resource family
+- do not remove or reinterpret dashboard resources in this rollout
 
 ### Phase 2: adopt the implemented Gate bootstrap primitive
 
@@ -624,13 +643,14 @@ Remaining work in this phase is hardening, not initial implementation.
 
 ### Phase 4: extend `runManagedApp()` in `nimbus-ai`
 
-Teach `runManagedApp()` to provision isolated stores in addition to, or instead of, dashboard databases:
+Teach `runManagedApp()` to provision isolated stores alongside dashboard databases:
 
-1. load managed isolated-store resource definitions from the app
-2. call the new Gate bootstrap primitive for each resource
-3. persist resulting store/stage ids into `ManagedAppOrgSetup`
-4. compare `app.appVersion` with stored setup version
-5. define explicit reconciliation behavior for upgrades
+1. keep the existing dashboard provisioning path for `appResources.databases`
+2. load managed isolated-store resource definitions from the app
+3. call `getOrIsolatedStore` for each isolated-store resource
+4. persist resulting store/stage ids into `ManagedAppOrgSetup`
+5. compare `app.appVersion` with stored setup version
+6. define explicit reconciliation behavior for upgrades
 
 Upgrade behavior should be explicit, not implicit. At minimum:
 
@@ -651,7 +671,7 @@ This makes the Gate path a stricter replacement than the current dashboard-copy 
 
 ### Phase 6: hardening for pilot rollout
 
-Before switching managed apps fully from `dashboard-service` to Gate isolated stores, close the operational gaps already called out in Gate docs:
+Before rolling out managed isolated stores broadly next to `dashboard-service`, close the operational gaps already called out in Gate docs:
 
 - durable snapshot storage / retention policy
 - restore observability and failure recovery
@@ -664,27 +684,29 @@ Before switching managed apps fully from `dashboard-service` to Gate isolated st
 The target shared mental model should become:
 
 1. `apps-cli --managed` marks the project and encourages alias-first resource usage
-2. app publication declares template isolated stores as part of managed app resources
+2. app publication can declare both dashboard resources and isolated-store resources as part of managed app resources
 3. `app-wrapper` continues to pass `roid`
-4. `nimbus-ai/run-managed` becomes the single orchestration point for per-org bootstrap
-5. `fusebase-gate` becomes the control plane for store creation, copy, migrations, restore, and runtime CRUD
-6. runtime tokens remain consumer-org-scoped through `runOrgId`
+4. `nimbus-ai/run-managed` becomes the single orchestration point for per-org bootstrap across both resource families
+5. `dashboard-service` remains the control plane for managed dashboards
+6. `fusebase-gate` becomes the control plane for managed isolated stores
+7. runtime tokens remain consumer-org-scoped through `runOrgId`
 
 With that shape:
 
-- `dashboard-service` stops being the managed SQL tenant copier
-- Gate becomes the replacement control plane for isolated app stores
+- `dashboard-service` continues to provision managed dashboards
+- Gate provisions managed isolated stores next to them
 - provider choice stays internal to Gate
-- managed app runtime keeps one stable alias-first contract
+- managed app runtime keeps one stable alias-first contract across both surfaces
 
 ## 18. Recommended Order of Work
 
 Lowest-risk order:
 
 1. Add isolated-store resources to app metadata and Nimbus models
-2. Wire `runManagedApp()` to `getOrIsolatedStore` behind a feature flag
-3. Persist Gate lineage metadata in `ManagedAppOrgSetup`
-4. Re-enable stage `resource_scope` enforcement
-5. Harden clone observability / recovery paths
-6. Migrate one managed pilot app
-7. Remove dashboard-service dependency for managed SQL provisioning after pilot validation
+2. Keep dashboard provisioning unchanged for existing managed resources
+3. Wire `runManagedApp()` to `getOrIsolatedStore` for isolated-store resources behind a feature flag
+4. Persist Gate lineage metadata in `ManagedAppOrgSetup`
+5. Re-enable stage `resource_scope` enforcement
+6. Harden clone observability / recovery paths
+7. Migrate one managed pilot app that uses both dashboards and stores
+8. Treat dashboard deprecation, if needed later, as a separate project

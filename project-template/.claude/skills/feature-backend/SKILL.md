@@ -23,8 +23,19 @@ description: "Guide for adding a backend layer (REST API, WebSockets, cron jobs)
 - ❌ Storing a user's OAuth token in an env var or in-memory config → all users share one token
 - ❌ Storing a user's preference in a module-level variable → last user's preference wins for everyone
 - ❌ Using env vars for per-user settings or selections → same value for everyone
+- ❌ Using session/token-derived values (`ft:*`, JWT pieces, rotating token IDs) as persistent row partition keys
 - ✅ Store per-user data in cookies or dashboard rows keyed by user
 - ✅ Use env vars only for credentials/config shared across all users (e.g. OAuth client ID/secret)
+
+### Stable key as partition key (required)
+
+For any persisted per-user data, derive the partition key from stable identity only:
+
+- Use `userId`/`orgUserId` from a stable identity endpoint (`getMe`-style call)
+- Normalize to a canonical key (example: `user:<userId>`) in one helper
+- Use the same key on **all** read/write paths
+
+Do not derive partition keys from runtime feature/session tokens. Tokens rotate, so token-derived keys cause "missing records after relogin" while data still exists under old keys.
 
 ## When to Add a Backend
 
