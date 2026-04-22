@@ -160,7 +160,7 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 
 ## State and feedback
 
-- **Cursor**: Always add `cursor-pointer` to interactive elements (buttons, links, clickable cards) that are not using shadcn/ui `Button` (which includes it automatically). For custom `<button>` elements or `<div onClick>` handlers, always include `cursor-pointer` in the Tailwind class list. For disabled states use `cursor-not-allowed` (and remove `cursor-pointer`).
+- **Cursor**: Always add `cursor-pointer` to interactive elements (buttons, links, clickable cards) including shadcn/ui `Button`. For custom `<button>` elements or `<div onClick>` handlers, always include `cursor-pointer` in the Tailwind class list. For disabled states use `cursor-not-allowed` (and remove `cursor-pointer`).
 - **Hover/active**: Rely on shadcn/ui component variants and Tailwind `hover:` utilities; avoid overriding styles on interactive elements without a clear reason.
 - **Errors**: Show inline validation messages via `<FormMessage>` and a toast or inline alert for API errors. See **handling-authentication-errors** for 401/token expiry.
 - **Success**: Toast or brief inline confirmation for saves and destructive actions.
