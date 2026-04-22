@@ -33,6 +33,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 - [Fusebase Gate — Isolated SQL migration discipline](references/isolated-sql-migration-discipline.md)
 - [Fusebase Gate Billing And Stripe Flows](references/billing.md)
 - [Fusebase Gate Email Operations](references/emails.md)
+- [Fusebase Gate Files Flows](references/files.md)
 - [Fusebase Gate Isolated SQL Stores](references/isolated-sql.md)
 - [Fusebase Gate Isolated Stores](references/isolated.md)
 - [Fusebase Gate Membership And Portal Flows](references/membership.md)
@@ -94,6 +95,25 @@ When runtime code uses `@fusebase/fusebase-gate-sdk`, `fusebase feature update -
 4. Keep a pre-publish check in your workflow:
    - `fusebase analyze gate --operations --json --feature <featureId>`
    - if runtime imports Gate SDK and `usedOps` is empty, treat it as a blocker and fix before publish.
+
+
+## Token permission mode (default soft)
+
+Token permission validation is soft by default (`strictPermissionValidation = false`).
+
+- If a request contains permissions the caller cannot grant, Gate degrades token permissions to the allowed subset.
+- If a request contains unknown or service-disallowed permissions, Gate ignores those permissions in soft mode.
+- Prefer the default soft mode for runtime integrations; enable strict mode only for explicit fail-fast requirements.
+
+
+## SDK operation error handling
+
+For runtime code with `@fusebase/fusebase-gate-sdk`, enforce explicit operation-level error handling:
+
+- Wrap each Gate operation in `try/catch` and branch behavior by status code and operation intent.
+- Treat `401/403` as expected authz outcomes (missing permission, scope mismatch, membership state) and return actionable guidance.
+- Avoid implicit privileged fallback when user-context calls fail.
+- For token operations, message that permission reduction can be expected in soft mode; only expect hard failure when strict mode is explicitly enabled.
 
 
 ## Security rule: no implicit service-token fallback

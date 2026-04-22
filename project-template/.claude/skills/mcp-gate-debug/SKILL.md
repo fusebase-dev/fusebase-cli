@@ -54,4 +54,4 @@ The summary should call out:
 
 ## Flag
 
-This skill is copied into the project only when the global CLI flag `mcp-gate-debug` is enabled (`fusebase config set-flag mcp-gate-debug` then `fusebase skills update`).
+This skill is copied into the project only when the global CLI flag `mcp-gate-debug` is enabled (`fusebase config set-flag mcp-gate-debug` then `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit`).

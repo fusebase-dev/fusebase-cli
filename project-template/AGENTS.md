@@ -31,6 +31,24 @@ Senior bar: **do not** “fix” errors with **`any`**, **`as any`**, **`as Reco
 
 All skills are located in `.claude/skills/`. When this document references a skill (e.g., `fusebase-cli`), look for `SKILL.md` in that folder.
 
+## Custom additions in skill docs (update-safe rule)
+
+When adding project-specific guidance to skill markdown files (`SKILL.md` and `references/*.md`), place it only inside custom blocks:
+
+```md
+<!-- CUSTOM:SKILL:BEGIN -->
+...your custom content...
+<!-- CUSTOM:SKILL:END -->
+```
+
+Rules:
+
+- You may use one or multiple custom blocks in a file.
+- Custom blocks can be placed anywhere in the file.
+- Keep base template content outside custom blocks unchanged.
+- Never put custom additions outside this block in managed skill files.
+- If blocks already exist, update only content inside them.
+
 <% if (it.flags?.includes("app-business-docs")) { %>
 **Quick flag note — `app-business-docs`:** Load `.claude/skills/app-business-docs/SKILL.md` when implementing or changing business logic so `docs/en/business-logic.md` stays aligned with actual behavior.
 <% } %>
@@ -107,7 +125,7 @@ SDK token usage in feature runtime:
 
 **Browser/UI runtime**:
 
-- Uses feature token from cookie `fbsfeaturetoken`; if the cookie is absent, fall back to `window.FBS_FEATURE_TOKEN`
+- Uses feature token from global runtime variable `window.FBS_FEATURE_TOKEN`; if it's missing, fall back to cookie `fbsfeaturetoken`
 - `.env` is NOT accessible in browser
 - LLM must never assume `.env` tokens in UI code
 - Direct SDK / Fusebase proxy calls pass the token via `x-app-feature-token`
@@ -158,7 +176,7 @@ SDK token usage in feature runtime:
 
 ### SDK = Runtime Execution (browser and optional feature backend)
 
-**Token**: Feature token from cookie `fbsfeaturetoken` (fallback: `window.FBS_FEATURE_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
+**Token**: Feature token from global runtime variable `window.FBS_FEATURE_TOKEN` (fallback: cookie `fbsfeaturetoken`); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 
 **SDK Structure**:
 
@@ -266,7 +284,7 @@ export function createDatabasesApi(featureToken: string): DatabasesApi {
   return new DatabasesApi(createSdkClient(featureToken));
 }
 
-// Usage: read feature token from `fbsfeaturetoken` cookie (fallback `window.FBS_FEATURE_TOKEN`), then e.g.:
+// Usage: read feature token from `window.FBS_FEATURE_TOKEN` (fallback: `fbsfeaturetoken` cookie), then e.g.:
 // const databasesApi = createDatabasesApi(featureToken)
 // const response = await databasesApi.listDatabases({})
 ```
@@ -504,13 +522,13 @@ The `fusebase` CLI is installed globally. **Always run it as `fusebase <command>
 
 Key commands:
 
-- `fusebase init` - Initialize new project (`--git` initializes local Git and syncs with configured GitLab remote; `--git-tag-managed` adds managed topic; interactive mode previews and allows editing suggested GitLab repo name; existing repos can be synced via `fusebase git sync` / `fusebase git --git-sync`; global flag `git-init` enables automatic post-init git flow)
+- `fusebase init` - Initialize new project (`--git` initializes local Git and syncs with configured GitLab remote; `--skip-git` force-disables git init/sync for this run; `--git-tag-managed` adds managed topic; interactive mode previews and allows editing suggested GitLab repo name; existing repos can be synced via `fusebase git sync` / `fusebase git --git-sync`; global flag `git-init` enables automatic post-init git flow)
 - `fusebase config gitlab` - Configure GitLab sync settings in `~/.fusebase/config.json` (`gitlabHost`, `gitlabGroup`, `gitlabToken`), including interactive setup and `--show`
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `fusebase feature create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]`<% if (it.analytics) { %> `[--coding-agent=<agent> --model=<model>]`<% } %> - Register feature (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the feature needs dashboard access — do not defer to a separate `feature update` step.<% if (it.analytics) { %> **Always include `--coding-agent` and `--model`** to report anonymous usage stats.<% } %>
 - `fusebase deploy` - Deploy features (runs lint then build per feature)
-- `fusebase skills update` - Update AGENTS.md and skills from template
-- `fusebase env create` - Create or overwrite .env with MCP token
+- `fusebase update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed SDK deps/install), outside app directory runs CLI update only; use `--skip-app` for CLI-only mode even inside app
+- `fusebase env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `fusebase config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
 - `fusebase secret create --feature=FEATURE_ID --secret "KEY:description"` - Create feature secrets (empty values), prints URL to set values
 
 Lint: run `npm run lint` from project root (or from a feature directory). The project template includes ESLint (TypeScript/JavaScript plus `@eslint/json` for `*.json`). Invalid JSON — including a raw line break inside a quoted string — is reported as a parse error. Deploy runs lint automatically before build for each feature that has a `lint` script.

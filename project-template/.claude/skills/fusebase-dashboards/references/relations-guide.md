@@ -1,7 +1,7 @@
 ---
-version: "1.2.0"
+version: "1.2.1"
 mcp_prompt: domain.relations
-last_synced: "2026-03-06"
+last_synced: "2026-04-17"
 title: "Dashboard Relations"
 category: specialized
 ---
@@ -72,7 +72,7 @@ Both use `type: "lookup"` in the schema. Difference is **editable vs read-only**
 
 **Rule:** For a given `relation_id`, **exactly one** column is editable; all others using the same relation are read-only lookups.
 
-**Overrides only for selected item types**: In MCP, use overrides only for **label** and **lookup/relation** columns. For lookup columns, overrides.source is required.
+**Overrides only for selected item types**: In MCP, use overrides only for **label** and **lookup/relation** columns. For lookup columns, relation binding must be in overrides.source; use overrides.render for render config when needed.
 
 **Add via updateViewIntent** with `schema_patch.add`, `type: "lookup"`, and **required** `overrides.source`:
 - **`_type_lookup: true`** (required for validation), `type: "lookup"`, `selectable`, `readonly`,
@@ -187,7 +187,7 @@ When you create or describe a **database** that has relations, include the **rel
 
 ## Version
 
-- **Version**: 1.2.0
+- **Version**: 1.2.1
 - **Category**: specialized
-- **Last synced**: 2026-03-06
+- **Last synced**: 2026-04-17
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

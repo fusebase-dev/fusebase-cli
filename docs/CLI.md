@@ -797,6 +797,7 @@ const selected = await checkbox({
 - Ensure project template is used during `fusebase init`
 - Check API key is valid (run `fusebase auth` again)
 - Run `fusebase env create` to create or overwrite `.env` with MCP token
+- In TTY mode after successful `env create`, confirm immediate `fusebase config ide --force` to refresh all IDE MCP configs (or run it manually if declined)
 
 ### Glossary
 
@@ -815,3 +816,4 @@ const selected = await checkbox({
 - **Architecture**: [Architecture Documentation](ARCHITECTURE.md)
 - **CLI Flows**: [Step-by-Step CLI Flows](CLI-FLOWS.md)
 - **Conceptual Model**: [Apps, Features, and Data Access](CONCEPTS.md)
+- **Guide**: [Env + IDE MCP refresh rules](guides/env-mcp-refresh.md)

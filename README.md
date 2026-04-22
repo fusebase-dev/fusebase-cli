@@ -112,6 +112,7 @@ Initialize a new Fusebase app in the current directory. This command will:
 - `--force` - Overwrite existing IDE config files/folders
 - `--git` - After setup, initialize local Git and sync with configured GitLab remote (creates/uses repo in `<gitlabGroup>/<dev|prod>/...`, sets `origin`, pushes current branch)
   - Also enabled automatically if global flag `git-init` is active (`fusebase config set-flag git-init`)
+- `--skip-git` - Skip local Git initialization and GitLab sync (overrides both `--git` and global `git-init`)
 - `--git-tag-managed` - If app is managed, add `managed` topic to the GitLab project during sync
   - In interactive init, CLI shows a suggested GitLab repo name and lets you edit it before sync
 
@@ -451,27 +452,61 @@ For custom app backends (`/api/*`), treat `x-app-feature-token` as optional in d
 
 ---
 
-### `fusebase skills update`
+### `fusebase update`
 
-Overwrite `AGENTS.md` and `.claude/skills/` in the current app with the latest versions from the project template. Use this to refresh agent rules and skill docs without re-running `fusebase init`.
+One command to refresh a generated app after a CLI or template upgrade:
 
-**Prerequisites:** App must be initialized (`fusebase.json` must exist in the current directory).
+1. **CLI binary update** — runs first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage.
+2. **Agent assets** — refreshes `AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`.
+3. **MCP + IDE** — selectively regenerates Dashboards and/or Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh both regardless.
+4. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **feature** `package.json` files are updated only if those deps already exist (nothing new is injected into features).
+5. **`npm install`** — runs **only** in directories where a managed dependency version actually changed.
 
-**Example:**
+**Pre-update Git checkpoint:** In a TTY, you are prompted for an optional commit before changes (empty commit if the tree is clean). If current branch tracks a remote (upstream configured), the pre-update commit is pushed immediately. Without Git, you are warned about rollback risk and can initialize a repo first. Use **`--skip-commit`** to skip, or **`--commit`** to run the checkpoint in CI/non-interactive mode without prompts.
+
+**Prerequisites:** `fusebase.json` with `orgId` and `appId`; `fusebase auth` for stages that touch MCP tokens.
+
+Behavior by directory:
+
+- In an app directory (`fusebase.json` exists): runs full flow (CLI + app stages).
+- Outside an app directory: runs only CLI binary update.
+- Use `--skip-app` to force CLI-only mode even inside an app directory.
+
+**Examples:**
 
 ```bash
-fusebase skills update
+fusebase update
+fusebase update --dry-run
+fusebase update --skip-app
+fusebase update --skip-skills --force-mcp
+fusebase update --skip-install
+fusebase update --skip-commit
 ```
 
-**Output:** `✓ Updated AGENTS.md and .claude/skills`
+**Flags (stages default on; use `no-*` to disable):**
 
-To validate skills (e.g. when adding or editing skills in `project-template/.claude/skills`), use **`npm run skills:validate`**. It runs [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref) for each skill. Requires `skills-ref` on PATH. On macOS (Homebrew Python) use a venv or pipx: e.g. `pipx install -e /path/to/agentskills/skills-ref`, or create a venv in that directory and activate it before running. CI runs this when skills or the script change.
+| Flag | Effect |
+|------|--------|
+| `--skip-app` | Skip app stages and run only CLI update |
+| `--skip-cli-update` | Skip automatic CLI self-update stage |
+| `--skip-skills` | Skip agent asset refresh |
+| `--skip-mcp` | Skip MCP token + IDE refresh |
+| `--force-mcp` | Always refresh MCP tokens + IDE configs |
+| `--skip-deps` | Skip managed dependency version sync |
+| `--skip-install` | After dep sync, do not run `npm install` |
+| `--skip-commit` | Skip pre-update Git checkpoint |
+| `--commit` | Run Git checkpoint without prompts (non-interactive) |
+| `--dry-run` | Print planned work only |
+
+`fusebase update` is the single update command.
 
 ---
 
 ### `fusebase env create`
 
 Create or overwrite `.env` in the current app with MCP token and URL. Use this after `fusebase init` or when the token has expired.
+
+When `.env` is created/updated, the command refreshes both Dashboards and Gate MCP tokens. In interactive terminals, it then offers to immediately run `fusebase config ide --force` for all IDE MCP configs; if declined, it prints that command as the next step.
 
 **Options:** `--no-force` — only create .env if missing; do not overwrite existing file.
 
@@ -504,12 +539,12 @@ Global configuration stored in your home directory:
 
 #### Experimental Flags
 
-Flags gate experimental features. The `skills update` command uses flags to conditionally include/exclude content via Eta templates.
+Flags gate experimental features. The `update` command uses flags to conditionally include/exclude template assets via Eta templates.
 
 | Flag | Effect |
 |------|--------|
 | `mcp-beta` | Unlocks optional MCP servers in the integrations catalog that are marked beta (see `ide-configs/mcp-servers.ts`) |
-| `git-init` | Makes `fusebase init` automatically offer local Git initialization (same behavior as passing `--git`) and includes Git workflow skill files in generated apps |
+| `git-init` | Makes `fusebase init` automatically offer local Git initialization (same behavior as passing `--git`; can be disabled per run with `--skip-git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict debug/deploy traceability section inside the `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag traceability in debug/deploy reports |
 | `app-business-docs` | Copies the `app-business-docs` skill into the app: keeps **`docs/en/business-logic.md`** (English) aligned with real behavior — domain rules, main user flows, edge cases; update after business-logic changes or when debugging unclear behavior |
 | `mcp-gate-debug` | Copies the `mcp-gate-debug` skill: after Fusebase Gate MCP tool runs, summarize smooth vs rough paths and suggest improvements to `.claude/skills/fusebase-gate`, prompts, or MCP server behavior — prioritize **isolated stores** (SQL/NoSQL) flows |
@@ -521,7 +556,7 @@ Enable a flag globally, then refresh the project template:
 fusebase config set-flag app-business-docs   # Business-logic documentation skill
 fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summary skill
 fusebase config set-flag isolated-stores     # Isolated stores functionality (SQL/NoSQL)
-fusebase skills update                       # Copy skills + render AGENTS.md for active flags
+fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```
 
 Other examples:
@@ -531,7 +566,7 @@ fusebase config set-flag mcp-beta    # Enable beta-gated MCP catalog entries
 fusebase config remove-flag mcp-beta # Disable
 fusebase config flags              # Interactive flag selector (TTY)
 fusebase config flags --list       # List active flags (non-interactive)
-fusebase skills update             # Regenerate project files
+fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Regenerate project files
 ```
 
 To permanently graduate a flag (remove gating and enable the feature forever), use the `/remove-flag` skill in your coding agent:

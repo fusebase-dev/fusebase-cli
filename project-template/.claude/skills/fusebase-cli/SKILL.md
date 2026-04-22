@@ -98,6 +98,7 @@ Options:
 - `--ide <preset>` - IDE preset: `claude-code`, `cursor`, `vscode`, `opencode`, `codex`, or `other` (single choice; generates all supported IDE configs by default)
 - `--force` - Overwrite existing IDE config files/folders
 - `--git` - After setup, initialize local Git and sync with configured GitLab remote (creates/uses remote project, configures `origin`, pushes current branch)
+- `--skip-git` - Skip local Git initialization and GitLab sync (overrides both `--git` and global `git-init`)
 - `--git-tag-managed` - If app is managed, add `managed` topic in GitLab during sync
 - In interactive init, CLI also shows a suggested GitLab repository name and lets you edit it before sync
 - Global flag `git-init` also enables the same post-init Git offer automatically (`fusebase config set-flag git-init`)
@@ -292,13 +293,17 @@ fusebase feature update аgjg851jguanadi41 --permissions="dashboardView.dash1:vi
 fusebase feature update аgjg851jguanadi41 --access=visitor --permissions="dashboardView.dash1:view1.read"
 ```
 
-### Update AGENTS.md and Skills
+### Smart update (`fusebase update`)
 
 ```bash
-fusebase skills update
+fusebase update
 ```
 
-Overwrites `AGENTS.md` and the `.claude/skills/` folder in the project with the latest from the Fusebase CLI project template. Use this to refresh agent rules and skill documentation without re-running `fusebase init`. Requires `fusebase.json` in the project root.
+Single update command for both CLI and app:
+
+- in app directory (`fusebase.json` exists): runs CLI self-update first (skip with `--skip-cli-update`; local linked/source mode auto-skips), then refreshes agent assets (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`), then runs selective MCP token refresh + IDE MCP config refresh, then syncs managed SDK deps and runs targeted `npm install`;
+- outside app directory: runs only CLI self-update;
+- use `--skip-app` to force CLI-only mode even inside an app directory.
 
 ### Create or update .env (MCP token)
 
@@ -307,6 +312,8 @@ fusebase env create
 ```
 
 Creates or overwrites `.env` with `DASHBOARDS_MCP_TOKEN` and `DASHBOARDS_MCP_URL`. Use after `fusebase init` or when the MCP token has expired. Requires `fusebase.json` (with `orgId`) and `fusebase auth` to be set.
+
+On successful create/update, CLI refreshes both Dashboards and Gate MCP tokens. In interactive terminals, it offers to run `fusebase config ide --force` immediately for all IDE MCP configs; if declined, it prints that command as the next step.
 
 ### Configure optional MCP integrations
 

@@ -65,16 +65,16 @@ bun index.ts [command]
 
 - `auth [--api-key <apiKey>]` - Start auth flow or set API key for authentication
 - `version` - Print CLI version (from package.json)
-- `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to initialize local Git and sync with configured GitLab remote; optional `--git-tag-managed` to set `managed` topic in GitLab when app is managed; in interactive mode shows editable suggested repo name before sync; same behavior can be enabled globally with flag `git-init`)
+- `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to initialize local Git and sync with configured GitLab remote; `--skip-git` to force-disable git init/sync for this run; optional `--git-tag-managed` to set `managed` topic in GitLab when app is managed; in interactive mode shows editable suggested repo name before sync; same behavior can be enabled globally with flag `git-init`)
 - `git` - Initialize a local Git repository in the current directory (`fusebase git`) and sync an existing local repo with configured GitLab remote (`fusebase git sync` or `fusebase git --git-sync`); requires global config keys `gitlabHost`, `gitlabToken`, `gitlabGroup`; baseline `.gitignore` rules are ensured automatically
 - `deploy` - Deploy features to Fusebase (runs lint then build per feature)
 - `feature list` - List all features for the current app with their URLs
 - `feature create` - Create and configure a feature (requires `--name`, `--subdomain`, `--path`, `--dev-command`, `--build-command`, `--output-dir`; optional `--access` for access principals e.g. `visitor`, `orgRole:member`; `--permissions` for manual `dashboardView/database` access)
 - `feature update <featureId>` - Update feature settings (`--access`, `--permissions` for manual `dashboardView/database`, `--sync-gate-permissions` for Gate analyze + sync)
 - `dev start` - Start the development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
-- `env create` - Create or overwrite .env with MCP token
+- `env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
 - `secret create` - Create feature secrets with empty values (`--feature <id> --secret KEY:description`); prints URL to set values
-- `skills update` - Overwrite AGENTS.md and .claude/skills/ in the app with latest from project-template. To validate skills: `npm run skills:validate` (uses [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref); requires `skills-ref` on PATH)
+- `update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed deps/install), outside app directory runs CLI binary update only; use `--skip-app` for CLI-only mode even inside app
 - `config set-flag <flag>` - Enable an experimental flag (e.g. `server`, `mcp-beta`)
 - `config remove-flag <flag>` - Disable an experimental flag
 - `config flags` - Manage experimental flags (interactive selector in TTY; use `--list` for non-interactive output)
@@ -108,7 +108,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `analytics` | Enable anonymous usage analytics (coding agent, model, OS stats). All stats/command logging is disabled by default and requires this flag. |
 | `mcp-beta` | Unlocks optional MCP servers in the catalog that are gated behind this flag (`ide-configs/mcp-servers.ts`) |
 | `scaffold` | Enables the `fusebase scaffold` command and its documentation |
-| `git-init` | Makes `fusebase init` automatically run Git initialization + GitLab sync flow (equivalent to `--git`) and includes Git workflow skill files in generated apps |
+| `git-init` | Makes `fusebase init` automatically run Git initialization + GitLab sync flow (equivalent to `--git`; can be disabled per run with `--skip-git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict traceability rules inside `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag references in debug/deploy reports |
 | `app-business-docs` | Includes the `app-business-docs` skill: maintain `docs/en/business-logic.md` (English) describing app business logic, flows, and scenarios; refresh after logic changes or on demand |
 | `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |
@@ -116,7 +116,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `sidecar` | Enables sidecar container management for feature backends (`fusebase sidecar add/remove/list`). Sidecars are pre-built Docker images deployed alongside the backend container, sharing localhost networking. Max 3 per feature. |
 | `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing feature code. Complements MCP discovery. |
 
-After changing flags, run `fusebase skills update` to regenerate project files (for template flags). For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
+After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 
 Project-specific config is stored in `fusebase.json` in the project root:
 ```json

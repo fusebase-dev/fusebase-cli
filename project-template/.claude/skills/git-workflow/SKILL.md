@@ -50,7 +50,7 @@ Use `revert` by default on shared branches.
 ## Operations That Commonly Need Separate Commits
 
 - `fusebase feature create/update` (`fusebase.json` changes)
-- `fusebase skills update` (`AGENTS.md`, `.claude/*` changes)
+- `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` (`AGENTS.md`, `.claude/*` changes)
 - `fusebase config ide` / `fusebase integrations` (IDE MCP config changes)
 - `fusebase env create` (`.env` local changes; usually not committed)
 

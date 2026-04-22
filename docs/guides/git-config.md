@@ -56,6 +56,7 @@ Flags are global (`fusebase config set-flag ...`):
 
 - `git-init`  
   Auto-runs Git initialization + GitLab sync during `fusebase init` (same behavior as passing `--git`).
+  Per-run override: pass `--skip-git` to disable local git init + sync for that init call.
 
 - `git-debug-commits`  
   Enables strict debug/deploy traceability rules in generated app guidance (commit-per-fix, deploy preflight, SHA/rollback reporting).
@@ -71,7 +72,7 @@ fusebase config flags --list
 If you changed template-related flags, refresh project guidance files:
 
 ```bash
-fusebase skills update
+fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit
 ```
 
 ## 3) Three Supported Scenarios
@@ -89,6 +90,12 @@ Alternative (global auto mode):
 ```bash
 fusebase config set-flag git-init
 fusebase init
+```
+
+If you need to skip Git for a specific run while `git-init` is enabled:
+
+```bash
+fusebase init --skip-git
 ```
 
 Expected result:

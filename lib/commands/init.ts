@@ -485,6 +485,11 @@ export const initCommand = new Command("init")
     false,
   )
   .option(
+    "--skip-git",
+    "Skip local Git initialization and GitLab sync (overrides --git and git-init flag)",
+    false,
+  )
+  .option(
     "--git-tag-managed",
     "When app is managed, add managed tag on the GitLab project during git sync",
     false,
@@ -497,6 +502,7 @@ export const initCommand = new Command("init")
       force: boolean;
       managed?: boolean;
       git?: boolean;
+      skipGit?: boolean;
       gitTagManaged?: boolean;
     }) => {
       await warnIfProductionNodeEnv();
@@ -514,7 +520,7 @@ export const initCommand = new Command("init")
         process.exit(1);
       }
 
-      const shouldSetupGit = options.git || hasFlag("git-init");
+      const shouldSetupGit = !options.skipGit && (options.git || hasFlag("git-init"));
 
       // Check if fusebase.json already exists
       if (await fileExists(fuseJsonPath)) {
