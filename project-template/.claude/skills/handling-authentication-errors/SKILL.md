@@ -44,30 +44,45 @@ When `AuthTokenExpiredError` is caught at the UI level, display a centered modal
 
 Manage modal open/close state in `App.tsx` and pass an `onAuthError` callback to child components that make API calls.
 
-## Critical: `/users/me` Exception
+## Critical: `/auth/context` Behavior
 
-The `/users/me` endpoint **MUST NOT** trigger `AuthTokenExpiredError`.
+The `/auth/context` endpoint **MUST NOT** trigger `AuthTokenExpiredError` just because `user` is missing.
 
-When a feature is **public**, anonymous visitors receive a 401 from `/users/me`. This is expected — it means "not authenticated", NOT "session expired". Throwing `AuthTokenExpiredError` here causes the Session Expired modal to appear immediately for every anonymous visitor.
+When a feature is **public**, anonymous visitors may receive an auth context with no `user` field. This is expected — it means "not authenticated", NOT "session expired". Throwing `AuthTokenExpiredError` here causes the Session Expired modal to appear immediately for every anonymous visitor.
 
 ```typescript
-export async function fetchCurrentUser(
+type AuthContextResponse = {
+  user?: {
+    id: number
+    email: string
+  }
+  org?: {
+    globalId: string
+  }
+  runtimeContext?: {
+    portalId?: string
+    workspaceId?: string
+  }
+}
+
+export async function fetchAuthContext(
   featureToken: string
-): Promise<{ id: number; email: string } | null> {
+): Promise<AuthContextResponse> {
   try {
     const response = await fetch(
-      'https://app-api.{FUSEBASE_HOST}/v4/api/users/me',
+      'https://app-api.{FUSEBASE_HOST}/v4/api/auth/context',
       { headers: { 'x-app-feature-token': featureToken } }
     )
-    if (!response.ok) return null // Do NOT throw AuthTokenExpiredError
+    if (!response.ok) return {} // Do NOT throw AuthTokenExpiredError here
     return await response.json()
   } catch {
-    return null
+    return {}
   }
 }
 ```
 
 ### Rule of thumb
 
-- **`/users/me` 401** → return `null` (user is anonymous/guest)
+- **`/auth/context` with missing `user`** → treat as anonymous/guest
+- **`/auth/context` request failure** → handle gracefully without forcing "Session Expired"
 - **Dashboard/data API 401 with `AppTokenValidationError`** → throw `AuthTokenExpiredError` (session expired)

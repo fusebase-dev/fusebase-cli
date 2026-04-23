@@ -104,21 +104,38 @@ Features run as the main window. The platform provides a feature token via `wind
 
 ## User Details
 
-Fetch current user:
+Fetch auth context:
 
 ```typescript
-const response = await fetch('https://app-api.{FUSEBASE_HOST}/v4/api/users/me', {
+type AuthContextResponse = {
+  user?: {
+    id: number
+    email: string
+  }
+  org?: {
+    globalId: string
+  }
+  runtimeContext?: {
+    portalId?: string
+    workspaceId?: string
+  }
+}
+
+const response = await fetch('https://app-api.{FUSEBASE_HOST}/v4/api/auth/context', {
   headers: { 'x-app-feature-token': featureToken },
 })
-const user = response.ok ? await response.json() : null
+const authContext: AuthContextResponse = response.ok ? await response.json() : {}
+const user = authContext.user ?? null
 // authenticated: { id: 4124, email: "testemail@gmail.com" }
-// anonymous visitor on a public feature: null
+// anonymous visitor on a public feature: null (user field is missing)
+// portal/workspace context (if available): authContext.runtimeContext
 ```
 
 Important for public features:
 
-- A visitor feature token may be valid even when `/users/me` returns 401
-- In that case, treat the result as `user: null`, not as "session expired"
+- A visitor feature token may be valid even when `/auth/context` returns no `user`
+- Missing `user` means "not authenticated", not "session expired"
+- `/auth/context` should not throw just because the visitor is anonymous
 - Show the login/auth form for anonymous visitors
 - Only show a "Session Expired" modal for actual `AppTokenValidationError` flows
 
