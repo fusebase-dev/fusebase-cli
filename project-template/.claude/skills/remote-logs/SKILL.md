@@ -80,7 +80,6 @@ fusebase remote-logs runtime <featureId> --container chromium
 # Show only backend logs
 fusebase remote-logs runtime <featureId> --container api
 ```
-<% } %>
 
 ## When to Use Each Log Type
 
