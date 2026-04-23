@@ -45,7 +45,6 @@ A backend is **optional**. Most features work fine with the Dashboard SDK alone 
 - Real-time push via WebSockets
 - Server-side API composition or proxying
 - Operations that cannot run in the browser (secrets, heavy computation)
-<% if (it.sidecar) { %>
 
 ## Sidecar Containers
 
@@ -60,9 +59,6 @@ Sidecars are pre-built Docker images that run alongside the feature backend in t
 ### Adding a Sidecar
 
 ```bash
-# Enable the sidecar flag first
-fusebase config set-flag sidecar
-
 # Add a sidecar to a feature backend
 fusebase sidecar add --feature <featureId> --name chromium --image browserless/chrome:latest --port 9222
 ```
@@ -99,7 +95,6 @@ fusebase remote-logs runtime <featureId> --container chromium
 
 For full sidecar documentation, see the **feature-sidecar** skill.
 
-<% } %>
 - Background processing or scheduled tasks
 
 **Do NOT add a backend** just for CRUD on dashboard data — use the Dashboard SDK directly from the SPA.

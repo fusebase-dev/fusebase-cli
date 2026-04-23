@@ -5,7 +5,7 @@ import {
   getRuntimeLogsByFeature,
   type RuntimeLogType,
 } from "../api";
-import { getConfig, hasFlag, loadFuseConfig } from "../config";
+import { getConfig, loadFuseConfig } from "../config";
 
 /**
  * Print build logs with status indicator.
@@ -143,12 +143,10 @@ const runtimeCommand = new Command("runtime")
     "console",
   );
 
-if (hasFlag("sidecar")) {
-  runtimeCommand.option(
-    "--container <name>",
-    "Filter logs to a specific container (e.g. api, or a sidecar name)",
-  );
-}
+runtimeCommand.option(
+  "--container <name>",
+  "Filter logs to a specific container (e.g. api, or a sidecar name)",
+);
 
 runtimeCommand.action(async (featureId: string, options) => {
     try {

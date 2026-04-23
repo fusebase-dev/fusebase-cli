@@ -471,11 +471,9 @@ When `git-debug-commits` is enabled, these rules are mandatory:
 **Load when you need to verify an API endpoint's actual behavior** before writing feature code — response shapes, error codes, or request formats. Uses temporary tokens and test scripts (`_test-api.ts` / `_test-sdk.ts`) to make direct API calls. Complements MCP discovery; does not replace it. Clean up test files after use.
 <% } %>
 
-<% if (it.flags?.includes("sidecar")) { %>
 ### ✅ feature-sidecar
 
-**Load when a feature backend needs auxiliary sidecar containers** (headless browsers, caches, specialized services). Covers sidecar CLI commands (`fusebase sidecar add/remove/list`), `fusebase.json` configuration format, inter-container networking (localhost), resource tiers, environment variables, debugging with remote-logs, and limitations. Requires the `sidecar` CLI flag.
-<% } %>
+**Load when a feature backend needs auxiliary sidecar containers** (headless browsers, caches, specialized services). Covers sidecar CLI commands (`fusebase sidecar add/remove/list`), `fusebase.json` configuration format, inter-container networking (localhost), resource tiers, environment variables, debugging with remote-logs, and limitations.
 
 ### Dev-level skills (TypeScript & React)
 

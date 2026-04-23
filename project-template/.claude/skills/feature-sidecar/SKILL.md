@@ -1,6 +1,6 @@
 ---
 name: feature-sidecar
-description: "Guide for managing sidecar containers alongside feature backends. Use when: (1) A feature backend needs auxiliary services like headless browsers, caches, or other tools, (2) Adding/removing/listing sidecar containers, (3) Configuring sidecar networking, env vars, or resource tiers. Requires the 'sidecar' CLI flag."
+description: "Guide for managing sidecar containers alongside feature backends. Use when: (1) A feature backend needs auxiliary services like headless browsers, caches, or other tools, (2) Adding/removing/listing sidecar containers, (3) Configuring sidecar networking, env vars, or resource tiers."
 ---
 
 # Feature Sidecar Containers
@@ -10,7 +10,6 @@ Sidecars are pre-built Docker images deployed alongside a feature backend in the
 ## Prerequisites
 
 1. Feature must have a `backend/` folder configured in `fusebase.json`
-2. Enable the `sidecar` flag: `fusebase config set-flag sidecar`
 
 ## Use Cases
 
@@ -194,7 +193,6 @@ fusebase deploy
 
 ## Checklist
 
-- [ ] Enabled `sidecar` flag: `fusebase config set-flag sidecar`
 - [ ] Feature has a `backend/` folder and `backend` block in `fusebase.json`
 - [ ] Added sidecar(s) via `fusebase sidecar add`
 - [ ] Verified sidecar count is at most 3

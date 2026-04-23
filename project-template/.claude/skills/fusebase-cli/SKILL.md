@@ -420,10 +420,9 @@ Deploys all features to Fusebase:
 
 The project template includes ESLint (`npm run lint`) and root `npm run typecheck` (TypeScript across features — catches errors ESLint does not). Run both before saying "Done" so deploy succeeds; see AGENTS.md "Final Gate". Claude Code runs lint and typecheck on Stop via `.claude/settings.json` hooks.
 
-<% if (it.sidecar) { %>
-### Manage Sidecar Containers *(requires `sidecar` flag)*
+### Manage Sidecar Containers
 
-Sidecar containers are pre-built Docker images deployed alongside a feature's backend container, sharing the localhost network namespace. Max 3 sidecars per feature. Enable with `fusebase config set-flag sidecar`.
+Sidecar containers are pre-built Docker images deployed alongside a feature's backend container, sharing the localhost network namespace. Max 3 sidecars per feature.
 
 ```bash
 # Add a sidecar to a feature backend
@@ -450,7 +449,6 @@ fusebase sidecar list --feature <featureId>
 - `--env` — environment variables as KEY=VALUE pairs (repeatable)
 
 Sidecars are stored in `fusebase.json` under `features[].backend.sidecars[]` and deployed on the next `fusebase deploy`.
-<% } %>
 
 ### Remote Logs (Deployed Backends)
 
