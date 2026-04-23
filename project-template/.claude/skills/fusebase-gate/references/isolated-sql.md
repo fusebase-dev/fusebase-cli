@@ -1,7 +1,7 @@
 ---
-version: "1.8.6"
+version: "1.8.7"
 mcp_prompt: isolatedSql
-last_synced: "2026-04-22"
+last_synced: "2026-04-23"
 title: "Fusebase Gate Isolated SQL Stores"
 category: specialized
 ---
@@ -43,6 +43,7 @@ Prefer structured APIs: **`getIsolatedStoreSqlStats`**, **`countIsolatedStoreSql
 - `select` default `limit=100`, max `500`. Max **20** filters, **5** sort fields.
 - **`batchInsertIsolatedStoreSqlRows`**: at most **`floor(65535 / columnCount)`** rows per call (Postgres bind limit); e.g. **~2621** rows at **25** columns.
 - **`update`** / **`delete`** need filters unless **`allowAll=true`**.
+- For JSONB columns in structured row APIs (`insert…`, `batchInsert…`, `update…`), pass values as JSON strings (e.g. `JSON.stringify(objOrArray)`) rather than raw JS objects/arrays to avoid Postgres `invalid input syntax for type json`.
 - Migration bundles are **schema-only**. Gate rejects top-level `INSERT` / `UPDATE` / `DELETE` / `TRUNCATE` / `MERGE` / `COPY` inside migration SQL.
 - Large **data** seeds: **`importIsolatedStoreSqlRows`** (`csv`/`tsv`, **`COPY FROM STDIN`**); default payload cap **64MiB** UTF-8 per call (`ISOLATED_SQL_IMPORT_MAX_PAYLOAD_BYTES`, hard cap **256MiB**); split larger files.
 - Small demo seeds or backfills: structured row APIs (`insert…`, `batchInsert…`) after schema apply, not inside migration SQL.
@@ -101,7 +102,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 ## Version
 
-- **Version**: 1.8.6
+- **Version**: 1.8.7
 - **Category**: specialized
-- **Last synced**: 2026-04-22
+- **Last synced**: 2026-04-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

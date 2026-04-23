@@ -375,7 +375,7 @@ Primary files behind this flow:
 `fusebase-gate` already covers most of the lower-level store lifecycle that a managed app needs for isolated `sql/postgres` data:
 
 - app-bound store registration via `createIsolatedStore`
-- idempotent get-or-create bootstrap via `getOrIsolatedStore`
+- idempotent get-or-create bootstrap via `getOrCreateIsolatedStore`
 - dedicated `dev` / `prod` stage instances, each backed by its own physical database
 - stage initialization via `initIsolatedStoreStage`
 - optional source clone during bootstrap via checkpoint/restore
@@ -421,7 +421,7 @@ To replace `dashboard-service` for managed apps, Gate needs to reproduce this cu
 
 Gate now has a first-class idempotent bootstrap op:
 
-- `getOrIsolatedStore`
+- `getOrCreateIsolatedStore`
 
 It already supports:
 
@@ -439,7 +439,7 @@ So the original "Gate has no get-or-create flow" gap is closed.
 The remaining issue is orchestration in `nimbus-ai`:
 
 - `runManagedApp()` still provisions `appResources.databases` through `dashboard-service`
-- it does not yet call `getOrIsolatedStore` for isolated-store resources
+- it does not yet call `getOrCreateIsolatedStore` for isolated-store resources
 
 #### Gap B: clone path exists, but is only partially hardened
 
@@ -501,7 +501,7 @@ Current `runManagedApp()` still knows only how to provision dashboard databases 
 So `nimbus-ai` still lacks:
 
 - resource model support for isolated stores
-- first-run provisioning logic that calls `getOrIsolatedStore`
+- first-run provisioning logic that calls `getOrCreateIsolatedStore`
 - setup reuse / reconciliation logic for existing consumer-org setups
 
 #### Gap F: copy/restore path is still MVP-grade operationally
@@ -552,7 +552,7 @@ sequenceDiagram
             NAI->>Dash: getOrCreateDatabase(alias, scope, template_alias)
             Dash->>Dash: copy dashboard database resources if absent
         and managed stores
-            NAI->>Gate: POST getOrIsolatedStore(orgId, clientId, alias, source)
+            NAI->>Gate: POST getOrCreateIsolatedStore(orgId, clientId, alias, source)
             alt store does not exist
                 Gate->>Gate: resolve template store/stage from owner org
                 Gate->>Gate: create target store
@@ -608,7 +608,7 @@ V1 coexistence rule:
 
 Gate now already exposes the required control-plane op:
 
-- `getOrIsolatedStore`
+- `getOrCreateIsolatedStore`
 
 Expected returned fields today:
 
@@ -624,7 +624,7 @@ The integration task is to use that contract from `nimbus-ai` rather than design
 
 ### Phase 3: implement template clone in Gate
 
-This is now implemented for `sql/postgres` inside `getOrIsolatedStore`.
+This is now implemented for `sql/postgres` inside `getOrCreateIsolatedStore`.
 
 Recommended MVP:
 
@@ -632,7 +632,7 @@ Recommended MVP:
 2. create target store and stage if absent
 3. restore checkpoint into target stage DB
 4. persist copied-from revision/template metadata
-Important detail:
+   Important detail:
 
 - use Gate checkpoint/restore as the copy primitive first
 - do not block the rollout on Neon-specific branching or provider-native clone features
@@ -647,7 +647,7 @@ Teach `runManagedApp()` to provision isolated stores alongside dashboard databas
 
 1. keep the existing dashboard provisioning path for `appResources.databases`
 2. load managed isolated-store resource definitions from the app
-3. call `getOrIsolatedStore` for each isolated-store resource
+3. call `getOrCreateIsolatedStore` for each isolated-store resource
 4. persist resulting store/stage ids into `ManagedAppOrgSetup`
 5. compare `app.appVersion` with stored setup version
 6. define explicit reconciliation behavior for upgrades
@@ -704,7 +704,7 @@ Lowest-risk order:
 
 1. Add isolated-store resources to app metadata and Nimbus models
 2. Keep dashboard provisioning unchanged for existing managed resources
-3. Wire `runManagedApp()` to `getOrIsolatedStore` for isolated-store resources behind a feature flag
+3. Wire `runManagedApp()` to `getOrCreateIsolatedStore` for isolated-store resources behind a feature flag
 4. Persist Gate lineage metadata in `ManagedAppOrgSetup`
 5. Re-enable stage `resource_scope` enforcement
 6. Harden clone observability / recovery paths
