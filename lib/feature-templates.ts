@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { embeddedFiles } from 'bun';
 import AdmZip from 'adm-zip';
 import { tmpdir } from 'os';
+import { buildTemplateContext, renderTemplate } from './template-engine';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -115,8 +116,10 @@ export async function copyTemplate(
     throw new Error(`Template ${templateId} not found`);
   }
 
+  const templateContext = buildTemplateContext();
+
   // Recursively copy template files (skip metadata.json at root)
-  await copyDirectory(templateDir, targetDir, replacements, true);
+  await copyDirectory(templateDir, targetDir, replacements, templateContext, true);
 }
 
 /**
@@ -127,6 +130,7 @@ async function copyDirectory(
   srcDir: string,
   destDir: string,
   replacements: Record<string, string>,
+  templateContext: Record<string, unknown>,
   isRoot = false
 ): Promise<void> {
   await mkdir(destDir, { recursive: true });
@@ -142,7 +146,7 @@ async function copyDirectory(
     const destPath = join(destDir, entry.name);
 
     if (entry.isDirectory()) {
-      await copyDirectory(srcPath, destPath, replacements);
+      await copyDirectory(srcPath, destPath, replacements, templateContext);
     } else {
       // Read file, apply replacements, write to destination
       let content = await readFile(srcPath, 'utf-8');
@@ -152,6 +156,9 @@ async function copyDirectory(
         const regex = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
         content = content.replace(regex, value);
       }
+
+      // Resolve conditional template blocks (<% ... %>) against active flags
+      content = renderTemplate(content, templateContext);
 
       // Write file
       const { writeFile: writeFileAsync } = await import('fs/promises');

@@ -1,14 +1,64 @@
 import { Eta } from "eta";
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "fs";
-import { join, extname } from "path";
+import { join, extname, basename } from "path";
 import { getFlags } from "./config";
 
 /** File extensions that should be processed through templating. */
-const TEMPLATE_EXTENSIONS = new Set([".md"]);
+const TEMPLATE_EXTENSIONS = new Set([
+  ".md",
+  ".mdx",
+  ".txt",
+  ".json",
+  ".jsonc",
+  ".js",
+  ".jsx",
+  ".cjs",
+  ".mjs",
+  ".ts",
+  ".tsx",
+  ".cts",
+  ".mts",
+  ".html",
+  ".css",
+  ".scss",
+  ".sass",
+  ".less",
+  ".yml",
+  ".yaml",
+  ".toml",
+  ".ini",
+  ".conf",
+  ".xml",
+  ".sql",
+  ".sh",
+  ".bash",
+  ".zsh",
+]);
+
+/** Extensionless/text config files that should be processed through templating. */
+const TEMPLATE_BASENAMES = new Set([
+  ".env",
+  ".gitignore",
+  ".npmrc",
+  ".nvmrc",
+  ".dockerignore",
+  ".eslintignore",
+  ".prettierignore",
+  ".editorconfig",
+  "Dockerfile",
+  "Makefile",
+  "docker-compose.yml",
+  "docker-compose.yaml",
+]);
 
 function shouldTemplate(filePath: string): boolean {
-  const ext = extname(filePath);
-  return TEMPLATE_EXTENSIONS.has(ext);
+  const ext = extname(filePath).toLowerCase();
+  if (TEMPLATE_EXTENSIONS.has(ext)) {
+    return true;
+  }
+
+  const name = basename(filePath);
+  return TEMPLATE_BASENAMES.has(name);
 }
 
 const eta = new Eta({ autoEscape: false });
