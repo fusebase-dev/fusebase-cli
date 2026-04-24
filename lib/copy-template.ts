@@ -309,7 +309,11 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
   // Render Eta templates based on active flags
   const context = buildTemplateContext();
   renderTemplateFile(join(targetDir, "AGENTS.md"), context);
+  renderTemplateFile(join(targetDir, "CLAUDE.md"), context);
+  renderTemplateFile(join(targetDir, ".claude", "settings.json"), context);
   renderTemplatesInDir(join(targetDir, ".claude", "skills"), context);
+  renderTemplatesInDir(join(targetDir, ".claude", "agents"), context);
+  renderTemplatesInDir(join(targetDir, ".claude", "hooks"), context);
 
   if (customBlocks.size > 0) {
     await restoreCustomBlocks(targetDir, customBlocks);

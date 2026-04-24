@@ -24,6 +24,7 @@ import {
   type App,
 } from "../api";
 import { copyAgentsAndSkills } from "../copy-template";
+import { buildTemplateContext, renderTemplatesInDir } from "../template-engine";
 import {
   type IdePreset,
   resolveIdePresets,
@@ -364,6 +365,10 @@ async function copyProjectTemplate(
   // Create features folder
   const featuresDir = join(targetDir, "features");
   await mkdir(featuresDir, { recursive: true });
+
+  // Resolve conditional template blocks in project template files.
+  const templateContext = buildTemplateContext();
+  renderTemplatesInDir(targetDir, templateContext);
 
   await replaceFusebaseHostPlaceholder(targetDir);
 }
