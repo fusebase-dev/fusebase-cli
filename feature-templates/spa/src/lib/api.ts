@@ -96,8 +96,17 @@ export function getCookie(name: string): string | null {
 }
 
 /**
+<% if (it.flags?.includes("test-spa-token-priority")) { %>
  * Read the feature token from global runtime variable first, then cookie fallback.
+<% } else { %>
+ * Read the feature token. Checks the `fbsfeaturetoken` cookie first;
+ * falls back to `window.FBS_FEATURE_TOKEN` if the cookie is absent.
+<% } %>
  */
 export function getFeatureToken(): string | null {
+<% if (it.flags?.includes("portal-specific-features")) { %>
   return (window as Window & { FBS_FEATURE_TOKEN?: string }).FBS_FEATURE_TOKEN ?? getCookie('fbsfeaturetoken') ?? null
+<% } else { %>
+  return getCookie('fbsfeaturetoken') ?? (window as Window & { FBS_FEATURE_TOKEN?: string }).FBS_FEATURE_TOKEN ?? null
+<% } %>
 }
