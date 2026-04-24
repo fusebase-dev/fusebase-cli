@@ -125,7 +125,11 @@ SDK token usage in feature runtime:
 
 **Browser/UI runtime**:
 
+<% if (it.flags?.includes("portal-specific-features")) { %>
 - Uses feature token from global runtime variable `window.FBS_FEATURE_TOKEN`; if it's missing, fall back to cookie `fbsfeaturetoken`
+<% } else { %>
+- Uses feature token from cookie `fbsfeaturetoken`; if the cookie is absent, fall back to `window.FBS_FEATURE_TOKEN`
+<% } %>
 - `.env` is NOT accessible in browser
 - LLM must never assume `.env` tokens in UI code
 - Direct SDK / Fusebase proxy calls pass the token via `x-app-feature-token`
@@ -176,7 +180,11 @@ SDK token usage in feature runtime:
 
 ### SDK = Runtime Execution (browser and optional feature backend)
 
+<% if (it.flags?.includes("portal-specific-features")) { %>
 **Token**: Feature token from global runtime variable `window.FBS_FEATURE_TOKEN` (fallback: cookie `fbsfeaturetoken`); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
+<% } else { %>
+**Token**: Feature token from cookie `fbsfeaturetoken` (fallback: `window.FBS_FEATURE_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
+<% } %>
 
 **SDK Structure**:
 
@@ -284,7 +292,11 @@ export function createDatabasesApi(featureToken: string): DatabasesApi {
   return new DatabasesApi(createSdkClient(featureToken));
 }
 
+<% if (it.flags?.includes("portal-specific-features")) { %>
 // Usage: read feature token from `window.FBS_FEATURE_TOKEN` (fallback: `fbsfeaturetoken` cookie), then e.g.:
+<% } else { %>
+// Usage: read feature token from `fbsfeaturetoken` cookie (fallback `window.FBS_FEATURE_TOKEN`), then e.g.:
+<% } %>
 // const databasesApi = createDatabasesApi(featureToken)
 // const response = await databasesApi.listDatabases({})
 ```

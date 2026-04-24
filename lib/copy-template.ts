@@ -179,6 +179,7 @@ const FLAG_GATED_SKILLS: Record<string, string> = {
   "git-workflow": "git-init",
   "app-business-docs": "app-business-docs",
   "mcp-gate-debug": "mcp-gate-debug",
+  "fusebase-portal-specific-features": "portal-specific-features",
 };
 
 /** Template paths that require a specific flag to be included. */

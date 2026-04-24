@@ -128,6 +128,7 @@ export const KNOWN_FLAGS = [
   "app-business-docs",
   "mcp-gate-debug",
   "isolated-stores",
+  "portal-specific-features",
   "api-exploration",
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
@@ -141,6 +142,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
   "app-business-docs": "Include business-logic documentation skill in project template.",
   "mcp-gate-debug": "Include Gate MCP debug summary skill (focus on isolated stores).",
   "isolated-stores": "Enable isolated stores functionality (SQL/NoSQL).",
+  "portal-specific-features":
+    "Include portal-specific feature prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
   "api-exploration":
     "Include api-exploration skill for verifying API endpoints with temporary tokens and test scripts.",
 };

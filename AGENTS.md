@@ -113,6 +113,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `app-business-docs` | Includes the `app-business-docs` skill: maintain `docs/en/business-logic.md` (English) describing app business logic, flows, and scenarios; refresh after logic changes or on demand |
 | `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); includes supporting `fusebase-gate` references and `isolated_store.*` permissions in `fusebase env create` |
+| `portal-specific-features` | Includes portal-specific feature prompts and references (`fusebase-portal-specific-features`, `{{CurrentPortal}}` filters, and auth-context guidance for portal runtime) |
 | `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing feature code. Complements MCP discovery. |
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
@@ -232,7 +233,7 @@ For guidance on developing Fusebase Apps features, see:
 - **`project-template/AGENTS.md`** - Single source of truth for feature development
 - **`project-template/.claude/skills/app-ui-design/SKILL.md`** - UI/UX and visual design for generated app features (shadcn/ui + Tailwind CSS v4)
 - **`project-template/.claude/skills/fusebase-dashboards/SKILL.md`** - Dashboard MCP flow, dashboard data, and SDK discovery for runtime code
-- **`project-template/.claude/skills/fusebase-portal-specific-features/SKILL.md`** - Guide for developing features that depend on the portal they are embedded in
+- **`project-template/.claude/skills/fusebase-portal-specific-features/SKILL.md`** - Guide for developing features that depend on the portal they are embedded in (enabled by flag `portal-specific-features`)
 - **`project-template/.claude/skills/fusebase-gate/SKILL.md`** - Fusebase Gate MCP/SDK; orgs, user lists, tokens, and broader platform capabilities (e.g. email, automation) as exposed via Gate
 - **`project-template/.claude/skills/file-upload/SKILL.md`** - File upload guide
 

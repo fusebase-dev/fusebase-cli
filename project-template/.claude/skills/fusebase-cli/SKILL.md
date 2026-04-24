@@ -106,6 +106,7 @@ Options:
 - Global flag `app-business-docs` includes the `app-business-docs` skill (English `docs/en/business-logic.md` maintenance)
 - Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; isolated stores emphasis)
 - Global flag `isolated-stores` enables isolated stores functionality (SQL/NoSQL), including required Fusebase Gate references and `isolated_store.*` permissions in `fusebase env create`
+- Global flag `portal-specific-features` includes portal-specific prompts/guidance (`fusebase-portal-specific-features` skill, `{{CurrentPortal}}` filter references, and `/auth/context` portal runtime context notes)
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 

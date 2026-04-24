@@ -91,11 +91,19 @@ Features may optionally include a `backend/` subfolder for a backend API (REST +
 
 ## Authentication
 
+<% if (it.flags?.includes("portal-specific-features")) { %>
 Features run as the main window. The platform provides a feature token via `window.FBS_FEATURE_TOKEN` (with `fbsfeaturetoken` cookie fallback when needed).
+<% } else { %>
+Features run as the main window. The platform sets a `fbsfeaturetoken` cookie automatically.
+<% } %>
 
 **Startup flow:**
 
+<% if (it.flags?.includes("portal-specific-features")) { %>
 1. Read feature token on app load from `window.FBS_FEATURE_TOKEN` first; if missing, fall back to `fbsfeaturetoken` cookie
+<% } else { %>
+1. Read feature token on app load: check `fbsfeaturetoken` cookie first, fall back to `window.FBS_FEATURE_TOKEN` if the cookie is absent
+<% } %>
 2. Render app once token is available (show loading state until then)
 3. Pass token via `x-app-feature-token` for direct SDK / Fusebase proxy calls
 4. For calls to the app's own backend (`/api/*`), rely on the same-origin cookie and make backend handlers read `x-app-feature-token` or fallback to `fbsfeaturetoken`
@@ -104,6 +112,7 @@ Features run as the main window. The platform provides a feature token via `wind
 
 ## User Details
 
+<% if (it.flags?.includes("portal-specific-features")) { %>
 Fetch auth context:
 
 ```typescript
@@ -136,6 +145,23 @@ Important for public features:
 - A visitor feature token may be valid even when `/auth/context` returns no `user`
 - Missing `user` means "not authenticated", not "session expired"
 - `/auth/context` should not throw just because the visitor is anonymous
+<% } else { %>
+Fetch current user:
+
+```typescript
+const response = await fetch('https://app-api.{FUSEBASE_HOST}/v4/api/users/me', {
+  headers: { 'x-app-feature-token': featureToken },
+})
+const user = response.ok ? await response.json() : null
+// authenticated: { id: 4124, email: "testemail@gmail.com" }
+// anonymous visitor on a public feature: null
+```
+
+Important for public features:
+
+- A visitor feature token may be valid even when `/users/me` returns 401
+- In that case, treat the result as `user: null`, not as "session expired"
+<% } %>
 - Show the login/auth form for anonymous visitors
 - Only show a "Session Expired" modal for actual `AppTokenValidationError` flows
 
