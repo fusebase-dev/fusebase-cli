@@ -52,6 +52,11 @@ const GATE_PERMISSIONS_BASE = [
   "token.write",
 ] as const;
 
+const FILE_PERMISSIONS = [
+  "files.read",
+  "files.write",
+] as const;
+
 const GATE_PERMISSIONS_ISOLATED = [
   "isolated_store.control.write",
   "isolated_store.data.write",
@@ -106,9 +111,10 @@ export function dashboardsMcpPolicyDescriptor(): Record<string, unknown> {
 }
 
 /** Serializable policy shape for Gate MCP token (isolated-stores toggles extra permissions). */
-export function gateMcpPolicyDescriptor(isolatedStores: boolean): Record<string, unknown> {
+export function gateMcpPolicyDescriptor(isolatedStores: boolean, filesFlag: boolean): Record<string, unknown> {
   const permissions = [
     ...GATE_PERMISSIONS_BASE,
+    ...(filesFlag ? FILE_PERMISSIONS : []),
     ...(isolatedStores ? GATE_PERMISSIONS_ISOLATED : []),
   ].sort((a, b) => a.localeCompare(b));
   return {
@@ -131,7 +137,7 @@ export function getExpectedMcpPolicyFingerprints(): {
 } {
   return {
     dashboards: fingerprintPolicyDescriptor(dashboardsMcpPolicyDescriptor()),
-    gate: fingerprintPolicyDescriptor(gateMcpPolicyDescriptor(hasFlag("isolated-stores"))),
+    gate: fingerprintPolicyDescriptor(gateMcpPolicyDescriptor(hasFlag("isolated-stores"), hasFlag("files"))),
   };
 }
 
@@ -144,6 +150,7 @@ export function getLegacyPermissionsOnlyFingerprints(): {
   gate: string;
 } {
   const isolatedStores = hasFlag("isolated-stores");
+  const filesFlag = hasFlag("files");
   return {
     dashboards: sha256Hex(
       stableStringify({
@@ -158,6 +165,7 @@ export function getLegacyPermissionsOnlyFingerprints(): {
         product: "gate-mcp",
         permissions: [
           ...GATE_PERMISSIONS_BASE,
+          ...(filesFlag ? FILE_PERMISSIONS : []),
           ...(isolatedStores ? GATE_PERMISSIONS_ISOLATED : []),
         ],
         isolated_stores: isolatedStores,
@@ -212,7 +220,10 @@ export function buildGateMcpTokenRequest(orgId: string, appId: string): CreateTo
   const isolated = hasFlag("isolated-stores")
     ? [...GATE_PERMISSIONS_ISOLATED]
     : [];
-  const permissions = [...GATE_PERMISSIONS_BASE, ...isolated];
+  const files = hasFlag("files")
+    ? [...FILE_PERMISSIONS]
+    : [];
+  const permissions = [...GATE_PERMISSIONS_BASE, ...files, ...isolated];
   return {
     scopes: [
       { scope_type: "org", scope_id: orgId },

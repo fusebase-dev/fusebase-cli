@@ -1,7 +1,7 @@
 ---
-version: "1.0.1"
+version: "1.1.0"
 mcp_prompt: notes
-last_synced: "2026-04-16"
+last_synced: "2026-04-27"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -14,7 +14,7 @@ category: specialized
 ---
 ## Fusebase Gate Notes Operations
 
-These operations manage workspace note folders, workspace notes, note reads, and note creation flows exposed by Gate.
+These operations manage workspace note folders, workspace notes, note reads, note creation, and stored-file attachment flows exposed by Gate.
 
 ## Relevant Operations
 
@@ -23,6 +23,7 @@ These operations manage workspace note folders, workspace notes, note reads, and
 - getWorkspaceNote returns one workspace note together with markdown content.
 - createWorkspaceNoteFolder creates a workspace note folder.
 - createWorkspaceNote creates a workspace note and can optionally append initial content after creation.
+- addWorkspaceNoteAttachment attaches a stored-file UUID to a workspace note and appends the matching editor blot.
 
 ## Identity And Scoping Rules
 
@@ -35,7 +36,7 @@ These operations manage workspace note folders, workspace notes, note reads, and
 - Use `listWorkspaceNoteFolders` before browsing nested folders when the caller does not already know a folder id.
 - `listWorkspaceNotes` returns notes for one parent folder at a time. Omit `parentId` to read the root folder.
 - `getWorkspaceNote` is the operation that returns note body content through `note.md`.
-- Workspace attachment image links inside `note.md` are rewritten to presigned file URLs when Gate can resolve them.
+- Workspace attachment image links inside `note.md` remain editor attachment paths; use the files completion `downloadUrl` when you need the public object URL.
 - Portal-shared and trashed notes are filtered out from these workspace note list operations.
 
 ## Create Flow Rules
@@ -46,10 +47,17 @@ These operations manage workspace note folders, workspace notes, note reads, and
 - `format` defaults to `text`. Use `html` only when you are intentionally sending html content for the initial paste step.
 - `createWorkspaceNote` returns note summary metadata, not the final note body. Call `getWorkspaceNote` afterward when you need the resulting markdown.
 
+## Attachment Flow Rules
+
+- Upload files with the files operations first. Complete the upload and use the returned `storedFileUUID`/`fileId` for attachment creation; use the completion `downloadUrl` for direct file reads.
+- `addWorkspaceNoteAttachment` creates the note-service attachment and then appends an editor blot.
+- Image attachments are inserted as `image` blots. All other attachment types are inserted as `file` blots.
+- The operation returns attachment metadata, not the full note body. Call `getWorkspaceNote` when you need refreshed markdown.
+
 ## Access Model
 
 - Note reads require `notes.read` and org access.
-- Note creation requires `notes.write` and org access.
+- Note creation and attachment writes require `notes.write` and org access.
 - If note-service or editor-server writes fail, verify caller permissions and workspace scope before assuming a schema mismatch.
 
 ## Working Rules
@@ -61,7 +69,7 @@ These operations manage workspace note folders, workspace notes, note reads, and
 
 ## Version
 
-- **Version**: 1.0.1
+- **Version**: 1.1.0
 - **Category**: specialized
-- **Last synced**: 2026-04-16
+- **Last synced**: 2026-04-27
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
