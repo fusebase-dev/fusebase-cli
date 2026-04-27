@@ -191,28 +191,67 @@ const FLAG_GATED_PATH_PREFIXES: Record<string, string> = {
   ".claude/skills/fusebase-gate/references/isolated-sql-migration-discipline.md": "isolated-stores",
 };
 
+function normalizeTemplateEntryPath(name: string): string {
+  const normalized = name.replace(/\\/g, "/").replace(/^\/+/, "");
+  return normalized.startsWith("project-template/")
+    ? normalized.slice("project-template/".length)
+    : normalized;
+}
+
 /**
  * Check whether a zip entry path should be skipped based on flag-gated skills.
  */
 function shouldSkipEntry(name: string): boolean {
+  const entryPath = normalizeTemplateEntryPath(name);
   for (const [skill, flag] of Object.entries(FLAG_GATED_SKILLS)) {
     if (skill === "git-workflow") {
       const enabled = hasFlag("git-init") || hasFlag("git-debug-commits");
-      if (name.startsWith(`.claude/skills/${skill}/`) && !enabled) {
+      if (entryPath.startsWith(`.claude/skills/${skill}/`) && !enabled) {
         return true;
       }
       continue;
     }
-    if (name.startsWith(`.claude/skills/${skill}/`) && !hasFlag(flag)) {
+    if (entryPath.startsWith(`.claude/skills/${skill}/`) && !hasFlag(flag)) {
       return true;
     }
   }
   for (const [pathPrefix, flag] of Object.entries(FLAG_GATED_PATH_PREFIXES)) {
-    if (name.startsWith(pathPrefix) && !hasFlag(flag)) {
+    if (entryPath.startsWith(pathPrefix) && !hasFlag(flag)) {
       return true;
     }
   }
   return false;
+}
+
+async function removeDisabledFlagGatedAssets(skillsDest: string): Promise<void> {
+  for (const [skill, flag] of Object.entries(FLAG_GATED_SKILLS)) {
+    if (skill === "git-workflow") {
+      const enabled = hasFlag("git-init") || hasFlag("git-debug-commits");
+      if (!enabled) {
+        const skillDir = join(skillsDest, skill);
+        if (await fileExists(skillDir)) {
+          await rm(skillDir, { recursive: true, force: true });
+        }
+      }
+      continue;
+    }
+    if (!hasFlag(flag)) {
+      const skillDir = join(skillsDest, skill);
+      if (await fileExists(skillDir)) {
+        await rm(skillDir, { recursive: true, force: true });
+      }
+    }
+  }
+
+  for (const [pathPrefix, flag] of Object.entries(FLAG_GATED_PATH_PREFIXES)) {
+    if (!hasFlag(flag)) {
+      const relativePath = pathPrefix.replace(".claude/skills/", "");
+      const targetPath = join(skillsDest, relativePath);
+      if (await fileExists(targetPath)) {
+        await rm(targetPath, { recursive: true, force: true });
+      }
+    }
+  }
 }
 
 /**
@@ -222,6 +261,7 @@ function shouldSkipEntry(name: string): boolean {
  */
 export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
   const customBlocks = await captureCustomBlocks(targetDir);
+  const skillsDest = join(targetDir, ".claude", "skills");
 
   // Check for obsolete ./skills folder
   const obsoleteSkillsPath = join(targetDir, "skills");
@@ -238,9 +278,8 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
     const zipData = await zipFile.arrayBuffer();
     const zip = new AdmZip(Buffer.from(zipData));
     const entries = zip.getEntries();
-    const normalized = (name: string) => name.replace(/\\/g, "/");
     for (const entry of entries) {
-      const name = normalized(entry.entryName);
+      const name = normalizeTemplateEntryPath(entry.entryName);
       if (shouldSkipEntry(name)) continue;
       if (name === "AGENTS.md" || name.startsWith(".claude/skills/") || name.startsWith(".claude/agents/") || name.startsWith(".claude/hooks/") || name === ".claude/settings.json") {
         zip.extractEntryTo(entry, targetDir, true, true);
@@ -254,7 +293,6 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
     const hooksSrc = join(templateDir, ".claude", "hooks");
     const settingsSrc = join(templateDir, ".claude", "settings.json");
     const agentsMdDest = join(targetDir, "AGENTS.md");
-    const skillsDest = join(targetDir, ".claude", "skills");
     const agentsDest = join(targetDir, ".claude", "agents");
     const hooksDest = join(targetDir, ".claude", "hooks");
     const settingsDest = join(targetDir, ".claude", "settings.json");
@@ -275,37 +313,11 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
       await cp(settingsSrc, settingsDest, { force: true });
     }
 
-    // Remove flag-gated skill directories that shouldn't be present
-    for (const [skill, flag] of Object.entries(FLAG_GATED_SKILLS)) {
-      if (skill === "git-workflow") {
-        const enabled = hasFlag("git-init") || hasFlag("git-debug-commits");
-        if (!enabled) {
-          const skillDir = join(skillsDest, skill);
-          if (await fileExists(skillDir)) {
-            await rm(skillDir, { recursive: true, force: true });
-          }
-        }
-        continue;
-      }
-      if (!hasFlag(flag)) {
-        const skillDir = join(skillsDest, skill);
-        if (await fileExists(skillDir)) {
-          await rm(skillDir, { recursive: true, force: true });
-        }
-      }
-    }
-
-    // Remove flag-gated files that shouldn't be present
-    for (const [pathPrefix, flag] of Object.entries(FLAG_GATED_PATH_PREFIXES)) {
-      if (!hasFlag(flag)) {
-        const relativePath = pathPrefix.replace(".claude/skills/", "");
-        const targetPath = join(skillsDest, relativePath);
-        if (await fileExists(targetPath)) {
-          await rm(targetPath, { recursive: true, force: true });
-        }
-      }
-    }
   }
+
+  // Ensure flag-gated assets are removed even if template content was copied earlier
+  // (for example init's full template extraction in binary mode).
+  await removeDisabledFlagGatedAssets(skillsDest);
 
   // Render Eta templates based on active flags
   const context = buildTemplateContext();
