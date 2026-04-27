@@ -36,7 +36,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - Use `listWorkspaceNoteFolders` before browsing nested folders when the caller does not already know a folder id.
 - `listWorkspaceNotes` returns notes for one parent folder at a time. Omit `parentId` to read the root folder.
 - `getWorkspaceNote` is the operation that returns note body content through `note.md`.
-- Workspace attachment image links inside `note.md` remain editor attachment paths; use the files completion `downloadUrl` when you need the public object URL.
+- Workspace attachment image links inside `note.md` remain editor attachment paths; use the files completion `readUrl` when you need the public object URL.
 - Portal-shared and trashed notes are filtered out from these workspace note list operations.
 
 ## Create Flow Rules
@@ -49,7 +49,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 
 ## Attachment Flow Rules
 
-- Upload files with the files operations first. Complete the upload and use the returned `storedFileUUID`/`fileId` for attachment creation; use the completion `downloadUrl` for direct file reads.
+- Upload files with the files operations first. Complete the upload and use the returned `storedFileUUID`/`fileId` for attachment creation; use the completion `readUrl` for direct file reads or image `src`.
 - `addWorkspaceNoteAttachment` creates the note-service attachment and then appends an editor blot.
 - Image attachments are inserted as `image` blots. All other attachment types are inserted as `file` blots.
 - The operation returns attachment metadata, not the full note body. Call `getWorkspaceNote` when you need refreshed markdown.
