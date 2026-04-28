@@ -23,7 +23,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - getWorkspaceNote returns one workspace note together with markdown content.
 - createWorkspaceNoteFolder creates a workspace note folder.
 - createWorkspaceNote creates a workspace note and can optionally append initial content after creation.
-- addWorkspaceNoteAttachment attaches a stored-file UUID to a workspace note and appends the matching editor blot.
+- addWorkspaceNoteAttachment attaches a `storedFileUUID` to a workspace note and appends the matching editor blot.
 
 ## Identity And Scoping Rules
 
@@ -52,7 +52,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 
 ## Attachment Flow Rules
 
-- Upload files with the files operations first. Complete the upload and use the returned `storedFileUUID`/`fileId` for attachment creation; use the completion `readUrl` for direct file reads or image `src`.
+- Upload files with the files operations first. Complete the upload and use the returned `storedFileUUID` for attachment creation. In Gate file responses this is file-service `storedFile.uuid` exposed as `storedFileUUID`; `fileId` is only an alias. Use the completion `readUrl` for direct file reads or image `src`.
 - `addWorkspaceNoteAttachment` creates the note-service attachment and then appends an editor blot.
 - Image attachments are inserted as `image` blots. All other attachment types are inserted as `file` blots.
 - The operation returns attachment metadata, not the full note body. Call `getWorkspaceNote` when you need refreshed markdown.

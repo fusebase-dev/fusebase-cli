@@ -14,8 +14,6 @@ For rules and checklists, see `AGENTS.md`.
 
 - **For runtime SDK code** that reads or writes dashboard data (`getDashboardViewData`, `batchPutDashboardData`, etc.), **`references/data-patterns.md` is required** — it defines the real response/request shapes; use it together with `sdk_describe` (do not infer `data.rows` vs top-level `data` from memory).
 
----
-
 ## References
 
 Each reference is in a separate file under `references/`. Load the file when you need that topic.
@@ -45,6 +43,23 @@ Each reference is in a separate file under `references/`. Load the file when you
 - [Deals (managed database)](references/deals.md)
 - [Meetings (managed database)](references/meetings.md)
 - [Templates](references/templates.md)
+
+---
+
+
+## When NOT To Use This Skill
+
+- Do not use this skill for multipart upload details, temp-file endpoints, stored-file endpoints, or display URL construction. Load `file-upload/references/upload-lifecycle.md` for the canonical lifecycle.
+- Do not use this skill for Gate file operations, auth, or scopes. Load `fusebase-gate` for `startMultipartFileUpload`, `completeMultipartFileUpload`, and `deleteFile`.
+- Do not copy shared upload API blocks into dashboard references. Dashboard guidance only explains how to put an already-uploaded file descriptor into a `files` column.
+
+
+## Anti-Overlap Checklist
+
+- [ ] Unique scope: dashboard schema, rows, views, relations, and dashboard data.
+- [ ] Neighbor links: use `file-upload` for upload lifecycle; use `fusebase-gate` for Gate file operations.
+- [ ] No duplicated upload endpoint or payload details in this skill.
+- [ ] Only hand off the already-uploaded file descriptor to `batchPutDashboardData`.
 
 ---
 
