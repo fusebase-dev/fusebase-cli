@@ -1,7 +1,7 @@
 ---
-version: "1.1.0"
+version: "1.2.0"
 mcp_prompt: notes
-last_synced: "2026-04-27"
+last_synced: "2026-04-28"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -29,6 +29,9 @@ These operations manage workspace note folders, workspace notes, note reads, not
 
 - Treat `orgId` and `workspaceId` as required path inputs for every notes operation.
 - Treat `workspaceId`, `parentId`, and `noteId` as opaque ids. Reuse values returned by previous responses instead of inventing them.
+- When a user says "default workspace", interpret that as the organization's default workspace id, not the literal string `default`.
+- For notes operations, call `listWorkspaces`, find the workspace with `isDefault: true`, and use its real `id` value.
+- Gate accepts the literal path alias `workspaceId: "default"` as a compatibility fallback, but do not choose it when you can discover the real workspace id.
 - When `parentId` is omitted for list or create flows, Gate defaults to the workspace root folder id `default`.
 
 ## Read Flow Rules
@@ -63,13 +66,14 @@ These operations manage workspace note folders, workspace notes, note reads, not
 ## Working Rules
 
 - Always inspect the exact contract with `tools_describe` or `sdk_describe` before integration work.
+- Before creating notes in an unspecified/default workspace, call `listWorkspaces` and use the default workspace's real `id` instead of building note URLs with `/workspaces/default`.
 - For root note creation or listing, prefer omitting `parentId` instead of inventing a folder id.
 - If the caller needs note content after create, follow `createWorkspaceNote` with `getWorkspaceNote`.
 ---
 
 ## Version
 
-- **Version**: 1.1.0
+- **Version**: 1.2.0
 - **Category**: specialized
-- **Last synced**: 2026-04-27
+- **Last synced**: 2026-04-28
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
