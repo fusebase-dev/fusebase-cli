@@ -17,6 +17,7 @@ interface GitLabProject {
   path: string;
   web_url: string;
   http_url_to_repo: string;
+  default_branch?: string | null;
   topics?: string[];
 }
 
@@ -30,6 +31,9 @@ interface ResolvedGitLabConfig {
   token: string;
   group: string;
 }
+
+const GITLAB_BOOTSTRAP_BRANCH = "fusebase-bootstrap";
+const GITLAB_BOOTSTRAP_FILE = ".fusebase-gitlab-bootstrap.md";
 
 function normalizeHost(host: string): string {
   return host.replace(/^https?:\/\//, "").replace(/\/+$/, "");
@@ -343,6 +347,8 @@ async function ensureProject(
       path: projectName,
       namespace_id: group.id,
       visibility: "private",
+      initialize_with_readme: true,
+      default_branch: GITLAB_BOOTSTRAP_BRANCH,
     }),
   });
   if (!createResponse.ok) {
@@ -374,6 +380,98 @@ async function addManagedTag(
   console.log(chalk.green("✓") + " Added GitLab topic: managed");
 }
 
+async function setGitLabDefaultBranch(
+  config: ResolvedGitLabConfig,
+  project: GitLabProject,
+  branch: string,
+): Promise<boolean> {
+  const response = await gitlabRequest(config, `/projects/${project.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ default_branch: branch }),
+  });
+  if (!response.ok) {
+    return false;
+  }
+  project.default_branch = branch;
+  return true;
+}
+
+async function ensureGitLabDefaultBranch(
+  config: ResolvedGitLabConfig,
+  project: GitLabProject,
+): Promise<string | null> {
+  if (project.default_branch) {
+    return project.default_branch === GITLAB_BOOTSTRAP_BRANCH
+      ? GITLAB_BOOTSTRAP_BRANCH
+      : null;
+  }
+
+  const commitResponse = await gitlabRequest(
+    config,
+    `/projects/${project.id}/repository/commits`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        branch: GITLAB_BOOTSTRAP_BRANCH,
+        commit_message: "Initialize GitLab repository",
+        actions: [
+          {
+            action: "create",
+            file_path: GITLAB_BOOTSTRAP_FILE,
+            content:
+              "Temporary bootstrap commit created by Fusebase CLI so GitLab can assign a default branch before the first project push.\n",
+          },
+        ],
+      }),
+    },
+  );
+
+  if (!commitResponse.ok) {
+    const details = await commitResponse.text();
+    const defaultSet = await setGitLabDefaultBranch(
+      config,
+      project,
+      GITLAB_BOOTSTRAP_BRANCH,
+    );
+    if (!defaultSet) {
+      throw new Error(
+        `GitLab project has no default branch and Fusebase CLI could not initialize one (${commitResponse.status}): ${details}`,
+      );
+    }
+  } else if (
+    !(await setGitLabDefaultBranch(config, project, GITLAB_BOOTSTRAP_BRANCH))
+  ) {
+    throw new Error(
+      `GitLab project has no default branch and Fusebase CLI could not assign ${GITLAB_BOOTSTRAP_BRANCH} as default.`,
+    );
+  }
+
+  console.log(
+    chalk.green("✓") +
+      ` Initialized GitLab default branch: ${GITLAB_BOOTSTRAP_BRANCH}`,
+  );
+  return GITLAB_BOOTSTRAP_BRANCH;
+}
+
+async function deleteGitLabBranch(
+  config: ResolvedGitLabConfig,
+  project: GitLabProject,
+  branch: string,
+): Promise<void> {
+  const response = await gitlabRequest(
+    config,
+    `/projects/${project.id}/repository/branches/${encodeURIComponent(branch)}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok && response.status !== 404) {
+    console.log(
+      chalk.yellow(
+        `Warning: could not delete temporary GitLab branch ${branch}.`,
+      ),
+    );
+  }
+}
+
 async function ensureOrigin(cwd: string, remoteUrl: string): Promise<boolean> {
   const originUrl = await gitOriginUrl(cwd);
   if (originUrl) {
@@ -394,7 +492,10 @@ async function ensureOrigin(cwd: string, remoteUrl: string): Promise<boolean> {
   return true;
 }
 
-async function pushCurrentBranch(cwd: string, options?: { compactOutput?: boolean }): Promise<void> {
+async function pushCurrentBranch(
+  cwd: string,
+  options?: { compactOutput?: boolean },
+): Promise<string | null> {
   await ensureInitialCommit(cwd);
   const branch = await getCurrentBranch(cwd);
   if (!branch) {
@@ -403,7 +504,7 @@ async function pushCurrentBranch(cwd: string, options?: { compactOutput?: boolea
         "Skipped push: no current branch detected. Create a commit/branch, then run `fusebase git sync`.",
       ),
     );
-    return;
+    return null;
   }
   const push = await runGit(cwd, ["push", "-u", "origin", branch], {
     stdio: options?.compactOutput ? "pipe" : "inherit",
@@ -413,9 +514,10 @@ async function pushCurrentBranch(cwd: string, options?: { compactOutput?: boolea
     if (options?.compactOutput && push.stderr.trim()) {
       console.log(chalk.dim(push.stderr.trim()));
     }
-    return;
+    return null;
   }
   console.log(chalk.green("✓") + ` Pushed branch ${branch} to origin.`);
+  return branch;
 }
 
 export async function syncGitWithGitLab(options: {
@@ -459,6 +561,7 @@ export async function syncGitWithGitLab(options: {
   });
   console.log(chalk.green("✓") + ` Using GitLab repository name: ${projectName}`);
   const project = await ensureProject(config, env, projectName);
+  const bootstrapBranch = await ensureGitLabDefaultBranch(config, project);
   if (tagManaged) {
     await addManagedTag(config, project);
   }
@@ -480,7 +583,21 @@ export async function syncGitWithGitLab(options: {
   }
 
   if (push) {
-    await pushCurrentBranch(cwd, { compactOutput });
+    const pushedBranch = await pushCurrentBranch(cwd, { compactOutput });
+    if (pushedBranch && bootstrapBranch && pushedBranch !== bootstrapBranch) {
+      if (await setGitLabDefaultBranch(config, project, pushedBranch)) {
+        console.log(
+          chalk.green("✓") + ` Set GitLab default branch: ${pushedBranch}`,
+        );
+        await deleteGitLabBranch(config, project, bootstrapBranch);
+      } else {
+        console.log(
+          chalk.yellow(
+            `Warning: could not set GitLab default branch to ${pushedBranch}.`,
+          ),
+        );
+      }
+    }
   }
 }
 
