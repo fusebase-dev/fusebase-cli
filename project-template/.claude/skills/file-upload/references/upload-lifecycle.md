@@ -34,7 +34,8 @@ Response:
 }
 ```
 
-Use `name` as `tempStoredFileName` for the stored-file step.
+The response includes `name`; treat it as `tempStoredFileName`.
+Use that value for the stored-file step.
 
 For files 50 MB or larger, use multipart upload against the same endpoint:
 
