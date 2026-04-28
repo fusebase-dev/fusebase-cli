@@ -1,7 +1,7 @@
 ---
-version: "1.11.0"
+version: "1.12.0"
 mcp_prompt: domain.data
-last_synced: "2026-04-15"
+last_synced: "2026-04-28"
 title: "Dashboard Data"
 category: core
 ---
@@ -358,7 +358,8 @@ batchPutDashboardData({
 
 **Reading cell values safely**: The value at `row[item_key]` may be a **primitive** (string, number, boolean) or an **object/array**. Do **not** use the `in` operator (e.g. `'value' in cell`) on primitives — it throws. Prefer: if `cell == null` return null; if `typeof cell !== 'object'` return cell as-is (primitive); if object and `'value' in cell` return cell.value; else return cell (e.g. files, link, raw objects).
 
-**Boolean-like columns when reading (apps/SDK)**: The API may return boolean-like fields as **numbers** (1 and 0) instead of true/false. In JavaScript/TypeScript, `1 === true` is false (strict equality compares type too). When building app logic (filtering, conditions, "is active", "is deleted"), **use truthy checks**, not strict equality: use `!!row[item_key]` or `if (row[item_key])` / `if (!row[item_key])`, not `row[item_key] === true`. Example: filter active rows with `rows.filter(r => !!r[COLUMNS.IS_ACTIVE])`, not `r[COLUMNS.IS_ACTIVE] === true` (the latter would drop all rows if the API returned 1).
+**Boolean-like columns when reading (apps/SDK)**: The API may return boolean-like fields as **numbers** (1 and 0) instead of true/false. In JavaScript/TypeScript, `1 === true` is false (strict equality compares type too). When building app logic (filtering, conditions, "is active", "is deleted"), **use truthy checks or explicit normalization**, not strict equality: use `!!row[item_key]` or `if (row[item_key])` / `if (!row[item_key])`, not `row[item_key] === true`. Example: filter active rows with `rows.filter(r => !!r[COLUMNS.IS_ACTIVE])`, not `r[COLUMNS.IS_ACTIVE] === true` (the latter would drop all rows if the API returned 1).
+- **Hard rule**: For values from `getDashboardViewData`, do **not** compare with `=== true`/`=== false` unless the value was normalized first. Preferred helper: `const toBool = (raw: unknown) => raw === true || raw === 1 || raw === "1";`.
 
 ### Custom column types: read and write by type
 
@@ -408,19 +409,9 @@ For columns with `render.type === "files"` (custom type `files`), the value is a
 
 **Backend builds context for every file cell**: In **getDashboardViewData** the backend **always** returns for file columns an object with `context` and `files` in **every cell** (including empty cells). Context is **per row**: different rows can have different context (e.g. row A = workspace, row B = portal block). When **writing**, use **defaults.defaultFileContext** unless you have the exact context for that row from getDashboardViewData; do not omit context.
 
-**File upload flow (production UX)** — two steps:
-(1) **Upload the file** to get a file descriptor. Use **the same context** for upload query params as you will use when writing the cell. Typically use **defaults.defaultFileContext** from the connection (whoami / resource connection/context). **Standalone database**: `workspaceId`, `target=workspace`, `targetId=workspaceId`, `groupId=workspace%23{workspaceId}`. **Portal scope**: `target` (portalGlobal/portalPage/portalBlock), `targetId`, `groupId` from context.
+**Upload handoff**: For file upload lifecycle, use `file-upload/references/upload-lifecycle.md`. It owns `tempStoredFileName`, `storedFileUUID`, `readUrl`, `relative url`, and file descriptor construction.
 
-**Create Temp File** (same app API as in the external File Upload flow):
-- **Files &lt; 50MB**: POST `.../v3/api/web-editor/file/v2-upload` with multipart/form-data: field `file` (the binary), field `folder=apps`. Response: `{ name, type, filename, size }` — use `name` as temp stored file name for the next step.
-- **Files ≥ 50MB**: (a) POST same URL with `action=start`, `folder=apps`, `name`, `type`, `size` → get `id`, `partsUrls`, `partSize`, `tempStoredfileName`. (b) Upload each chunk via PUT to the corresponding `partsUrls` entry (body = chunk). (c) POST same URL with `action=finish`, `parts` (JSON array of `{ etag, partNumber }`), `uploadingId`, `tempStoredfileName`. Use `tempStoredfileName` for the next step.
-
-**Create Stored File**: POST `.../v4/api/bucket-files` with JSON body `{ tempStoredFileName: "&lt;name from temp step&gt;", folder: "apps" }`. Response includes `attachment` (e.g. `storedFileUUID`) and `file` (e.g. `url`, `filename`, `type`, `size`). This descriptor is what you pass in the dashboard cell.
-
-File descriptor for the dashboard: `globalId`, `bucketId`, `url`, `name`, `type`, `size`, `storedFileUUID`, `userId`, `workspaceId`, `kind` (from bucket-files response).
-(2) **Write the value to the dashboard** via `batchPutDashboardData`. Set the cell value to `{ context: defaults.defaultFileContext, files: [ { ...descriptor from step 1 } ] }` (use **defaults.defaultFileContext** from connection unless you have the exact context for that row from getDashboardViewData). The `files` array must contain at least `name` and `url` per item; include other fields from the upload response when available.
-
-**Display URL for files in UI**: The `files[].url` (and `file.url` in bucket-files response) is a **relative** path. To display or link to the file, prepend `https://app.{FUSEBASE_HOST}/box/file` to get the full URL.
+**Writing an uploaded file to a dashboard**: First upload the file with the `file-upload` skill, then pass the resulting file descriptor to `batchPutDashboardData`. Set the file column value to `{ context: defaults.defaultFileContext, files: [descriptor] }` unless you have the exact row context from getDashboardViewData.
 
 ### Constraints and Validation
 
@@ -457,7 +448,7 @@ getDashboardViewData({ dashboardId, viewId, root_index_values: ["uuid1", "uuid2"
 getDashboardViewData({ dashboardId, viewId, item_keys: ["email", "status"] })
 ```
 
-**Filtering by boolean-like column (app/SDK)** — API may return 1/0; use truthy, not === true:
+**Filtering by boolean-like column (app/SDK)** — API may return 1/0; use truthy or helper normalization, not === true:
 ```
 // Right: works when API returns 1 or true
 const activeRows = rows.filter(r => !!r[COLUMNS.IS_ACTIVE]);
@@ -596,7 +587,7 @@ batchPutDashboardData({
 
 ## Version
 
-- **Version**: 1.11.0
+- **Version**: 1.12.0
 - **Category**: core
-- **Last synced**: 2026-04-15
+- **Last synced**: 2026-04-28
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

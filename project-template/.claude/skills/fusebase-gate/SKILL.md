@@ -49,6 +49,21 @@ Each reference is in a separate file under `references/`. Load the file when you
 ---
 
 
+## When NOT To Use This Skill
+
+- Do not use this skill for dashboard schema, rows, or `files` cell payload guidance. Load `fusebase-dashboards` for dashboard writes.
+- Do not use this skill as the canonical low-level upload lifecycle reference. Load `file-upload/references/upload-lifecycle.md` for `tempStoredFileName -> storedFileUUID -> readUrl / relative url -> file descriptor`.
+- Do not copy shared upload endpoint or payload blocks into Gate references. Gate guidance only owns Gate operations, auth, and scope.
+
+
+## Anti-Overlap Checklist
+
+- [ ] Unique scope: Gate operations and their auth/scope behavior.
+- [ ] Neighbor links: use `file-upload` for upload lifecycle; use `fusebase-dashboards` for dashboard `files` columns.
+- [ ] No duplicated dashboard `batchPutDashboardData` payload details here.
+- [ ] Only hand off `storedFileUUID`, `readUrl`, or file descriptor outputs to neighboring skills.
+
+
 ## Verify gate MCP connection
 
 Before any work with gate MCP, verify that the **fusebase-gate** MCP server is connected.
