@@ -12,6 +12,14 @@ Use the same terminology everywhere: `tempStoredFileName`, `storedFileUUID`, `re
    - `relative url` is a stored file path that must be prefixed before display.
 4. Pass a file descriptor to the next layer.
 
+<!-- CUSTOM:SKILL:BEGIN -->
+## Flow Selection Rule
+
+- Use the `web-editor/file/v2-upload` -> `bucket-files/create-relative` flow for files uploaded as note attachments.
+- Use the Gate `startMultipartFileUpload` -> direct `PUT` -> `completeMultipartFileUpload` flow for non-note file uploads.
+- When a note needs a readable image/file URL after upload, keep the note attachment lifecycle on the web-editor flow and use the resulting file descriptor or URL returned by that flow.
+<!-- CUSTOM:SKILL:END -->
+
 ## Create A Temp File
 
 For files smaller than 50 MB, send multipart/form-data to:

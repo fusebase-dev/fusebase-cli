@@ -34,6 +34,13 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 - Do not send block ids, storage-provider-specific headers, visibility, public URL, or read access mode fields.
 - Do not describe dashboard `files` column payloads here; after Gate completion, hand off the file descriptor or `readUrl` to the owning skill.
 
+<!-- CUSTOM:SKILL:BEGIN -->
+## Flow Selection
+
+- Use Gate multipart operations for non-note file uploads.
+- Do not use Gate multipart operations as the default path for note attachment uploads; notes should keep the `web-editor/file/v2-upload` -> `bucket-files/create-relative` lifecycle documented in `file-upload/references/upload-lifecycle.md`.
+<!-- CUSTOM:SKILL:END -->
+
 ## Access Model
 
 - Upload, multipart, and delete flows require `files.write` and org access.
