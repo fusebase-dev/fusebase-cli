@@ -23,7 +23,18 @@ Required fields:
 - `file`: the file bytes
 - `folder`: `apps`
 
-The response includes `name`; treat it as `tempStoredFileName`.
+Response:
+
+```json
+{
+  "name": "notes/119/1766749985-f5Ai3b/file.docx",
+  "type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "filename": "file.docx",
+  "size": 16511
+}
+```
+
+Use `name` as `tempStoredFileName` for the stored-file step.
 
 For files 50 MB or larger, use multipart upload against the same endpoint:
 
@@ -31,7 +42,125 @@ For files 50 MB or larger, use multipart upload against the same endpoint:
 2. Upload each chunk to the returned part URL with `PUT`.
 3. Finish with `action=finish`, uploaded `parts`, `uploadingId`, and `tempStoredFileName`.
 
+Start request fields:
+
+- `action`: `start`
+- `folder`: `apps`
+- `name`: original file name
+- `type`: MIME type
+- `size`: file size in bytes
+
+Start response:
+
+```json
+{
+  "id": "rTuydPY3YaUR5rZ1kk3",
+  "partsUrls": [
+    "https://s3-bucket.s3-eu-central-1.amazonaws.com/notes/119/1766750238-wqXiUD/recording.mov?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=..."
+  ],
+  "partSize": 52428800,
+  "tempStoredfileName": "notes/119/1766750238-wqXiUD/recording.mov"
+}
+```
+
+API quirk: some legacy responses/fields spell this as `tempStoredfileName` with a lowercase `f`. Treat that value as canonical `tempStoredFileName` in guidance and handoffs, but send the exact field name required by the endpoint or SDK schema you are calling.
+
+Finish request fields:
+
+- `action`: `finish`
+- `parts`: JSON array of uploaded parts, each with `etag` and `partNumber`
+- `uploadingId`: `id` from the start response
+- `tempStoredfileName`: temp name from the start response, if this endpoint expects the legacy casing
+
 Each chunk should be retried up to 3 times before failing the upload.
+
+Example large-file helper:
+
+```typescript
+const UPLOAD_URL =
+  "https://app-api.{FUSEBASE_HOST}/v3/api/web-editor/file/v2-upload";
+const CHUNK_RETRIES = 3;
+
+async function uploadLargeFile(
+  file: File,
+  featureToken: string,
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<{ tempStoredFileName: string } | null> {
+  const startForm = new FormData();
+  startForm.append("action", "start");
+  startForm.append("folder", "apps");
+  startForm.append("name", file.name);
+  startForm.append("type", file.type);
+  startForm.append("size", String(file.size));
+
+  const startRes = await fetch(UPLOAD_URL, {
+    method: "POST",
+    headers: { "x-app-feature-token": featureToken },
+    body: startForm,
+  });
+  if (!startRes.ok) return null;
+  const { id, partsUrls, partSize, tempStoredfileName } =
+    await startRes.json();
+
+  const progress = new Array(partsUrls.length).fill(0);
+
+  const uploadChunk = async (
+    url: string,
+    index: number,
+  ): Promise<{ etag: string; partNumber: number }> => {
+    const chunk = file.slice(index * partSize, (index + 1) * partSize);
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < CHUNK_RETRIES; attempt++) {
+      try {
+        const res = await fetch(url, { method: "PUT", body: chunk });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const etag = JSON.parse(res.headers.get("etag") ?? '""');
+        if (!etag) throw new Error("Missing etag");
+
+        if (onProgress) {
+          progress[index] = chunk.size;
+          onProgress(
+            progress.reduce((a, b) => a + b, 0),
+            file.size,
+          );
+        }
+
+        return { etag, partNumber: index + 1 };
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+
+    throw new Error(
+      `Chunk ${index} failed after ${CHUNK_RETRIES} attempts: ${lastError?.message}`,
+    );
+  };
+
+  const parts = await Promise.all(
+    partsUrls.map((url: string, index: number) => uploadChunk(url, index)),
+  );
+
+  const finishForm = new FormData();
+  finishForm.append("action", "finish");
+  finishForm.append("parts", JSON.stringify(parts));
+  finishForm.append("uploadingId", id);
+  finishForm.append("tempStoredfileName", tempStoredfileName);
+
+  const finishRes = await fetch(UPLOAD_URL, {
+    method: "POST",
+    headers: { "x-app-feature-token": featureToken },
+    body: finishForm,
+  });
+  if (!finishRes.ok) return null;
+
+  const result = await finishRes.json();
+  return {
+    tempStoredFileName: result.tempStoredFileName ?? result.tempStoredfileName,
+  };
+}
+```
 
 ## Create A Stored File
 
@@ -52,11 +181,73 @@ The response includes `attachment.storedFileUUID` and file metadata. Use `stored
 
 Gate note: file-service stored-file JSON uses `uuid`; Gate file operations expose that same value as `storedFileUUID` and may also return `fileId` as an alias. In guidance and handoffs, prefer `storedFileUUID`.
 
+Stored-file response shape:
+
+```json
+{
+  "bucket": {
+    "globalId": "string",
+    "userId": 0,
+    "workspaceId": "string",
+    "target": "string",
+    "targetId": "string",
+    "groupId": "string",
+    "activeItems": 0,
+    "clock": 0,
+    "deleted": false
+  },
+  "attachment": {
+    "globalId": "string",
+    "bucketId": "string",
+    "userId": 0,
+    "workspaceId": "string",
+    "filename": "string",
+    "storedFileUUID": "string",
+    "kind": "file",
+    "type": "string",
+    "size": 0,
+    "extra": {},
+    "clock": 0,
+    "deleted": false,
+    "updatedAt": 0,
+    "createdAt": 0,
+    "noteServiceAttachment": true
+  },
+  "file": {
+    "globalId": "string",
+    "bucketId": "string",
+    "target": "task",
+    "targetId": "string",
+    "portalId": "string",
+    "orgId": "string",
+    "workspaceId": "string",
+    "filename": "string",
+    "type": "image",
+    "format": "string",
+    "userId": 0,
+    "size": 0,
+    "createdAt": 0,
+    "deleted": false,
+    "url": "string",
+    "extra": {}
+  }
+}
+```
+
 ## Display URLs
 
 If the upload API returns a `relative url`, prepend:
 
 `https://app.{FUSEBASE_HOST}/box/file`
+
+Example:
+
+```typescript
+function buildFileHref(url: string): string {
+  if (/^https?:\/\//.test(url)) return url;
+  return `https://app.{FUSEBASE_HOST}/box/file${url}`;
+}
+```
 
 If Gate returns `readUrl`, use it as-is for reads, links, or image `src`.
 
