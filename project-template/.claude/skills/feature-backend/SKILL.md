@@ -95,6 +95,56 @@ fusebase remote-logs runtime <featureId> --container chromium
 
 For full sidecar documentation, see the **feature-sidecar** skill.
 
+## Total Resource Budget
+
+Azure Container Apps caps the **sum** of CPU and memory across **all containers in one revision** (backend + every sidecar) at:
+
+> **Max 2.0 CPU / 4.0 Gi RAM**
+
+Configurations that exceed this cap are rejected at deploy time, even if every individual container is within an allowed tier.
+
+### Tier reference
+
+These are the only allowed tiers (matches the `DeploySidecarDefinition` contract in the CLI):
+
+| Tier | CPU | Memory |
+|------|-----|--------|
+| small | 0.5 | 1Gi |
+| medium | 1 | 2Gi |
+| large | 2 | 4Gi |
+
+### Backend container default tier
+
+The **backend container itself always runs at `small` (0.5 CPU / 1 Gi)**. This is fixed today and is not user-configurable — only sidecars accept a `--tier` option. When you compute the total budget, always start from `0.5 CPU / 1 Gi` for the backend.
+
+### Worked examples
+
+**Fits** — backend (small) + chromium sidecar (medium) + redis sidecar (small):
+
+```
+backend     small    0.5 CPU / 1 Gi
+chromium    medium   1.0 CPU / 2 Gi
+redis       small    0.5 CPU / 1 Gi
+-------------------------------------
+TOTAL                2.0 CPU / 4 Gi   ✓ at the limit
+```
+
+**Exceeds** — backend (small) + chromium (medium) + lightpanda (medium):
+
+```
+backend     small    0.5 CPU / 1 Gi
+chromium    medium   1.0 CPU / 2 Gi
+lightpanda  medium   1.0 CPU / 2 Gi
+-------------------------------------
+TOTAL                2.5 CPU / 5 Gi   ✗ Azure rejects, deploy will fail
+```
+
+If a revision would exceed the cap, downgrade one of the sidecars to a smaller tier (e.g. lightpanda is intended as a lightweight browser and runs fine at `small`).
+
+### Cron jobs are excluded
+
+**Cron jobs do NOT count toward this limit.** Each cron job runs as its own separate container (see *Scheduled Tasks (Cron Jobs)* below) with an independent resource budget — the 2.0 CPU / 4.0 Gi cap applies only to the live backend revision (backend + sidecars), not to scheduled job containers.
+
 - Background processing or scheduled tasks
 
 **Do NOT add a backend** just for CRUD on dashboard data — use the Dashboard SDK directly from the SPA.
@@ -424,6 +474,7 @@ Before adding a backend:
 - [ ] Updated `fusebase.json` with `backend` block
 - [ ] SPA does not define routes under `/api`
 - [ ] No `.env` files or `dotenv` — secrets injected by `fusebase dev start`
+- [ ] Verified backend tier + all sidecar tiers sum to ≤ 2 CPU / 4 Gi
 
 
 
