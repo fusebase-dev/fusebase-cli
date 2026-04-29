@@ -4,6 +4,9 @@ import { join } from "path";
 import {
   loadFuseConfig,
   invalidateFuseConfigCache,
+  hasFlag,
+  type BackendJobConfig,
+  type FeatureConfig,
   type SidecarConfig,
 } from "../config";
 
@@ -40,6 +43,33 @@ function parseEnvPairs(envArgs: string[]): Record<string, string> {
   return result;
 }
 
+function ensureJobFlagOrExit(jobName: string | undefined): void {
+  if (jobName === undefined) return;
+  if (!hasFlag("job-sidecars")) {
+    console.error(
+      `Error: --job requires the 'job-sidecars' flag. Run: fusebase config set-flag job-sidecars`,
+    );
+    process.exit(1);
+  }
+}
+
+function findJobOrExit(
+  feature: FeatureConfig,
+  featureId: string,
+  jobName: string,
+): BackendJobConfig {
+  const jobs = feature.backend?.jobs ?? [];
+  const job = jobs.find((j) => j.name === jobName);
+  if (!job) {
+    console.error(
+      `Error: Job "${jobName}" not found in feature "${featureId}". ` +
+        `Available jobs: ${jobs.map((j) => j.name).join(", ") || "(none)"}`,
+    );
+    process.exit(1);
+  }
+  return job;
+}
+
 const addCommand = new Command("add")
   .description("Add a sidecar container to a feature backend in fusebase.json")
   .requiredOption(
@@ -62,6 +92,10 @@ const addCommand = new Command("add")
     (val: string, prev: string[]) => [...prev, val],
     [] as string[],
   )
+  .option(
+    "-j, --job <jobName>",
+    "Attach the sidecar to the named cron job instead of the backend (requires 'job-sidecars' flag)",
+  )
   .action(
     (opts: {
       feature: string;
@@ -70,7 +104,10 @@ const addCommand = new Command("add")
       port?: number;
       tier?: string;
       env: string[];
+      job?: string;
     }) => {
+      ensureJobFlagOrExit(opts.job);
+
       const fuseJsonPath = join(process.cwd(), FUSE_JSON);
 
       if (!existsSync(fuseJsonPath)) {
@@ -113,8 +150,6 @@ const addCommand = new Command("add")
         process.exit(1);
       }
 
-      const sidecars: SidecarConfig[] = feature.backend.sidecars ?? [];
-
       if (!SIDECAR_NAME_REGEX.test(opts.name)) {
         console.error(
           `Error: Invalid sidecar name "${opts.name}". ` +
@@ -123,9 +158,21 @@ const addCommand = new Command("add")
         process.exit(1);
       }
 
+      const job = opts.job
+        ? findJobOrExit(feature, opts.feature, opts.job)
+        : null;
+
+      const sidecars: SidecarConfig[] = job
+        ? (job.sidecars ?? [])
+        : (feature.backend.sidecars ?? []);
+
+      const scopeLabel = job
+        ? `job "${opts.job}" of feature "${opts.feature}"`
+        : `feature "${opts.feature}"`;
+
       if (sidecars.some((s) => s.name === opts.name)) {
         console.error(
-          `Error: A sidecar named "${opts.name}" already exists for feature "${opts.feature}". ` +
+          `Error: A sidecar named "${opts.name}" already exists for ${scopeLabel}. ` +
             `Use a different name or remove the existing sidecar first.`,
         );
         process.exit(1);
@@ -133,7 +180,7 @@ const addCommand = new Command("add")
 
       if (sidecars.length >= MAX_SIDECARS) {
         console.error(
-          `Error: Feature "${opts.feature}" already has ${MAX_SIDECARS} sidecars (maximum). ` +
+          `Error: ${scopeLabel[0]!.toUpperCase()}${scopeLabel.slice(1)} already has ${MAX_SIDECARS} sidecars (maximum). ` +
             `Remove an existing sidecar before adding a new one.`,
         );
         process.exit(1);
@@ -164,7 +211,12 @@ const addCommand = new Command("add")
         newSidecar.env = parseEnvPairs(opts.env);
       }
 
-      feature.backend.sidecars = [...sidecars, newSidecar];
+      const nextSidecars = [...sidecars, newSidecar];
+      if (job) {
+        job.sidecars = nextSidecars;
+      } else {
+        feature.backend.sidecars = nextSidecars;
+      }
 
       const raw = readFileSync(fuseJsonPath, "utf-8");
       const indent = detectIndent(raw);
@@ -176,7 +228,9 @@ const addCommand = new Command("add")
       invalidateFuseConfigCache();
 
       console.log(
-        `✓ Added sidecar "${opts.name}" to feature "${opts.feature}" in ${FUSE_JSON}`,
+        job
+          ? `✓ Added sidecar "${opts.name}" to job "${opts.job}" of feature "${opts.feature}" in ${FUSE_JSON}`
+          : `✓ Added sidecar "${opts.name}" to feature "${opts.feature}" in ${FUSE_JSON}`,
       );
       console.log(`  Image: ${opts.image}`);
       if (opts.port !== undefined) console.log(`  Port:  ${opts.port}`);
@@ -196,7 +250,13 @@ const removeCommand = new Command("remove")
     "Feature ID to remove the sidecar from",
   )
   .requiredOption("-n, --name <name>", "Sidecar name to remove")
-  .action((opts: { feature: string; name: string }) => {
+  .option(
+    "-j, --job <jobName>",
+    "Remove from the named cron job instead of the backend (requires 'job-sidecars' flag)",
+  )
+  .action((opts: { feature: string; name: string; job?: string }) => {
+    ensureJobFlagOrExit(opts.job);
+
     const fuseJsonPath = join(process.cwd(), FUSE_JSON);
 
     if (!existsSync(fuseJsonPath)) {
@@ -220,18 +280,36 @@ const removeCommand = new Command("remove")
     }
 
     const feature = features[featureIndex]!;
-    const sidecars: SidecarConfig[] = feature.backend?.sidecars ?? [];
+    const job = opts.job
+      ? findJobOrExit(feature, opts.feature, opts.job)
+      : null;
+
+    const sidecars: SidecarConfig[] = job
+      ? (job.sidecars ?? [])
+      : (feature.backend?.sidecars ?? []);
     const sidecarIndex = sidecars.findIndex((s) => s.name === opts.name);
     if (sidecarIndex === -1) {
+      const scopeLabel = job
+        ? `job "${opts.job}" of feature "${opts.feature}"`
+        : `feature "${opts.feature}"`;
       console.error(
-        `Error: No sidecar named "${opts.name}" found for feature "${opts.feature}".`,
+        `Error: No sidecar named "${opts.name}" found for ${scopeLabel}.`,
       );
       process.exit(1);
     }
 
-    feature.backend!.sidecars = sidecars.filter((s) => s.name !== opts.name);
-    if (feature.backend!.sidecars.length === 0) {
-      delete feature.backend!.sidecars;
+    const nextSidecars = sidecars.filter((s) => s.name !== opts.name);
+    if (job) {
+      if (nextSidecars.length === 0) {
+        delete job.sidecars;
+      } else {
+        job.sidecars = nextSidecars;
+      }
+    } else {
+      feature.backend!.sidecars = nextSidecars;
+      if (feature.backend!.sidecars.length === 0) {
+        delete feature.backend!.sidecars;
+      }
     }
 
     const raw = readFileSync(fuseJsonPath, "utf-8");
@@ -244,7 +322,9 @@ const removeCommand = new Command("remove")
     invalidateFuseConfigCache();
 
     console.log(
-      `✓ Removed sidecar "${opts.name}" from feature "${opts.feature}" in ${FUSE_JSON}`,
+      job
+        ? `✓ Removed sidecar "${opts.name}" from job "${opts.job}" of feature "${opts.feature}" in ${FUSE_JSON}`
+        : `✓ Removed sidecar "${opts.name}" from feature "${opts.feature}" in ${FUSE_JSON}`,
     );
     console.log(
       `  The sidecar will be removed from cloud infrastructure on the next fusebase deploy.`,
@@ -257,7 +337,13 @@ const listCommand = new Command("list")
     "-f, --feature <featureId>",
     "Feature ID to list sidecars for",
   )
-  .action((opts: { feature: string }) => {
+  .option(
+    "-j, --job <jobName>",
+    "List sidecars for the named cron job instead of the backend (requires 'job-sidecars' flag)",
+  )
+  .action((opts: { feature: string; job?: string }) => {
+    ensureJobFlagOrExit(opts.job);
+
     const fuseConfig = loadFuseConfig();
     if (!fuseConfig) {
       console.error(
@@ -275,17 +361,27 @@ const listCommand = new Command("list")
       process.exit(1);
     }
 
-    const sidecars: SidecarConfig[] = feature.backend?.sidecars ?? [];
+    const job = opts.job
+      ? findJobOrExit(feature, opts.feature, opts.job)
+      : null;
+
+    const sidecars: SidecarConfig[] = job
+      ? (job.sidecars ?? [])
+      : (feature.backend?.sidecars ?? []);
 
     if (sidecars.length === 0) {
       console.log(
-        `No sidecars configured for feature "${opts.feature}".`,
+        job
+          ? `No sidecars configured for job "${opts.job}" of feature "${opts.feature}".`
+          : `No sidecars configured for feature "${opts.feature}".`,
       );
       return;
     }
 
     console.log(
-      `Sidecars for feature "${opts.feature}" (${sidecars.length}/${MAX_SIDECARS}):`,
+      job
+        ? `Sidecars for job "${opts.job}" of feature "${opts.feature}" (${sidecars.length}/${MAX_SIDECARS}):`
+        : `Sidecars for feature "${opts.feature}" (${sidecars.length}/${MAX_SIDECARS}):`,
     );
     console.log();
 

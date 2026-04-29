@@ -514,6 +514,46 @@ fusebase update --skip-commit
 
 ---
 
+### `fusebase sidecar`
+
+Manage sidecar containers for a feature backend or for a specific cron job. Sidecars are pre-built Docker images that run alongside the main container, sharing its network namespace (reachable on `localhost`). Stored in `fusebase.json` under `features[].backend.sidecars[]` (backend) or `features[].backend.jobs[].sidecars[]` (per cron job).
+
+```bash
+# Add a sidecar to the backend (default — same as today)
+fusebase sidecar add --feature <featureId> --name <name> --image <image> \
+  [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...]
+
+# Add a sidecar to a specific cron job (requires the job-sidecars flag)
+fusebase sidecar add --feature <featureId> --job <jobName> --name <name> --image <image> \
+  [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...]
+
+# Remove a sidecar
+fusebase sidecar remove --feature <featureId> --name <name> [--job <jobName>]
+
+# List configured sidecars
+fusebase sidecar list --feature <featureId> [--job <jobName>]
+```
+
+**Options:**
+
+- `--feature <featureId>` (required) — feature ID
+- `--name <name>` (required for add/remove) — sidecar name. Lowercase letters, digits, and hyphens; max 63 chars; must start with a lowercase letter.
+- `--image <image>` (required for add) — Docker image reference (e.g. `browserless/chrome:latest`)
+- `--port <port>` — port the sidecar listens on (informational; `localhost:<port>` from the main container)
+- `--tier small|medium|large` — resource tier (default: `small`)
+- `--env KEY=VALUE` — environment variables, repeatable
+- `--job <jobName>` — attach the sidecar to the named cron job instead of the backend. **Requires the `job-sidecars` flag** (`fusebase config set-flag job-sidecars`). Without `--job`, all three subcommands target backend sidecars exactly as today.
+
+**Limits and rules:**
+
+- Max **3 sidecars per scope**. The backend's cap is independent of each job's cap — every job has its own 3-sidecar budget.
+- Sidecar names must be unique within a scope. The same name (e.g. `chromium`) may exist on the backend and on a cron job; they are separate containers in separate replicas.
+- Backend sidecars share the backend container app's network namespace. Cron-job sidecars share **the cron job replica's** network namespace only — they are isolated from the backend's sidecars and from sidecars in other jobs.
+- Replicas of a cron job complete when the **main job container** exits. Non-exiting sidecars (headless browsers, Redis, etc.) are torn down automatically with the replica; `replicaTimeout=3600s` is the hard ceiling.
+- `fusebase dev start` does not run cron jobs nor sidecars — they only take effect after `fusebase deploy`.
+
+---
+
 ### `fusebase env create`
 
 Create or overwrite `.env` in the current app with MCP token and URL. Use this after `fusebase init` or when the token has expired.
@@ -562,6 +602,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `mcp-gate-debug` | Copies the `mcp-gate-debug` skill: after Fusebase Gate MCP tool runs, summarize smooth vs rough paths and suggest improvements to `.claude/skills/fusebase-gate`, prompts, or MCP server behavior — prioritize **isolated stores** (SQL/NoSQL) flows |
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); also turns on required template references and `isolated_store.*` permissions in `fusebase env create` |
 | `portal-specific-features` | Includes portal-specific feature guidance in prompts: `fusebase-portal-specific-features` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
+| `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`features[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `feature-sidecar` and `feature-backend` skill templates. |
 
 Enable a flag globally, then refresh the project template:
 

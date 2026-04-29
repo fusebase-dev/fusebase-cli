@@ -484,6 +484,8 @@ Before adding a backend:
 
 Cron jobs run on a schedule using the **same Docker image** as the feature backend. Each job is an independent process that executes a command on a cron schedule and exits.
 
+> **⚠️ Cron jobs cannot reach backend sidecars on `localhost`.** Cron jobs are deployed as **independent Azure Container Apps Jobs**, not as part of the backend container app, so they do not share the backend's network namespace. A cron container that calls `http://localhost:9222` (or any other backend sidecar port) will fail with `fetch failed`.<% if (it.flags?.includes("job-sidecars")) { %> If a cron needs an auxiliary container, declare a **per-job sidecar** — see [Job Sidecars](#job-sidecars) below.<% } else { %> If a cron needs an auxiliary container, call back to the main backend over its public URL (`/api/...`), where the backend can use its own sidecars.<% } %>
+
 ### 1. Register the job in fusebase.json
 
 ```bash
@@ -548,9 +550,53 @@ fusebase job delete --feature <featureId> --name <job-name>
 
 This removes the job from `backend.jobs` in `fusebase.json`. On the next `fusebase deploy` the job will be automatically deleted from cloud infrastructure.
 
-### Cron Jobs Checklist
+<% if (it.flags?.includes("job-sidecars")) { %>
+### Job Sidecars
+
+Each cron job can declare its own sidecar containers under `features[].backend.jobs[].sidecars`. Sidecars share the **job replica's** network namespace, not the backend's, so the main job container talks to them on `localhost:<port>` exactly the way the backend talks to its own sidecars.
+
+Add a sidecar to a job:
+
+```bash
+fusebase sidecar add \
+  --feature <featureId> \
+  --job <jobName> \
+  --name <name> \
+  --image <dockerImage> \
+  [--port <port>] \
+  [--tier small|medium|large] \
+  [--env KEY=VALUE ...]
+```
+
+Example — a screenshot cron with its own headless browser:
+
+```bash
+fusebase sidecar add \
+  --feature my-scraper \
+  --job screenshots \
+  --name chromium \
+  --image browserless/chrome:latest \
+  --port 9222 \
+  --tier medium \
+  --env PORT=9222
+```
+
+Use `fusebase sidecar remove --job <jobName>` and `fusebase sidecar list --job <jobName>` to manage them. When `--job` is omitted, the commands target backend sidecars exactly as before.
+
+Key constraints:
+
+- Each job has its own **3-sidecar cap**, independent of the backend cap.
+- Sidecar names are unique **per scope** — the same name (e.g. `chromium`) may exist on the backend and on a job; they are separate containers in separate replicas.
+- Replica completion is determined by the **main job container's exit**. Non-exiting sidecars (headless browsers, Redis, etc.) are torn down with the replica; no custom shutdown logic is needed. `replicaTimeout=3600s` is the hard ceiling.
+- `fusebase dev start` still does **not** run cron jobs nor any sidecars — job sidecars take effect only after `fusebase deploy`.
+
+For full details (config format, networking, debugging), see the **feature-sidecar** skill.
+
+<% } %>### Cron Jobs Checklist
 
 - [ ] Feature already has a `backend/` folder and a `backend` block in `fusebase.json` (backend is scaffolded first)
 - [ ] Added `cron:<job-name>` npm script to `backend/package.json`
 - [ ] Ran `fusebase job create` to register the job
 - [ ] Ran `fusebase deploy` to deploy the feature — **cron jobs only run after deployment**, not during `fusebase dev start`
+<% if (it.flags?.includes("job-sidecars")) { %>- [ ] If the cron needs an auxiliary container (browser, cache, etc.), attached sidecars to the **job** via `fusebase sidecar add --job <jobName>` (not the backend)
+<% } %>

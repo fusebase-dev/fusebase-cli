@@ -451,6 +451,25 @@ fusebase sidecar list --feature <featureId>
 
 Sidecars are stored in `fusebase.json` under `features[].backend.sidecars[]` and deployed on the next `fusebase deploy`.
 
+<% if (it.flags?.includes("job-sidecars")) { %>**Per-job sidecars (`--job <jobName>`):**
+
+Cron jobs declared under `features[].backend.jobs[]` deploy as **independent** Azure Container Apps Jobs and do **not** share the backend container app's network namespace. To give a specific cron job its own auxiliary container (e.g. a headless browser used only by a screenshot cron), pass `--job <jobName>` to all three subcommands:
+
+```bash
+# Add a sidecar to a job
+fusebase sidecar add --feature <featureId> --job <jobName> \
+  --name <name> --image <image> [--port <port>] [--tier ...] [--env ...]
+
+# Remove a sidecar from a job
+fusebase sidecar remove --feature <featureId> --job <jobName> --name <name>
+
+# List sidecars on a job
+fusebase sidecar list --feature <featureId> --job <jobName>
+```
+
+When `--job` is omitted, all three subcommands target backend sidecars exactly as before. Each job has its own 3-sidecar cap, independent of the backend cap. Sidecar names are unique per scope — the same name (e.g. `chromium`) may exist on the backend and on a job. Per-job sidecars are stored under `features[].backend.jobs[].sidecars[]` in `fusebase.json` and deployed on the next `fusebase deploy`. See the **feature-sidecar** skill for full details (networking, termination, examples).
+<% } %>
+
 ### Remote Logs (Deployed Backends)
 
 Fetch logs from deployed feature backends. **Only applicable to features with a `backend/` folder.** Use this for production issues, NOT for local development (for local dev, see the `dev-debug-logs` skill).

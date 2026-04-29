@@ -33,6 +33,7 @@ export interface BackendJobConfig {
   type: "cron";
   cron: string;
   command: string;
+  sidecars?: SidecarConfig[];
 }
 
 export interface SidecarConfig {
@@ -130,6 +131,7 @@ export const KNOWN_FLAGS = [
   "isolated-stores",
   "portal-specific-features",
   "api-exploration",
+  "job-sidecars",
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
@@ -146,6 +148,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include portal-specific feature prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
   "api-exploration":
     "Include api-exploration skill for verifying API endpoints with temporary tokens and test scripts.",
+  "job-sidecars":
+    "Enable per-job sidecar containers for cron jobs (`fusebase sidecar add --job <name>`).",
 };
 
 export function getFlags(): string[] {
