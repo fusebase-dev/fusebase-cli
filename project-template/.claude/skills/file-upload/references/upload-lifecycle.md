@@ -259,9 +259,11 @@ Stored-file response shape:
 
 ## Display URLs
 
-If the upload API returns a `relative url`, prepend:
+If the upload API returns a `relative url` or a `file.url` that starts with `/`, prepend:
 
 `https://app.{FUSEBASE_HOST}/box/file`
+
+Never put a relative stored-file URL directly into an `<a href>`, image `src`, or persisted downstream `file descriptor.url`. Browsers resolve `/uuid/name.ext` against the current app host, which can point at the wrong service and return 404.
 
 Example:
 
@@ -288,6 +290,8 @@ A file descriptor is the object passed to downstream features after upload. Incl
 - `workspaceId`
 - `storedFileUUID`
 - `kind`
+
+For `url`, store a display-ready URL. If the stored-file response gives a relative `file.url`, normalize it with `buildFileHref` before saving a new descriptor, and also apply the same helper when rendering already-saved descriptors so legacy relative URLs still open correctly.
 
 The dashboard adapter uses this descriptor inside a `files` column value. Gate adapters may also expose `fileId`, `publicFileName`, and `readUrl`; those are Gate operation outputs, not a separate lifecycle.
 

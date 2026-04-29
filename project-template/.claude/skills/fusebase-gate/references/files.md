@@ -1,5 +1,5 @@
 ---
-version: "1.9.0"
+version: "1.10.0"
 mcp_prompt: files
 last_synced: "2026-04-29"
 title: "Fusebase Gate Files Flows"
@@ -14,7 +14,7 @@ category: specialized
 ---
 ## Fusebase Gate Files Flows
 
-This reference covers only Gate file operations and their auth/scope behavior. For the canonical low-level upload lifecycle and shared terminology, use `file-upload/references/upload-lifecycle.md`.
+This reference covers only Gate file operations and their auth/scope behavior. For the canonical low-level upload lifecycle, shared terminology, relative display URL normalization, and file descriptor construction, use `file-upload/references/upload-lifecycle.md`.
 
 ## Relevant Operations
 
@@ -32,7 +32,8 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 - Capture the direct PUT response ETag, strip wrapping quotes if present, and send it to `completeMultipartFileUpload` as `parts: [{ etag, partNumber: 1 }]` for one-part uploads.
 - Treat the temp upload name as `tempStoredFileName` in guidance and handoffs. Follow `tools_describe`/SDK schema for the exact request field name required by the current Gate contract.
 - `completeMultipartFileUpload` always creates the stored-file record after file-service finish succeeds. Persist `storedFileUUID` as the canonical stored-file id, plus `publicFileName` and `readUrl`.
-- Use the returned `readUrl` for reads or image `src`. Use the returned `storedFileUUID` with notes `addWorkspaceNoteAttachment` to attach the file to a note.
+- Use the returned Gate `readUrl` for reads or image `src`. If another upload flow returns a relative `file.url` such as `/uuid/name.ext`, do not render or persist it as a browser href directly; normalize it through the file-upload display URL rule before saving descriptors or rendering existing descriptors.
+- Use the returned `storedFileUUID` with notes `addWorkspaceNoteAttachment` to attach the file to a note.
 - `deleteFile` calls file-service as `DELETE /storedfiles/{uuid}`. Use the `storedFileUUID` returned by completion, not `tempStoredFileName`.
 - Do not send block ids, storage-provider-specific headers, unsigned `Content-Type`, visibility, public URL, or read access mode fields.
 - Do not describe dashboard `files` column payloads here; after Gate completion, hand off the file descriptor or `readUrl` to the owning skill.
@@ -45,7 +46,7 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 
 ## Version
 
-- **Version**: 1.9.0
+- **Version**: 1.10.0
 - **Category**: specialized
 - **Last synced**: 2026-04-29
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
