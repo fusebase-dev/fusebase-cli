@@ -3,7 +3,7 @@ import type { CreateTokenRequest } from "./api";
 import { hasFlag } from "./config";
 
 /** Bump when fingerprint inputs change so old .env values force refresh once. */
-export const MCP_POLICY_SCHEMA_VERSION = 1 as const;
+export const MCP_POLICY_SCHEMA_VERSION = 2 as const;
 
 /** Written to `.env` after token refresh — sole source of truth for policy drift checks (`fusebase app update`, `fusebase env create`). */
 export const DASHBOARDS_MCP_POLICY_FP_KEY = "DASHBOARDS_MCP_POLICY_FP";
@@ -111,10 +111,10 @@ export function dashboardsMcpPolicyDescriptor(): Record<string, unknown> {
 }
 
 /** Serializable policy shape for Gate MCP token (isolated-stores toggles extra permissions). */
-export function gateMcpPolicyDescriptor(isolatedStores: boolean, filesFlag: boolean): Record<string, unknown> {
+export function gateMcpPolicyDescriptor(isolatedStores: boolean): Record<string, unknown> {
   const permissions = [
     ...GATE_PERMISSIONS_BASE,
-    ...(filesFlag ? FILE_PERMISSIONS : []),
+    ...FILE_PERMISSIONS,
     ...(isolatedStores ? GATE_PERMISSIONS_ISOLATED : []),
   ].sort((a, b) => a.localeCompare(b));
   return {
@@ -137,7 +137,7 @@ export function getExpectedMcpPolicyFingerprints(): {
 } {
   return {
     dashboards: fingerprintPolicyDescriptor(dashboardsMcpPolicyDescriptor()),
-    gate: fingerprintPolicyDescriptor(gateMcpPolicyDescriptor(hasFlag("isolated-stores"), hasFlag("files"))),
+    gate: fingerprintPolicyDescriptor(gateMcpPolicyDescriptor(hasFlag("isolated-stores"))),
   };
 }
 
@@ -150,7 +150,6 @@ export function getLegacyPermissionsOnlyFingerprints(): {
   gate: string;
 } {
   const isolatedStores = hasFlag("isolated-stores");
-  const filesFlag = hasFlag("files");
   return {
     dashboards: sha256Hex(
       stableStringify({
@@ -165,7 +164,7 @@ export function getLegacyPermissionsOnlyFingerprints(): {
         product: "gate-mcp",
         permissions: [
           ...GATE_PERMISSIONS_BASE,
-          ...(filesFlag ? FILE_PERMISSIONS : []),
+          ...FILE_PERMISSIONS,
           ...(isolatedStores ? GATE_PERMISSIONS_ISOLATED : []),
         ],
         isolated_stores: isolatedStores,
@@ -220,10 +219,7 @@ export function buildGateMcpTokenRequest(orgId: string, appId: string): CreateTo
   const isolated = hasFlag("isolated-stores")
     ? [...GATE_PERMISSIONS_ISOLATED]
     : [];
-  const files = hasFlag("files")
-    ? [...FILE_PERMISSIONS]
-    : [];
-  const permissions = [...GATE_PERMISSIONS_BASE, ...files, ...isolated];
+  const permissions = [...GATE_PERMISSIONS_BASE, ...FILE_PERMISSIONS, ...isolated];
   return {
     scopes: [
       { scope_type: "org", scope_id: orgId },
