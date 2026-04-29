@@ -16,6 +16,7 @@ import {
   fetchApp,
   fetchAppFeatures,
   copyBackendParams,
+  copyFrontendParams,
   type App,
   type AppFeature,
   type Deploy,
@@ -173,6 +174,23 @@ async function calculateBackendHash(dir: string): Promise<string> {
   return hash.digest("hex");
 }
 
+async function calculateFrontendHash(
+  dir: string,
+  exclude: string[] = [],
+): Promise<string> {
+  const { createHash } = await import("crypto");
+  const files = await getAllFiles(dir, dir, ["node_modules", ...exclude]);
+  files.sort();
+
+  const hash = createHash("sha256");
+  for (const file of files) {
+    hash.update(file);
+    const content = await readFile(join(dir, file));
+    hash.update(content);
+  }
+  return hash.digest("hex");
+}
+
 /**
  * Create a tar.gz archive of the given directory and return its path.
  * Uses the `tar` npm package (pure JS, no system tar dependency).
@@ -285,9 +303,12 @@ async function runBuildCommand(featureConfig: FeatureConfig): Promise<void> {
 
 export const deployCommand = new Command("deploy")
   .description("Deploy features to Fusebase")
-  .option("--force", "Force backend deploy even if source has not changed")
+  .option(
+    "--force",
+    "Force re-upload and re-deploy regardless of frontend/backend hash match",
+  )
   .action(async (opts: { force?: boolean }) => {
-    const forceBackend = opts.force ?? false;
+    const force = opts.force ?? false;
     // Check if app is initialized
     const fuseConfig = await loadFuseConfig();
     if (!fuseConfig) {
@@ -351,6 +372,7 @@ export const deployCommand = new Command("deploy")
       versionId: string;
       url: string;
       success: boolean;
+      skipped?: boolean;
       error?: string;
     }> = [];
 
@@ -390,13 +412,11 @@ export const deployCommand = new Command("deploy")
           // no backend folder
         }
 
-        // ── Static deploy flow ─────────────────────────────────
-        // Determine the directory to upload from (outputDir or path)
+        // ── Resolve upload directory and listing ────────────────────────────
         const uploadDir = featureConfig.build?.outputDir
           ? join(featureBasePath, featureConfig.build.outputDir)
           : featureBasePath;
 
-        // Check if upload directory exists
         try {
           await stat(uploadDir);
         } catch {
@@ -406,11 +426,10 @@ export const deployCommand = new Command("deploy")
           throw new Error(`output directory does not exist: ${outputDirPath}`);
         }
 
-        // Exclude backend folder from static upload when it lives in uploadDir
+        // Exclude backend folder from static upload/hash when it lives in uploadDir
         const staticExclude =
           hasBackendDir && !featureConfig.build?.outputDir ? ["backend"] : [];
 
-        // Get all files in upload directory
         const files = await getAllFiles(uploadDir, uploadDir, staticExclude);
         if (files.length === 0) {
           const outputDirPath = featureConfig.build?.outputDir
@@ -424,7 +443,23 @@ export const deployCommand = new Command("deploy")
         }
         console.log(`   Files: ${files.length}`);
 
-        // Check if the active backend version has the same hash
+        // ── Compute hashes upfront so skip decisions are made before any upload ──
+        console.log(`   Calculating frontend hash...`);
+        const frontendHash = await calculateFrontendHash(
+          uploadDir,
+          staticExclude,
+        );
+        logger.info("Frontend hash: %s", frontendHash);
+
+        let backendHash: string | undefined;
+        if (hasBackendDir) {
+          console.log(`   Calculating backend hash...`);
+          backendHash = await calculateBackendHash(backendDir);
+          logger.info("Backend hash: %s", backendHash);
+        }
+
+        // Fetch active version BEFORE creating a new one so we can decide which
+        // of the four branches to take (force / skip-all / frontend-copy / full)
         const activeVersion = await getActiveVersion(
           config.apiKey,
           fuseConfig.orgId,
@@ -432,7 +467,36 @@ export const deployCommand = new Command("deploy")
           featureId,
         ).catch(() => null);
 
-        // Create a new version
+        const frontendMatches =
+          !!activeVersion?.frontendHash &&
+          activeVersion.frontendHash === frontendHash;
+        const backendMatches = hasBackendDir
+          ? !!activeVersion?.backendHash &&
+            activeVersion.backendHash === backendHash
+          : true;
+
+        // ── Branch B: skip the whole feature (no version, no upload, no deploy) ─
+        if (!force && frontendMatches && backendMatches) {
+          console.log(
+            `   ✓ No changes for feature, skipping deploy\n`,
+          );
+
+          const feature = features.find((f) => f.id === featureId);
+          const featureUrl = feature?.sub
+            ? `https://${feature.sub}.${domain}/`
+            : "";
+
+          results.push({
+            featureId,
+            versionId: activeVersion?.globalId ?? "",
+            url: featureUrl,
+            success: true,
+            skipped: true,
+          });
+          continue;
+        }
+
+        // Create a new version (branches A, C, D)
         console.log(`   Creating version...`);
         const version = await createAppFeatureVersion(
           config.apiKey,
@@ -441,82 +505,92 @@ export const deployCommand = new Command("deploy")
           featureId,
         );
 
-        // Initialize upload
-        console.log(`   Initializing upload...`);
-        const uploadResponse = await initUpload(
-          config.apiKey,
-          fuseConfig.orgId,
-          fuseConfig.appId,
-          featureId,
-          version.id,
-          files,
-        );
-
-        // Upload files with progress
-        const totalFiles = uploadResponse.uploads.length;
-        let uploadedFiles = 0;
-        let totalBytes = 0;
-        let uploadedBytes = 0;
-
-        // Calculate total bytes
-        for (const file of files) {
-          const filePath = join(uploadDir, file);
-          const fileStats = await stat(filePath);
-          totalBytes += fileStats.size;
-        }
-
-        console.log(
-          `   Uploading ${totalFiles} files (${formatBytes(totalBytes)})...`,
-        );
-
-        const progressBar = new cliProgress.SingleBar({
-          format:
-            "   {bar} {percentage}% | {value}/{total} bytes | {files}/{totalFiles} files",
-          barCompleteChar: "█",
-          barIncompleteChar: "░",
-          hideCursor: true,
-        });
-        progressBar.start(totalBytes, 0, { files: 0, totalFiles });
-
-        // Upload files in parallel chunks
-        for (
-          let i = 0;
-          i < uploadResponse.uploads.length;
-          i += UPLOAD_CONCURRENCY
-        ) {
-          const chunk = uploadResponse.uploads.slice(i, i + UPLOAD_CONCURRENCY);
-
-          await Promise.all(
-            chunk.map(async (upload) => {
-              const filePath = join(uploadDir, upload.path);
-              const fileStats = await stat(filePath);
-
-              await uploadFile(upload.uploadUrl, upload.path, uploadDir);
-
-              uploadedFiles++;
-              uploadedBytes += fileStats.size;
-
-              progressBar.update(uploadedBytes, {
-                files: uploadedFiles,
-                totalFiles,
-              });
-            }),
+        // ── Frontend handling ───────────────────────────────────────────────
+        if (!force && frontendMatches && activeVersion?.globalId) {
+          // Branch C: frontend unchanged — reuse s3Path/frontendHash via copyFrontendParams
+          console.log(
+            `   ✓ Frontend unchanged (hash matches active version), skipping upload`,
           );
-        }
+          await copyFrontendParams(
+            config.apiKey,
+            fuseConfig.orgId,
+            version.id,
+            activeVersion.globalId,
+          );
+        } else {
+          // Branches A, D: upload frontend
+          console.log(`   Initializing upload...`);
+          const uploadResponse = await initUpload(
+            config.apiKey,
+            fuseConfig.orgId,
+            fuseConfig.appId,
+            featureId,
+            version.id,
+            files,
+            frontendHash,
+          );
 
-        progressBar.stop();
-        console.log(`   ✓ Static files deployed successfully\n`);
+          const totalFiles = uploadResponse.uploads.length;
+          let uploadedFiles = 0;
+          let totalBytes = 0;
+          let uploadedBytes = 0;
+
+          for (const file of files) {
+            const filePath = join(uploadDir, file);
+            const fileStats = await stat(filePath);
+            totalBytes += fileStats.size;
+          }
+
+          console.log(
+            `   Uploading ${totalFiles} files (${formatBytes(totalBytes)})...`,
+          );
+
+          const progressBar = new cliProgress.SingleBar({
+            format:
+              "   {bar} {percentage}% | {value}/{total} bytes | {files}/{totalFiles} files",
+            barCompleteChar: "█",
+            barIncompleteChar: "░",
+            hideCursor: true,
+          });
+          progressBar.start(totalBytes, 0, { files: 0, totalFiles });
+
+          for (
+            let i = 0;
+            i < uploadResponse.uploads.length;
+            i += UPLOAD_CONCURRENCY
+          ) {
+            const chunk = uploadResponse.uploads.slice(
+              i,
+              i + UPLOAD_CONCURRENCY,
+            );
+
+            await Promise.all(
+              chunk.map(async (upload) => {
+                const filePath = join(uploadDir, upload.path);
+                const fileStats = await stat(filePath);
+
+                await uploadFile(upload.uploadUrl, upload.path, uploadDir);
+
+                uploadedFiles++;
+                uploadedBytes += fileStats.size;
+
+                progressBar.update(uploadedBytes, {
+                  files: uploadedFiles,
+                  totalFiles,
+                });
+              }),
+            );
+          }
+
+          progressBar.stop();
+          console.log(`   ✓ Static files deployed successfully\n`);
+        }
 
         // ── Backend deploy flow (if backend folder present) ──────────────────
-        if (hasBackendDir) {
+        if (hasBackendDir && backendHash) {
           console.log(`   Deploying backend...`);
 
-          // Calculate hash of backend to detect changes
-          console.log(`   Calculating backend hash...`);
-          const backendHash = await calculateBackendHash(backendDir);
-          logger.info("Backend hash: %s", backendHash);
-
-          if (activeVersion?.backendHash === backendHash && !forceBackend) {
+          if (!force && backendMatches && activeVersion?.globalId) {
             console.log(
               `   ✓ Backend unchanged (hash matches active version), skipping deploy\n`,
             );
@@ -525,7 +599,7 @@ export const deployCommand = new Command("deploy")
               config.apiKey,
               fuseConfig.orgId,
               version.id,
-              activeVersion.globalId!,
+              activeVersion.globalId,
             );
           } else {
             console.log(
@@ -671,8 +745,11 @@ export const deployCommand = new Command("deploy")
     if (successful.length > 0) {
       console.log("✓ Successful deployments:");
       for (const result of successful) {
-        console.log(`  • ${result.featureId}`);
-        console.log(`    Version ID: ${result.versionId}`);
+        const tag = result.skipped ? " (skipped — no changes)" : "";
+        console.log(`  • ${result.featureId}${tag}`);
+        if (result.versionId) {
+          console.log(`    Version ID: ${result.versionId}`);
+        }
         if (result.url) {
           console.log(`    URL: ${result.url}`);
         }
