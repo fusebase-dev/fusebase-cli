@@ -20,6 +20,20 @@ Use the same terminology everywhere: `tempStoredFileName`, `storedFileUUID`, `re
 - When a note needs a readable image/file URL after upload, keep the note attachment lifecycle on the web-editor flow and use the resulting file descriptor or URL returned by that flow.
 <!-- CUSTOM:SKILL:END -->
 
+## Presigned PUT Headers
+
+For every direct `PUT` to a presigned S3 URL, inspect `X-Amz-SignedHeaders` in the URL before adding request headers.
+
+- If the URL has `X-Amz-SignedHeaders=host`, send a bare `PUT` with no custom headers:
+
+  ```typescript
+  await fetch(uploadUrl, { method: "PUT", body: bytes });
+  ```
+
+- Do not add `Content-Type`, storage-provider headers, or other custom headers unless they are explicitly listed in `X-Amz-SignedHeaders` or returned by the upload API as required headers.
+- In browser code, prefer `ArrayBuffer`/raw bytes for the body. A typed `Blob` or an explicit `Content-Type` can cause the browser to include `Content-Type` in the CORS preflight request; if the bucket CORS rules do not allow that header, `fetch` may fail with a generic network error before the `PUT` response is visible.
+- A cross-origin browser `PUT` can still preflight because `PUT` is not a CORS simple method. The important rule is to keep the requested headers aligned with the presigned URL and bucket CORS policy.
+
 ## Create A Temp File
 
 For files smaller than 50 MB, send multipart/form-data to:

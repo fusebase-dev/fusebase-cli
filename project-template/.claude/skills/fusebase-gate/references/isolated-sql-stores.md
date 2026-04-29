@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-04-21"
+last_synced: "2026-04-29"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -57,6 +57,7 @@ For `sql/postgres`, the current managed-store path already supports:
 - batch insert and CSV/TSV import via `COPY`
 - stage stats, table introspection, counts, and query/select paths
 - checkpoints and full stage restore
+- provider-switchable snapshot storage (`local_file` or `azure_blob`)
 - Studio migration/status rendering via bundle metadata persisted by Gate
 
 What it does not yet fully productize:
@@ -64,7 +65,7 @@ What it does not yet fully productize:
 - app release pipeline delivery of migration bundles
 - first-class snapshot preview API
 - completed SQL RLS enforcement layer
-- production-grade retention / external snapshot storage policy
+- production-grade retention policy and pruning workflow for stored snapshots
 
 For the next production-pilot cut, the main remaining tasks are:
 
@@ -292,4 +293,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-04-21
+- **Last synced**: 2026-04-29
