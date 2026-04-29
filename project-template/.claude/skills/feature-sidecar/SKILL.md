@@ -122,6 +122,15 @@ Each sidecar can have its own resource tier:
 
 Default tier is `small` if not specified. Choose based on the sidecar's workload — headless browsers typically need `medium` or `large`.
 
+> ⚠️ Total CPU/memory across the backend (small tier: 0.5 / 1 Gi) + all sidecars must stay within **2.0 CPU / 4.0 Gi** (Azure Container Apps limit). See the **Total Resource Budget** section in the `feature-backend` skill.
+
+Worked examples (numbers match the `feature-backend` skill):
+
+- backend (small) + chromium (medium) + redis (small) = 2.0 CPU / 4.0 Gi ✓
+- backend (small) + chromium (medium) + lightpanda (medium) = 2.5 CPU / 5 Gi ✗ → Azure rejects deploy, downgrade one sidecar to small.
+
+Cron jobs are **excluded** from this budget — each cron job runs as its own container.
+
 ## Environment Variables
 
 Sidecar env vars are isolated — they are NOT shared with the backend or other sidecars. Use them for sidecar-specific configuration:
@@ -199,3 +208,4 @@ fusebase deploy
 - [ ] Backend code uses `localhost:<port>` to communicate with sidecars
 - [ ] Tested sidecar locally with Docker (optional but recommended)
 - [ ] Deployed and verified with `fusebase remote-logs runtime`
+- [ ] Total CPU/memory = backend (small, 0.5/1 Gi) + Σ sidecar tiers ≤ 2 CPU / 4 Gi (Azure cap)
