@@ -199,6 +199,128 @@ fusebase deploy
 # Output includes:
 # Deploying feature "my-scraper" with sidecars: chromium
 ```
+<% if (it.flags?.includes("job-sidecars")) { %>
+
+## Job Sidecars
+
+Cron jobs (declared under `features[].backend.jobs[]`) are deployed as **separate Azure Container Apps Jobs**, not as part of the backend container app. They do **not** share the backend's network namespace, so a job cannot reach the backend's sidecars on `localhost`.
+
+To give a job its own auxiliary container (for example a headless browser used only by a screenshot cron), declare sidecars **on the job**.
+
+### Add a Sidecar to a Job
+
+```bash
+fusebase sidecar add \
+  --feature <featureId> \
+  --job <jobName> \
+  --name <name> \
+  --image <dockerImage> \
+  [--port <port>] \
+  [--tier small|medium|large] \
+  [--env KEY=VALUE ...]
+```
+
+Example — give a `screenshots` cron its own headless browser:
+
+```bash
+fusebase sidecar add \
+  --feature my-scraper \
+  --job screenshots \
+  --name chromium \
+  --image browserless/chrome:latest \
+  --port 9222 \
+  --tier medium \
+  --env PORT=9222
+```
+
+`--job` works the same way for `remove` and `list`:
+
+```bash
+fusebase sidecar remove --feature my-scraper --job screenshots --name chromium
+fusebase sidecar list --feature my-scraper --job screenshots
+```
+
+When `--job` is omitted, all three subcommands target backend sidecars exactly as before.
+
+### Configuration Format
+
+Job sidecars live under each job entry in `fusebase.json`:
+
+```json
+{
+  "features": [
+    {
+      "id": "my-scraper",
+      "backend": {
+        "jobs": [
+          {
+            "name": "screenshots",
+            "type": "cron",
+            "cron": "*/1 * * * *",
+            "command": "npm run cron:screenshots",
+            "sidecars": [
+              {
+                "name": "chromium",
+                "image": "browserless/chrome:latest",
+                "port": 9222,
+                "tier": "medium",
+                "env": { "PORT": "9222" }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+### Networking and Scope
+
+- Each cron job replica runs as an independent Azure Container Apps Job. Its sidecars share the network namespace of **that job replica only** — they are reachable on `localhost:<port>` from the job's main container.
+- Job sidecars are isolated from the backend container app's sidecars and from sidecars in other jobs.
+- Sidecar names are unique **within a scope**. The same name (e.g. `chromium`) may exist on the backend and on a job — they are separate containers in separate replicas.
+
+### Per-Job Limits
+
+- Each job has its own **3-sidecar cap**, independent of the backend's cap.
+- The backend can still have up to 3 sidecars; each job can add up to 3 more on top of that.
+
+### Termination Semantics
+
+Azure Container Apps Jobs determine replica completion from the **main job container's exit**. When the main container exits, the replica is torn down and any non-exiting sidecars (headless browsers, Redis, etc.) are killed with it. No custom shutdown logic is needed in the sidecar.
+
+If the main job container is still running at `replicaTimeout=3600s` (1 hour, fixed), Azure kills the replica regardless. Plan job logic to finish well within that ceiling.
+
+### Example: Screenshots Cron with Headless Browser
+
+The cron's main container runs `npm run cron:screenshots`, which does its work against `http://localhost:9222` exposed by the `chromium` sidecar:
+
+```typescript
+// backend/src/jobs/screenshots.ts
+async function main() {
+  const res = await fetch("http://localhost:9222/screenshot", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ url: "https://example.com" }),
+  });
+  if (!res.ok) throw new Error(`screenshot failed: ${res.status}`);
+  // ... handle screenshot bytes ...
+  process.exit(0);
+}
+
+main().catch((err) => {
+  console.error("[screenshots] Failed:", err);
+  process.exit(1);
+});
+```
+
+When `process.exit(0)` runs, the replica completes and `chromium` is torn down with it.
+
+### Local Dev
+
+`fusebase dev start` does **not** start cron jobs nor any sidecars (backend or job). Job sidecars take effect only after `fusebase deploy`.
+<% } %>
 
 ## Checklist
 
@@ -209,3 +331,7 @@ fusebase deploy
 - [ ] Tested sidecar locally with Docker (optional but recommended)
 - [ ] Deployed and verified with `fusebase remote-logs runtime`
 - [ ] Total CPU/memory = backend (small, 0.5/1 Gi) + Σ sidecar tiers ≤ 2 CPU / 4 Gi (Azure cap)
+<% if (it.flags?.includes("job-sidecars")) { %>
+- [ ] If a cron job needs an auxiliary container, attached sidecars to the **job** (not the backend) using `fusebase sidecar add --job <jobName>`
+- [ ] Verified job sidecar count is at most 3 per job (independent of backend cap)
+<% } %>

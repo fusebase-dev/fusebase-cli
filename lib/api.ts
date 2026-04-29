@@ -941,13 +941,21 @@ export interface DeploySidecarDefinition {
   tier?: "small" | "medium" | "large";
 }
 
+export interface DeployJobDefinition {
+  name: string;
+  type: "cron";
+  cron: string;
+  command: string;
+  sidecars?: DeploySidecarDefinition[];
+}
+
 export async function createDeploy(
   apiKey: string,
   orgId: string,
   appId: string,
   appFeatureId: string,
   versionId: string,
-  jobs?: Array<{ name: string; type: "cron"; cron: string; command: string }>,
+  jobs?: DeployJobDefinition[],
   sidecars?: DeploySidecarDefinition[],
 ): Promise<Deploy> {
   const baseUrl = getBaseUrl();

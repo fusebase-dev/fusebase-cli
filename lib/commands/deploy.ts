@@ -19,11 +19,17 @@ import {
   type App,
   type AppFeature,
   type Deploy,
+  type DeployJobDefinition,
   type DeploySidecarDefinition,
 } from "../api";
 import { getFusebaseAppHost } from "../config";
 import { logger } from "../logger";
-import { getConfig, loadFuseConfig, type FeatureConfig } from "../config";
+import {
+  getConfig,
+  loadFuseConfig,
+  type FeatureConfig,
+  type SidecarConfig,
+} from "../config";
 
 const FUSE_JSON = "fusebase.json";
 const UPLOAD_CONCURRENCY = 5;
@@ -583,8 +589,10 @@ export const deployCommand = new Command("deploy")
             await unlink(archivePath).catch(() => {});
 
             // Transform sidecar config for API (env Record -> key/value array)
-            const sidecars: DeploySidecarDefinition[] | undefined =
-              featureConfig.backend?.sidecars?.map((sc) => ({
+            const toDeploySidecars = (
+              list: SidecarConfig[] | undefined,
+            ): DeploySidecarDefinition[] | undefined =>
+              list?.map((sc) => ({
                 name: sc.name,
                 image: sc.image,
                 ...(sc.port != null ? { port: sc.port } : {}),
@@ -599,10 +607,38 @@ export const deployCommand = new Command("deploy")
                 ...(sc.tier ? { tier: sc.tier } : {}),
               }));
 
+            const sidecars = toDeploySidecars(featureConfig.backend?.sidecars);
+
             if (sidecars && sidecars.length > 0) {
               console.log(
                 `   Sidecars: ${sidecars.map((s) => s.name).join(", ")}`,
               );
+            }
+
+            const jobs: DeployJobDefinition[] | undefined =
+              featureConfig.backend?.jobs?.map((j) => {
+                const jobSidecars = toDeploySidecars(j.sidecars);
+                return {
+                  name: j.name,
+                  type: j.type,
+                  cron: j.cron,
+                  command: j.command,
+                  ...(jobSidecars && jobSidecars.length > 0
+                    ? { sidecars: jobSidecars }
+                    : {}),
+                };
+              });
+
+            if (jobs) {
+              for (const j of jobs) {
+                if (j.sidecars && j.sidecars.length > 0) {
+                  console.log(
+                    `   Job ${j.name} sidecars: ${j.sidecars
+                      .map((s) => s.name)
+                      .join(", ")}`,
+                  );
+                }
+              }
             }
 
             // Start backend deploy
@@ -613,7 +649,7 @@ export const deployCommand = new Command("deploy")
               fuseConfig.appId,
               featureId,
               version.id,
-              featureConfig.backend?.jobs,
+              jobs,
               sidecars,
             );
             console.log(`   Deploy ID: ${deploy.id}`);

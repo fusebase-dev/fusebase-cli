@@ -82,9 +82,9 @@ bun index.ts [command]
 - `config gitlab` - Get/set GitLab sync config in `~/.fusebase/config.json` (`gitlabHost`, `gitlabGroup`, `gitlabToken`); supports interactive setup, `--show`, and direct flags (`--host`, `--group`, `--token`)
 - `integrations` - Configure optional MCP integrations (catalog + custom HTTP MCP in `fusebase.json`); `integrations add|disable|enable|remove`; `--no-prompt` skips checkbox
 - `scaffold` - Scaffold a feature from a built-in template. Without options, lists available templates with descriptions. Use `--template <id> --dir <path>` to scaffold. Errors if any files would be overwritten. Templates: `spa` (React + Vite SPA, deployed directly into `<dir>`), `backend` (Node.js + Hono, deployed into `<dir>/backend/`). Backend can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
-- `sidecar add` - Add a sidecar container to a feature backend (`--feature <id> --name <name> --image <image> [--port <port>] [--tier small|medium|large] [--env KEY=VALUE...]`). Max 3 sidecars per feature.
-- `sidecar remove` - Remove a sidecar container by name (`--feature <id> --name <name>`)
-- `sidecar list` - List configured sidecar containers for a feature (`--feature <id>`)
+- `sidecar add` - Add a sidecar container to a feature backend (`--feature <id> --name <name> --image <image> [--port <port>] [--tier small|medium|large] [--env KEY=VALUE...] [--job <jobName>]`). Max 3 sidecars per scope. Pass `--job <jobName>` to attach the sidecar to a cron job instead of the backend; without `--job` the sidecar is added to the backend, as today.
+- `sidecar remove` - Remove a sidecar container by name (`--feature <id> --name <name> [--job <jobName>]`). With `--job`, removes from the named cron job; without `--job`, from the backend.
+- `sidecar list` - List configured sidecar containers for a feature (`--feature <id> [--job <jobName>]`). With `--job`, lists sidecars on that cron job; without `--job`, on the backend.
 
 ## Configuration
 
