@@ -229,16 +229,24 @@ Total: 1 feature(s)
 
 ### `fusebase deploy`
 
-Deploy features to Fusebase. This command will:
+Deploy features to Fusebase. For each feature this command will:
 
-1. Install dependencies and run lint for each feature (if the feature has a `lint` script in its `package.json`)
-2. Run the build command for each feature (if configured)
-3. Upload all files from the output directory
-3. Create a new version of each feature
+1. Install dependencies and run lint (if the feature has a `lint` script in its `package.json`)
+2. Run the build command (if configured)
+3. Compute a SHA-256 `frontendHash` of the upload directory and a `backendHash` of the `backend/` folder (if present)
+4. Compare those hashes against the active version and take one of:
+   - **No changes** → skip the feature entirely (no new version, no upload, no backend deploy). Logs `✓ No changes for feature, skipping deploy`.
+   - **Frontend unchanged, backend changed** → create a new version, reuse the previous frontend bundle via `copyFrontendParams` (no upload), then re-deploy the backend.
+   - **Frontend changed** → create a new version, upload files, persist the new `frontendHash`. Backend is handled per its own hash (skipped/copied or re-deployed).
+5. With `--force`, hash matches are ignored and a full upload + redeploy runs for every feature.
 
 **Arguments:** None
 
-**Options:** None
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--force` | Force re-upload and re-deploy regardless of frontend/backend hash match |
 
 **Prerequisites:**
 
@@ -246,10 +254,14 @@ Deploy features to Fusebase. This command will:
 - API key must be configured (`fusebase auth`)
 - At least one feature must have a `path` configured in `fusebase.json`
 
-**Example:**
+**Examples:**
 
 ```bash
+# Skips features with unchanged frontend + backend
 fusebase deploy
+
+# Always uploads and redeploys
+fusebase deploy --force
 ```
 
 **Feature Configuration in `fusebase.json`:**

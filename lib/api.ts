@@ -657,6 +657,7 @@ export async function initUpload(
   appFeatureId: string,
   versionId: string,
   files: string[],
+  frontendHash?: string,
 ): Promise<InitUploadResponse> {
   const baseUrl = getBaseUrl();
   const response = await fetch(
@@ -667,7 +668,7 @@ export async function initUpload(
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ files }),
+      body: JSON.stringify(frontendHash ? { files, frontendHash } : { files }),
     },
   );
 
@@ -850,6 +851,7 @@ export interface ActiveVersionResponse {
   deployFqdn?: string;
   s3Path?: string;
   backendHash?: string;
+  frontendHash?: string;
   createdAt?: number;
   updatedAt?: number;
 }
@@ -1059,6 +1061,43 @@ export async function copyBackendParams(
 
     throw new Error(
       `Failed to copy backend params: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+}
+
+export async function copyFrontendParams(
+  apiKey: string,
+  orgId: string,
+  targetVersionId: string,
+  sourceVersionId: string,
+): Promise<void> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${targetVersionId}/copy-frontend-params`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ sourceVersionId }),
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: "copyFrontendParams",
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
+    });
+
+    throw new Error(
+      `Failed to copy frontend params: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
     );
   }
 }
