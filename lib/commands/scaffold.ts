@@ -1,13 +1,14 @@
 import { Command } from "commander";
 import { resolve, join, relative } from "path";
 import { spawn } from "child_process";
-import { writeFile } from "fs/promises";
+import { access, writeFile } from "fs/promises";
 import {
   listTemplates,
   copyTemplate,
   checkTemplateCollisions,
 } from "../feature-templates";
 import { loadFuseConfig } from "../config";
+import { createDefaultOpenApiSpec } from "../openapi";
 
 async function runNpmInstall(cwd: string): Promise<void> {
   console.log(`   Installing dependencies in ${cwd}...`);
@@ -27,6 +28,18 @@ async function runNpmInstall(cwd: string): Promise<void> {
       }
     });
   });
+}
+
+async function ensureOpenApiSpec(targetDir: string): Promise<void> {
+  const openApiPath = join(targetDir, "openapi.json");
+  try {
+    await access(openApiPath);
+    console.log("✓ Reused existing openapi.json");
+    return;
+  } catch {
+    await writeFile(openApiPath, createDefaultOpenApiSpec(), "utf-8");
+    console.log("✓ Created openapi.json");
+  }
 }
 
 export const scaffoldCommand = new Command("scaffold")
@@ -95,6 +108,7 @@ export const scaffoldCommand = new Command("scaffold")
 
       // Install dependencies
       if (templateId === "backend") {
+        await ensureOpenApiSpec(targetDir);
         await runNpmInstall(join(targetDir, "backend"));
 
         // If targetDir matches a registered feature, auto-add backend config to fusebase.json

@@ -239,6 +239,7 @@ Deploy features to Fusebase. For each feature this command will:
    - **Frontend unchanged, backend changed** → create a new version, reuse the previous frontend bundle via `copyFrontendParams` (no upload), then re-deploy the backend.
    - **Frontend changed** → create a new version, upload files, persist the new `frontendHash`. Backend is handled per its own hash (skipped/copied or re-deployed).
 5. With `--force`, hash matches are ignored and a full upload + redeploy runs for every feature.
+6. If the feature contains `openapi.json`, validate it and publish the app API manifest to the feature registry.
 
 **Arguments:** None
 
@@ -282,6 +283,36 @@ fusebase deploy --force
   ]
 }
 ```
+
+---
+
+### `fusebase api validate [--file <path>]`
+
+Validate the feature OpenAPI contract for the Phase 1 app API MVP.
+
+Behavior:
+
+- looks for `openapi.json` in the current directory by default
+- also detects `openapi.yaml` / `openapi.yml`, but YAML validation is not supported in this MVP yet
+- validates:
+  - `OpenAPI 3.1`
+  - `info.title`
+  - `info.version`
+  - operation presence
+  - unique `operationId`
+  - basic `x-fusebase-*` fields
+
+**Examples:**
+
+```bash
+fusebase api validate
+fusebase api validate --file openapi.json
+```
+
+**Output:**
+
+- success summary with title, version, and operation ids
+- or a list of validation issues with JSON paths
 
 ---
 
@@ -363,6 +394,14 @@ Create and configure a feature for development.
 ```bash
 fusebase feature create --name="My Feature" --subdomain=my-feature --path=features/my-feature --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist
 ```
+
+If you later scaffold a backend into that feature with:
+
+```bash
+fusebase scaffold --template backend --dir features/my-feature
+```
+
+the CLI creates `openapi.json` automatically if it does not already exist.
 
 **Updates `fusebase.json`:**
 

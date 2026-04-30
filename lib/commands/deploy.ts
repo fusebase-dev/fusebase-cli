@@ -17,6 +17,7 @@ import {
   fetchAppFeatures,
   copyBackendParams,
   copyFrontendParams,
+  updateAppFeature,
   type App,
   type AppFeature,
   type Deploy,
@@ -31,6 +32,11 @@ import {
   type FeatureConfig,
   type SidecarConfig,
 } from "../config";
+import {
+  buildPublishedAppApiManifest,
+  loadAndValidateOpenApiFile,
+  resolveOpenApiFile,
+} from "../openapi";
 
 const FUSE_JSON = "fusebase.json";
 const UPLOAD_CONCURRENCY = 5;
@@ -305,6 +311,62 @@ async function runBuildCommand(featureConfig: FeatureConfig): Promise<void> {
 
   // Dependencies are already installed by the deploy loop before lint
   await runCommand(buildCommand, featurePath, "Building");
+}
+
+async function publishOpenApiManifestIfPresent(params: {
+  apiKey: string;
+  orgId: string;
+  appId: string;
+  featureId: string;
+  featureBasePath: string;
+}): Promise<void> {
+  const openApiPath = await resolveOpenApiFile(params.featureBasePath);
+  if (!openApiPath) {
+    logger.debug(
+      "No OpenAPI spec found in %s, skipping manifest publish",
+      params.featureBasePath,
+    );
+    return;
+  }
+
+  try {
+    const { document, validation } = await loadAndValidateOpenApiFile(openApiPath);
+    if (validation.issues.length > 0) {
+      const issueText = validation.issues
+        .map((issue) => `- ${issue.path}: ${issue.message}`)
+        .join("\n");
+      console.warn(
+        `   Warning: OpenAPI spec is invalid, skipping manifest publish: ${openApiPath}`,
+      );
+      console.warn(issueText);
+      return;
+    }
+
+    const manifest = buildPublishedAppApiManifest({
+      filePath: openApiPath,
+      document,
+      validation,
+    });
+
+    await updateAppFeature(
+      params.apiKey,
+      params.orgId,
+      params.appId,
+      params.featureId,
+      { manifest },
+    );
+
+    console.log(
+      `   Published OpenAPI registry: ${validation.operationCount} operation(s) from ${manifest.sourceFile}`,
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown OpenAPI publish error";
+    console.warn(
+      `   Warning: Failed to publish OpenAPI manifest from ${openApiPath}. Skipping.`,
+    );
+    console.warn(`   ${message}`);
+  }
 }
 
 export const deployCommand = new Command("deploy")
@@ -743,6 +805,14 @@ export const deployCommand = new Command("deploy")
             console.log(`\n   ✓ Backend deployed successfully\n`);
           } // end else (hash changed)
         }
+
+        await publishOpenApiManifestIfPresent({
+          apiKey: config.apiKey,
+          orgId: fuseConfig.orgId,
+          appId: fuseConfig.appId,
+          featureId,
+          featureBasePath,
+        });
 
         // Build feature URL
         const feature = features.find((f) => f.id === featureId);

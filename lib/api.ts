@@ -120,6 +120,7 @@ export interface AppFeature {
   url: string;
   accessPrincipals?: AppFeatureAccessPrincipal[];
   permissions?: AppFeaturePermissions;
+  manifest?: Record<string, unknown>;
 }
 
 export interface AppFeaturesResponse {
@@ -602,6 +603,7 @@ export interface UpdateAppFeatureRequest {
   title?: string;
   accessPrincipals?: AppFeatureAccessPrincipal[];
   permissions?: AppFeaturePermissions;
+  manifest?: Record<string, unknown>;
 }
 
 export async function updateAppFeature(
