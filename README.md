@@ -19,6 +19,7 @@ See:
 - [Conceptual Model](docs/CONCEPTS.md)
 - [Feature Permissions](docs/PERMISSIONS.md) — canonical model for `dashboardView`, `database`, `gate`, and `feature update`
 - [Fusebase Gate meta (`fusebaseGateMeta`)](docs/FUSEBASE_GATE_META.md) — Gate SDK analyze flow and `fusebase.json` snapshot
+- [E2E tests](test/e2e/README.md) — CLI end-to-end smoke + dev-start parallel tests, env vars, and CI variables
 
 ## CLI Usage
 

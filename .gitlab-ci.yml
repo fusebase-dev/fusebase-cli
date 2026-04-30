@@ -67,13 +67,61 @@ build:
       - build/
     expire_in: 30 days
 
+# E2E smoke against the dev environment.
+# Runs on non-draft MR pipelines and on the default branch — gates `upload:dev`
+# so a failed smoke blocks the dev artifact upload.
+# Required CI variables (masked + protected, set out-of-band by SRE / Denis):
+#   FUSEBASE_DEV_API_KEY, FUSEBASE_TEST_ORG_ID_DEV, FUSEBASE_TEST_DASHBOARD_ID_DEV.
+# When the variables are not set, the suite SKIPs cleanly via `e2eEnvAvailable`.
+e2e:dev:
+  image: oven/bun:1.3.11
+  needs:
+    - job: build
+      artifacts: false
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_DRAFT != "true"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  variables:
+    FUSEBASE_API_KEY: $FUSEBASE_DEV_API_KEY
+    FUSEBASE_ENV: dev
+    FUSEBASE_TEST_ORG_ID: $FUSEBASE_TEST_ORG_ID_DEV
+    FUSEBASE_TEST_DASHBOARD_ID: $FUSEBASE_TEST_DASHBOARD_ID_DEV
+  script:
+    - bun --version
+    - bun install --frozen-lockfile
+    - bun run test:e2e
+
+# E2E smoke against the prod environment.
+# Runs on tag pipelines — gates `upload:prod` so a failed smoke blocks the release.
+# Required CI variables (masked + protected, set out-of-band by SRE / Denis):
+#   FUSEBASE_PROD_API_KEY, FUSEBASE_TEST_ORG_ID_PROD, FUSEBASE_TEST_DASHBOARD_ID_PROD.
+e2e:prod:
+  image: oven/bun:1.3.11
+  needs:
+    - job: build
+      artifacts: false
+  rules:
+    - if: $CI_COMMIT_TAG
+  variables:
+    FUSEBASE_API_KEY: $FUSEBASE_PROD_API_KEY
+    FUSEBASE_ENV: prod
+    FUSEBASE_TEST_ORG_ID: $FUSEBASE_TEST_ORG_ID_PROD
+    FUSEBASE_TEST_DASHBOARD_ID: $FUSEBASE_TEST_DASHBOARD_ID_PROD
+  script:
+    - bun --version
+    - bun install --frozen-lockfile
+    - bun run test:e2e
+
 # Upload dev artifacts to S3 on every default-branch commit.
 # Sets manifest.devVersion to a timestamp (YYYY.mmddhh.mmss).
 # manifest.version is preserved (only updated by upload:prod).
 # Also creates a GitLab Release tagged with the dev version.
 upload:dev:
   image: oven/bun:1
-  needs: [build]
+  needs:
+    - job: build
+    - job: e2e:dev
+      artifacts: false
   variables:
     S3_BUCKET: fusebase-cli-bin
     UPLOAD_DEV: "1"
@@ -97,7 +145,10 @@ upload:dev:
 # Sets manifest.version to the new semver version.
 upload:prod:
   image: oven/bun:1
-  needs: [build]
+  needs:
+    - job: build
+    - job: e2e:prod
+      artifacts: false
   rules:
     - if: $SKIP_RELEASE == "1"
       when: never
