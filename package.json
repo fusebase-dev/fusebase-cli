@@ -22,6 +22,7 @@
     "get-version": "node -e \"console.log(require('./package.json').version)\"",
     "internal:gate-analyze": "bun index.ts analyze gate --operations",
     "build": "bash scripts/build.sh",
+    "test:e2e": "bun test ./test/e2e/*.e2e.ts --timeout 1800000",
     "beta": "npm version prerelease --preid beta"
   },
   "devDependencies": {
