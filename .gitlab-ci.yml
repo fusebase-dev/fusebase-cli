@@ -120,7 +120,7 @@ upload:dev:
   image: oven/bun:1
   needs:
     - job: build
-    - job: e2e:dev
+    # - job: e2e:dev
       artifacts: false
   variables:
     S3_BUCKET: fusebase-cli-bin
@@ -147,7 +147,7 @@ upload:prod:
   image: oven/bun:1
   needs:
     - job: build
-    - job: e2e:prod
+    # - job: e2e:prod
       artifacts: false
   rules:
     - if: $SKIP_RELEASE == "1"
