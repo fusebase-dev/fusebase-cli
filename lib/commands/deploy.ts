@@ -471,11 +471,6 @@ export const deployCommand = new Command("deploy")
         // Run lint if feature has a lint script (e.g. in package.json)
         await runLintIfPresent(featureBasePath);
 
-        // Run build command if specified
-        if (featureConfig.build?.command) {
-          await runBuildCommand(featureConfig);
-        }
-
         // ── Detect backend folder for hybrid (static + backend) deploy ──────
         const backendDir = join(featureBasePath, "backend");
         let hasBackendDir = false;
@@ -486,42 +481,22 @@ export const deployCommand = new Command("deploy")
           // no backend folder
         }
 
-        // ── Resolve upload directory and listing ────────────────────────────
-        const uploadDir = featureConfig.build?.outputDir
-          ? join(featureBasePath, featureConfig.build.outputDir)
-          : featureBasePath;
-
-        try {
-          await stat(uploadDir);
-        } catch {
-          const outputDirPath = featureConfig.build?.outputDir
-            ? `${featureConfig.path}/${featureConfig.build.outputDir}`
-            : featureConfig.path;
-          throw new Error(`output directory does not exist: ${outputDirPath}`);
-        }
-
-        // Exclude backend folder from static upload/hash when it lives in uploadDir
-        const staticExclude =
-          hasBackendDir && !featureConfig.build?.outputDir ? ["backend"] : [];
-
-        const files = await getAllFiles(uploadDir, uploadDir, staticExclude);
-        if (files.length === 0) {
-          const outputDirPath = featureConfig.build?.outputDir
-            ? `${featureConfig.path}/${featureConfig.build.outputDir}`
-            : featureConfig.path;
-          throw new Error(`No files found in: ${outputDirPath}`);
-        }
-
-        if (featureConfig.build?.outputDir) {
-          console.log(`   Output: ${featureConfig.build.outputDir}`);
-        }
-        console.log(`   Files: ${files.length}`);
-
         // ── Compute hashes upfront so skip decisions are made before any upload ──
+        // Hash the source directory (not the build output) so we detect source
+        // changes even when builds aren't byte-reproducible, and avoid hashing
+        // volatile build artifacts. Build runs only if the hash differs, so
+        // unchanged features skip the build entirely. Exclude the build output
+        // dir, the backend folder (hashed separately), and node_modules.
         console.log(`   Calculating frontend hash...`);
+        const frontendHashExclude = [
+          ...(featureConfig.build?.outputDir
+            ? [featureConfig.build.outputDir]
+            : []),
+          ...(hasBackendDir ? ["backend"] : []),
+        ];
         const frontendHash = await calculateFrontendHash(
-          uploadDir,
-          staticExclude,
+          featureBasePath,
+          frontendHashExclude,
         );
         logger.info("Frontend hash: %s", frontendHash);
 
@@ -592,7 +567,44 @@ export const deployCommand = new Command("deploy")
             activeVersion.globalId,
           );
         } else {
-          // Branches A, D: upload frontend
+          // Branches A, D: build + upload frontend
+          if (featureConfig.build?.command) {
+            await runBuildCommand(featureConfig);
+          }
+
+          // ── Resolve upload directory and listing ──────────────────────────
+          const uploadDir = featureConfig.build?.outputDir
+            ? join(featureBasePath, featureConfig.build.outputDir)
+            : featureBasePath;
+
+          try {
+            await stat(uploadDir);
+          } catch {
+            const outputDirPath = featureConfig.build?.outputDir
+              ? `${featureConfig.path}/${featureConfig.build.outputDir}`
+              : featureConfig.path;
+            throw new Error(
+              `output directory does not exist: ${outputDirPath}`,
+            );
+          }
+
+          // Exclude backend folder from static upload when it lives in uploadDir
+          const staticExclude =
+            hasBackendDir && !featureConfig.build?.outputDir ? ["backend"] : [];
+
+          const files = await getAllFiles(uploadDir, uploadDir, staticExclude);
+          if (files.length === 0) {
+            const outputDirPath = featureConfig.build?.outputDir
+              ? `${featureConfig.path}/${featureConfig.build.outputDir}`
+              : featureConfig.path;
+            throw new Error(`No files found in: ${outputDirPath}`);
+          }
+
+          if (featureConfig.build?.outputDir) {
+            console.log(`   Output: ${featureConfig.build.outputDir}`);
+          }
+          console.log(`   Files: ${files.length}`);
+
           console.log(`   Initializing upload...`);
           const uploadResponse = await initUpload(
             config.apiKey,
