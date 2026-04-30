@@ -189,6 +189,20 @@ bun index.ts --help # Verify command registration
 bun index.ts <command> # Test specific command
 ```
 
+### End-to-end tests
+
+E2E tests that exercise the CLI against a real Fusebase environment live in
+`test/e2e/` (separate `*.e2e.ts` suffix so they are excluded from the default
+`bun test` run). They require `FUSEBASE_API_KEY`, `FUSEBASE_ENV`,
+`FUSEBASE_TEST_ORG_ID`, and `FUSEBASE_TEST_DASHBOARD_ID`. Run them with:
+
+```bash
+bun run test:e2e
+```
+
+See `test/e2e/README.md` for the full env-var matrix, GitLab CI variable
+list, and the orphan-cleanup note.
+
 ## Documentation Updates
 
 When modifying CLI commands (adding/removing options, changing behavior, or adding new commands), **always update** the corresponding documentation:

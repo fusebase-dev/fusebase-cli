@@ -68,6 +68,20 @@ export function getApiBaseUrl(env: FusebaseEnv): string {
   }
 }
 
+/**
+ * Apps subdomain host (mirrors `getFusebaseAppHost` in lib/config.ts). Used to
+ * reconstruct a feature's public URL before deploy, so cron jobs can be
+ * configured with the URL via a secret without waiting for the deploy summary.
+ */
+export function getAppHost(env: FusebaseEnv): string {
+  switch (env) {
+    case "dev":
+      return "dev-thefusebase-app.com";
+    case "prod":
+      return "thefusebase.app";
+  }
+}
+
 const cached = readEnv();
 
 /** True when every required env var is present and valid. */
