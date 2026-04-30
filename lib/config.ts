@@ -132,6 +132,7 @@ export const KNOWN_FLAGS = [
   "portal-specific-features",
   "api-exploration",
   "job-sidecars",
+  "app-api-registry",
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
@@ -150,6 +151,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include api-exploration skill for verifying API endpoints with temporary tokens and test scripts.",
   "job-sidecars":
     "Enable per-job sidecar containers for cron jobs (`fusebase sidecar add --job <name>`).",
+  "app-api-registry":
+    "Enable publishing app OpenAPI manifests to the control-plane registry during deploy.",
 };
 
 export function getFlags(): string[] {

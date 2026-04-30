@@ -36,6 +36,7 @@ export interface OpenApiValidationResult {
 }
 
 export interface PublishedAppApiManifest {
+  [key: string]: unknown;
   kind: "app-api-registry";
   format: "openapi";
   schemaVersion: string;

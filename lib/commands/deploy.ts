@@ -28,6 +28,7 @@ import { getFusebaseAppHost } from "../config";
 import { logger } from "../logger";
 import {
   getConfig,
+  hasFlag,
   loadFuseConfig,
   type FeatureConfig,
   type SidecarConfig,
@@ -320,6 +321,11 @@ async function publishOpenApiManifestIfPresent(params: {
   featureId: string;
   featureBasePath: string;
 }): Promise<void> {
+  if (!hasFlag("app-api-registry")) {
+    logger.debug("app-api-registry flag is disabled, skipping manifest publish");
+    return;
+  }
+
   const openApiPath = await resolveOpenApiFile(params.featureBasePath);
   if (!openApiPath) {
     logger.debug(
