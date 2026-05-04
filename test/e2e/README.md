@@ -152,14 +152,3 @@ curl -H "Authorization: Bearer $FUSEBASE_API_KEY" \
 curl -X DELETE -H "Authorization: Bearer $FUSEBASE_API_KEY" \
   "https://public-api.dev-thefusebase.com/v1/orgs/$FUSEBASE_TEST_ORG_ID/apps/$APP_ID"
 ```
-
-## Related JIRA tickets
-
-- NIM-40894 — parent story (e2e tests for CLI).
-- NIM-40898 — nimbus-ai cascade Azure cleanup in `deleteApp`.
-- NIM-40899 — public-api `DELETE /v1/orgs/{orgId}/apps/{appId}` endpoint.
-- NIM-40900 — this harness (helpers + scripts + skip behaviour).
-- NIM-40901 — smoke deploy test (single feature: backend + sidecar + cron).
-- NIM-40902 — `fusebase dev start` parallel features test.
-- NIM-40903 — CI integration.
-- NIM-40904 — documentation + CI vars.
