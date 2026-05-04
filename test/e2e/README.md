@@ -8,11 +8,12 @@ repo.
 ## What the e2e tests cover
 
 - **Smoke deploy** (`smoke-deploy.e2e.ts`) — `init` → scaffold → `deploy` of a
-  single feature that combines a backend, a sidecar container, and a cron job;
-  asserts the backend serves `/api/healthz`, that backend HTTP writes hit the
-  test dashboard, and that the cron job writes hit the same dashboard. Calls
-  `DELETE /v1/orgs/{orgId}/apps/{appId}` in teardown so the cascade in
-  `nimbus-ai` removes the Container App + Container Apps Job.
+  single feature that combines a backend, a sidecar container, and a cron job.
+  Verifies the deployed backend `/api/healthz` responds, and that both backend
+  HTTP writes and the cron job hit the backend's in-memory marker store keyed
+  by a per-run `runId`. Calls `DELETE /v1/orgs/{orgId}/apps/{appId}` in
+  teardown so the cascade in `nimbus-ai` removes the Container App + Container
+  Apps Job.
 - **Dev start parallel** (`dev-start-parallel.e2e.ts`) — spawns
   `fusebase dev start` for two features in parallel, polls each feature port,
   then terminates both processes (no leaked children).
@@ -34,9 +35,6 @@ The full `bun run test:e2e` run is dominated by the smoke deploy.
 
 - An existing Fusebase **test org** on the target environment (one for `dev`,
   one for `prod`). The org is referenced by `FUSEBASE_TEST_ORG_ID`.
-- A pre-provisioned **test dashboard** in that org with at least one writable
-  table. The smoke test reads/writes rows but does **not** create or delete
-  the dashboard. The dashboard is referenced by `FUSEBASE_TEST_DASHBOARD_ID`.
 - An API key for an account that owns those resources. The dev runner uses
   `awcalibr@gmail.com`; prod uses `cli-smoke-test-nimbustest@nimbustest.com`.
 
@@ -44,8 +42,8 @@ The full `bun run test:e2e` run is dominated by the smoke deploy.
 
 ```
 test/e2e/
-  helpers/             # Reusable building blocks (env, CLI runner, api, dashboard).
-  harness.e2e.ts       # Smoke check — auths, lists apps, reads test dashboard.
+  helpers/             # Reusable building blocks (env, CLI runner, api).
+  harness.e2e.ts       # Smoke check — auths and lists apps via public-api.
   smoke-deploy.e2e.ts  # Full CLI lifecycle smoke test (NIM-40901).
   dev-start.e2e.ts     # `fusebase dev start` two features in parallel (local).
   *.e2e.ts             # Other test files (do NOT match the default *.test.ts
@@ -59,7 +57,6 @@ test/e2e/
 export FUSEBASE_API_KEY=...
 export FUSEBASE_ENV=dev          # or "prod"
 export FUSEBASE_TEST_ORG_ID=...
-export FUSEBASE_TEST_DASHBOARD_ID=...
 
 # 2. Run the e2e suite.
 bun run test:e2e
@@ -75,7 +72,6 @@ If any env var is missing, the suite logs the missing names and SKIPs cleanly
 | `FUSEBASE_API_KEY`           | Yes      | Bearer key for the public Fusebase API.             |
 | `FUSEBASE_ENV`               | Yes      | `dev` or `prod`. Resolves the public-api base URL.  |
 | `FUSEBASE_TEST_ORG_ID`       | Yes      | Org under which test apps are created/deleted.      |
-| `FUSEBASE_TEST_DASHBOARD_ID` | Yes      | Pre-provisioned test dashboard (one per env).       |
 
 ## Helpers
 
@@ -91,9 +87,6 @@ If any env var is missing, the suite logs the missing names and SKIPs cleanly
   `deleteApp` call hits `DELETE /v1/orgs/{orgId}/apps/{appId}` (added under
   NIM-40899) and treats 404 as success so it can be used idempotently in
   teardown.
-- `helpers/dashboard.ts` — read helpers for the pre-provisioned test
-  dashboard (`getInfo`, `listRows`, `findRowsByField`). Used by the smoke
-  test to verify backend + cron writes.
 
 ## Conventions
 
@@ -116,21 +109,19 @@ Pipeline jobs that run this suite (defined in `.gitlab-ci.yml`):
   a failing smoke blocks the release upload.
 
 Each job sets the test env vars (`FUSEBASE_API_KEY`, `FUSEBASE_ENV`,
-`FUSEBASE_TEST_ORG_ID`, `FUSEBASE_TEST_DASHBOARD_ID`) from per-environment
-masked + protected GitLab CI variables. Configure these once in the apps-cli
-project's CI/CD settings (Settings → CI/CD → Variables); the implementer
-does **not** commit secret values:
+`FUSEBASE_TEST_ORG_ID`) from per-environment masked + protected GitLab CI
+variables. Configure these once in the apps-cli project's CI/CD settings
+(Settings → CI/CD → Variables); the implementer does **not** commit secret
+values:
 
 | GitLab CI variable                | Used by    | Source                                                 |
 | --------------------------------- | ---------- | ------------------------------------------------------ |
 | `FUSEBASE_DEV_API_KEY`            | `e2e:dev`  | API key for the dev test account (`awcalibr@gmail.com`). |
 | `FUSEBASE_TEST_ORG_ID_DEV`        | `e2e:dev`  | Org ID of the dev test workspace.                      |
-| `FUSEBASE_TEST_DASHBOARD_ID_DEV`  | `e2e:dev`  | Pre-provisioned test dashboard in the dev org.         |
 | `FUSEBASE_PROD_API_KEY`           | `e2e:prod` | API key for the prod test account (`cli-smoke-test-nimbustest@nimbustest.com`). |
 | `FUSEBASE_TEST_ORG_ID_PROD`       | `e2e:prod` | Org ID of the prod test workspace.                     |
-| `FUSEBASE_TEST_DASHBOARD_ID_PROD` | `e2e:prod` | Pre-provisioned test dashboard in the prod org.        |
 
-All six should be **Masked** and **Protected** so they only resolve on
+All four should be **Masked** and **Protected** so they only resolve on
 protected branches/tags and are scrubbed from logs.
 
 If any required variable is missing on a runner, the suite logs the missing
