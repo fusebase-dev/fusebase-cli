@@ -17,12 +17,6 @@ export interface E2eEnv {
   env: FusebaseEnv;
   /** Org under which test apps are created. */
   orgId: string;
-  /**
-   * Pre-provisioned test dashboard (one per environment). The smoke test
-   * reads/writes rows through it but does NOT create or delete the dashboard
-   * itself.
-   */
-  dashboardId: string;
   /** Resolved public-api base URL (no trailing slash). */
   apiBaseUrl: string;
 }
@@ -31,7 +25,6 @@ const REQUIRED_VARS = [
   "FUSEBASE_API_KEY",
   "FUSEBASE_ENV",
   "FUSEBASE_TEST_ORG_ID",
-  "FUSEBASE_TEST_DASHBOARD_ID",
 ] as const;
 
 function readEnv(): { value: E2eEnv | null; missing: string[] } {
@@ -52,7 +45,6 @@ function readEnv(): { value: E2eEnv | null; missing: string[] } {
       apiKey: process.env.FUSEBASE_API_KEY!,
       env,
       orgId: process.env.FUSEBASE_TEST_ORG_ID!,
-      dashboardId: process.env.FUSEBASE_TEST_DASHBOARD_ID!,
       apiBaseUrl: getApiBaseUrl(env),
     },
     missing: [],

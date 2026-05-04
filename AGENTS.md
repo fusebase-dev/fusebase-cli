@@ -193,8 +193,8 @@ bun index.ts <command> # Test specific command
 
 E2E tests that exercise the CLI against a real Fusebase environment live in
 `test/e2e/` (separate `*.e2e.ts` suffix so they are excluded from the default
-`bun test` run). They require `FUSEBASE_API_KEY`, `FUSEBASE_ENV`,
-`FUSEBASE_TEST_ORG_ID`, and `FUSEBASE_TEST_DASHBOARD_ID`. Run them with:
+`bun test` run). They require `FUSEBASE_API_KEY`, `FUSEBASE_ENV`, and
+`FUSEBASE_TEST_ORG_ID`. Run them with:
 
 ```bash
 bun run test:e2e
