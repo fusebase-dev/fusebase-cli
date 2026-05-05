@@ -433,7 +433,8 @@ fusebase sidecar add \
   --image <image> \
   [--port <port>] \
   [--tier small|medium|large] \
-  [--env KEY=VALUE ...]
+  [--env KEY=VALUE ...] \
+  [--secret KEY|KEY:ALIAS ...]
 
 # Remove a sidecar by name
 fusebase sidecar remove --feature <featureId> --name <name>
@@ -448,6 +449,7 @@ fusebase sidecar list --feature <featureId>
 - `--port` — port the sidecar listens on (accessible via localhost from the backend)
 - `--tier` — resource tier: `small` (default), `medium`, or `large`
 - `--env` — environment variables as KEY=VALUE pairs (repeatable)
+- `--secret` — whitelist an app feature secret key (registered via `fusebase secret create`) to inject into the sidecar as an env var, repeatable. Use `KEY` to expose the secret under its own name, or `KEY:ALIAS` to rename it inside the sidecar. On collision between sidecar `env` and a whitelisted secret key, the sidecar's static `env` value wins. Deploy fails with a `ValidationError` listing every missing key if a referenced secret is not registered for the feature. See the **feature-sidecar** skill ("Whitelisting Secrets") for details.
 
 Sidecars are stored in `fusebase.json` under `features[].backend.sidecars[]` and deployed on the next `fusebase deploy`.
 
@@ -458,7 +460,7 @@ Cron jobs declared under `features[].backend.jobs[]` deploy as **independent** A
 ```bash
 # Add a sidecar to a job
 fusebase sidecar add --feature <featureId> --job <jobName> \
-  --name <name> --image <image> [--port <port>] [--tier ...] [--env ...]
+  --name <name> --image <image> [--port <port>] [--tier ...] [--env ...] [--secret ...]
 
 # Remove a sidecar from a job
 fusebase sidecar remove --feature <featureId> --job <jobName> --name <name>

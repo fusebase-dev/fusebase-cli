@@ -561,11 +561,13 @@ Manage sidecar containers for a feature backend or for a specific cron job. Side
 ```bash
 # Add a sidecar to the backend (default — same as today)
 fusebase sidecar add --feature <featureId> --name <name> --image <image> \
-  [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...]
+  [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
+  [--secret KEY|KEY:ALIAS ...]
 
 # Add a sidecar to a specific cron job (requires the job-sidecars flag)
 fusebase sidecar add --feature <featureId> --job <jobName> --name <name> --image <image> \
-  [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...]
+  [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
+  [--secret KEY|KEY:ALIAS ...]
 
 # Remove a sidecar
 fusebase sidecar remove --feature <featureId> --name <name> [--job <jobName>]
@@ -582,6 +584,7 @@ fusebase sidecar list --feature <featureId> [--job <jobName>]
 - `--port <port>` — port the sidecar listens on (informational; `localhost:<port>` from the main container)
 - `--tier small|medium|large` — resource tier (default: `small`)
 - `--env KEY=VALUE` — environment variables, repeatable
+- `--secret KEY|KEY:ALIAS` — whitelist an app feature secret key (registered via `fusebase secret create`) to inject into the sidecar as an env var, repeatable. Use `KEY:ALIAS` to expose the secret under a different env var name inside the sidecar. On collision between sidecar `env` and a secret key, the sidecar's static `env` value wins. Deploy fails with a `ValidationError` listing every missing key if any referenced secret is not registered for the feature.
 - `--job <jobName>` — attach the sidecar to the named cron job instead of the backend. **Requires the `job-sidecars` flag** (`fusebase config set-flag job-sidecars`). Without `--job`, all three subcommands target backend sidecars exactly as today.
 
 **Limits and rules:**

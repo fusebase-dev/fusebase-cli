@@ -43,6 +43,42 @@ const FUSE_JSON = "fusebase.json";
 const UPLOAD_CONCURRENCY = 5;
 const DEPLOY_POLL_INTERVAL_MS = 3000;
 
+// Transform sidecar config for the deploy API.
+// - `env` Record<string,string> becomes an array of {key, value}.
+// - `secrets` mixed entries (string | {from, as}) are normalized to always-object
+//   {from, as} on the wire (matches the swagger contract from NIM-40948).
+// - `secrets` is omitted from the payload when undefined or empty.
+export const toDeploySidecars = (
+  list: SidecarConfig[] | undefined,
+): DeploySidecarDefinition[] | undefined =>
+  list?.map((sc) => {
+    const secrets = sc.secrets?.map((entry) =>
+      typeof entry === "string"
+        ? { from: entry, as: entry }
+        : { from: entry.from, as: entry.as },
+    );
+    return {
+      name: sc.name,
+      image: sc.image,
+      ...(sc.port != null ? { port: sc.port } : {}),
+      ...(sc.env
+        ? {
+            env: Object.entries(sc.env).map(([key, value]) => ({
+              key,
+              value,
+            })),
+          }
+        : {}),
+      ...(sc.tier ? { tier: sc.tier } : {}),
+      ...(secrets && secrets.length > 0 ? { secrets } : {}),
+    };
+  });
+
+export const formatSidecarLabel = (s: DeploySidecarDefinition): string =>
+  s.secrets && s.secrets.length > 0
+    ? `${s.name} (secrets: ${s.secrets.length})`
+    : s.name;
+
 async function getAllFiles(
   dir: string,
   baseDir: string = dir,
@@ -742,30 +778,11 @@ export const deployCommand = new Command("deploy")
             const { unlink } = await import("fs/promises");
             await unlink(archivePath).catch(() => {});
 
-            // Transform sidecar config for API (env Record -> key/value array)
-            const toDeploySidecars = (
-              list: SidecarConfig[] | undefined,
-            ): DeploySidecarDefinition[] | undefined =>
-              list?.map((sc) => ({
-                name: sc.name,
-                image: sc.image,
-                ...(sc.port != null ? { port: sc.port } : {}),
-                ...(sc.env
-                  ? {
-                      env: Object.entries(sc.env).map(([key, value]) => ({
-                        key,
-                        value,
-                      })),
-                    }
-                  : {}),
-                ...(sc.tier ? { tier: sc.tier } : {}),
-              }));
-
             const sidecars = toDeploySidecars(featureConfig.backend?.sidecars);
 
             if (sidecars && sidecars.length > 0) {
               console.log(
-                `   Sidecars: ${sidecars.map((s) => s.name).join(", ")}`,
+                `   Sidecars: ${sidecars.map(formatSidecarLabel).join(", ")}`,
               );
             }
 
@@ -788,7 +805,7 @@ export const deployCommand = new Command("deploy")
                 if (j.sidecars && j.sidecars.length > 0) {
                   console.log(
                     `   Job ${j.name} sidecars: ${j.sidecars
-                      .map((s) => s.name)
+                      .map(formatSidecarLabel)
                       .join(", ")}`,
                   );
                 }

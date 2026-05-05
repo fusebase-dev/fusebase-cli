@@ -943,6 +943,14 @@ export interface DeploySidecarDefinition {
   port?: number;
   env?: Array<{ key: string; value: string }>;
   tier?: "small" | "medium" | "large";
+  /**
+   * Whitelisted app feature secrets to inject as env vars into the sidecar
+   * container. Wire format is always-object — apps-cli normalizes string config
+   * entries (`"KEY"`) to `{from: "KEY", as: "KEY"}` at the deploy mapper
+   * boundary before sending. The static `env` overrides secret values on key
+   * conflict (resolved server-side in nimbus-ai).
+   */
+  secrets?: Array<{ from: string; as: string }>;
 }
 
 export interface DeployJobDefinition {
