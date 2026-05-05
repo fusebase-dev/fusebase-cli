@@ -31,7 +31,8 @@ fusebase sidecar add \
   --image <dockerImage> \
   [--port <port>] \
   [--tier small|medium|large] \
-  [--env KEY=VALUE ...]
+  [--env KEY=VALUE ...] \
+  [--secret KEY|KEY:ALIAS ...]
 ```
 
 Example:
@@ -59,6 +60,56 @@ fusebase sidecar remove --feature <featureId> --name <name>
 fusebase sidecar list --feature <featureId>
 ```
 
+## Whitelisting Secrets
+
+By default, app feature secrets registered via `fusebase secret create` are injected only into the main backend container (and into cron job containers). Sidecars receive **no** feature secrets unless you explicitly whitelist the keys you want each sidecar to see.
+
+Use the repeatable `--secret` option on `fusebase sidecar add` to opt in:
+
+```bash
+# Inject the secret as an env var with the same name (DB_PASSWORD)
+fusebase sidecar add --feature my-scraper --name redis \
+  --image redis:7-alpine \
+  --secret DB_PASSWORD
+
+# Inject the secret under a different env var name inside the sidecar
+# (sidecar sees REDIS_AUTH_TOKEN; the underlying secret remains DB_PASSWORD)
+fusebase sidecar add --feature my-scraper --name redis \
+  --image redis:7-alpine \
+  --secret DB_PASSWORD:REDIS_AUTH_TOKEN
+```
+
+### Source
+
+Secrets must be **registered** with the feature beforehand (or alongside) via:
+
+```bash
+fusebase secret create --feature <featureId> --secret "DB_PASSWORD:Redis auth"
+```
+
+Set the actual values in the FuseBase web UI (the URL is printed by `secret create`). Only registered keys may be referenced from `--secret`. See the **feature-secrets** skill for the full secret lifecycle.
+
+### Forms
+
+| Form | Stored as | Result inside the sidecar |
+|------|-----------|---------------------------|
+| `--secret KEY` | string `"KEY"` in `secrets[]` | env var `KEY` = secret value |
+| `--secret KEY:ALIAS` | object `{ from: "KEY", as: "ALIAS" }` | env var `ALIAS` = secret value |
+
+Both forms can be mixed in the same sidecar's `secrets` array.
+
+### Validation Rules
+
+- **CLI fail-fast** (during `sidecar add`):
+  - empty `KEY` or `ALIAS` is rejected;
+  - duplicate target env var name within the same sidecar is rejected (target = `ALIAS` if present, else `KEY`).
+- **Deploy-time strict validation** (during `fusebase deploy`): if any referenced secret key is not registered for the feature, the API returns a `ValidationError` listing **all** missing keys at once and **no** Azure resources are touched.
+- **`env` overrides on collision**: a sidecar may legitimately list the same key in both `--env KEY=VALUE` and `--secret KEY` (`fusebase sidecar add` does not reject this). At deploy time the sidecar's static `env` value wins; the secret value is shadowed for that key only.
+
+### Scope
+
+`--secret` works the same way for backend sidecars and per-job sidecars (`--job <jobName>`). Each sidecar maintains its own independent allowlist — sidecars never share secrets with one another or with the backend.
+
 ## Configuration Format
 
 Sidecars are stored in `fusebase.json` under each feature's `backend.sidecars` array:
@@ -81,7 +132,11 @@ Sidecars are stored in `fusebase.json` under each feature's `backend.sidecars` a
             "tier": "medium",
             "env": {
               "MAX_CONCURRENT_SESSIONS": "5"
-            }
+            },
+            "secrets": [
+              "BROWSERLESS_TOKEN",
+              { "from": "DB_PASSWORD", "as": "REDIS_AUTH_TOKEN" }
+            ]
           }
         ]
       }
@@ -140,7 +195,7 @@ fusebase sidecar add --feature my-feature --name redis --image redis:7 \
   --env REDIS_MAXMEMORY=256mb --env REDIS_MAXMEMORY_POLICY=allkeys-lru
 ```
 
-Backend secrets (created via `fusebase secret create`) are NOT injected into sidecars.
+Feature secrets (registered via `fusebase secret create`) are **not** injected into sidecars by default. To grant a sidecar access to specific secrets, whitelist them with `--secret` on `fusebase sidecar add` (see [Whitelisting Secrets](#whitelisting-secrets) above). On collision between a sidecar's `env` and a whitelisted secret with the same env var name, the static `env` value wins.
 
 ## Limitations
 

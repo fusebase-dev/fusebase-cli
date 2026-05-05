@@ -43,6 +43,59 @@ function parseEnvPairs(envArgs: string[]): Record<string, string> {
   return result;
 }
 
+type SidecarSecretEntry = NonNullable<SidecarConfig["secrets"]>[number];
+
+function parseSecretEntries(secretArgs: string[]): SidecarSecretEntry[] {
+  const result: SidecarSecretEntry[] = [];
+  const targetNames = new Set<string>();
+  const duplicates: string[] = [];
+
+  for (const arg of secretArgs) {
+    const colonIndex = arg.indexOf(":");
+    let entry: SidecarSecretEntry;
+    let target: string;
+
+    if (colonIndex === -1) {
+      if (!arg) {
+        console.error(
+          `Error: Empty secret. Expected KEY or KEY:ALIAS.`,
+        );
+        process.exit(1);
+      }
+      entry = arg;
+      target = arg;
+    } else {
+      const key = arg.substring(0, colonIndex);
+      const alias = arg.substring(colonIndex + 1);
+      if (!key || !alias) {
+        console.error(
+          `Error: Invalid secret "${arg}". Both KEY and ALIAS must be non-empty (use KEY or KEY:ALIAS).`,
+        );
+        process.exit(1);
+      }
+      entry = { from: key, as: alias };
+      target = alias;
+    }
+
+    if (targetNames.has(target)) {
+      if (!duplicates.includes(target)) duplicates.push(target);
+    } else {
+      targetNames.add(target);
+    }
+    result.push(entry);
+  }
+
+  if (duplicates.length > 0) {
+    console.error(
+      `Error: Duplicate secret target name(s): ${duplicates.join(", ")}. ` +
+        `Each secret must map to a distinct env var name within the same sidecar.`,
+    );
+    process.exit(1);
+  }
+
+  return result;
+}
+
 function ensureJobFlagOrExit(jobName: string | undefined): void {
   if (jobName === undefined) return;
   if (!hasFlag("job-sidecars")) {
@@ -93,6 +146,12 @@ const addCommand = new Command("add")
     [] as string[],
   )
   .option(
+    "-s, --secret <KEY|KEY:ALIAS...>",
+    "Whitelist app feature secret keys to inject as env vars (repeatable; use KEY:ALIAS to rename)",
+    (val: string, prev: string[]) => [...prev, val],
+    [] as string[],
+  )
+  .option(
     "-j, --job <jobName>",
     "Attach the sidecar to the named cron job instead of the backend (requires 'job-sidecars' flag)",
   )
@@ -104,6 +163,7 @@ const addCommand = new Command("add")
       port?: number;
       tier?: string;
       env: string[];
+      secret: string[];
       job?: string;
     }) => {
       ensureJobFlagOrExit(opts.job);
@@ -211,6 +271,10 @@ const addCommand = new Command("add")
         newSidecar.env = parseEnvPairs(opts.env);
       }
 
+      if (opts.secret.length > 0) {
+        newSidecar.secrets = parseSecretEntries(opts.secret);
+      }
+
       const nextSidecars = [...sidecars, newSidecar];
       if (job) {
         job.sidecars = nextSidecars;
@@ -237,6 +301,11 @@ const addCommand = new Command("add")
       if (opts.tier) console.log(`  Tier:  ${opts.tier}`);
       if (opts.env.length > 0) {
         console.log(`  Env:   ${opts.env.length} variable(s)`);
+      }
+      if (newSidecar.secrets && newSidecar.secrets.length > 0) {
+        console.log(
+          `  Secrets: ${newSidecar.secrets.length} entry(ies)`,
+        );
       }
     },
   );
@@ -392,6 +461,12 @@ const listCommand = new Command("list")
       if (sc.tier) console.log(`    Tier:  ${sc.tier}`);
       if (sc.env && Object.keys(sc.env).length > 0) {
         console.log(`    Env:   ${Object.keys(sc.env).join(", ")}`);
+      }
+      if (sc.secrets && sc.secrets.length > 0) {
+        const rendered = sc.secrets.map((s) =>
+          typeof s === "string" ? s : `${s.from} -> ${s.as}`,
+        );
+        console.log(`    Secrets: ${rendered.join(", ")}`);
       }
     }
   });

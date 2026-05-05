@@ -42,6 +42,13 @@ export interface SidecarConfig {
   port?: number;
   env?: Record<string, string>;
   tier?: "small" | "medium" | "large";
+  /**
+   * Whitelist of app feature secret keys to inject as env vars into the sidecar
+   * container. String entries inject under the same name; `{from, as}` renames
+   * the env var inside the sidecar. The sidecar's static `env` entries override
+   * secret values on key conflict.
+   */
+  secrets?: Array<string | { from: string; as: string }>;
 }
 
 export interface BackendConfig {
