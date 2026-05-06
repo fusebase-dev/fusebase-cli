@@ -485,15 +485,20 @@ Fetch the build image logs from the most recent deployment. Shows the container 
 #### Runtime Logs
 
 ```bash
-fusebase remote-logs runtime <featureId> [--tail <number>] [--type <console|system>]
+fusebase remote-logs runtime <featureId> \
+  [--tail <number>] [--type <console|system>] \
+  [--from <iso>] [--to <iso>] [--container <name>]
 ```
 
-Fetch runtime logs from the deployed container.
+Fetch persisted runtime logs (backend + sidecars + jobs) from the deployed feature. Each line is rendered as `[<source>] <ISO timestamp> <message>` so you can distinguish backend / sidecar / job output.
 
 **Options:**
 
-- `--tail <number>` - Number of log lines to fetch (default: 100, max: 300)
+- `--tail <number>` - Number of log entries to fetch (default: 100, max: 1000)
 - `--type <console|system>` - Log type: `console` for app output, `system` for container system logs (default: `console`)
+- `--from <iso>` - Inclusive lower bound of the log time window (ISO 8601). Default server-side: `to - 1h`. Range from..to is capped at 7 days.
+- `--to <iso>` - Inclusive upper bound of the log time window (ISO 8601). Default server-side: now.
+- `--container <name>` - Filter to a specific container. Use `api` for the backend, or the sidecar/job name.
 
 **Examples:**
 
@@ -501,8 +506,11 @@ Fetch runtime logs from the deployed container.
 # Get build logs for a feature
 fusebase remote-logs build abc123
 
-# Get last 100 runtime console logs
+# Get last 100 runtime console logs from the last hour
 fusebase remote-logs runtime abc123 --tail 100
+
+# Restrict to an explicit time window
+fusebase remote-logs runtime abc123 --from 2026-04-30T00:00:00Z --to 2026-04-30T23:59:59Z --tail 200
 
 # Get system logs (container lifecycle events)
 fusebase remote-logs runtime abc123 --type system

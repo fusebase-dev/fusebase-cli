@@ -1470,11 +1470,28 @@ export interface BuildLogsResponse {
   deployId: string;
 }
 
+/**
+ * A single aggregated runtime log line. Emitted by Container Apps Console/System
+ * log shipping; aggregated across the backend, sidecars, and jobs of a feature.
+ */
+export interface RuntimeLogEntry {
+  /** ISO 8601 timestamp; empty string when the source line had no parseable timestamp. */
+  timestamp: string;
+  /** `backend`, `sidecar:<container>`, or `job:<container-app>`. */
+  source: string;
+  /** Log line text. Empty string for system rows that have no message body. */
+  message: string;
+}
+
 export interface RuntimeLogsResponse {
-  logs: string;
+  logs: RuntimeLogEntry[];
   tail: number;
   type: RuntimeLogType;
   deployId: string;
+  /** Resolved inclusive lower bound of the log time window (ISO 8601). */
+  from: string;
+  /** Resolved inclusive upper bound of the log time window (ISO 8601). */
+  to: string;
 }
 
 /**
@@ -1566,6 +1583,10 @@ export async function getBuildLogsByVersion(
 export interface GetRuntimeLogsOptions {
   tail?: number;
   type?: RuntimeLogType;
+  /** Inclusive lower bound of the log time window (ISO 8601). Default server-side: `to - 1h`. */
+  from?: string;
+  /** Inclusive upper bound of the log time window (ISO 8601). Default server-side: now. */
+  to?: string;
 }
 
 /**
@@ -1581,6 +1602,8 @@ export async function getRuntimeLogsByFeature(
   const params = new URLSearchParams();
   if (options?.tail !== undefined) params.set("tail", String(options.tail));
   if (options?.type) params.set("type", options.type);
+  if (options?.from) params.set("from", options.from);
+  if (options?.to) params.set("to", options.to);
 
   const queryString = params.toString();
   const url = `${baseUrl}/v1/orgs/${orgId}/features/${featureId}/runtime-logs${queryString ? `?${queryString}` : ""}`;
@@ -1630,6 +1653,8 @@ export async function getRuntimeLogsByVersion(
   const params = new URLSearchParams();
   if (options?.tail !== undefined) params.set("tail", String(options.tail));
   if (options?.type) params.set("type", options.type);
+  if (options?.from) params.set("from", options.from);
+  if (options?.to) params.set("to", options.to);
 
   const queryString = params.toString();
   const url = `${baseUrl}/v1/orgs/${orgId}/versions/${versionId}/runtime-logs${queryString ? `?${queryString}` : ""}`;
