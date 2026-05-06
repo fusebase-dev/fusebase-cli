@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { AppMagicLinksApi, createClient } from '@fusebase/fusebase-gate-sdk'
 import {
   FEATURE_TOKEN_COOKIE,
   SESSION_COOKIE,
@@ -21,6 +20,36 @@ interface ActivationResponse {
   redirectPath?: string | null
 }
 
+class MagicLinkActivationError extends Error {
+  readonly status: number
+  readonly body: unknown
+
+  constructor(status: number, body: unknown) {
+    super(`Magic-link activation failed with status ${status}`)
+    this.name = 'MagicLinkActivationError'
+    this.status = status
+    this.body = body
+  }
+}
+
+async function activateMagicLink(gateBaseUrl: string, globalId: string): Promise<ActivationResponse> {
+  const url = `${gateBaseUrl}/apps/magic-links/${encodeURIComponent(globalId)}/activate`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+  })
+  let body: unknown = null
+  try {
+    body = await response.json()
+  } catch {
+    body = null
+  }
+  if (!response.ok) {
+    throw new MagicLinkActivationError(response.status, body)
+  }
+  return (body ?? {}) as ActivationResponse
+}
+
 export function MagicLinkActivator() {
   const [state, setState] = useState<ActivationState>({ status: 'loading' })
 
@@ -36,12 +65,9 @@ export function MagicLinkActivator() {
       const gateBaseUrl = deriveGateBaseUrl({
         override: import.meta.env.VITE_FUSEBASE_GATE_URL ?? null,
       })
-      const api = new AppMagicLinksApi(createClient({ baseUrl: gateBaseUrl }))
 
       try {
-        const response = (await api.activateAppMagicLink({
-          path: { globalId: params.id },
-        })) as ActivationResponse
+        const response = await activateMagicLink(gateBaseUrl, params.id)
 
         const isSecure = window.location.protocol === 'https:'
         const cookieMaxAge = 60 * 60 * 24 * 30
@@ -65,7 +91,6 @@ export function MagicLinkActivator() {
       } catch (error) {
         if (cancelled) return
         const reason = parseActivationError(error)
-        // eslint-disable-next-line no-console
         console.error('[magic-link] activation failed', { reason, error })
         setState({ status: 'failed', reason })
       }
