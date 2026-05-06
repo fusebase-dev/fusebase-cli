@@ -41,6 +41,12 @@ bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}-macos-x6
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}" --target=bun-linux-x64
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}.exe" --target=bun-windows-x64
 
+# Embed the FuseBase icon and version metadata into the Windows binary.
+# `bun build --windows-icon` only works on Windows hosts; on Linux CI we use
+# rcedit-x64.exe (via Wine, handled by the rcedit npm package) as a post-build
+# step. Wine must be installed in the build environment.
+bun "$PROJECT_ROOT/scripts/embed-windows-icon.ts" "build/fusebase-${VERSION}.exe" "${VERSION}"
+
 rm dev-server-dist.zip project-template.zip feature-templates.zip ide-configs.zip
 
 # Save dev version for the upload job (empty file for prod builds)
