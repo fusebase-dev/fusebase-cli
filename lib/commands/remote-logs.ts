@@ -3,6 +3,7 @@ import chalk from "chalk";
 import {
   getBuildLogsByFeature,
   getRuntimeLogsByFeature,
+  type RuntimeLogEntry,
   type RuntimeLogType,
 } from "../api";
 import { getConfig, loadFuseConfig } from "../config";
@@ -33,39 +34,54 @@ function printBuildLogs(log: string | undefined, status: string): void {
 }
 
 /**
- * Filter log lines to only those from a specific container.
- * Log lines from nimbus-ai are prefixed with `[container]: `.
+ * Match a `--container <name>` filter against an entry's `source`.
+ *
+ * Source field shape (NIM-40512): `backend`, `sidecar:<name>`, `job:<name>`.
+ * `--container api` is mapped to `backend` for backward compat with the
+ * pre-aggregation log format that prefixed backend lines with `[api]:`.
  */
-function filterLogsByContainer(logs: string, container: string): string {
-  const prefix = `[${container}]: `;
-  return logs
-    .split("\n")
-    .filter((line) => line.startsWith(prefix))
-    .map((line) => line.slice(prefix.length))
-    .join("\n");
+function entryMatchesContainer(
+  entry: RuntimeLogEntry,
+  container: string,
+): boolean {
+  if (entry.source === container) return true;
+  if (container === "api" && entry.source === "backend") return true;
+  const colonIdx = entry.source.indexOf(":");
+  if (colonIdx !== -1 && entry.source.slice(colonIdx + 1) === container) {
+    return true;
+  }
+  return false;
 }
 
 /**
- * Print runtime logs with formatting.
+ * Print runtime log entries with `[source] timestamp message` formatting.
  */
 function printRuntimeLogs(
-  logs: string,
+  entries: RuntimeLogEntry[],
   tail: number,
   type: RuntimeLogType,
+  from: string,
+  to: string,
   container?: string,
 ): void {
   const header = container
-    ? `\n${chalk.bold("Runtime Logs")} (${chalk.cyan(type)}, container ${chalk.cyan(container)}, last ${chalk.cyan(String(tail))} entries)\n`
-    : `\n${chalk.bold("Runtime Logs")} (${chalk.cyan(type)}, last ${chalk.cyan(String(tail))} entries)\n`;
+    ? `\n${chalk.bold("Runtime Logs")} (${chalk.cyan(type)}, container ${chalk.cyan(container)}, last ${chalk.cyan(String(tail))} entries, ${chalk.gray(from)} → ${chalk.gray(to)})\n`
+    : `\n${chalk.bold("Runtime Logs")} (${chalk.cyan(type)}, last ${chalk.cyan(String(tail))} entries, ${chalk.gray(from)} → ${chalk.gray(to)})\n`;
   console.log(header);
   console.log("─".repeat(60));
 
-  const displayLogs = container ? filterLogsByContainer(logs, container) : logs;
+  const displayEntries = container
+    ? entries.filter((e) => entryMatchesContainer(e, container))
+    : entries;
 
-  if (displayLogs.trim()) {
-    console.log(displayLogs);
-  } else {
+  if (displayEntries.length === 0) {
     console.log(chalk.gray("No runtime logs available."));
+  } else {
+    for (const entry of displayEntries) {
+      console.log(
+        `${chalk.cyan(`[${entry.source}]`)} ${entry.timestamp} ${entry.message}`,
+      );
+    }
   }
 
   console.log("─".repeat(60));
@@ -101,6 +117,22 @@ async function getOrgAndApiKey(): Promise<{
   };
 }
 
+/**
+ * Validate an ISO 8601 timestamp string. Accepts the formats `Date.parse`
+ * recognises that round-trip through `toISOString()` losslessly (minute
+ * precision or finer). Returns the input on success or throws with a helpful
+ * message on failure.
+ */
+function validateIsoTimestamp(value: string, flag: string): string {
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) {
+    throw new Error(
+      `${flag} must be a valid ISO 8601 timestamp (e.g. 2026-04-30T09:00:00Z), got: ${value}`,
+    );
+  }
+  return value;
+}
+
 // Build logs subcommand
 const buildCommand = new Command("build")
   .description("Get build logs for a deployed feature")
@@ -134,62 +166,90 @@ const runtimeCommand = new Command("runtime")
   .argument("<featureId>", "Feature ID")
   .option(
     "-t, --tail <number>",
-    "Number of log entries to retrieve (0-300)",
+    "Number of log entries to retrieve (1-1000)",
     "100",
   )
   .option(
     "--type <type>",
     "Type of logs: console (stdout/stderr) or system (Container Apps service logs)",
     "console",
+  )
+  .option(
+    "--from <iso>",
+    "Inclusive lower bound of the log time window (ISO 8601, e.g. 2026-04-30T09:00:00Z). Defaults server-side to to - 1h.",
+  )
+  .option(
+    "--to <iso>",
+    "Inclusive upper bound of the log time window (ISO 8601). Defaults server-side to now. Range from..to is capped at 7 days.",
+  )
+  .option(
+    "--container <name>",
+    "Filter logs to a specific container (e.g. api, or a sidecar/job name)",
   );
 
-runtimeCommand.option(
-  "--container <name>",
-  "Filter logs to a specific container (e.g. api, or a sidecar name)",
-);
-
 runtimeCommand.action(async (featureId: string, options) => {
+  try {
+    const { orgId, apiKey } = await getOrgAndApiKey();
+
+    const tail = parseInt(options.tail, 10);
+    if (isNaN(tail) || tail < 1 || tail > 1000) {
+      console.error("Error: --tail must be a number between 1 and 1000.");
+      process.exit(1);
+    }
+
+    const type = options.type as RuntimeLogType;
+    if (type !== "console" && type !== "system") {
+      console.error('Error: --type must be either "console" or "system".');
+      process.exit(1);
+    }
+
+    let from: string | undefined;
+    let to: string | undefined;
     try {
-      const { orgId, apiKey } = await getOrgAndApiKey();
-
-      const tail = parseInt(options.tail, 10);
-      if (isNaN(tail) || tail < 0 || tail > 300) {
-        console.error("Error: --tail must be a number between 0 and 300.");
-        process.exit(1);
-      }
-
-      const type = options.type as RuntimeLogType;
-      if (type !== "console" && type !== "system") {
-        console.error('Error: --type must be either "console" or "system".');
-        process.exit(1);
-      }
-
-      console.log(
-        `\n📋 Fetching runtime logs for feature: ${chalk.cyan(featureId)}`,
-      );
-
-      const response = await getRuntimeLogsByFeature(apiKey, orgId, featureId, {
-        tail,
-        type,
-      });
-
-      printRuntimeLogs(
-        response.logs,
-        response.tail,
-        response.type,
-        options.container,
-      );
-
-      console.log(`\n${chalk.gray(`Deploy ID: ${response.deployId}`)}\n`);
-    } catch (error) {
+      if (options.from) from = validateIsoTimestamp(options.from, "--from");
+      if (options.to) to = validateIsoTimestamp(options.to, "--to");
+    } catch (e) {
       console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
+        chalk.red(`Error: ${e instanceof Error ? e.message : String(e)}`),
       );
       process.exit(1);
     }
-  });
+
+    if (from && to && Date.parse(from) > Date.parse(to)) {
+      console.error("Error: --from must be earlier than or equal to --to.");
+      process.exit(1);
+    }
+
+    console.log(
+      `\n📋 Fetching runtime logs for feature: ${chalk.cyan(featureId)}`,
+    );
+
+    const response = await getRuntimeLogsByFeature(apiKey, orgId, featureId, {
+      tail,
+      type,
+      from,
+      to,
+    });
+
+    printRuntimeLogs(
+      response.logs,
+      response.tail,
+      response.type,
+      response.from,
+      response.to,
+      options.container,
+    );
+
+    console.log(`\n${chalk.gray(`Deploy ID: ${response.deployId}`)}\n`);
+  } catch (error) {
+    console.error(
+      chalk.red(
+        `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      ),
+    );
+    process.exit(1);
+  }
+});
 
 // Main remote-logs command
 export const remoteLogsCommand = new Command("remote-logs")

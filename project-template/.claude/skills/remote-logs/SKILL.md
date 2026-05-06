@@ -41,24 +41,31 @@ Output includes:
 Fetch live logs from the running backend:
 
 ```bash
-# Default: last 100 console (stdout/stderr) entries
+# Default: last 100 console (stdout/stderr) entries from the last hour
 fusebase remote-logs runtime <featureId>
 
-# Specify tail count (0-300)
+# Specify tail count (1-1000)
 fusebase remote-logs runtime <featureId> --tail 200
 
 # Get system logs instead of console logs
 fusebase remote-logs runtime <featureId> --type system
 
-# Filter to a specific container (backend or sidecar)
+# Restrict the time window (ISO 8601, max 7d range)
+fusebase remote-logs runtime <featureId> \
+  --from 2026-04-30T00:00:00Z --to 2026-04-30T23:59:59Z
+
+# Filter to a specific container (backend, sidecar, or job)
 fusebase remote-logs runtime <featureId> --container api
 fusebase remote-logs runtime <featureId> --container my-sidecar
+fusebase remote-logs runtime <featureId> --container cron-daily
 ```
 
 Options:
-- `--tail <n>` - Number of log entries (0-300, default: 100)
+- `--tail <n>` - Number of log entries (1-1000, default: 100)
 - `--type <type>` - Log type: `console` (stdout/stderr) or `system` (service/infrastructure logs)
-- `--container <name>` - Filter logs to a specific container. Use `api` for the main backend, or the sidecar name for sidecar containers
+- `--from <iso>` - Inclusive lower bound of the log time window (ISO 8601). Default server-side: `to - 1h`. Range from..to is capped at 7 days.
+- `--to <iso>` - Inclusive upper bound of the log time window (ISO 8601). Default server-side: now.
+- `--container <name>` - Filter logs to a specific container. Use `api` for the main backend, or the sidecar/job name for sidecar/job containers.
 
 ### Log Format with Sidecars
 
