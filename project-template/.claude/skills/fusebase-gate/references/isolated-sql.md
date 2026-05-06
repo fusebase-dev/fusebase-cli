@@ -1,7 +1,7 @@
 ---
 version: "1.8.7"
 mcp_prompt: isolatedSql
-last_synced: "2026-04-23"
+last_synced: "2026-05-06"
 title: "Fusebase Gate Isolated SQL Stores"
 category: specialized
 ---
@@ -25,14 +25,14 @@ Load MCP prompt **`isolatedSqlMigrationDiscipline`** (`prompts_search`, groups `
 ### Standard sequence (schema + store)
 
 1. **`listIsolatedStores`** → **`createIsolatedStore`** (`engine` `postgres`, `storeType` `sql`, `source` `{ sourceType: app, sourceId: … }`, `alias`).
-2. **`initIsolatedStoreStage`** for `dev` / `prod` (omit `bindingConfig` when Gate auto-provisions).
+2. **`initIsolatedStoreStage`** for `prod` / `dev` (omit `bindingConfig` when Gate auto-provisions).
 3. In the app repo, keep schema files under **`postgres/migrations/`** and assemble the bundle with SDK helper **`buildSqlMigrationBundle(...)`**. Do not hand-build migration JSON or copy ad-hoc checksums into chat unless this is an explicitly temporary smoke test.
 4. **`getIsolatedStoreSqlMigrationStatus`** with the **exact bundle** you will apply: read **`canApply`**, **`isDrifted`**, **`pendingCount`**, **`structuredIssues`**. Optionally pass **`expectedLastAppliedVersion`** / **`expectedLastAppliedChecksum`** from a prior status → **409** if the journal tail changed.
 5. Optional: **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** — same checks, **no** SQL / journal writes.
 6. **`applyIsolatedStoreSqlMigrations`** — pending tail only when prefix matches. **409** + **`data.errorCode`** / **`data.issues`** on drift or head mismatch. Prod: automatic checkpoint may run before pending migrations.
 7. Verify: **`listIsolatedStoreSqlTables`**, **`getIsolatedStoreSqlStats`**, or **`queryIsolatedStoreSql`** (read-only, **one** statement per call).
 
-`dev` and `prod` are **different databases** — repeat the sequence per stage with the **same logical version line**.
+Default stage is **`prod`** when stage is omitted by higher-level orchestration. `dev` and `prod` are **different databases** — repeat the sequence per stage with the **same logical version line**.
 
 ### Data path (no DDL)
 
@@ -104,5 +104,5 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 - **Version**: 1.8.7
 - **Category**: specialized
-- **Last synced**: 2026-04-23
+- **Last synced**: 2026-05-06
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

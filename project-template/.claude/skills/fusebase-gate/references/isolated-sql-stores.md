@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-04-29"
+last_synced: "2026-05-06"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -16,6 +16,8 @@ category: specialized
 End-to-end reference for **`sql` / `postgres`** isolated stores: MCP tools, `@fusebase/fusebase-gate-sdk` (`IsolatedStoresApi`), permissions, migrations, and failure modes.  
 **Contracts:** `src/api/contracts/ops/isolated-stores/isolated-stores.ts`.
 For a hierarchy-focused reference, see [isolated-store-hierarchy.md](./isolated-store-hierarchy.md).
+That hierarchy reference now also explains the current stage model (`store -> stage instance -> revision -> physical database`) in practical terms.
+For the current go/no-go list, see [isolated-stores-release-checklist.md](./isolated-stores-release-checklist.md).
 
 Current stable baseline (2026-04-12):
 
@@ -73,6 +75,8 @@ For the next production-pilot cut, the main remaining tasks are:
 - migration / copy flow for managed apps;
 - minimal frontend/backend execution split that does not rely only on skills;
 - a stable operator-facing path into store management (Studio path is acceptable for the pilot).
+
+The concrete release gate for these items is tracked in [isolated-stores-release-checklist.md](./isolated-stores-release-checklist.md).
 
 Items that can wait for public-release hardening:
 
@@ -293,4 +297,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-04-29
+- **Last synced**: 2026-05-06

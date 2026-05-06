@@ -1,7 +1,7 @@
 ---
 version: "1.2.9"
 mcp_prompt: isolated
-last_synced: "2026-04-22"
+last_synced: "2026-05-06"
 title: "Fusebase Gate Isolated Stores"
 category: specialized
 ---
@@ -20,14 +20,14 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 - An isolated store is a logical app-owned SQL database.
 - A store belongs to an org and to a source scope such as `app`.
-- Each store has stage instances such as `dev` and `prod`.
+- Each store has stage instances such as `prod` and `dev`.
 - Each stage instance binds to its own physical database.
 - Revisions and checkpoints are attached to a stage instance, not to the whole store.
 
 ## Working Flow
 
 1. Create the isolated store.
-2. Initialize a stage such as `dev` or `prod`.
+2. Initialize a stage such as `prod` or `dev`.
 3. Use SQL tools for `sql/postgres` stores.
 4. Create checkpoints before risky changes.
 5. Restore a revision only when the revision has a physical `file://` snapshot.
@@ -46,6 +46,7 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 ## Stage Rules
 
+- Default stage is `prod` when stage is omitted by higher-level orchestration.
 - `dev` and `prod` are separate stage instances with separate physical databases.
 - Do not assume data written to `dev` exists in `prod`.
 - **SQL schema:** follow the **`isolatedSql`** prompt and repo **`docs/isolated-sql-stores.md`** (status → optional dryRun → apply). Load **`isolatedSqlMigrationDiscipline`** before editing migration bundles.
@@ -89,5 +90,5 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 - **Version**: 1.2.9
 - **Category**: specialized
-- **Last synced**: 2026-04-22
+- **Last synced**: 2026-05-06
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

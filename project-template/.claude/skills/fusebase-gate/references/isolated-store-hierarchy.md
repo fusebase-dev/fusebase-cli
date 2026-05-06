@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-store-hierarchy.md"
-last_synced: "2026-04-22"
+last_synced: "2026-05-06"
 title: "Isolated stores hierarchy: Gate vs Neon"
 category: specialized
 ---
@@ -32,6 +32,32 @@ Important side objects:
 - SQL migration journal `fusebase_schema_migrations` lives **inside the stage database**
 - runtime permissions and optional `resource_scope` checks are evaluated against the store and stage-instance identities, not directly against schemas or tables
 
+### Stage model in practice
+
+For the current Gate contract, the important unit is not just the store, but the **stage instance**.
+
+A stage instance owns:
+
+- the logical stage name: `dev` or `prod`
+- the current stage status such as `ready` or `provisioning`
+- the provider binding config for the physical database
+- stage-local provisioning metadata
+- stage-local revisions / checkpoints
+- for SQL stores, the stage-local migration journal inside that stage database
+
+That means:
+
+- `dev` and `prod` are not two views over one database
+- they are two separate stage instances
+- each stage instance can sit at a different migration head
+- each stage instance has its own restore history and snapshot lineage
+
+In other words:
+
+- `store` = logical app-owned data asset
+- `stage instance` = concrete environment of that asset
+- `revision` = point-in-time snapshot of one specific stage instance
+
 ### What each level means
 
 - **Org**
@@ -49,6 +75,13 @@ Important side objects:
   In the current contract this is intentionally simple and fixed to:
   - `dev`
   - `prod`
+
+  A stage instance is the level where Gate tracks:
+  - readiness / provisioning state
+  - binding config
+  - migration history
+  - checkpoint / restore history
+  - latest applied migration bundle metadata for Studio
 
 - **Physical database**
   For the current SQL path, each stage instance binds to its own physical database.
@@ -93,6 +126,8 @@ Current hard or explicit constraints in the Gate contract:
 - stage names are currently limited to **`dev`** and **`prod`**
 - each stage has its **own physical database**
 - revisions/checkpoints are scoped to a **stage instance**
+- restore always targets a **single stage instance**, never the whole store
+- SQL migration status / apply is evaluated **per stage instance**
 - `selectIsolatedStoreSqlRows`
   - default limit `100`
   - max `500`
@@ -108,8 +143,27 @@ What is **not** currently documented as a hard product limit:
 
 - max isolated stores per org
 - max revisions per stage
+- extra stage names beyond `dev` / `prod`
 
 Operationally those are still bounded by provider capacity and retention policy, but not by a small explicit Gate quota today.
+
+### Stage lifecycle summary
+
+Current lifecycle for a new SQL store usually looks like:
+
+1. `createIsolatedStore`
+2. `initIsolatedStoreStage(dev)`
+3. `getIsolatedStoreSqlMigrationStatus(dev)`
+4. `applyIsolatedStoreSqlMigrations(dev)`
+5. optional `createIsolatedStoreCheckpoint(dev)`
+6. later repeat the same flow for `prod`
+
+Important operational rule:
+
+- promotion is not implicit
+- applying migrations to `dev` does not move `prod`
+- restoring a `dev` revision does not affect `prod`
+- every stage is managed independently even though both belong to the same store
 
 ## 2. Neon hierarchy
 
@@ -260,4 +314,4 @@ So:
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-04-22
+- **Last synced**: 2026-05-06

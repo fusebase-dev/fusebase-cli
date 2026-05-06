@@ -44,6 +44,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 - [Isolated SQL stores and migrations (Gate)](references/isolated-sql-stores.md)
 - [Isolated SQL stores PostgreSQL RLS plan (Gate)](references/isolated-sql-rls-plan.md)
 - [Isolated stores hierarchy: Gate vs Neon](references/isolated-store-hierarchy.md)
+- [Isolated stores release checklist](references/isolated-stores-release-checklist.md)
 - [Stripe for apps and agents (Gate)](references/stripe-for-apps-and-agents.md)
 
 ---
