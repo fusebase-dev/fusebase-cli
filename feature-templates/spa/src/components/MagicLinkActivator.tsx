@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
-  FEATURE_TOKEN_COOKIE,
-  SESSION_COOKIE,
-  buildLinkCookie,
   deriveGateBaseUrl,
   parseActivationError,
   parseLinkParams,
+  selectActivationOutcome,
+  type ActivationResponseShape,
   type LinkActivationFailure,
 } from '../lib/magic-link'
 
@@ -13,12 +12,6 @@ type ActivationState =
   | { status: 'loading' }
   | { status: 'invalid' }
   | { status: 'failed'; reason: LinkActivationFailure }
-
-interface ActivationResponse {
-  sessionToken?: string
-  featureToken?: string
-  redirectPath?: string | null
-}
 
 class MagicLinkActivationError extends Error {
   readonly status: number
@@ -32,7 +25,7 @@ class MagicLinkActivationError extends Error {
   }
 }
 
-async function activateMagicLink(gateBaseUrl: string, globalId: string): Promise<ActivationResponse> {
+async function activateMagicLink(gateBaseUrl: string, globalId: string): Promise<ActivationResponseShape> {
   const url = `${gateBaseUrl}/apps/magic-links/${encodeURIComponent(globalId)}/activate`
   const response = await fetch(url, {
     method: 'POST',
@@ -41,13 +34,16 @@ async function activateMagicLink(gateBaseUrl: string, globalId: string): Promise
   let body: unknown = null
   try {
     body = await response.json()
-  } catch {
+  } catch (parseError) {
+    if (response.ok) {
+      console.warn('[magic-link] activation succeeded but response body was not JSON', parseError)
+    }
     body = null
   }
   if (!response.ok) {
     throw new MagicLinkActivationError(response.status, body)
   }
-  return (body ?? {}) as ActivationResponse
+  return (body ?? {}) as ActivationResponseShape
 }
 
 export function MagicLinkActivator() {
@@ -68,26 +64,16 @@ export function MagicLinkActivator() {
 
       try {
         const response = await activateMagicLink(gateBaseUrl, params.id)
+        if (cancelled) return
 
-        const isSecure = window.location.protocol === 'https:'
-        const cookieMaxAge = 60 * 60 * 24 * 30
-        if (response.featureToken) {
-          document.cookie = buildLinkCookie(FEATURE_TOKEN_COOKIE, response.featureToken, {
-            isSecure,
-            maxAgeSeconds: cookieMaxAge,
-          })
+        const outcome = selectActivationOutcome(response, params.redirect, {
+          isSecure: window.location.protocol === 'https:',
+          maxAgeSeconds: 60 * 60 * 24 * 30,
+        })
+        for (const { cookie } of outcome.cookies) {
+          document.cookie = cookie
         }
-        if (response.sessionToken) {
-          document.cookie = buildLinkCookie(SESSION_COOKIE, response.sessionToken, {
-            isSecure,
-            maxAgeSeconds: cookieMaxAge,
-          })
-        }
-
-        const target = response.redirectPath && response.redirectPath.startsWith('/')
-          ? response.redirectPath
-          : params.redirect
-        window.location.replace(target)
+        window.location.replace(outcome.redirectTarget)
       } catch (error) {
         if (cancelled) return
         const reason = parseActivationError(error)
@@ -127,35 +113,33 @@ export function MagicLinkActivator() {
   )
 }
 
-function renderFailureUi(state: ActivationState): { title: string; body: string } {
+function renderFailureUi(state: Exclude<ActivationState, { status: 'loading' }>): { title: string; body: string } {
   if (state.status === 'invalid') {
     return {
       title: 'Invalid link',
       body: 'This link is missing required information. Request a new magic link from the sign-in form to continue.',
     }
   }
-  if (state.status === 'failed') {
-    if (state.reason === 'expired') {
+  switch (state.reason) {
+    case 'expired':
       return {
         title: 'This link has expired',
         body: 'Magic links are valid for 24 hours. Request a new one from the sign-in form and use it within the next day.',
       }
-    }
-    if (state.reason === 'revoked') {
+    case 'revoked':
       return {
         title: 'This link is no longer valid',
         body: 'Your access to this app was changed after the link was sent. Sign in again or contact the person who invited you.',
       }
-    }
-    if (state.reason === 'not_found') {
+    case 'not_found':
       return {
         title: 'Link not found',
         body: 'We could not find this magic link. It may have been already used or removed. Request a new one from the sign-in form.',
       }
-    }
-  }
-  return {
-    title: 'Could not activate this link',
-    body: 'Something went wrong while activating your link. Try again, or request a new link from the sign-in form.',
+    case 'unknown':
+      return {
+        title: 'Could not activate this link',
+        body: 'Something went wrong while activating your link. Try again, or request a new link from the sign-in form.',
+      }
   }
 }

@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  FEATURE_TOKEN_COOKIE,
   MAGIC_LINK_ROUTE,
+  SESSION_COOKIE,
   buildLinkCookie,
   deriveGateBaseUrl,
   parseActivationError,
   parseLinkParams,
   sanitizeRedirectPath,
+  selectActivationOutcome,
 } from '../feature-templates/spa/src/lib/magic-link'
 
 describe('feature-templates/spa /link handler helpers', () => {
@@ -104,6 +107,65 @@ describe('feature-templates/spa /link handler helpers', () => {
       expect(buildLinkCookie('eversessionid', 's', { isSecure: true, maxAgeSeconds: 60 })).toBe(
         'eversessionid=s; path=/; SameSite=Lax; Max-Age=60; Secure',
       )
+    })
+  })
+
+  describe('selectActivationOutcome', () => {
+    const cookieOpts = { isSecure: true, maxAgeSeconds: 60 }
+
+    it('prefers a safe server-returned redirectPath over the URL fallback', () => {
+      const outcome = selectActivationOutcome(
+        { redirectPath: '/proposals/42' },
+        '/fallback',
+        cookieOpts,
+      )
+      expect(outcome.redirectTarget).toBe('/proposals/42')
+    })
+
+    it('rejects an unsafe server redirectPath instead of trusting it (open-redirect guard)', () => {
+      // Regression for NIM-41013 round-1 CR: window.location.replace('//evil.com/path')
+      // is a protocol-relative redirect to evil.com. The server response must be
+      // sanitised exactly like the URL fallback.
+      const cases = ['//evil.com/path', 'https://evil.com', 'evil.com', '/foo\\bar', 'javascript:alert(1)']
+      for (const bad of cases) {
+        const outcome = selectActivationOutcome({ redirectPath: bad }, '/fallback', cookieOpts)
+        expect(outcome.redirectTarget).toBe('/fallback')
+      }
+    })
+
+    it('falls back to the (sanitised) URL redirect when the server omits redirectPath', () => {
+      expect(
+        selectActivationOutcome({ redirectPath: null }, '/proposals/42', cookieOpts).redirectTarget,
+      ).toBe('/proposals/42')
+      expect(
+        selectActivationOutcome({}, '/proposals/42', cookieOpts).redirectTarget,
+      ).toBe('/proposals/42')
+    })
+
+    it('also sanitises an unsafe URL fallback (defence in depth)', () => {
+      expect(
+        selectActivationOutcome({ redirectPath: null }, '//evil.com/x', cookieOpts).redirectTarget,
+      ).toBe('/')
+    })
+
+    it('builds cookie strings only for tokens that are present', () => {
+      const outcome = selectActivationOutcome(
+        { sessionToken: 'sess', featureToken: 'feat', redirectPath: '/' },
+        '/',
+        cookieOpts,
+      )
+      expect(outcome.cookies.map((c) => c.name)).toEqual([FEATURE_TOKEN_COOKIE, SESSION_COOKIE])
+      expect(outcome.cookies[0]?.cookie).toBe('fbsfeaturetoken=feat; path=/; SameSite=Lax; Max-Age=60; Secure')
+      expect(outcome.cookies[1]?.cookie).toBe('eversessionid=sess; path=/; SameSite=Lax; Max-Age=60; Secure')
+    })
+
+    it('omits cookies when tokens are absent', () => {
+      expect(
+        selectActivationOutcome({ redirectPath: '/' }, '/', cookieOpts).cookies,
+      ).toEqual([])
+      expect(
+        selectActivationOutcome({ sessionToken: '', featureToken: '', redirectPath: '/' }, '/', cookieOpts).cookies,
+      ).toEqual([])
     })
   })
 })

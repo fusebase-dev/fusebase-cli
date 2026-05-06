@@ -53,7 +53,7 @@ These operations expose one-click client onboarding for AI Apps. They mirror the
 
 ## Activation Rules (`activateAppMagicLink`)
 
-- The SPA at `/link` reads `id` and `redirect` from the query string, then calls `activateAppMagicLink({ id })` (the SDK omits `redirect` because the server already stored it on the link row at create time).
+- The SPA at `/link` reads `id` and `redirect` from the query string, then activates the link by issuing `POST {gateBaseUrl}/apps/magic-links/{id}/activate`. The bundled SPA template currently calls this endpoint directly via `fetch` so it stays usable before `@fusebase/fusebase-gate-sdk` exposes `AppMagicLinksApi.activateAppMagicLink`. Once that SDK ships, prefer `activateAppMagicLink({ path: { globalId: id } })` over hand-rolled fetches; the wire request is identical (the server already stored `redirectPath` on the link row at create time, so the client never sends it on activation).
 - Successful response: `{ id, sessionToken, featureToken, dashboardToken, redirectPath, expiresAt, appFeatureId }`.
   - `sessionToken` — set as the `eversessionid` cookie on the app subdomain so subsequent calls authenticate.
   - `featureToken` — Gate feature token; persist via the existing scaffold convention (`postMessage`, cookie `fbsfeaturetoken`, etc.).

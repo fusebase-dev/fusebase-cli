@@ -62,8 +62,9 @@ export function parseActivationError(error: unknown): LinkActivationFailure {
  * Resolve the Gate SDK base URL.
  *
  * Priority: explicit override (`VITE_FUSEBASE_GATE_URL`) > app hostname heuristic > prod.
- * Heuristic recognises Fusebase-managed app domains; for custom domains pass an override
- * via the env var or update this helper.
+ * Heuristic recognises Fusebase-managed app domains; for custom domains set
+ * `VITE_FUSEBASE_GATE_URL=https://<your-gate-host>/v4/api/proxy/gate-service/v1` at
+ * build time (Vite inlines `import.meta.env.VITE_*` constants).
  */
 export function deriveGateBaseUrl(opts?: { hostname?: string; override?: string | null }): string {
   const override = opts?.override
@@ -102,4 +103,45 @@ export function buildLinkCookie(
   }
   if (opts?.isSecure) parts.push('Secure')
   return parts.join('; ')
+}
+
+export interface ActivationResponseShape {
+  sessionToken?: string | null
+  featureToken?: string | null
+  redirectPath?: string | null
+}
+
+export interface ActivationOutcome {
+  redirectTarget: string
+  cookies: Array<{ name: string; cookie: string }>
+}
+
+/**
+ * Pure: pick the redirect target and prepare cookie strings from an activation response.
+ *
+ * Both the server-returned `redirectPath` and the URL fallback are funnelled through
+ * `sanitizeRedirectPath` — protects against `//evil.com` open-redirects regardless of
+ * which side produced the value (CR feedback round 1 on NIM-41013).
+ */
+export function selectActivationOutcome(
+  response: ActivationResponseShape,
+  fallbackRedirect: string,
+  cookieOpts: { isSecure: boolean; maxAgeSeconds: number },
+): ActivationOutcome {
+  const serverRedirect = sanitizeRedirectPath(response.redirectPath)
+  const redirectTarget = serverRedirect !== '/' ? serverRedirect : sanitizeRedirectPath(fallbackRedirect)
+  const cookies: Array<{ name: string; cookie: string }> = []
+  if (response.featureToken) {
+    cookies.push({
+      name: FEATURE_TOKEN_COOKIE,
+      cookie: buildLinkCookie(FEATURE_TOKEN_COOKIE, response.featureToken, cookieOpts),
+    })
+  }
+  if (response.sessionToken) {
+    cookies.push({
+      name: SESSION_COOKIE,
+      cookie: buildLinkCookie(SESSION_COOKIE, response.sessionToken, cookieOpts),
+    })
+  }
+  return { redirectTarget, cookies }
 }
