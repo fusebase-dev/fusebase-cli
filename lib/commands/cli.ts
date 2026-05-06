@@ -21,6 +21,26 @@ async function cleanupTmp(path: string): Promise<void> {
   }
 }
 
+function launchWindowsInstallerWithAutoKill(installerPath: string): void {
+  const escapedInstallerPath = installerPath.replace(/'/g, "''");
+  const script = [
+    `$currentPid = ${process.pid}`,
+    "try { Wait-Process -Id $currentPid -Timeout 30 -ErrorAction SilentlyContinue } catch {}",
+    "taskkill /F /IM fusebase.exe *> $null",
+    `Start-Process -FilePath '${escapedInstallerPath}' -Verb RunAs`,
+  ].join("; ");
+
+  spawn(
+    "powershell.exe",
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+    {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    },
+  ).unref();
+}
+
 async function detectLinkedOrLocalCli(): Promise<{
   linked: boolean;
   reason?: "argv-script" | "exec-is-bun";
@@ -120,14 +140,13 @@ export async function runCliSelfUpdate(): Promise<CliSelfUpdateResult> {
       throw new Error(`Failed to save installer: ${String(err)}`);
     }
 
-    spawn("explorer.exe", [installerDir], {
-      detached: true,
-      stdio: "ignore",
-    }).unref();
+    launchWindowsInstallerWithAutoKill(installerPath);
 
     console.log(`✓ Installer saved to: ${installerPath}`);
-    console.log("  The folder has been opened in Explorer.");
-    console.log("  Double-click the installer to complete the update.");
+    console.log(
+      "  Installer will start automatically after this process exits.",
+    );
+    console.log("  Any running fusebase.exe processes will be terminated first.");
     return { status: "updated", latestVersion };
   }
 
