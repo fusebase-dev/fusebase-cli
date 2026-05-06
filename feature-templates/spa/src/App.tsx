@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react'
 import { AuthTokenExpiredError, getFeatureToken } from './lib/api'
+import { MAGIC_LINK_ROUTE } from './lib/magic-link'
 import { AuthExpiredModal } from './components/AuthExpiredModal'
+import { MagicLinkActivator } from './components/MagicLinkActivator'
 
 function App() {
+  if (typeof window !== 'undefined' && window.location.pathname === MAGIC_LINK_ROUTE) {
+    return <MagicLinkActivator />
+  }
+  return <FeatureApp />
+}
+
+function FeatureApp() {
   const [featureToken, setFeatureToken] = useState<string | null>(null)
   const [authExpired, setAuthExpired] = useState<AuthTokenExpiredError | null>(null)
 

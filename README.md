@@ -404,6 +404,8 @@ fusebase scaffold --template backend --dir features/my-feature
 
 the CLI creates `openapi.json` automatically if it does not already exist.
 
+The `spa` feature template ships a built-in **`/link`** route that handles app magic links: it reads `?id=…&redirect=…` from the URL, calls Gate `activateAppMagicLink`, persists the returned session and feature tokens as cookies, and redirects to the deep page. Expired, revoked, and not-found cases each render a tailored UI inline, so closed-access apps work for one-click client onboarding without extra wiring. See [`project-template/.claude/skills/fusebase-gate/references/app-magic-links.md`](project-template/.claude/skills/fusebase-gate/references/app-magic-links.md) for the full Gate contract (invite vs self-service vs activate).
+
 **Updates `fusebase.json`:**
 
 ```json
