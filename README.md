@@ -234,13 +234,24 @@ Deploy features to Fusebase. For each feature this command will:
 
 1. Install dependencies and run lint (if the feature has a `lint` script in its `package.json`)
 2. Run the build command (if configured)
-3. Compute a SHA-256 `frontendHash` of the upload directory and a `backendHash` of the `backend/` folder (if present)
+3. Compute a SHA-256 `frontendHash` of the upload directory and a `backendHash` of the `backend/` folder (if present). The `backendHash` is encoded as `<sourceHash>:<configHash>` and covers:
+   - source files under `backend/`
+   - the entire `backend` config block from `fusebase.json` (cron `jobs[*]`, `sidecars[*]`, and per-job `jobs[*].sidecars[*]`)
+   - the sorted list of registered app feature secret **keys** (values are not included)
 4. Compare those hashes against the active version and take one of:
    - **No changes** → skip the feature entirely (no new version, no upload, no backend deploy). Logs `✓ No changes for feature, skipping deploy`.
-   - **Frontend unchanged, backend changed** → create a new version, reuse the previous frontend bundle via `copyFrontendParams` (no upload), then re-deploy the backend.
+   - **Frontend unchanged, backend changed** → create a new version, reuse the previous frontend bundle via `copyFrontendParams` (no upload), then re-deploy the backend. When only the backend config block or secret-key list changed (source files in `backend/` are unchanged), the deploy log prints `Backend config or secrets changed, redeploying without source change` so you can tell why the backend redeployed.
    - **Frontend changed** → create a new version, upload files, persist the new `frontendHash`. Backend is handled per its own hash (skipped/copied or re-deployed).
 5. With `--force`, hash matches are ignored and a full upload + redeploy runs for every feature.
 6. If the feature contains `openapi.json` and the `app-api-registry` flag is enabled, validate it and publish the app API manifest to the feature registry.
+
+Because the `backend` config block and the registered secret-key list are part of `backendHash`, regular `fusebase deploy` (no `--force`) auto-redeploys when you:
+
+- change a cron job's `cron` schedule or any other field under `backend.jobs[*]`
+- add, remove, or modify a sidecar under `backend.sidecars[*]` or `backend.jobs[*].sidecars[*]`
+- add or remove an app feature secret via `fusebase secret create` (or other CLI commands that change the registered key list)
+
+Editing only a secret **value** out-of-band (via the URL printed by `fusebase secret create`) does **not** change the key list and therefore does **not** trigger an auto-redeploy. To pick up an out-of-band value change, run `fusebase deploy --force`. `--force` remains available as an escape hatch and forces re-upload + redeploy regardless of any hash match.
 
 **Arguments:** None
 
