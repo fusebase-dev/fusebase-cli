@@ -234,7 +234,7 @@ Deploy features to Fusebase. For each feature this command will:
 
 1. Install dependencies and run lint (if the feature has a `lint` script in its `package.json`)
 2. Run the build command (if configured)
-3. Compute a SHA-256 `frontendHash` of the upload directory and a `backendHash` of the `backend/` folder (if present). The `backendHash` is encoded as `<sourceHash>:<configHash>` and covers:
+3. Compute a SHA-256 `frontendHash` of the upload directory and a `backendHash` of the `backend/` folder (if present). The `backendHash` is encoded as `<sourceHash>:<configHash>` (each half truncated to fit the 64-char `backendHash` storage column) and covers:
    - source files under `backend/`
    - the entire `backend` config block from `fusebase.json` (cron `jobs[*]`, `sidecars[*]`, and per-job `jobs[*].sidecars[*]`)
    - the sorted list of registered app feature secret **keys** (values are not included)

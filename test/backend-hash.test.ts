@@ -9,6 +9,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import {
+  BACKEND_HASH_CONFIG_PREFIX_LEN,
+  BACKEND_HASH_SOURCE_PREFIX_LEN,
   calculateBackendConfigHash,
   calculateBackendHash,
   calculateBackendSourceHash,
@@ -16,6 +18,10 @@ import {
   splitBackendHash,
 } from "../lib/commands/deploy";
 import type { BackendConfig } from "../lib/config";
+
+// Active version's `backendHash` column is VARCHAR(64); fail loudly if the
+// combined hash ever overflows that limit again (NIM-41039).
+const BACKEND_HASH_MAX_LEN = 64;
 
 const baseBackend: BackendConfig = {
   start: { command: "node server.js" },
@@ -185,6 +191,23 @@ describe("calculateBackendHash (combined)", () => {
     expect(splitBackendHash(after).config).not.toBe(
       splitBackendHash(before).config,
     );
+  });
+
+  it("fits within the active-version backendHash VARCHAR(64) column", async () => {
+    const hash = await calculateBackendHash(dir, baseBackend, ["DB", "API"]);
+    expect(hash.length).toBeLessThanOrEqual(BACKEND_HASH_MAX_LEN);
+    const parts = splitBackendHash(hash);
+    expect(parts.source).toHaveLength(BACKEND_HASH_SOURCE_PREFIX_LEN);
+    expect(parts.config).toHaveLength(BACKEND_HASH_CONFIG_PREFIX_LEN);
+  });
+
+  it("encoded source/config halves are prefixes of the full SHA-256 digests", async () => {
+    const hash = await calculateBackendHash(dir, baseBackend, ["DB"]);
+    const parts = splitBackendHash(hash);
+    const fullSource = await calculateBackendSourceHash(dir);
+    const fullConfig = calculateBackendConfigHash(baseBackend, ["DB"]);
+    expect(parts.source).toBe(fullSource.slice(0, BACKEND_HASH_SOURCE_PREFIX_LEN));
+    expect(parts.config).toBe(fullConfig.slice(0, BACKEND_HASH_CONFIG_PREFIX_LEN));
   });
 });
 
