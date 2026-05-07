@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { createHash } from "crypto";
 import { readFile, readdir, stat } from "fs/promises";
 import { join, relative } from "path";
 import { homedir } from "os";
@@ -15,6 +16,7 @@ import {
   getDeploy,
   fetchApp,
   fetchAppFeatures,
+  fetchAppFeatureSecrets,
   copyBackendParams,
   copyFrontendParams,
   updateAppFeature,
@@ -30,6 +32,7 @@ import {
   getConfig,
   hasFlag,
   loadFuseConfig,
+  type BackendConfig,
   type FeatureConfig,
   type SidecarConfig,
 } from "../config";
@@ -204,12 +207,39 @@ async function runCommand(
 }
 
 /**
+ * Stable JSON serializer for arbitrary values: object keys are sorted
+ * recursively so reformatting / key reordering does not change the hash.
+ * Array order is preserved (job/sidecar order is treated as significant).
+ */
+export function canonicalJsonStringify(value: unknown): string {
+  if (value === undefined) {
+    return "null";
+  }
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return "[" + value.map(canonicalJsonStringify).join(",") + "]";
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj)
+    .filter((k) => obj[k] !== undefined)
+    .sort();
+  return (
+    "{" +
+    keys
+      .map((k) => JSON.stringify(k) + ":" + canonicalJsonStringify(obj[k]))
+      .join(",") +
+    "}"
+  );
+}
+
+/**
  * Calculate a deterministic SHA-256 hash of all files in a directory.
  * Files are sorted by path to ensure consistent ordering.
  * Excludes node_modules and hidden files.
  */
-async function calculateBackendHash(dir: string): Promise<string> {
-  const { createHash } = await import("crypto");
+export async function calculateBackendSourceHash(dir: string): Promise<string> {
   const files = await getAllFiles(dir, dir, ["node_modules"]);
   files.sort();
 
@@ -223,11 +253,57 @@ async function calculateBackendHash(dir: string): Promise<string> {
   return hash.digest("hex");
 }
 
+/**
+ * Hash the parts of the deploy that aren't source files: the entire
+ * `featureConfig.backend` block (so cron / sidecar / per-job sidecar edits
+ * are detected) and the sorted list of registered app secret **keys**
+ * (so adding/removing a key is detected). Secret *values* are intentionally
+ * excluded — out-of-band value edits still require `--force`.
+ */
+export function calculateBackendConfigHash(
+  backendConfig: BackendConfig | undefined,
+  secretKeys: string[],
+): string {
+  const sortedKeys = [...secretKeys].sort();
+  const payload =
+    canonicalJsonStringify(backendConfig ?? null) +
+    "|" +
+    JSON.stringify(sortedKeys);
+  return createHash("sha256").update(payload).digest("hex");
+}
+
+/**
+ * Combined backend hash. Encoded as `${sourceHash}:${configHash}` so callers
+ * can split the active version's stored hash and tell which part changed
+ * (e.g. "config/secrets only" → emit explanatory log line).
+ */
+export async function calculateBackendHash(
+  dir: string,
+  backendConfig: BackendConfig | undefined,
+  secretKeys: string[],
+): Promise<string> {
+  const sourceHash = await calculateBackendSourceHash(dir);
+  const configHash = calculateBackendConfigHash(backendConfig, secretKeys);
+  return `${sourceHash}:${configHash}`;
+}
+
+/**
+ * Split a stored backend hash into its source / config parts. Hashes written
+ * by older CLI versions don't contain a `:` and are treated as source-only.
+ */
+export function splitBackendHash(
+  hash: string | undefined,
+): { source?: string; config?: string } {
+  if (!hash) return {};
+  const idx = hash.indexOf(":");
+  if (idx === -1) return { source: hash };
+  return { source: hash.slice(0, idx), config: hash.slice(idx + 1) };
+}
+
 async function calculateFrontendHash(
   dir: string,
   exclude: string[] = [],
 ): Promise<string> {
-  const { createHash } = await import("crypto");
   const files = await getAllFiles(dir, dir, ["node_modules", ...exclude]);
   files.sort();
 
@@ -537,9 +613,25 @@ export const deployCommand = new Command("deploy")
         logger.info("Frontend hash: %s", frontendHash);
 
         let backendHash: string | undefined;
+        let backendSourceHash: string | undefined;
+        let secretKeys: string[] = [];
         if (hasBackendDir) {
           console.log(`   Calculating backend hash...`);
-          backendHash = await calculateBackendHash(backendDir);
+          // Fetch the registered app feature secret **keys** (no values) so
+          // CLI-driven add/remove of a key flips the backend hash; out-of-band
+          // value edits keep the existing `--force` requirement.
+          const secretsResponse = await fetchAppFeatureSecrets(
+            config.apiKey,
+            fuseConfig.orgId,
+            fuseConfig.appId,
+            featureId,
+          );
+          secretKeys = secretsResponse.secrets.map((s) => s.key);
+          backendSourceHash = await calculateBackendSourceHash(backendDir);
+          backendHash = `${backendSourceHash}:${calculateBackendConfigHash(
+            featureConfig.backend,
+            secretKeys,
+          )}`;
           logger.info("Backend hash: %s", backendHash);
         }
 
@@ -724,6 +816,18 @@ export const deployCommand = new Command("deploy")
               activeVersion.globalId,
             );
           } else {
+            // Distinguish "source unchanged, only config/secrets changed" so the
+            // user understands why a redeploy is happening without source edits.
+            const remoteParts = splitBackendHash(activeVersion?.backendHash);
+            if (
+              !force &&
+              backendSourceHash &&
+              remoteParts.source === backendSourceHash
+            ) {
+              console.log(
+                "   Backend config or secrets changed, redeploying without source change",
+              );
+            }
             console.log(
               "   Backend hash does not match active version, proceeding with deploy (local ",
               backendHash,

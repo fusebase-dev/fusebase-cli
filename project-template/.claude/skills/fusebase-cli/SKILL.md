@@ -410,6 +410,7 @@ fusebase dev start features/<name>
 
 ```bash
 fusebase deploy
+fusebase deploy --force   # re-upload + redeploy every feature regardless of hashes
 ```
 
 Deploys all features to Fusebase:
@@ -418,6 +419,8 @@ Deploys all features to Fusebase:
 2. Runs each feature's build command
 3. Uploads the built files from `outputDir`
 4. Activates the new version on Fusebase
+
+A regular `fusebase deploy` (no `--force`) also auto-redeploys when only `fusebase.json`'s `backend` block or the registered secret-key list changed — for example a cron-schedule edit, a sidecar add/remove under `backend.sidecars[*]` or `backend.jobs[*].sidecars[*]`, or `fusebase secret create` adding a new key. Editing a secret **value** out-of-band (via the URL printed by `fusebase secret create`) does **not** change the key list and still requires `--force`.
 
 The project template includes ESLint (`npm run lint`) and root `npm run typecheck` (TypeScript across features — catches errors ESLint does not). Run both before saying "Done" so deploy succeeds; see AGENTS.md "Final Gate". Claude Code runs lint and typecheck on Stop via `.claude/settings.json` hooks.
 
