@@ -655,7 +655,6 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `app-business-docs` | Copies the `app-business-docs` skill into the app: keeps **`docs/en/business-logic.md`** (English) aligned with real behavior — domain rules, main user flows, edge cases; update after business-logic changes or when debugging unclear behavior |
 | `mcp-gate-debug` | Copies the `mcp-gate-debug` skill: after Fusebase Gate MCP tool runs, summarize smooth vs rough paths and suggest improvements to `.claude/skills/fusebase-gate`, prompts, or MCP server behavior — prioritize **isolated stores** (SQL/NoSQL) flows |
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); also turns on required template references and `isolated_store.*` permissions in `fusebase env create` |
-| `portal-specific-features` | Includes portal-specific feature guidance in prompts: `fusebase-portal-specific-features` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
 | `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`features[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `feature-sidecar` and `feature-backend` skill templates. |
 
 Enable a flag globally, then refresh the project template:
@@ -664,7 +663,6 @@ Enable a flag globally, then refresh the project template:
 fusebase config set-flag app-business-docs   # Business-logic documentation skill
 fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summary skill
 fusebase config set-flag isolated-stores     # Isolated stores functionality (SQL/NoSQL)
-fusebase config set-flag portal-specific-features # Portal-specific features prompts/guidance
 fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```
 

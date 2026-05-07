@@ -104,9 +104,5 @@ export function getCookie(name: string): string | null {
 <% } %>
  */
 export function getFeatureToken(): string | null {
-<% if (it.flags?.includes("portal-specific-features")) { %>
   return (window as Window & { FBS_FEATURE_TOKEN?: string }).FBS_FEATURE_TOKEN ?? getCookie('fbsfeaturetoken') ?? null
-<% } else { %>
-  return getCookie('fbsfeaturetoken') ?? (window as Window & { FBS_FEATURE_TOKEN?: string }).FBS_FEATURE_TOKEN ?? null
-<% } %>
 }
