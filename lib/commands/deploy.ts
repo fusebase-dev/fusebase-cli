@@ -46,6 +46,14 @@ const FUSE_JSON = "fusebase.json";
 const UPLOAD_CONCURRENCY = 5;
 const DEPLOY_POLL_INTERVAL_MS = 3000;
 
+// The active version's `backendHash` column is VARCHAR(64). A full SHA-256 hex
+// digest is 64 chars, so naively encoding the combined hash as
+// `${sourceHash}:${configHash}` produces 129 chars and overflows the column.
+// Truncate each half so the encoded hash fits in 64 chars while preserving
+// enough collision resistance for idempotency checks (128/124 bits).
+export const BACKEND_HASH_SOURCE_PREFIX_LEN = 32;
+export const BACKEND_HASH_CONFIG_PREFIX_LEN = 31;
+
 // Transform sidecar config for the deploy API.
 // - `env` Record<string,string> becomes an array of {key, value}.
 // - `secrets` mixed entries (string | {from, as}) are normalized to always-object
@@ -275,7 +283,9 @@ export function calculateBackendConfigHash(
 /**
  * Combined backend hash. Encoded as `${sourceHash}:${configHash}` so callers
  * can split the active version's stored hash and tell which part changed
- * (e.g. "config/secrets only" → emit explanatory log line).
+ * (e.g. "config/secrets only" → emit explanatory log line). Each half is
+ * truncated so the combined hash fits in the VARCHAR(64) `backendHash`
+ * column on the active version (see `BACKEND_HASH_*_PREFIX_LEN`).
  */
 export async function calculateBackendHash(
   dir: string,
@@ -284,7 +294,10 @@ export async function calculateBackendHash(
 ): Promise<string> {
   const sourceHash = await calculateBackendSourceHash(dir);
   const configHash = calculateBackendConfigHash(backendConfig, secretKeys);
-  return `${sourceHash}:${configHash}`;
+  return `${sourceHash.slice(0, BACKEND_HASH_SOURCE_PREFIX_LEN)}:${configHash.slice(
+    0,
+    BACKEND_HASH_CONFIG_PREFIX_LEN,
+  )}`;
 }
 
 /**
@@ -628,10 +641,19 @@ export const deployCommand = new Command("deploy")
           );
           secretKeys = secretsResponse.secrets.map((s) => s.key);
           backendSourceHash = await calculateBackendSourceHash(backendDir);
-          backendHash = `${backendSourceHash}:${calculateBackendConfigHash(
+          // Inline `calculateBackendHash` so the read of `backendDir` happens
+          // once and `backendSourceHash` can be reused for the later
+          // "source unchanged, config-only changed" log-line check. Truncation
+          // matches `calculateBackendHash` so the encoded hash fits the
+          // VARCHAR(64) `backendHash` column.
+          const backendConfigHash = calculateBackendConfigHash(
             featureConfig.backend,
             secretKeys,
-          )}`;
+          );
+          backendHash = `${backendSourceHash.slice(
+            0,
+            BACKEND_HASH_SOURCE_PREFIX_LEN,
+          )}:${backendConfigHash.slice(0, BACKEND_HASH_CONFIG_PREFIX_LEN)}`;
           logger.info("Backend hash: %s", backendHash);
         }
 
@@ -822,7 +844,8 @@ export const deployCommand = new Command("deploy")
             if (
               !force &&
               backendSourceHash &&
-              remoteParts.source === backendSourceHash
+              remoteParts.source ===
+                backendSourceHash.slice(0, BACKEND_HASH_SOURCE_PREFIX_LEN)
             ) {
               console.log(
                 "   Backend config or secrets changed, redeploying without source change",
