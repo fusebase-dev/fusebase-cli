@@ -559,6 +559,17 @@ After changing feature code, run `fusebase feature update <featureId>` if any of
 fusebase feature update <featureId> --permissions="dashboardView.dash1:view1.read,write" --sync-gate-permissions
 ```
 
+### Required verification after `--sync-gate-permissions`
+
+Do not stop at "command succeeded". For Gate-integrated features, verify the result explicitly:
+
+1. Run `fusebase analyze gate --operations --json --feature <featureId>`
+2. Confirm `usedOps` is non-empty when runtime code uses `@fusebase/fusebase-gate-sdk`
+3. Run `fusebase feature list`
+4. Confirm the feature does **not** show `Permissions: none` unless the feature intentionally requires no runtime permissions
+
+If `usedOps` is empty or feature list still shows `Permissions: none`, treat publish as blocked and fix analysis/runtime call patterns before continuing.
+
 ## Typical Workflow
 
 1. `fusebase auth` - Authenticate (one-time setup)

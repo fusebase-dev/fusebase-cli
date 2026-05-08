@@ -91,6 +91,24 @@ Features may optionally include a `backend/` subfolder for a backend API (REST +
 
 ## Authentication
 
+## Runtime host helper (do not hardcode app-api hosts)
+
+Never hardcode `app-api.thefusebase.com` or similar tenant hosts in feature code. Always build runtime API base URLs from `FUSEBASE_HOST`, because dev/stage/prod hosts differ and hardcoded production hosts cause CORS and wrong-origin failures.
+
+Preferred helper:
+
+```typescript
+export function getGateBaseUrl(): string {
+  return `https://app-api.${import.meta.env.VITE_FUSEBASE_HOST ?? "{FUSEBASE_HOST}"}/v4/api/proxy/gate-service/v1`
+}
+
+export function getDashboardsBaseUrl(): string {
+  return `https://app-api.${import.meta.env.VITE_FUSEBASE_HOST ?? "{FUSEBASE_HOST}"}/v4/api/proxy/dashboard-service/v1`
+}
+```
+
+If the feature already centralizes runtime config, keep one canonical helper there instead of rebuilding URLs inline in components.
+
 <% if (it.flags?.includes("portal-specific-features")) { %>
 Features run as the main window. The platform provides a feature token via `window.FBS_FEATURE_TOKEN` (with `fbsfeaturetoken` cookie fallback when needed).
 <% } else { %>
@@ -109,6 +127,21 @@ Features run as the main window. The platform sets a `fbsfeaturetoken` cookie au
 4. For calls to the app's own backend (`/api/*`), rely on the same-origin cookie and make backend handlers read `x-app-feature-token` or fallback to `fbsfeaturetoken`
 
 **All features MUST handle token expiration** (`AppTokenValidationError` / 401). See skill **handling-authentication-errors** for the implementation pattern.
+
+## Gate token preflight before UI debugging
+
+Before debugging a Gate-powered UI flow, verify the current feature token against Gate directly:
+
+1. Call `GET https://app-api.{FUSEBASE_HOST}/v4/api/proxy/gate-service/v1/me` with `x-app-feature-token`.
+2. Inspect returned identity, scopes, and effective permissions.
+3. If permissions/scopes are empty or unexpectedly narrow, treat that as a token/config problem first, not a UI bug.
+
+For PostgreSQL store debugging, also verify:
+
+4. `listIsolatedStores` with the current `orgId`
+5. if the store is app-scoped, retry with the exact `clientId`
+
+If `/me` context or store discovery is wrong, fix token/permissions/source-scope before changing app code.
 
 ## User Details
 

@@ -17,6 +17,25 @@ All features **MUST** handle `AppTokenValidationError` responses from the API. W
 
 ## Implementation
 
+## Preflight: distinguish expired token vs wrong token context
+
+Before changing UI error handling for Gate-powered features, first verify the current feature token against Gate:
+
+```typescript
+const response = await fetch(
+  'https://app-api.{FUSEBASE_HOST}/v4/api/proxy/gate-service/v1/me',
+  { headers: { 'x-app-feature-token': featureToken } }
+)
+```
+
+Interpretation:
+
+- `401` with `AppTokenValidationError` -> token is actually expired/invalid
+- `200` but empty or unexpected permissions/scopes -> token context is wrong for the intended flow
+- valid token + later `404 NotFound` on store routes -> likely org/source-scope/store-discovery issue, not auth expiry
+
+Do not show a Session Expired modal for plain `NotFound` or for valid-but-underprivileged tokens.
+
 ### 1. Detect `AppTokenValidationError` in API calls
 
 The error name may appear at different nesting levels depending on the SDK. Check all of them:

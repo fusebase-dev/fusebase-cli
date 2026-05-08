@@ -139,6 +139,27 @@ For backend startup failures:
 - Check whether the backend printed startup errors, missing env vars, port conflicts, or stack traces
 - If the browser is only showing a generic fetch failure, confirm the browser-visible symptom in `browser-logs.jsonl`
 
+## Quick runbook: CORS vs NotFound for Gate/PostgreSQL flows
+
+When a PostgreSQL-backed feature fails early, use this order before changing code:
+
+1. **Preflight / OPTIONS**
+   - confirm whether the browser is failing on CORS/preflight before the real request
+   - check `browser-logs.jsonl` and `access-logs.jsonl`
+2. **Gate `/me` token context**
+   - call `GET /v4/api/proxy/gate-service/v1/me` with the current `x-app-feature-token`
+   - verify identity, scopes, and effective permissions
+3. **Store discovery**
+   - call `listIsolatedStores` for the current `orgId`
+   - if the store is app-scoped, verify the exact `clientId` / source scope match
+4. **Only then change app code**
+
+Heuristic:
+
+- preflight/CORS failure -> host/origin/config issue
+- valid `/me` + empty store list -> org/source-scope/config issue
+- valid `/me` + visible store + failing data call -> then inspect feature code / SDK args
+
 ## Rules
 
 - Use `fusebase dev start`; do not bypass the CLI with direct `npm run dev` if you need these logs
