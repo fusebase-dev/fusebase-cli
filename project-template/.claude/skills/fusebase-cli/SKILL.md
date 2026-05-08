@@ -104,8 +104,10 @@ Options:
 - Global flag `git-init` also enables the same post-init Git offer automatically (`fusebase config set-flag git-init`)
 - Global flag `git-debug-commits` enables strict debug/deploy traceability section in the `git-workflow` skill (deploy preflight, commit-per-fix, SHA/tag references)
 - Global flag `app-business-docs` includes the `app-business-docs` skill (English `docs/en/business-logic.md` maintenance)
-- Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; isolated stores emphasis)
-- Global flag `isolated-stores` enables isolated stores functionality (SQL/NoSQL), including required Fusebase Gate references and `isolated_store.*` permissions in `fusebase env create`
+- Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; FuseBase PostgreSQL Database emphasis)
+- FuseBase PostgreSQL Database guidance and `isolated_store.*` Gate permissions are included by default in generated apps; no dedicated flag is required
+- Global flag `legacy-dashboards-db` exposes dashboard DB management guidance in generated app templates/skills and enables dashboard-service write/create permissions in MCP tokens
+- Global flag `portal-specific-features` includes portal-specific prompts/guidance (`fusebase-portal-specific-features` skill, `{{CurrentPortal}}` filter references, and `/auth/context` portal runtime context notes)
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 

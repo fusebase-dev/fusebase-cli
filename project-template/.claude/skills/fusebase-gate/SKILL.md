@@ -12,7 +12,7 @@ This document describes how to use **MCP (Model Context Protocol)** with **Fuseb
 
 For rules and checklists, see `AGENTS.md`.
 
-For **sql/postgres** isolated stores, treat **`references/isolated-sql-stores.md`** as the **production runbook** (playbooks, permissions, status/apply/409). Add **`references/isolated-sql-migration-discipline.md`** whenever you edit or apply migration bundles (anti-drift). **`references/isolated-sql.md`** is the condensed MCP-oriented SQL surface. See TOC below.
+For **FuseBase PostgreSQL Database** (`sql` / `postgres` via the Gate `isolated-stores` contract), treat **`references/isolated-sql-stores.md`** as the **production runbook** (playbooks, permissions, status/apply/409). Add **`references/isolated-sql-migration-discipline.md`** whenever you edit or apply migration bundles (anti-drift). **`references/isolated-sql.md`** is the condensed MCP-oriented SQL surface. See TOC below.
 
 ---
 
@@ -34,13 +34,13 @@ Each reference is in a separate file under `references/`. Load the file when you
 - [Fusebase Gate Billing And Stripe Flows](references/billing.md)
 - [Fusebase Gate Email Operations](references/emails.md)
 - [Fusebase Gate Files Flows](references/files.md)
-- [Fusebase Gate Isolated SQL Stores](references/isolated-sql.md)
-- [Fusebase Gate Isolated Stores](references/isolated.md)
 - [Fusebase Gate Membership And Portal Flows](references/membership.md)
 - [Fusebase Gate Notes Operations](references/notes.md)
 - [Fusebase Gate Org Group Operations](references/org-groups.md)
 - [Fusebase Gate Stripe App And Agent Integration](references/stripe-apps.md)
 - [Fusebase Gate Users Operations](references/users.md)
+- [FuseBase PostgreSQL Database](references/isolated.md)
+- [FuseBase PostgreSQL Database](references/isolated-sql.md)
 - [Isolated SQL stores and migrations (Gate)](references/isolated-sql-stores.md)
 - [Isolated SQL stores PostgreSQL RLS plan (Gate)](references/isolated-sql-rls-plan.md)
 - [Isolated stores hierarchy: Gate vs Neon](references/isolated-store-hierarchy.md)

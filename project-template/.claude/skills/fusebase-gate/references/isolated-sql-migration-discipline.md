@@ -1,7 +1,7 @@
 ---
-version: "1.1.3"
+version: "1.1.4"
 mcp_prompt: isolatedSqlMigrationDiscipline
-last_synced: "2026-04-13"
+last_synced: "2026-05-07"
 title: "Fusebase Gate — Isolated SQL migration discipline"
 category: specialized
 ---
@@ -50,7 +50,8 @@ Always leave these fields in the handoff/log: migration file path, **`version`**
 
 - [ ] Versions strictly increasing; one entry per version.
 - [ ] Bundle assembled with **`buildSqlMigrationBundle(...)`** from exact file contents.
-- [ ] **`checksum`** = SHA-256 of exact UTF-8 **`sql`** you send.
+- [ ] **`checksum`** = SHA-256 of canonicalized migration SQL (`CRLF -> LF`, trailing whitespace trimmed) produced by **`buildSqlMigrationBundle(...)`**.
+- [ ] Avoid manual checksum rewrites in manifests (`checksumNote`, server-only checksum hacks). If checksum mismatches, rebuild bundle from files via SDK helper and re-run status.
 - [ ] No silent edits to already-applied files.
 - [ ] **Prod:** **`getIsolatedStoreSqlMigrationStatus`** with the **same** bundle → then **`applyIsolatedStoreSqlMigrations`**; confirm **`canApply`** / **`pendingCount`**.
 - [ ] Optional **`dryRun: true`** on apply, or **`expectedLastAppliedVersion` / `expectedLastAppliedChecksum`** on status or apply (409 if journal head moved).
@@ -71,7 +72,7 @@ Avoid **`CREATE EXTENSION pgcrypto`** on locked-down hosts; prefer **`gen_random
 
 ## Version
 
-- **Version**: 1.1.3
+- **Version**: 1.1.4
 - **Category**: specialized
-- **Last synced**: 2026-04-13
+- **Last synced**: 2026-05-07
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

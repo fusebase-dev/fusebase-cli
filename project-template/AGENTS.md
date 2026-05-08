@@ -8,8 +8,10 @@ This file is the **definitive guide** for AI agents and LLMs working with Fuseba
 
 **During development (LLM work): use MCP ONLY.**
 
-- ✅ read/write data
-- ✅ create/update databases/dashboards/views/columns
+- ✅ read/write data through the storage surface that matches the task
+- ✅ create/update **FuseBase PostgreSQL Database** stores, stages, and migrations for new app-owned structured data
+- ✅ inspect existing project dashboards/views/columns when the app already depends on dashboards or the user explicitly asked for dashboard work
+- ❌ do not choose dashboards as the default storage path for a new app data model
 - ✅ upload files if exposed as MCP tool
 - ✅ discover schemas, IDs, permissions
 - ❌ **If MCP tools are not available, STOP and follow MCP troubleshooting steps - do NOT create workarounds**
@@ -53,11 +55,13 @@ Rules:
 **Quick flag note — `app-business-docs`:** Load `.claude/skills/app-business-docs/SKILL.md` when implementing or changing business logic so `docs/en/business-logic.md` stays aligned with actual behavior.
 <% } %>
 
+**Storage decision rule:** For any new app-owned structured data model, choose **FuseBase PostgreSQL Database** first. Reach for **FuseBase Project Dashboards** only when the user explicitly wants dashboards or the app is extending an existing dashboard/project-dashboard surface.
+
 **"Skill in context"** means `SKILL.md` **and** its `references/*.md` files. Reading only `SKILL.md` is **not sufficient** — you **must** also read the relevant references. For dashboard work: `references/core-concepts.md` for the entity model; **`references/data-patterns.md` is mandatory** whenever you write runtime code that reads or writes dashboard data via the SDK — it documents the real shapes for data operations (not only `sdk_describe`). Skipping references leads to broken entities or silently empty UI (e.g. wrong `data` vs `data.rows` parsing).
 
 **Two MCP-oriented skills (different products):**
 
-- **`fusebase-dashboards`** (folder `.claude/skills/fusebase-dashboards/`) — dashboards, databases, views, dashboard data, and the dashboard-service SDK path during development. See [Required Skills](#required-skills).
+- **`fusebase-dashboards`** (folder `.claude/skills/fusebase-dashboards/`) — **FuseBase Project Dashboards**: existing dashboards, views, dashboard data, and the dashboard-service SDK path during development. Do not treat this as the default database-creation path for new app-owned data models. See [Required Skills](#required-skills).
 - **`fusebase-gate`** (folder `.claude/skills/fusebase-gate/`) — **Fusebase Gate** and the wider platform surface: how to use the Gate MCP and SDK for org-scoped flows, user lists and membership, tokens and authz, health/bootstrap, and other platform capabilities (e.g. email campaigns, automation, integrations) **as exposed through Gate**. Load it **before** Gate MCP work or when integrating features with orgs, users, and platform services beyond raw dashboard data.
 
 ## Two Concepts (SDK, MCP)
@@ -158,21 +162,22 @@ SDK token usage in feature runtime:
 - [ ] **Business logic doc** — After material domain or workflow changes, load skill **app-business-docs** and update `docs/en/business-logic.md` (English); re-run when debugging shows the story and code diverge
 <% } %>
 <% if (it.flags?.includes("mcp-gate-debug")) { %>
-- [ ] **MCP Gate debug** — After a batch of Gate MCP tool work (especially isolated stores), follow skill **mcp-gate-debug** and summarize what worked vs what did not plus concrete improvement targets
+- [ ] **MCP Gate debug** — After a batch of Gate MCP tool work (especially FuseBase PostgreSQL Database flows), follow skill **mcp-gate-debug** and summarize what worked vs what did not plus concrete improvement targets
 <% } %>
-<% if (it.flags?.includes("isolated-stores")) { %>
-- [ ] **Isolated SQL schema discipline (MUST)** — for any isolated SQL schema change, follow strict order: create/update files in `postgres/migrations/` -> compute checksum from file bytes -> run `getIsolatedStoreSqlMigrationStatus` -> then `applyIsolatedStoreSqlMigrations`
+- [ ] **FuseBase PostgreSQL Database schema discipline (MUST)** — for any isolated SQL schema change, follow strict order: create/update files in `postgres/migrations/` -> compute checksum from file bytes -> run `getIsolatedStoreSqlMigrationStatus` -> then `applyIsolatedStoreSqlMigrations`
 - [ ] **No persistent inline SQL for schema** — inline SQL in MCP `tool_call` is allowed only for one-off smoke/dev tests and must be explicitly marked temporary
 - [ ] **Schema ops artifact logged** — after isolated SQL schema operations, include: migration file path, `version`, `name`, `checksum`, `storeId`, `stage`
-<% } %>
 
 ## Mental Model: MCP + SDK Architecture
 
 ### MCP (Model Context Protocol) = Development Tool for LLMs
 
-**Token**: `DASHBOARDS_MCP_TOKEN` from `.env`
+**Tokens**:
 
-**What MCP provides:** tools for discovery and execution (e.g. `tools_list`, `tools_search`, `tools_describe`, `tool_call`), bootstrap/context, prompts loading, and domain operations. **MCP is used for ALL backend operations during LLM development work.** For the exact flow (bootstrap → domain knowledge → discovery → tool_call) and schemas, see the **fusebase-dashboards** skill. **When that skill is in context, prompts_search for domain knowledge is optional — the skill content is sufficient.**
+- `GATE_MCP_TOKEN` from `.env` for **FuseBase PostgreSQL Database** and wider Gate/platform flows
+- `DASHBOARDS_MCP_TOKEN` from `.env` for **FuseBase Project Dashboards**
+
+**What MCP provides:** tools for discovery and execution (e.g. `tools_list`, `tools_search`, `tools_describe`, `tool_call`), bootstrap/context, prompts loading, and domain operations. **MCP is used for ALL backend operations during LLM development work.** For **FuseBase PostgreSQL Database** flows, use the **fusebase-gate** skill. For **FuseBase Project Dashboards** flows, use the **fusebase-dashboards** skill. When the relevant skill is already in context, prompts_search for domain knowledge is optional.
 
 ### SDK = Runtime Execution (browser and optional feature backend)
 
@@ -192,7 +197,7 @@ SDK token usage in feature runtime:
 
 Every MCP tool has a corresponding SDK method with the same `operationId` and request/response schemas. MCP for LLM discovery/execution during development → SDK for runtime execution in feature code.
 
-**Discovery**: LLM uses MCP tools (`tools_search`, `tools_describe`) to find operations, then uses SDK discovery (`sdk_search`, `sdk_describe`) to find corresponding SDK methods for feature code. Always **describe before use** — run `tools_describe` before calling an MCP tool, `sdk_describe` before inserting SDK code, and read **`fusebase-dashboards/references/data-patterns.md`** before parsing dashboard data responses. See the `fusebase-dashboards` skill for MCP flow and SDK discovery.
+**Discovery**: LLM uses MCP tools (`tools_search`, `tools_describe`) to find operations, then uses SDK discovery (`sdk_search`, `sdk_describe`) to find corresponding SDK methods for feature code. Always **describe before use** — run `tools_describe` before calling an MCP tool, `sdk_describe` before inserting SDK code, and read the relevant skill references before parsing responses (`fusebase-gate` for PostgreSQL/Gate, `fusebase-dashboards/references/data-patterns.md` for dashboard data).
 
 ## Canonical Workflow
 
@@ -208,12 +213,12 @@ Load skills as described in [Required Skills](#required-skills) before discovery
 
 **Important**: All domain/business operations must be executed via **`tool_call`** with `opId` and `args`. Only meta/builtin tools can be called directly.
 
-**Workflow:** Bootstrap/connection context → have domain knowledge (if **fusebase-dashboards** skill is in context, that is sufficient; otherwise load domain prompts via `prompts_search` with a **group filter** — see that skill; never call `prompts_search({})` without groups) → discover operations via `tools_search`/`tools_list` → `tools_describe` → execute via `tool_call`.
+**Workflow:** Bootstrap/connection context → have domain knowledge from the relevant skill (`fusebase-gate` for PostgreSQL, `fusebase-dashboards` for dashboards) → discover operations via `tools_search`/`tools_list` → `tools_describe` → execute via `tool_call`.
 <% if (it.flags?.includes("api-exploration")) { %>
 **Endpoint verification:** If you need to confirm an endpoint's actual response shape or behavior before writing feature code, use the **api-exploration** skill — create a temporary token and run a test script. This complements MCP discovery; it does not replace it.
 <% } %>
 
-**Critical**: Never hardcode database/dashboard/view IDs. Always discover them via MCP first. Concrete opIds and flow details are in the **fusebase-dashboards** skill.
+**Critical**: Never hardcode store/database/dashboard/view IDs. Always discover them via MCP first. Concrete opIds and flow details are in the relevant skill (`fusebase-gate` for PostgreSQL, `fusebase-dashboards` for dashboards).
 
 ### Step 2: Plan (MCP-only)
 
@@ -236,9 +241,9 @@ Never manually create `package.json`, `vite.config.ts`, `tsconfig.json`, `postcs
 
 ### Step 3: Execute Changes (MCP-only)
 
-**Creating structure** (LLM development only - NOT feature code): Use `tool_call` with the appropriate opIds to create/update dashboards, views, and schema. See **fusebase-dashboards** skill for flow and operation names. These calls do NOT go into feature code; feature code uses SDK (Step 4: Handoff to Runtime).
+**Creating structure** (LLM development only - NOT feature code): For new app-owned structured data, use **FuseBase PostgreSQL Database** flows (`fusebase-gate` skill, migrations, status/apply). Use dashboard-service structure ops only when the user explicitly wants dashboards or the app already depends on an existing dashboard surface. These calls do NOT go into feature code; feature code uses SDK (Step 4: Handoff to Runtime).
 
-**Reading/writing data** (during LLM development - NOT feature code): Use `tool_call` for read/write; opIds and schema (e.g. data operations, `schemaMode`) are in the **fusebase-dashboards** skill. These calls do NOT go into feature code; feature code uses SDK (Step 4). Re-run list/describe tools to verify changes.
+**Reading/writing data** (during LLM development - NOT feature code): Use `tool_call` for read/write through the selected storage surface. For **FuseBase PostgreSQL Database**, follow **fusebase-gate**. For **FuseBase Project Dashboards**, follow **fusebase-dashboards**. These calls do NOT go into feature code; feature code uses SDK (Step 4). Re-run list/describe tools to verify changes.
 
 ### Step 4: Handoff to Runtime (SDK-only)
 
@@ -338,6 +343,45 @@ export function createGateTokensApi(featureToken: string): TokensApi {
 }
 ```
 
+**Browser/UI runtime usage for FuseBase PostgreSQL Database** (using feature token; backend optional, not required):
+
+```typescript
+import {
+  createClient,
+  IsolatedStoresApi,
+} from "@fusebase/fusebase-gate-sdk";
+
+const GATE_BASE_URL =
+  "https://app-api.{FUSEBASE_HOST}/v4/api/proxy/gate-service/v1";
+
+export function createGateSdkClient(featureToken: string) {
+  return createClient({
+    baseUrl: GATE_BASE_URL,
+    defaultHeaders: { "x-app-feature-token": featureToken },
+  });
+}
+
+export function createIsolatedStoresApi(featureToken: string): IsolatedStoresApi {
+  return new IsolatedStoresApi(createGateSdkClient(featureToken));
+}
+
+// Typical frontend-safe read path:
+// const api = createIsolatedStoresApi(featureToken)
+// const rows = await api.selectIsolatedStoreSqlRows({
+//   orgId,
+//   storeId,
+//   stage: "prod",
+//   tableName: "public.tasks",
+//   limit: 50,
+// })
+```
+
+For PostgreSQL in app runtime:
+
+- backend is **optional**, not mandatory;
+- direct browser/UI access through Gate SDK + feature token is a valid default path for reads and allowed structured writes;
+- use backend only when you need privileged logic, secret-bearing integrations, heavy server-side orchestration, or non-user-context operations.
+
 ### Step 4.5: Register the Feature and Start Dev (for new feature after code is complete)
 
 Once feature code is written and ready to run, **execute these automatically — do NOT list them as "next steps" for the user**:
@@ -407,9 +451,7 @@ Covers:
 **Load when working with Fusebase Gate or platform-level flows** — organizations, org user lists and membership, Gate tokens and authorization scopes, health/bootstrap, and how to use the **Gate MCP** and **Gate SDK** during development vs runtime.
 
 The skill explains how to interact with the **broader Fusebase ecosystem** beyond dashboard data: for example org-scoped user operations, platform services, email and campaign-related flows, automation, and integrations **as exposed through Gate** (see `references/*.md` for each topic). **Verify the fusebase-gate MCP server** is available before gate `tool_call` work (see skill).
-<% if (it.flags?.includes("isolated-stores")) { %>
 For isolated SQL schema work, loading only `fusebase-gate/SKILL.md` is insufficient. Also load and follow `references/isolated-sql-migration-discipline.md`, `references/isolated-sql.md`, and `references/isolated-sql-stores.md` as hard invariants.
-<% } %>
 
 ### ✅ file-upload
 
@@ -454,7 +496,7 @@ When `git-debug-commits` is enabled, these rules are mandatory:
 <% if (it.flags?.includes("mcp-gate-debug")) { %>
 ### ✅ mcp-gate-debug
 
-**Load after Gate MCP sessions** — produce a short debug-oriented summary (successes, friction, improvements) aimed at `.claude/skills/fusebase-gate` and MCP/prompt quality; prioritize **isolated stores** debugging.
+**Load after Gate MCP sessions** — produce a short debug-oriented summary (successes, friction, improvements) aimed at `.claude/skills/fusebase-gate` and MCP/prompt quality; prioritize **FuseBase PostgreSQL Database** debugging.
 <% } %>
 
 ### ✅ feature-backend
@@ -618,10 +660,8 @@ You can only claim completion if:
 - ✅ **Gate features require `--sync-gate-permissions`**: If runtime code uses `@fusebase/fusebase-gate-sdk`, run `fusebase feature update <featureId> --sync-gate-permissions` before calling the feature published.
 - ✅ **`Permissions: none` is a blocker for runtime-integrated features**: If CLI output shows `Permissions: none`, do not present the feature as fully published unless it intentionally requires no runtime permissions.
 - ✅ **Gate analysis sanity check**: Run `fusebase analyze gate --operations --json --feature <featureId>` and verify `usedOps` is non-empty for Gate-integrated runtime code. Empty `usedOps` with active Gate SDK usage is a release blocker.
-<% if (it.flags?.includes("isolated-stores")) { %>
 - ✅ **Isolated SQL schema final gate**: If isolated SQL schema changed, `postgres/migrations/` must contain matching new/updated migration file(s) and manifest updates. Otherwise completion is blocked.
 - ✅ **Isolated SQL schema artifact is mandatory**: Include migration file path, `version`, `name`, `checksum`, `storeId`, and `stage` in the final handoff.
-<% } %>
 
 ## One-line Reminder
 

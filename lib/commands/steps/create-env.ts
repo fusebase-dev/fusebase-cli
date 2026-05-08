@@ -2,7 +2,7 @@
  * Create .env Step
  *
  * Creates or updates a .env file with MCP token and URL for the project.
- * Generates a new token with full permissions for the organization scope.
+ * Generates MCP tokens for the organization scope using the current CLI policy.
  * If .env exists, merges new values (preserves existing vars, updates MCP vars).
  */
 

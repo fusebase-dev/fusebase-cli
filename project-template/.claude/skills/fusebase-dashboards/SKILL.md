@@ -1,14 +1,14 @@
 ---
 name: fusebase-dashboards
-description: 'How to use MCP for working with Fusebase dashboards during LLM development. Use when: 1. Discovering dashboards, views, schema via MCP; 2. Creating or updating dashboards/views; 3. Reading/writing dashboard data; 4. Working with relations, filters, templates, child tables; 5. Working with managed databases (e.g. meetings, companies, deals) — load prompts_search({ groups: ["managedDatabases"] }) and see references/meetings.md, references/companies.md, references/deals.md.'
+description: "How to use MCP for working with FuseBase Project Dashboards during LLM development. Use when: 1. Discovering dashboards, views, and schema via MCP; 2. Reading or updating dashboard data; 3. Working with relations, filters, templates, and child tables; 4. Understanding dashboard/view structure before SDK runtime code."
 metadata:
   source: entrypoint
 ---
 
 
-# Fusebase Dashboards MCP Skill
+# FuseBase Project Dashboards MCP Skill
 
-This document describes how to use **MCP (Model Context Protocol)** for working with Fusebase dashboards **during LLM development**. MCP is used for discovery and execution from the LLM; the **SDK** is used only in **runtime code** (feature/browser). See the Fusebase Dashboards SDK skill for SDK usage.
+This document describes how to use **MCP (Model Context Protocol)** for working with **FuseBase Project Dashboards** **during LLM development**. MCP is used for discovery and execution from the LLM; the **SDK** is used only in **runtime code** (feature/browser). See the Fusebase Dashboards SDK skill for SDK usage.
 
 For rules and checklists, see `AGENTS.md`.
 
@@ -35,14 +35,10 @@ Each reference is in a separate file under `references/`. Load the file when you
 **specialized**
 
 - [Child Tables](references/child-tables.md)
-- [Companies (managed database)](references/companies.md)
 - [Dashboard Relations](references/relations-guide.md)
 - [Dashboard Rows](references/rows.md)
 - [Dashboard View Filters](references/filters.md)
 - [Dashboard View Representations](references/representations.md)
-- [Deals (managed database)](references/deals.md)
-- [Meetings (managed database)](references/meetings.md)
-- [Templates](references/templates.md)
 
 ---
 
@@ -82,7 +78,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 
 ## MCP vs SDK (reminder)
 
-- **MCP tools** (`tools_list`, `tools_search`, `tools_describe`, `tool_call`, `bootstrap`, `prompts_list`, `prompts_search`, etc.) — for performing actions **inside the LLM session**: discovery, reading/writing data, creating/updating dashboards during development.
+- **MCP tools** (`tools_list`, `tools_search`, `tools_describe`, `tool_call`, `bootstrap`, `prompts_list`, `prompts_search`, etc.) — for performing actions **inside the LLM session**: discovery, schema inspection, and reading/writing dashboard data during development.
 - **SDK methods** — for **runtime code** only (feature/browser). The LLM uses `sdk_search` / `sdk_describe` to generate code that the feature will execute; the LLM does not execute SDK.
 
 Do not mix: use either the MCP chain (discovery → tool_call) for development, or the SDK chain (sdk_search → sdk_describe → insert code) for generating feature code. Each operation has the same `opId` in both MCP and SDK.
@@ -138,23 +134,22 @@ You must have the required domain knowledge (database, dashboard, view, relation
 
 **Prompt groups (summary):**
 
-| Group            | Purpose                                                                   |
-| ---------------- | ------------------------------------------------------------------------- |
-| tooling          | Discovery and execution (tools.list → describe → call)                    |
-| authz            | Permissions, scopes, ID formats                                           |
-| bootstrap        | Connection context and defaults                                           |
-| database         | Database entities and operations                                          |
-| dashboard        | Dashboards, types, root_entity                                            |
-| view             | Views (dashboard projections)                                             |
-| schema           | Dashboard schema and columns                                              |
-| relations        | one_to_many, many_to_many relations                                       |
-| filters          | View filters                                                              |
-| representations  | Cell display                                                              |
-| rows             | Rows (custom rows)                                                        |
-| data             | Reading/writing cell data                                                 |
-| templates        | Templates and creating from templates                                     |
-| childTables      | Child-table-link columns, get-or-create child dashboard                   |
-| managedDatabases | Managed DBs (meetings, companies, deals: getOrCreate, aliases, relations) |
+| Group           | Purpose                                                 |
+| --------------- | ------------------------------------------------------- |
+| tooling         | Discovery and execution (tools.list → describe → call)  |
+| authz           | Permissions, scopes, ID formats                         |
+| bootstrap       | Connection context and defaults                         |
+| database        | Database entities and operations                        |
+| dashboard       | Dashboards, types, root_entity                          |
+| view            | Views (dashboard projections)                           |
+| schema          | Dashboard schema and columns                            |
+| relations       | one_to_many, many_to_many relations                     |
+| filters         | View filters                                            |
+| representations | Cell display                                            |
+| rows            | Rows (custom rows)                                      |
+| data            | Reading/writing cell data                               |
+| templates       | Templates and creating from templates                   |
+| childTables     | Child-table-link columns, get-or-create child dashboard |
 
 ### II.1a Prompts and skills (version check)
 

@@ -521,7 +521,7 @@ One command to refresh a generated app after a CLI or template upgrade:
 
 1. **CLI binary update** — runs first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage.
 2. **Agent assets** — refreshes `AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`.
-3. **MCP + IDE** — selectively regenerates Dashboards and/or Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh both regardless.
+3. **MCP + IDE** — selectively regenerates Dashboards and/or Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes FuseBase PostgreSQL Database permissions by default). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh both regardless.
 4. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **feature** `package.json` files are updated only if those deps already exist (nothing new is injected into features).
 5. **`npm install`** — runs **only** in directories where a managed dependency version actually changed.
 
@@ -653,16 +653,20 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `git-init` | Makes `fusebase init` automatically offer local Git initialization (same behavior as passing `--git`; can be disabled per run with `--skip-git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict debug/deploy traceability section inside the `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag traceability in debug/deploy reports |
 | `app-business-docs` | Copies the `app-business-docs` skill into the app: keeps **`docs/en/business-logic.md`** (English) aligned with real behavior — domain rules, main user flows, edge cases; update after business-logic changes or when debugging unclear behavior |
-| `mcp-gate-debug` | Copies the `mcp-gate-debug` skill: after Fusebase Gate MCP tool runs, summarize smooth vs rough paths and suggest improvements to `.claude/skills/fusebase-gate`, prompts, or MCP server behavior — prioritize **isolated stores** (SQL/NoSQL) flows |
-| `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); also turns on required template references and `isolated_store.*` permissions in `fusebase env create` |
+| `mcp-gate-debug` | Copies the `mcp-gate-debug` skill: after Fusebase Gate MCP tool runs, summarize smooth vs rough paths and suggest improvements to `.claude/skills/fusebase-gate`, prompts, or MCP server behavior — prioritize FuseBase PostgreSQL Database flows |
+| `legacy-dashboards-db` | Exposes dashboard DB management guidance in generated app templates and skills, and enables dashboard-service write/create permissions in MCP tokens |
+| `portal-specific-features` | Includes portal-specific feature guidance in prompts: `fusebase-portal-specific-features` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
 | `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`features[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `feature-sidecar` and `feature-backend` skill templates. |
+
+FuseBase PostgreSQL Database support is part of the default app baseline and does not require a feature flag. By default, dashboards MCP tokens are read-only enough for discovery/integration; dashboard DB creation and write/create permissions are enabled only with `legacy-dashboards-db`.
 
 Enable a flag globally, then refresh the project template:
 
 ```bash
 fusebase config set-flag app-business-docs   # Business-logic documentation skill
 fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summary skill
-fusebase config set-flag isolated-stores     # Isolated stores functionality (SQL/NoSQL)
+fusebase config set-flag legacy-dashboards-db # Dashboard DB management guidance + write/create permissions
+fusebase config set-flag portal-specific-features # Portal-specific features prompts/guidance
 fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```
 

@@ -1,18 +1,20 @@
 ---
-version: "1.8.7"
+version: "1.8.9"
 mcp_prompt: isolatedSql
-last_synced: "2026-05-06"
-title: "Fusebase Gate Isolated SQL Stores"
+last_synced: "2026-05-08"
+title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
-# Fusebase Gate Isolated SQL Stores
+# FuseBase PostgreSQL Database
 
 > **MARKER**: `mcp-isolated-sql-loaded` — When this marker is present in context, MCP prompts for this topic may skip conceptual sections and use API reference only.
 
 > **VERSION CHECK**: If operations fail unexpectedly, load MCP prompt `isolatedSql` for latest content.
 
 ---
-## Fusebase Gate — Isolated SQL (`sql` / `postgres`)
+## FuseBase PostgreSQL Database (`sql` / `postgres`)
+
+User-facing naming in this guide is **FuseBase PostgreSQL Database**. Internally, the API surface still uses the Gate `isolated-stores` contract and `IsolatedStoresApi` naming.
 
 ### Canonical docs
 
@@ -37,6 +39,7 @@ Default stage is **`prod`** when stage is omitted by higher-level orchestration.
 ### Data path (no DDL)
 
 Prefer structured APIs: **`getIsolatedStoreSqlStats`**, **`countIsolatedStoreSqlRows`**, **`selectIsolatedStoreSqlRows`**, **`insertIsolatedStoreSqlRow`**, **`batchInsertIsolatedStoreSqlRows`**, **`importIsolatedStoreSqlRows`**, **`updateIsolatedStoreSqlRows`**, **`deleteIsolatedStoreSqlRows`**. Raw: **`queryIsolatedStoreSql`** (read); **`executeIsolatedStoreSql`** — DML only, **no DDL**; schema only via **`applyIsolatedStoreSqlMigrations`**.
+Runtime app path does **not** require a custom backend by default. Frontend/browser code can call Gate SDK methods such as **`selectIsolatedStoreSqlRows`**, **`countIsolatedStoreSqlRows`**, and other allowed structured operations directly with the feature token. Add a feature backend only when you need privileged logic, external secrets, heavy orchestration, or non-user-context work.
 
 ### Structured SQL limits
 
@@ -90,7 +93,7 @@ For **local** storage in a repo, keep migration SQL in a **dedicated folder** at
 - Do not ship raw migration SQL in browser runtime just to render status. Runtime UI should read migration status from Gate metadata or a server-side helper, not assemble the bundle in the browser.
 - **Required handoff after schema ops:** migration file path, `version`, `name`, `checksum`, `storeId`, `stage`.
 
-Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers **`buildSqlMigrationBundle(...)`** and **`calculateSqlMigrationChecksum(sql)`** so checksums match the exact UTF-8 **`sql`** bytes Gate receives. Checksums are **SHA-256** (`sha256`) hex digests. Optional **`bundleVersion`** on the bundle. Keep repo manifests app-owned and environment-neutral.
+Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers **`buildSqlMigrationBundle(...)`** and **`calculateSqlMigrationChecksum(sql)`** so checksums match Gate canonicalization (`CRLF -> LF`, trailing whitespace trimmed). Checksums are **SHA-256** (`sha256`) hex digests. Optional **`bundleVersion`** on the bundle. Keep repo manifests app-owned and environment-neutral.
 
 ### UI links (store and table)
 
@@ -102,7 +105,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 ## Version
 
-- **Version**: 1.8.7
+- **Version**: 1.8.9
 - **Category**: specialized
-- **Last synced**: 2026-05-06
+- **Last synced**: 2026-05-08
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

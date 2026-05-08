@@ -1,24 +1,25 @@
 ---
-version: "1.2.9"
+version: "1.3.0"
 mcp_prompt: isolated
-last_synced: "2026-05-06"
-title: "Fusebase Gate Isolated Stores"
+last_synced: "2026-05-07"
+title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
-# Fusebase Gate Isolated Stores
+# FuseBase PostgreSQL Database
 
 > **MARKER**: `mcp-isolated-loaded` — When this marker is present in context, MCP prompts for this topic may skip conceptual sections and use API reference only.
 
 > **VERSION CHECK**: If operations fail unexpectedly, load MCP prompt `isolated` for latest content.
 
 ---
-## Fusebase Gate Isolated Stores
+## FuseBase PostgreSQL Database
 
-These prompts cover the common control-plane model for isolated low-level stores managed through Gate.
+These prompts cover the common control-plane model for FuseBase PostgreSQL Database, implemented through the Gate `isolated-stores` contract.
 
 ## Core Model
 
-- An isolated store is a logical app-owned SQL database.
+- A FuseBase PostgreSQL Database is a logical app-owned SQL database.
+- Internally, this product surface uses the Gate `isolated-stores` domain and opIds.
 - A store belongs to an org and to a source scope such as `app`.
 - Each store has stage instances such as `prod` and `dev`.
 - Each stage instance binds to its own physical database.
@@ -26,7 +27,7 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 ## Working Flow
 
-1. Create the isolated store.
+1. Create the PostgreSQL database store.
 2. Initialize a stage such as `prod` or `dev`.
 3. Use SQL tools for `sql/postgres` stores.
 4. Create checkpoints before risky changes.
@@ -36,11 +37,11 @@ These prompts cover the common control-plane model for isolated low-level stores
 ## Access Rules
 
 - Always send `orgId`, `storeId`, and `stage` exactly as returned by previous operations.
-- Treat hardcoded isolated `storeId` values in external app code, env files, or app secrets as an anti-pattern.
+- Treat hardcoded `storeId` values in external app code, env files, or app secrets as an anti-pattern.
 - Resolve the target store at runtime via `listIsolatedStores` with `clientId`, then filter by stable app-level `alias` (or `aliasLike`) and use the returned `storeId`.
 - Persist app-owned alias and client binding (`clientId`) as configuration; do not persist provider/runtime store ids as long-lived app secrets.
 - `listIsolatedStores` accepts optional query `clientId` to narrow stores by `app` source scope `sourceId`; token callers must use their own client scope id when setting it.
-- **Empty `listIsolatedStores`** is expected until at least one `createIsolatedStore` for that `orgId`. Flow: create store → `initIsolatedStoreStage` (`dev` / `prod`) → then SQL/NoSQL ops. If the list stays empty after create, check **wrong `orgId`**, or **`clientId` filter** (omit the query to list all org stores, or pass the exact app client id matching the store’s `source.sourceId`).
+- **Empty `listIsolatedStores`** is expected until at least one `createIsolatedStore` for that `orgId`. Flow: create store → `initIsolatedStoreStage` (`dev` / `prod`) → then PostgreSQL SQL ops. If the list stays empty after create, check **wrong `orgId`**, or **`clientId` filter** (omit the query to list all org stores, or pass the exact app client id matching the store’s `source.sourceId`).
 - Token control-plane ownership is checked through the `client` scope of the token.
 - Runtime access can also be narrowed by `resourceScope` on `isolated_store_stage_instance`.
 
@@ -56,7 +57,7 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 ## Tool Selection
 
-- For store or stage lifecycle, use the generic isolated store operations.
+- For database store or stage lifecycle, use the generic isolated store operations.
 - For `sql/postgres`, load the `isolatedSql` prompt group and prefer structured row operations before raw SQL.
 - For database-level summaries, prefer `getIsolatedStoreSqlStats` over manually stitching list/describe/count calls.
 
@@ -88,7 +89,7 @@ These prompts cover the common control-plane model for isolated low-level stores
 
 ## Version
 
-- **Version**: 1.2.9
+- **Version**: 1.3.0
 - **Category**: specialized
-- **Last synced**: 2026-05-06
+- **Last synced**: 2026-05-07
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

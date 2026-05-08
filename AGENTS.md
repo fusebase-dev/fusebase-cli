@@ -111,9 +111,12 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `git-init` | Makes `fusebase init` automatically run Git initialization + GitLab sync flow (equivalent to `--git`; can be disabled per run with `--skip-git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict traceability rules inside `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag references in debug/deploy reports |
 | `app-business-docs` | Includes the `app-business-docs` skill: maintain `docs/en/business-logic.md` (English) describing app business logic, flows, and scenarios; refresh after logic changes or on demand |
-| `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |
-| `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); includes supporting `fusebase-gate` references and `isolated_store.*` permissions in `fusebase env create` |
+| `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on FuseBase PostgreSQL Database debugging |
+| `legacy-dashboards-db` | Includes dashboard DB management guidance in generated app templates and skills, and enables dashboard-service write/create permissions in MCP tokens |
+| `portal-specific-features` | Includes portal-specific feature prompts and references (`fusebase-portal-specific-features`, `{{CurrentPortal}}` filters, and auth-context guidance for portal runtime) |
 | `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing feature code. Complements MCP discovery. |
+
+FuseBase PostgreSQL Database support is part of the default app baseline and does not require a feature flag. By default, dashboard-service MCP tokens stay read-only enough for discovery/integration; dashboard DB creation and write/create permissions require `legacy-dashboards-db`.
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 

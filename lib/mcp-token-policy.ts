@@ -3,32 +3,36 @@ import type { CreateTokenRequest } from "./api";
 import { hasFlag } from "./config";
 
 /** Bump when fingerprint inputs change so old .env values force refresh once. */
-export const MCP_POLICY_SCHEMA_VERSION = 2 as const;
+export const MCP_POLICY_SCHEMA_VERSION = 3 as const;
 
 /** Written to `.env` after token refresh — sole source of truth for policy drift checks (`fusebase app update`, `fusebase env create`). */
 export const DASHBOARDS_MCP_POLICY_FP_KEY = "DASHBOARDS_MCP_POLICY_FP";
 export const GATE_MCP_POLICY_FP_KEY = "GATE_MCP_POLICY_FP";
 
-const DASHBOARDS_PERMISSIONS = [
+const DASHBOARDS_PERMISSIONS_READONLY = [
+  "column.*.read",
+  "dashboard.read",
+  "data.read",
+  "database.read",
+  "relation.read",
+  "template.read",
+  "token.read",
+  "view.read",
+] as const;
+
+const DASHBOARDS_PERMISSIONS_DB_MANAGEMENT = [
   "column.*.read",
   "column.*.write",
   "dashboard.delete",
-  "dashboard.read",
   "dashboard.write",
-  "data.read",
   "data.write",
   "database.delete",
-  "database.read",
   "database.write",
-  "relation.read",
   "relation.write",
-  "template.read",
   "template.write",
   "token.delete",
-  "token.read",
   "token.write",
   "view.delete",
-  "view.read",
   "view.write",
 ] as const;
 
@@ -66,6 +70,20 @@ const GATE_PERMISSIONS_ISOLATED = [
   "isolated_store.schema.write",
 ] as const;
 
+function dashboardsDbManagementEnabled(): boolean {
+  return hasFlag("legacy-dashboards-db");
+}
+
+function getDashboardsPermissions(): string[] {
+  const permissions = new Set<string>(DASHBOARDS_PERMISSIONS_READONLY);
+  if (dashboardsDbManagementEnabled()) {
+    for (const permission of DASHBOARDS_PERMISSIONS_DB_MANAGEMENT) {
+      permissions.add(permission);
+    }
+  }
+  return [...permissions].sort((a, b) => a.localeCompare(b));
+}
+
 /**
  * Baseline permission-only fingerprints accepted for old projects with no FP keys in `.env`.
  * Generated from the permission lists that shipped before FP markers existed.
@@ -93,10 +111,11 @@ function sha256Hex(input: string): string {
 
 /** Serializable policy shape (no org/app ids) for dashboards MCP token. */
 export function dashboardsMcpPolicyDescriptor(): Record<string, unknown> {
+  const permissions = getDashboardsPermissions();
   return {
     schema: MCP_POLICY_SCHEMA_VERSION,
     product: "dashboards-mcp",
-    permissions: [...DASHBOARDS_PERMISSIONS],
+    permissions,
     resource_scope: {
       allow: [
         {
@@ -107,15 +126,16 @@ export function dashboardsMcpPolicyDescriptor(): Record<string, unknown> {
       ],
     },
     scope_types: ["org"],
+    db_management_enabled: dashboardsDbManagementEnabled(),
   };
 }
 
-/** Serializable policy shape for Gate MCP token (isolated-stores toggles extra permissions). */
-export function gateMcpPolicyDescriptor(isolatedStores: boolean): Record<string, unknown> {
+/** Serializable policy shape for Gate MCP token. PostgreSQL DB permissions are part of the default baseline. */
+export function gateMcpPolicyDescriptor(): Record<string, unknown> {
   const permissions = [
     ...GATE_PERMISSIONS_BASE,
     ...FILE_PERMISSIONS,
-    ...(isolatedStores ? GATE_PERMISSIONS_ISOLATED : []),
+    ...GATE_PERMISSIONS_ISOLATED,
   ].sort((a, b) => a.localeCompare(b));
   return {
     schema: MCP_POLICY_SCHEMA_VERSION,
@@ -123,7 +143,7 @@ export function gateMcpPolicyDescriptor(isolatedStores: boolean): Record<string,
     permissions,
     resource_scope: {},
     scope_types: ["org", "client"],
-    isolated_stores: isolatedStores,
+    isolated_postgres_default: true,
   };
 }
 
@@ -137,7 +157,7 @@ export function getExpectedMcpPolicyFingerprints(): {
 } {
   return {
     dashboards: fingerprintPolicyDescriptor(dashboardsMcpPolicyDescriptor()),
-    gate: fingerprintPolicyDescriptor(gateMcpPolicyDescriptor(hasFlag("isolated-stores"))),
+    gate: fingerprintPolicyDescriptor(gateMcpPolicyDescriptor()),
   };
 }
 
@@ -149,13 +169,13 @@ export function getLegacyPermissionsOnlyFingerprints(): {
   dashboards: string;
   gate: string;
 } {
-  const isolatedStores = hasFlag("isolated-stores");
   return {
     dashboards: sha256Hex(
       stableStringify({
         legacy: 1,
         product: "dashboards-mcp",
-        permissions: [...DASHBOARDS_PERMISSIONS],
+        permissions: getDashboardsPermissions(),
+        db_management_enabled: dashboardsDbManagementEnabled(),
       }),
     ),
     gate: sha256Hex(
@@ -165,9 +185,9 @@ export function getLegacyPermissionsOnlyFingerprints(): {
         permissions: [
           ...GATE_PERMISSIONS_BASE,
           ...FILE_PERMISSIONS,
-          ...(isolatedStores ? GATE_PERMISSIONS_ISOLATED : []),
+          ...GATE_PERMISSIONS_ISOLATED,
         ],
-        isolated_stores: isolatedStores,
+        isolated_postgres_default: true,
       }),
     ),
   };
@@ -196,11 +216,12 @@ export function matchesCurrentOrLegacyFallback(stored: {
   );
 }
 
-/** Full API request for dashboards MCP token (org-scoped). */
+/** Full API request for dashboards MCP token (org-scoped, read-only by default). */
 export function buildDashboardsMcpTokenRequest(orgId: string): CreateTokenRequest {
+  const permissions = getDashboardsPermissions();
   return {
     scopes: [{ scope_type: "org", scope_id: orgId }],
-    permissions: [...DASHBOARDS_PERMISSIONS],
+    permissions,
     resource_scope: {
       allow: [
         {
@@ -216,10 +237,11 @@ export function buildDashboardsMcpTokenRequest(orgId: string): CreateTokenReques
 
 /** Full API request for Gate MCP token (org + client scopes). */
 export function buildGateMcpTokenRequest(orgId: string, appId: string): CreateTokenRequest {
-  const isolated = hasFlag("isolated-stores")
-    ? [...GATE_PERMISSIONS_ISOLATED]
-    : [];
-  const permissions = [...GATE_PERMISSIONS_BASE, ...FILE_PERMISSIONS, ...isolated];
+  const permissions = [
+    ...GATE_PERMISSIONS_BASE,
+    ...FILE_PERMISSIONS,
+    ...GATE_PERMISSIONS_ISOLATED,
+  ];
   return {
     scopes: [
       { scope_type: "org", scope_id: orgId },

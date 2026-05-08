@@ -1,7 +1,7 @@
 ---
 version: "1.6.0"
 mcp_prompt: domain.overview
-last_synced: "2026-04-17"
+last_synced: "2026-05-07"
 title: "Domain Overview"
 category: core
 ---
@@ -42,9 +42,8 @@ category: core
 - Can contain multiple dashboards.
 - Identified by a UUID (`global_id`).
 - May have an optional human-readable alias.
-- **When creating a database** (createDatabase or getOrCreateDatabase when it creates):
-  - If **appId** is available (e.g. from fusebase.json or runtime env), set **alias** to `app_${appId}_{name}` where **name** is a slug derived from the database title or the requested name (lowercase, valid alias chars: letters, numbers, dots, underscores, hyphens). The total alias length must be 5–64 chars. Example: title "My Feedback" with appId "abc123" → alias `app_abc123_my_feedback`.
-  - If appId is not available, do NOT include the `alias` field unless the user explicitly requests it; omit it from the create request.
+- In default app flows, databases are usually existing project containers rather than something the LLM creates from scratch.
+- If database-creation tools are visible in your MCP session, follow their exact input schema and permission requirements from `tools_describe` rather than assuming they are always available.
 - **Opening in the Thefusebase UI**: To link the user to this database in the browser, use:
   `https://{{orgDomain}}/dashboard/{{orgId}}/tables/databases/{{databaseId}}`
   - **orgDomain**: The organization’s **CNAME** when a custom domain is configured; otherwise **`{orgSubdomain}.{FUSEBASE_WEB_CLIENT_HOST}`** (org subdomain on the Fusebase tenant host; pay attention that `{FUSEBASE_WEB_CLIENT_HOST}` may be different from `{FUSEBASE_HOST}`, used in `https://app.{FUSEBASE_HOST}/...` and `https://app-api.{FUSEBASE_HOST}/...` in these prompts). Ensure you know the exact value of `FUSEBASE_WEB_CLIENT_HOST`.
@@ -62,13 +61,13 @@ category: core
   - Rows are user-owned.
   - Users can typically create and delete rows.
   - Common for dashboards inside databases.
-  - **MUST have a database**: A dashboard with `rootEntity=custom` must belong to a database (`database_id` set). If the database does not exist, create it first (e.g. getOrCreateDatabase or createDatabase), then create the dashboard in that database.
+  - **MUST have a database**: A dashboard with `rootEntity=custom` must belong to a database (`database_id` set). In default app flows, resolve or reuse the existing project database; only use database-creation flows when the corresponding MCP tools are actually available in your session.
 
 - **System dashboards** (non-custom `root_entity`):
   - Rows come from system or external sources (e.g. portals, workspaces, users, forms).
   - **MUST be standalone**: `database_id` MUST be null (not set).
   - **Single instance per org**: Only one dashboard with a given `root_entity` can exist per organization.
-  - **Created from templates**: Creating a dashboard from a template is not available in MCP (use REST/SDK). In MCP, use **createDashboardIntent** for from-scratch dashboards or **copyDashboardFromDashboard** to copy from an existing dashboard.
+  - **Created from templates**: Creating a dashboard from a template is not available in MCP (use REST/SDK). In MCP, use `copyDashboardFromDashboard` or other visible copy flows when you need to clone an existing structure.
   - Row creation/deletion is typically not allowed.
   - Editing of custom columns may be allowed depending on permissions and column settings.
   - Supported `root_entity` values should be confirmed via schema enums.
@@ -154,7 +153,7 @@ Use the **resolveAliases** operation to resolve human-readable aliases (or exist
 - **ALWAYS use**: `prompts_search({ groups: ["data", "rows", "schema"] })`
 - **NEVER use**: `prompts_search({})` or `prompts_search` without groups filter
 - **Only load additional prompt groups** if operation requires them:
-  - Add `"dashboard"` group only if creating new dashboards
+  - Add `"dashboard"` group only if your MCP session actually exposes dashboard-creation or dashboard-editing tools
   - Add `"filters"` group only if working with view filters
   - Add `"templates"` group only if working with dashboard templates
   - Add `"relations"` group only if working with dashboard relations
@@ -162,7 +161,7 @@ Use the **resolveAliases** operation to resolve human-readable aliases (or exist
 
 ### Intent-Based Workflow (MANDATORY for Dashboards/Views)
 
-**For creating/updating dashboards and views, use Intent endpoints:**
+**For sessions where dashboard creation/update tools are visible, use Intent endpoints:**
 1. Discover: `tools_search(queries: ["create dashboard", "intent"])`
 2. Inspect: `tools_describe(name: "<found tool>", schemaMode: "input")`
 3. Execute: `tool_call({ opId: "<exact name>", args: { ... } })`
@@ -218,5 +217,5 @@ erDiagram
 
 - **Version**: 1.6.0
 - **Category**: core
-- **Last synced**: 2026-04-17
+- **Last synced**: 2026-05-07
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
