@@ -1,7 +1,7 @@
 ---
 version: "1.8.9"
 mcp_prompt: isolatedSql
-last_synced: "2026-05-08"
+last_synced: "2026-05-09"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -29,8 +29,8 @@ Load MCP prompt **`isolatedSqlMigrationDiscipline`** (`prompts_search`, groups `
 1. **`listIsolatedStores`** → **`createIsolatedStore`** (`engine` `postgres`, `storeType` `sql`, `source` `{ sourceType: app, sourceId: … }`, `alias`).
 2. **`initIsolatedStoreStage`** for `prod` / `dev` (omit `bindingConfig` when Gate auto-provisions).
 3. In the app repo, keep schema files under **`postgres/migrations/`** and assemble the bundle with SDK helper **`buildSqlMigrationBundle(...)`**. Do not hand-build migration JSON or copy ad-hoc checksums into chat unless this is an explicitly temporary smoke test.
-4. **`getIsolatedStoreSqlMigrationStatus`** with the **exact bundle** you will apply: read **`canApply`**, **`isDrifted`**, **`pendingCount`**, **`structuredIssues`**. Optionally pass **`expectedLastAppliedVersion`** / **`expectedLastAppliedChecksum`** from a prior status → **409** if the journal tail changed.
-5. Optional: **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** — same checks, **no** SQL / journal writes.
+4. **`getIsolatedStoreSqlMigrationStatus`** with the bundle for this stage: read **`canApply`**, **`isDrifted`**, **`pendingCount`**, **`structuredIssues`**. For lightweight status-only probes, migration entries may use **`sql: ""`** when you only need metadata comparison (`version` / `name` / `checksum`). Optionally pass **`expectedLastAppliedVersion`** / **`expectedLastAppliedChecksum`** from a prior status → **409** if the journal tail changed.
+5. Optional: **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** — same pre-apply validation as a real apply, **no** SQL / journal writes. Use the same full bundle you would really apply.
 6. **`applyIsolatedStoreSqlMigrations`** — pending tail only when prefix matches. **409** + **`data.errorCode`** / **`data.issues`** on drift or head mismatch. Prod: automatic checkpoint may run before pending migrations.
 7. Verify: **`listIsolatedStoreSqlTables`**, **`getIsolatedStoreSqlStats`**, or **`queryIsolatedStoreSql`** (read-only, **one** statement per call).
 
@@ -107,5 +107,5 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 - **Version**: 1.8.9
 - **Category**: specialized
-- **Last synced**: 2026-05-08
+- **Last synced**: 2026-05-09
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -1,7 +1,7 @@
 ---
 version: "1.3.0"
 mcp_prompt: isolated
-last_synced: "2026-05-07"
+last_synced: "2026-05-08"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -44,6 +44,14 @@ These prompts cover the common control-plane model for FuseBase PostgreSQL Datab
 - **Empty `listIsolatedStores`** is expected until at least one `createIsolatedStore` for that `orgId`. Flow: create store → `initIsolatedStoreStage` (`dev` / `prod`) → then PostgreSQL SQL ops. If the list stays empty after create, check **wrong `orgId`**, or **`clientId` filter** (omit the query to list all org stores, or pass the exact app client id matching the store’s `source.sourceId`).
 - Token control-plane ownership is checked through the `client` scope of the token.
 - Runtime access can also be narrowed by `resourceScope` on `isolated_store_stage_instance`.
+
+### Source scope quick table
+
+- `listIsolatedStores({ orgId })` -> lists all stores visible to the org-scoped caller.
+- `listIsolatedStores({ orgId, clientId: <matching appId> })` -> lists only stores whose app source scope matches that exact app id.
+- `listIsolatedStores({ orgId, clientId: <different appId> })` -> empty list is expected.
+- Feature token from a different app must not see or manage the store through app-scoped ownership.
+- Heuristic: store visible without `clientId` but missing with `clientId` -> wrong app binding or wrong client id filter. Missing in both cases -> check wrong `orgId`, token scope, or registry state before assuming deletion.
 
 ## Stage Rules
 
@@ -91,5 +99,5 @@ These prompts cover the common control-plane model for FuseBase PostgreSQL Datab
 
 - **Version**: 1.3.0
 - **Category**: specialized
-- **Last synced**: 2026-05-07
+- **Last synced**: 2026-05-08
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-05-08"
+last_synced: "2026-05-09"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -194,10 +194,12 @@ Do this **per stage** you care about (usually **dev** first, then **prod**).
 
 1. **Load context** — MCP: `prompts_search` groups `authz`, `isolated`, `isolatedSql`, `sdk`; before touching bundles load **`isolatedSqlMigrationDiscipline`**.
 2. **Build the bundle** from repo files + manifest with SDK helpers: strict increasing **`version`**, stable **`name`**, **`checksum`** = SHA-256 of canonicalized SQL (**`CRLF -> LF`**, trailing whitespace trimmed).
-3. **`getIsolatedStoreSqlMigrationStatus`** — same `storeId`, `stage`, **`bundle`** you will apply.
+3. **`getIsolatedStoreSqlMigrationStatus`** — same `storeId`, `stage`, and bundle line you want to compare.
+   - For lightweight status-only checks, each migration entry may use **`sql: ""`** when you only need metadata comparison (`version` / `name` / `checksum`) and drift/pending/head visibility.
+   - For status immediately before apply, you can still send the exact full bundle you plan to apply.
    - Check **`canApply`** / **`isDrifted`**, **`pendingCount`**, **`structuredIssues`**.
    - Optional optimistic lock: pass **`expectedLastAppliedVersion`** / **`expectedLastAppliedChecksum`** from your _previous_ status if you want Gate to **409** when someone else migrated first.
-4. **Optional preflight** — **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** (same body otherwise): validates prefix + locks, **no SQL executed**, no journal writes; response includes full **`status`**.
+4. **Optional preflight** — **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** (same body otherwise): validates the same pre-apply bundle rules as a real apply (including checksum/schema-only checks), **no SQL executed**, no journal writes; response includes full **`status`**.
 5. **`applyIsolatedStoreSqlMigrations`** — same bundle; prod may create an automatic **checkpoint** before pending migrations run.
 6. **Verify** — `listIsolatedStoreSqlTables`, `getIsolatedStoreSqlStats`, or `queryIsolatedStoreSql` (one statement per call).
 
@@ -211,13 +213,15 @@ Do this **per stage** you care about (usually **dev** first, then **prod**).
 
 - **`isDrifted`**: bundle prefix does not match journal → **`canApply`** is false, **`structuredIssues`** lists per-version mismatches (journal vs bundle; checksum issues may include **`bundleSqlContentSha256`** — not raw SQL).
 - Pending tail: **`pendingMigrations`** when not drifted.
+- Status can run with metadata-only bundle entries (`sql: ""`) when the caller only needs drift/head/pending visibility. This is useful for MCP/bootstrap checks that should not resend full SQL text on every probe.
 
-### Apply
+### Apply / dryRun
 
 - **200** — migrations ran (or **dryRun** returned validation only).
 - **409** — **`data.errorCode`**:
   - **`isolated_sql_migration_drift`** — prefix mismatch; **`data.issues`** mirrors structured drift rows.
   - **`isolated_sql_journal_head_mismatch`** — optimistic-lock fields disagree with journal tail.
+- **`dryRun: true`** now uses the same pre-apply bundle validation pipeline as a real apply. If the full bundle would fail on canonical checksum or schema-only rules, dryRun fails too.
 
 ### Transactions
 
@@ -304,4 +308,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-05-08
+- **Last synced**: 2026-05-09
