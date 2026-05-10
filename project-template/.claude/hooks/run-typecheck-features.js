@@ -101,6 +101,8 @@ function main() {
     const result = spawnSync(decision.command, decision.args, {
       cwd: featureDir,
       encoding: "utf-8",
+      // Windows + Node 18.20.4+ / 20.15.1+ / 22+: spawnSync to npm.cmd/npx.cmd without shell returns EINVAL (CVE-2024-27980).
+      shell: process.platform === "win32",
     });
     const code = result.status ?? 1;
     if (code !== 0) {
