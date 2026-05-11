@@ -330,6 +330,10 @@ Add a custom MCP by URL (checks reachability with HTTP GET unless `--skip-check`
 
 ```bash
 fusebase integrations add <name> --url <url> [--type http] [--token <token>]
+<% if (it.flags?.includes("managed-integrations")) { %>
+fusebase integrations list-templates   # list Gate MCP manager templates using app .env token
+fusebase integrations connect-template --template-name <template-name>
+<% } %>
 fusebase integrations disable <name>   # keep fusebase.json; remove from IDE configs
 fusebase integrations enable <name>
 fusebase integrations remove <name>    # or: delete
