@@ -13,6 +13,7 @@ This document describes how to use **MCP (Model Context Protocol)** for working 
 For rules and checklists, see `AGENTS.md`.
 
 - **For runtime SDK code** that reads or writes dashboard data (`getDashboardViewData`, `batchPutDashboardData`, etc.), **`references/data-patterns.md` is required** — it defines the real response/request shapes; use it together with `sdk_describe` (do not infer `data.rows` vs top-level `data` from memory).
+- **Default-path rule** — this skill is for existing dashboard surfaces and explicitly dashboard-oriented tasks. It is **not** the default storage-planning skill for new app-owned structured data. Do not ask the user to choose between PostgreSQL and a new dashboard/database unless the user explicitly requested dashboards or the project is extending an existing dashboard surface.
 
 ## References
 

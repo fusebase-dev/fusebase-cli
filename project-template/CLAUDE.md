@@ -2,6 +2,8 @@
 
 **Default storage choice:** For new app-owned structured data, use **FuseBase PostgreSQL Database** by default. Use **FuseBase Project Dashboards** only when the user explicitly asks for dashboards or when the app is integrating with an existing dashboard surface.
 
+**Do not present a default storage fork:** For a normal new app-owned data model, do not ask the user to choose between PostgreSQL and a new dashboard/database. PostgreSQL is the default. Mention dashboards only when the task is explicitly about dashboards or about extending an already existing dashboard surface.
+
 **Type safety:** No `any` / `as Record<string, unknown>` / `as any` on SDK JSON; use `@fusebase/*` types, `sdk_describe`, narrowing — @AGENTS.md **Type safety invariant**.
 
 **Dashboard SDK data (runtime code):** Before writing or reviewing code that calls dashboard data SDK methods (`getDashboardViewData`, `batchPutDashboardData`, and similar), you **must** (1) read `.claude/skills/fusebase-dashboards/references/data-patterns.md` for the actual response/request shapes, and (2) use `sdk_describe` on that method (e.g. `schemaMode: "output"`) before writing parsing logic. **Do not** guess shapes (for example assuming `response.data.rows` when the API returns a flat `data` array plus `meta`).

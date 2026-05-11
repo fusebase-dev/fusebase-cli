@@ -3,7 +3,7 @@ import type { CreateTokenRequest } from "./api";
 import { hasFlag } from "./config";
 
 /** Bump when fingerprint inputs change so old .env values force refresh once. */
-export const MCP_POLICY_SCHEMA_VERSION = 3 as const;
+export const MCP_POLICY_SCHEMA_VERSION = 4 as const;
 
 /** Written to `.env` after token refresh — sole source of truth for policy drift checks (`fusebase app update`, `fusebase env create`). */
 export const DASHBOARDS_MCP_POLICY_FP_KEY = "DASHBOARDS_MCP_POLICY_FP";
@@ -18,6 +18,7 @@ const DASHBOARDS_PERMISSIONS_READONLY = [
   "template.read",
   "token.read",
   "view.read",
+  "view.write",
 ] as const;
 
 const DASHBOARDS_PERMISSIONS_DB_MANAGEMENT = [
@@ -216,7 +217,7 @@ export function matchesCurrentOrLegacyFallback(stored: {
   );
 }
 
-/** Full API request for dashboards MCP token (org-scoped, read-only by default). */
+/** Full API request for dashboards MCP token (org-scoped, existing-dashboard-safe by default). */
 export function buildDashboardsMcpTokenRequest(orgId: string): CreateTokenRequest {
   const permissions = getDashboardsPermissions();
   return {

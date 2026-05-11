@@ -154,7 +154,7 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
   "mcp-gate-debug":
     "Include Gate MCP debug summary skill (focus on FuseBase PostgreSQL Database flows).",
   "legacy-dashboards-db":
-    "Expose dashboard DB management guidance and enable dashboard-service write/create permissions in MCP tokens.",
+    "Expose dashboard DB/dashboard creation guidance and enable dashboard-service database/dashboard management permissions in MCP tokens.",
   "portal-specific-features":
     "Include portal-specific feature prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
   "api-exploration":

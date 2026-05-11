@@ -57,6 +57,8 @@ Rules:
 
 **Storage decision rule:** For any new app-owned structured data model, choose **FuseBase PostgreSQL Database** first. Reach for **FuseBase Project Dashboards** only when the user explicitly wants dashboards or the app is extending an existing dashboard/project-dashboard surface.
 
+**No storage-choice prompt by default:** Do **not** ask the user to choose between PostgreSQL and a new dashboard/database for a normal new app-owned data model. Unless the user explicitly requests dashboards or the app is clearly extending an existing dashboard surface, treat **FuseBase PostgreSQL Database** as the only default storage path and plan accordingly.
+
 **"Skill in context"** means `SKILL.md` **and** its `references/*.md` files. Reading only `SKILL.md` is **not sufficient** — you **must** also read the relevant references. For dashboard work: `references/core-concepts.md` for the entity model; **`references/data-patterns.md` is mandatory** whenever you write runtime code that reads or writes dashboard data via the SDK — it documents the real shapes for data operations (not only `sdk_describe`). Skipping references leads to broken entities or silently empty UI (e.g. wrong `data` vs `data.rows` parsing).
 
 **Two MCP-oriented skills (different products):**
