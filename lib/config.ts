@@ -91,6 +91,7 @@ export interface GateSdkOperationsSnapshot {
 
 // Read fusebase.json env config (takes precedence over process.env)
 export interface FuseConfig {
+  /** written but not used, only for debug purposes */
   env?: string;
   orgId: string;
   appId: string;
