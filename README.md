@@ -657,6 +657,8 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `legacy-dashboards-db` | Exposes dashboard DB management guidance in generated app templates and skills, and enables dashboard-service write/create permissions in MCP tokens |
 | `portal-specific-features` | Includes portal-specific feature guidance in prompts: `fusebase-portal-specific-features` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
 | `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`features[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `feature-sidecar` and `feature-backend` skill templates. |
+| `managed-integrations` | Enables managed third-party MCP integrations: `fusebase integrations list-templates` and `fusebase integrations connect-template` |
+| `managed-integrations-personal-auth` | Enables personal authorization for managed integrations. Shared managed authorization remains gated by `managed-integrations`. |
 
 FuseBase PostgreSQL Database support is part of the default app baseline and does not require a feature flag. By default, dashboards MCP tokens are read-only enough for discovery/integration; dashboard DB creation and write/create permissions are enabled only with `legacy-dashboards-db`.
 
@@ -667,6 +669,8 @@ fusebase config set-flag app-business-docs   # Business-logic documentation skil
 fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summary skill
 fusebase config set-flag legacy-dashboards-db # Dashboard DB management guidance + write/create permissions
 fusebase config set-flag portal-specific-features # Portal-specific features prompts/guidance
+fusebase config set-flag managed-integrations # Managed third-party MCP integrations
+fusebase config set-flag managed-integrations-personal-auth # Personal managed integration authorization
 fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```
 
@@ -715,6 +719,8 @@ Interactive catalog (optional servers) plus custom HTTP MCP servers stored in `f
 fusebase integrations                  # checkbox: catalog optional + custom entries
 fusebase integrations --ide cursor     # limit writes to one IDE (optional)
 fusebase integrations --no-prompt      # skip UI; optional catalog = inferred from IDE configs
+fusebase integrations list-templates   # requires managed-integrations flag
+fusebase integrations connect-template --template-name github # requires managed-integrations flag; scopes to current appId
 
 # Custom server (GET reachability check by default; use --skip-check to skip)
 fusebase integrations add my-mcp --url https://example.com/mcp --type http [--token TOKEN]

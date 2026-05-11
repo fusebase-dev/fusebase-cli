@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import chalk from "chalk";
 import type { IdePreset } from "./steps/ide-setup";
 import { resolveIdePresets } from "./steps/ide-setup";
 import {
@@ -14,6 +15,16 @@ import {
   type McpCustomIntegrationEntry,
 } from "../mcp-custom-integrations";
 import { probeMcpHttpEndpoint } from "../mcp-probe";
+import {
+  hasFlag,
+  loadFuseConfig,
+  MANAGED_INTEGRATIONS_FLAG,
+} from "../config";
+import {
+  connectManagedMcpTemplate,
+  listManagedMcpTemplates,
+  readAppGateTokenOrExit,
+} from "../managed-integrations";
 
 const VALID_IDE_PRESETS: IdePreset[] = ["claude-code", "cursor", "vscode", "opencode", "codex", "other"];
 
@@ -53,9 +64,121 @@ function collectHeader(
   return [...prev, { key, value: v }];
 }
 
+function parsePositiveIntOption(value: string, fieldName: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${fieldName} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function printKeyValueRows(rows: Array<{ key: string; value: string }>): void {
+  const keyWidth = Math.max(...rows.map((row) => row.key.length));
+  for (const row of rows) {
+    console.log(`  ${row.key.padEnd(keyWidth)}  ${row.value}`);
+  }
+}
+
 export const integrationsCommand = new Command("integrations").description(
   "Configure optional MCP integrations: catalog servers, custom HTTP MCP URLs, and IDE configs",
 );
+
+if (hasFlag(MANAGED_INTEGRATIONS_FLAG)) {
+  integrationsCommand
+    .command("list-templates")
+    .description("List MCP manager templates from Gate service")
+    .action(async () => {
+      const gateToken = await readAppGateTokenOrExit(process.cwd());
+      const managedTemplates = await listManagedMcpTemplates(gateToken);
+
+      if (managedTemplates.length === 0) {
+        console.log("No managed templates found.");
+        return;
+      }
+
+      console.log(chalk.bold.cyan("Managed templates"));
+      for (const template of managedTemplates) {
+        console.log(
+          `  ${chalk.green("•")} ${template.name} (id: \`${template.globalId}\`, app: \`${template.app}\`)`,
+        );
+      }
+
+      const firstTemplateName = managedTemplates[0]!.name;
+      const escapedTemplateName = firstTemplateName.includes(" ")
+        ? `"${firstTemplateName.replace(/"/g, '\\"')}"`
+        : firstTemplateName;
+      console.log("");
+      console.log(chalk.bold("Connect example:"));
+      console.log(
+        `  ${chalk.cyan("fusebase integrations connect-template --template-name")} ${escapedTemplateName}`,
+      );
+    });
+
+  integrationsCommand
+    .command("connect-template")
+    .description("Create an MCP server connection from a managed template")
+    .requiredOption("--template-name <name>", "Template name to connect")
+    .option("--channel-id <id>", "Channel ID attached to the server")
+    .option("--no-channel", "Create server without channels")
+    .option(
+      "--wait-timeout-sec <sec>",
+      "How long to wait for auth activation",
+      (value) => parsePositiveIntOption(value, "wait-timeout-sec"),
+      300,
+    )
+    .option(
+      "--poll-interval-sec <sec>",
+      "Auth polling interval",
+      (value) => parsePositiveIntOption(value, "poll-interval-sec"),
+      5,
+    )
+    .option("--token <token>", "Required when template auth type is token_bearer")
+    .action(
+      async (options: {
+        templateName: string;
+        channelId?: string;
+        channel?: boolean;
+        waitTimeoutSec: number;
+        pollIntervalSec: number;
+        token?: string;
+      }) => {
+        try {
+          const gateToken = await readAppGateTokenOrExit(process.cwd());
+          const fuseConfig = loadFuseConfig();
+          if (!fuseConfig?.appId) {
+            throw new Error("Invalid fusebase.json. Missing appId. Run 'fusebase init' first.");
+          }
+
+          const server = await connectManagedMcpTemplate({
+            templateName: options.templateName,
+            gateToken,
+            channelId: options.channelId,
+            noChannel: options.channel === false,
+            waitTimeoutSec: options.waitTimeoutSec,
+            pollIntervalSec: options.pollIntervalSec,
+            token: options.token,
+          });
+
+          console.log(chalk.green("✓ Managed MCP server connected."));
+          printKeyValueRows([
+            { key: "Template", value: options.templateName },
+            { key: "Server ID", value: server.serverId },
+          ]);
+          if (server.command !== undefined) {
+            const commandText =
+              typeof server.command === "string"
+                ? server.command
+                : JSON.stringify(server.command, null, 2);
+            console.log(chalk.bold("Command:"));
+            console.log(commandText);
+          }
+        } catch (error) {
+          console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+          process.exit(1);
+        }
+      },
+    );
+}
 
 integrationsCommand
   .command("add")
@@ -112,7 +235,7 @@ integrationsCommand
       if (!opts.skipCheck) {
         const probeHeaders = buildProbeHeaders(entry);
         const result = await probeMcpHttpEndpoint(entry.url, { headers: probeHeaders });
-        if (!result.ok) {
+        if (result.ok === false) {
           console.error(`Error: MCP endpoint unreachable: ${result.error}`);
           process.exit(1);
         }

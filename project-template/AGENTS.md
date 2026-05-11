@@ -571,6 +571,10 @@ Key commands:
 - `fusebase deploy` - Deploy features (runs lint then build per feature)
 - `fusebase update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed SDK deps/install), outside app directory runs CLI update only; use `--skip-app` for CLI-only mode even inside app
 - `fusebase env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `fusebase config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
+<% if (it.flags?.includes("managed-integrations")) { %>
+- `fusebase integrations list-templates` - List Gate MCP manager templates using `GATE_MCP_TOKEN` from app `.env`
+- `fusebase integrations connect-template --template-name=<name>` - Create a managed MCP server connection from a Gate MCP manager template, scoped to the current app id
+<% } %>
 - `fusebase secret create --feature=FEATURE_ID --secret "KEY:description"` - Create feature secrets (empty values), prints URL to set values
 
 Lint: run `npm run lint` from project root (or from a feature directory). The project template includes ESLint (TypeScript/JavaScript plus `@eslint/json` for `*.json`). Invalid JSON — including a raw line break inside a quoted string — is reported as a parse error. Deploy runs lint automatically before build for each feature that has a `lint` script.

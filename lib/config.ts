@@ -129,6 +129,9 @@ export function getUpdateChannel(): "prod" | "dev" {
 }
 
 /** Known experimental flags. */
+export const MANAGED_INTEGRATIONS_FLAG = "managed-integrations";
+export const PERSONAL_MANAGED_INTEGRATIONS_FLAG = "managed-integrations-personal-auth";
+
 export const KNOWN_FLAGS = [
   "analytics",
   "mcp-beta",
@@ -140,6 +143,7 @@ export const KNOWN_FLAGS = [
   "portal-specific-features",
   "api-exploration",
   "job-sidecars",
+  MANAGED_INTEGRATIONS_FLAG,
   "app-api-registry",
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
@@ -161,6 +165,10 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include api-exploration skill for verifying API endpoints with temporary tokens and test scripts.",
   "job-sidecars":
     "Enable per-job sidecar containers for cron jobs (`fusebase sidecar add --job <name>`).",
+  [MANAGED_INTEGRATIONS_FLAG]:
+    "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
+  // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
+    // "Enable personal authorization for managed integrations.",
   "app-api-registry":
     "Enable publishing app OpenAPI manifests to the control-plane registry during deploy.",
 };
