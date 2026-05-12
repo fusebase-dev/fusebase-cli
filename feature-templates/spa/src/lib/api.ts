@@ -50,13 +50,13 @@ export function authUiForAppTokenReason(
   if (reason === 'expired') {
     return {
       title: 'Session expired',
-      body: 'Your feature session expired. Refresh the page to get a new token.',
+      body: 'Your app session expired. Refresh the page to get a new token.',
     }
   }
   if (reason === 'missing_gate_service_token') {
-    const title = 'Gate access missing from feature token'
+    const title = 'Gate access missing from app token'
     const base =
-      'This is not a browser session timeout. The platform issued a feature token without the Gate (gst) part, so every Gate API call is rejected. Refresh once; if it persists, the feature likely declares Gate permissions that your org role cannot receive together — review fusebaseGateMeta.permissions and org role matrix, or contact support with the x-request-id from the failed response.'
+      'This is not a browser session timeout. The platform issued an app token without the Gate (gst) part, so every Gate API call is rejected. Refresh once; if it persists, the app likely declares Gate permissions that your org role cannot receive together — review fusebaseGateMeta.permissions and org role matrix, or contact support with the x-request-id from the failed response.'
     const body = serverHint ? `${serverHint}\n\n${base}` : base
     return { title, body }
   }
@@ -97,11 +97,15 @@ export function getCookie(name: string): string | null {
 
 /**
 <% if (it.flags?.includes("test-spa-token-priority")) { %>
- * Read the feature token from global runtime variable first, then cookie fallback.
+ * Read the app token from global runtime variable first, then cookie fallback.
 <% } else { %>
- * Read the feature token. Checks the `fbsfeaturetoken` cookie first;
+ * Read the app token. Checks the `fbsfeaturetoken` cookie first;
  * falls back to `window.FBS_FEATURE_TOKEN` if the cookie is absent.
 <% } %>
+ *
+ * NOTE: cookie name and window global keep the legacy `feature` identifiers
+ * because the dev-server proxy and platform runtime still emit those names.
+ * Wire-protocol rename is tracked as a separate cleanup ticket.
  */
 export function getFeatureToken(): string | null {
   return (window as Window & { FBS_FEATURE_TOKEN?: string }).FBS_FEATURE_TOKEN ?? getCookie('fbsfeaturetoken') ?? null

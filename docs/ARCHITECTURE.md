@@ -6,8 +6,8 @@
 
 - Authenticate with the Fusebase API
 - Initialize new Fusebase apps in local directories
-- Configure and develop features locally
-- Deploy features to the Fusebase platform
+- Configure and develop apps locally
+- Deploy apps to the Fusebase platform
 - Run a local development server with integrated API proxy
 
 **Target Users:**
@@ -18,23 +18,23 @@
 
 **Problems Solved:**
 
-- Streamlined local development workflow for Fusebase features
-- Automated feature deployment with build pipeline integration
-- Development server with automatic feature token injection and `fbsfeaturetoken` cookie setup
-- Framework-agnostic feature development (auto-detects Vite, Next.js, React, etc.)
+- Streamlined local development workflow for Fusebase apps
+- Automated app deployment with build pipeline integration
+- Development server with automatic app token injection and `fbsapptoken` cookie setup
+- Framework-agnostic app development (auto-detects Vite, Next.js, React, etc.)
 
 ## Conceptual Model
 
-For a detailed explanation of core concepts (apps vs projects, features vs code, MCP vs SDK), see [Conceptual Model: Apps, Features, and Data Access](CONCEPTS.md).
+For a detailed explanation of core concepts (products vs projects, apps vs code, MCP vs SDK), see [Conceptual Model: Products, Apps, and Data Access](CONCEPTS.md).
 
 **Quick reference**:
 
-- **App**: Server-side entity in Fusebase API (source of truth)
-- **Local Project**: Directory with `fusebase.json` linking to an app
-- **Feature Record**: Server-side entity representing a deployable unit
-- **Feature Code**: Local source code that gets built and deployed
+- **Product**: Server-side container entity in Fusebase API (source of truth) that owns one or more apps
+- **Local Project**: Directory with `fusebase.json` linking to a product
+- **App Record**: Server-side entity representing a deployable unit (child of a product)
+- **App Code**: Local source code that gets built and deployed
 - **MCP**: Discovery and reasoning layer (for LLMs and developers)
-- **SDK**: Execution layer (for feature code)
+- **SDK**: Execution layer (for app code)
 
 ## High-Level Architecture
 
@@ -53,12 +53,12 @@ apps-cli/
 │   │   ├── dev-debug-logs.ts   # Per-session local dev logging utilities
 │   │   ├── backend-output.ts   # Backend process output capture
 │   ├── framework-detect.ts     # Framework detection from package.json
-│   ├── feature-templates.ts   # Feature template utilities (list, copy)
+│   ├── feature-templates.ts   # App template utilities (list, copy)
 │   └── commands/
 │       ├── init.ts             # App initialization command
-│       ├── deploy.ts           # Feature deployment command
+│       ├── deploy.ts           # App deployment command
 │       ├── dev.ts              # Dev server command
-│       ├── dev-feature.ts      # Feature creation/configuration command
+│       ├── dev-app.ts      # App creation/configuration command
 │       └── steps/
 │           ├── ide-setup.ts    # IDE config file generation
 │           └── create-env.ts   # .env file creation
@@ -66,9 +66,9 @@ apps-cli/
 │   ├── src/                    # React app source
 │   └── vite.config.ts          # Vite configuration
 ├── project-template/           # Template copied during `fusebase init`
-│   ├── AGENTS.md               # Feature development guide
+│   ├── AGENTS.md               # App development guide
 │   └── skills/                 # Development skills documentation
-├── feature-templates/          # Feature templates (copied only when selected)
+├── feature-templates/          # App templates (copied only when selected)
 │   └── hello-world/            # Hello World template (React + Vite + SDK)
 ├── ide-configs/                # IDE configuration templates
 └── package.json                # Dependencies and build scripts
@@ -88,12 +88,12 @@ apps-cli/
    - Commands write to `fusebase.json` or `~/.fusebase/config.json`
 
 3. **Dev Server Flow** (`fusebase dev start`):
-   - Spawns feature's dev server (if `dev.command` configured)
+   - Spawns app's dev server (if `dev.command` configured)
    - Starts API proxy server (port 4174) via `lib/dev-server/server.ts`
    - Starts frontend server (port 4173) - Vite in dev, static in binary
-   - Detects feature dev URL from stdout/stderr
-   - Injects feature tokens via `postMessage` to iframe
-   - Sets cookie `fbsfeaturetoken` for same-origin runtime/backend auth
+   - Detects app dev URL from stdout/stderr
+   - Injects app tokens via `postMessage` to iframe
+   - Sets cookie `fbsapptoken` for same-origin runtime/backend auth
 
 ## Command System
 
@@ -159,10 +159,10 @@ program.addCommand(devCommand)    // from lib/commands/dev.ts
    - Written by: `fusebase auth` command
 
 2. **Project Config** (`fusebase.json` in project root):
-   - Fields: `orgId`, `appId`, `env?`, `features[]`
-   - Optional per-feature field: `features[].fusebaseGateMeta` — Gate SDK operation scan + resolved permissions (see [Fusebase Gate meta](FUSEBASE_GATE_META.md))
+   - Fields: `orgId`, `productId`, `env?`, `apps[]`
+   - Optional per-app field: `apps[].fusebaseGateMeta` — Gate SDK operation scan + resolved permissions (see [Fusebase Gate meta](FUSEBASE_GATE_META.md))
    - Read via: `loadFuseConfig()`
-   - Written by: `fusebase init`, `fusebase feature create`, `fusebase analyze gate`
+   - Written by: `fusebase init`, `fusebase app create`, `fusebase analyze gate`
 
 3. **Environment Variables**:
    - `ENV`: Set to `"dev"` to use dev API endpoints
@@ -261,7 +261,7 @@ apps-cli interacts with Dashboard Service through MCP + SDK:
 - **SDK**:
   - Generated from TypeScript contracts
   - Mirrors MCP tools 1:1 by operation id
-  - Used for runtime execution in feature code
+  - Used for runtime execution in app code
 
 ## How LLM Discovers Capabilities
 
@@ -291,7 +291,7 @@ LLM awareness in apps-cli is based on MCP metadata.
    - Plans implementation approach
 
 3. **Implementation Phase** (SDK):
-   - LLM writes feature code using SDK methods
+   - LLM writes app code using SDK methods
    - SDK methods mirror MCP tools by operation ID
    - Same schemas, same endpoints, different execution context
 
@@ -314,17 +314,17 @@ LLM awareness in apps-cli is based on MCP metadata.
 - Don't assume endpoint patterns
 - Always use MCP discovery to find correct operations
 
-**❌ Do NOT use MCP tools in feature code**:
+**❌ Do NOT use MCP tools in app code**:
 
 - MCP tools are for discovery/reasoning only
-- Feature code must use SDK methods
-- MCP tools are called by the LLM/IDE, not by feature code
+- App code must use SDK methods
+- MCP tools are called by the LLM/IDE, not by app code
 
 **❌ Do NOT hardcode IDs**:
 
 - Database, dashboard, view IDs must be discovered
 - Use `explore-databases.ts` or MCP discovery tools
-- Document discovered IDs as constants in feature code
+- Document discovered IDs as constants in app code
 
 ### MCP + SDK Approach
 
@@ -374,7 +374,7 @@ bun run build
 
 ### Lint
 
-The **project template** includes ESLint (flat config in `eslint.config.mjs`), a `lint` script in `package.json`, and devDependencies (`eslint`, `typescript-eslint`, etc.). `fusebase deploy` runs `npm run lint` for each feature that has a `lint` script before running the build.
+The **project template** includes ESLint (flat config in `eslint.config.mjs`), a `lint` script in `package.json`, and devDependencies (`eslint`, `typescript-eslint`, etc.). `fusebase deploy` runs `npm run lint` for each app that has a `lint` script before running the build.
 
 ### Release/Publish
 
@@ -395,23 +395,23 @@ The **project template** includes ESLint (flat config in `eslint.config.mjs`), a
 | `lib/api.ts`                  | Fusebase API client (all HTTP requests)     |
 | `lib/config.ts`               | Configuration management (global + project) |
 | `lib/commands/init.ts`        | App initialization logic                    |
-| `lib/commands/deploy.ts`      | Feature deployment logic                    |
+| `lib/commands/deploy.ts`      | App deployment logic                    |
 | `lib/commands/dev.ts`         | Dev server orchestration                    |
-| `lib/commands/dev-feature.ts` | Feature creation/configuration command      |
+| `lib/commands/dev-app.ts` | App creation/configuration command      |
 | `lib/dev-server/server.ts`    | Dev server implementation (API proxy)       |
 | `lib/framework-detect.ts`     | Framework detection from package.json       |
-| `lib/feature-templates.ts`    | Feature template utilities (list, copy)     |
+| `lib/feature-templates.ts`    | App template utilities (list, copy)     |
 
 ### Glossary
 
-- **Feature**: A deployable unit in a Fusebase app (e.g., a dashboard, form, widget)
-- **Feature Token**: Authentication token for a feature to call Fusebase APIs
-- **Feature Template**: Pre-built feature starter (e.g., Hello World app) that can be selected during `fusebase feature create`
+- **App**: A deployable unit in a Fusebase app (e.g., a dashboard, form, widget)
+- **App Token**: Authentication token for an app to call Fusebase APIs
+- **App Template**: Pre-built app starter (e.g., Hello World app) that can be selected during `fusebase app create`
 - **Dev Server**: Local development environment (frontend UI + API proxy)
 - **API Proxy**: Server that forwards requests to Fusebase API with auth headers
 - **Fusebase Config**: Project-specific config in `fusebase.json`
 - **Global Config**: User-specific config in `~/.fusebase/config.json`
-- **Embedded Files**: Zip files bundled into compiled binary (project template, feature templates, dev-server dist, IDE configs)
+- **Embedded Files**: Zip files bundled into compiled binary (project template, app templates, dev-server dist, IDE configs)
 
 ### Troubleshooting
 
@@ -423,7 +423,7 @@ The **project template** includes ESLint (flat config in `eslint.config.mjs`), a
 
 3. **Dev server port conflicts**: Dev server auto-finds available ports starting from 4173/4174. If ports are in use, kill existing processes or change ports in code.
 
-4. **Feature token not received**: Ensure feature iframe listens for `postMessage` with `type: 'featuretoken'`. Check browser console for token delivery.
+4. **App token not received**: Ensure app iframe listens for `postMessage` with `type: 'featuretoken'`. Check browser console for token delivery.
 
 5. **Build failures on deploy**: Ensure `build.command` and `build.outputDir` are correctly configured in `fusebase.json`. Check that build output directory exists and contains files.
 
@@ -431,6 +431,6 @@ The **project template** includes ESLint (flat config in `eslint.config.mjs`), a
 
 - **"App not initialized"**: Run `fusebase init` in project directory
 - **"No API key configured"**: Run `fusebase auth <api-key>`
-- **"No features configured"**: Run `fusebase feature create` to configure at least one feature
+- **"No apps configured"**: Run `fusebase app create` to configure at least one app
 - **Dev server URL not detected**: Manually enter URL in dev UI if auto-detection fails
 - **Binary mode vs dev mode**: In development, dev-server uses Vite with HMR. In compiled binary, serves prebuilt static assets from embedded zip.

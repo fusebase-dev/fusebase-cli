@@ -74,7 +74,7 @@ function instrumentCommand(cmd: Command): void {
               cliVersion: VERSION,
               os: os.platform(),
               osVersion: os.release(),
-              appId: fuseConfig?.appId,
+              appId: fuseConfig?.productId,
               orgId: fuseConfig?.orgId || "",
               duration,
               success,

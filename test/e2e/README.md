@@ -8,14 +8,14 @@ repo.
 ## What the e2e tests cover
 
 - **Smoke deploy** (`smoke-deploy.e2e.ts`) — `init` → scaffold → `deploy` of a
-  single feature that combines a backend, a sidecar container, and a cron job.
+  single app that combines a backend, a sidecar container, and a cron job.
   Verifies the deployed backend `/api/healthz` responds, and that both backend
   HTTP writes and the cron job hit the backend's in-memory marker store keyed
-  by a per-run `runId`. Calls `DELETE /v1/orgs/{orgId}/apps/{appId}` in
+  by a per-run `runId`. Calls `DELETE /v1/orgs/{orgId}/products/{productId}` in
   teardown so the cascade in `nimbus-ai` removes the Container App + Container
   Apps Job.
 - **Dev start parallel** (`dev-start-parallel.e2e.ts`) — spawns
-  `fusebase dev start` for two features in parallel, polls each feature port,
+  `fusebase dev start` for two apps in parallel, polls each app port,
   then terminates both processes (no leaked children).
 - **Harness placeholder** (`harness.e2e.ts`) — fast sanity check that the
   configured env vars resolve and the public-api is reachable. Catches
@@ -45,7 +45,7 @@ test/e2e/
   helpers/             # Reusable building blocks (env, CLI runner, api).
   harness.e2e.ts       # Smoke check — auths and lists apps via public-api.
   smoke-deploy.e2e.ts  # Full CLI lifecycle smoke test (NIM-40901).
-  dev-start.e2e.ts     # `fusebase dev start` two features in parallel (local).
+  dev-start.e2e.ts     # `fusebase dev start` two apps in parallel (local).
   *.e2e.ts             # Other test files (do NOT match the default *.test.ts
                        #  pattern, so plain `bun test` skips them).
 ```
@@ -84,7 +84,7 @@ If any env var is missing, the suite logs the missing names and SKIPs cleanly
   `dev start` test.
 - `helpers/api.ts` — fetch wrapper around the public Fusebase API (`listApps`,
   `getApp`, `deleteApp`, plus a generic `request<T>()` escape hatch). The
-  `deleteApp` call hits `DELETE /v1/orgs/{orgId}/apps/{appId}` (added under
+  `deleteApp` call hits `DELETE /v1/orgs/{orgId}/products/{productId}` (added under
   NIM-40899) and treats 404 as success so it can be used idempotently in
   teardown.
 
@@ -130,7 +130,7 @@ names and SKIPs cleanly — the job exits 0 rather than failing the pipeline.
 ## Orphan resource cleanup
 
 The cascade in `nimbus-ai` (NIM-40898) deletes the Azure Container App and
-Container Apps Jobs whenever the public-api `DELETE /v1/orgs/{orgId}/apps/{appId}`
+Container Apps Jobs whenever the public-api `DELETE /v1/orgs/{orgId}/products/{productId}`
 endpoint is called. The smoke test calls that endpoint in `afterAll` regardless
 of test outcome, so the happy path leaves no orphans.
 
@@ -146,9 +146,9 @@ delete the stale ones manually:
 
 ```bash
 curl -H "Authorization: Bearer $FUSEBASE_API_KEY" \
-  "https://public-api.dev-thefusebase.com/v1/orgs/$FUSEBASE_TEST_ORG_ID/apps" \
+  "https://public-api.dev-thefusebase.com/v1/orgs/$FUSEBASE_TEST_ORG_ID/products" \
   | jq '.[] | select(.subdomain | startswith("e2e-cli-")) | {id, subdomain}'
 
 curl -X DELETE -H "Authorization: Bearer $FUSEBASE_API_KEY" \
-  "https://public-api.dev-thefusebase.com/v1/orgs/$FUSEBASE_TEST_ORG_ID/apps/$APP_ID"
+  "https://public-api.dev-thefusebase.com/v1/orgs/$FUSEBASE_TEST_ORG_ID/products/$APP_ID"
 ```

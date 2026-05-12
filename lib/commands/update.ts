@@ -1,14 +1,14 @@
 import { Command } from "commander";
-import { runAppUpdate, type AppUpdateOptions } from "./app";
+import { runProductUpdate, type ProductUpdateOptions } from "./product";
 import { runCliSelfUpdate } from "./cli";
 import { existsSync } from "fs";
 import { join } from "path";
 
-type SmartUpdateOptions = AppUpdateOptions & { skipApp?: boolean };
+type SmartUpdateOptions = ProductUpdateOptions & { skipProduct?: boolean };
 
 export const updateCommand = new Command("update")
-  .description("Smart update: CLI everywhere, app stages in app directories")
-  .option("--skip-app", "Skip app update flow even when fusebase.json exists")
+  .description("Smart update: CLI everywhere, product stages in product directories")
+  .option("--skip-product", "Skip product update flow even when fusebase.json exists")
   .option("--skip-cli-update", "Skip automatic CLI self-update step")
   .option("--skip-skills", "Skip AGENTS.md and .claude assets refresh")
   .option("--skip-mcp", "Skip MCP token and IDE config refresh")
@@ -19,11 +19,11 @@ export const updateCommand = new Command("update")
   .option("--commit", "Run pre-update Git checkpoint in non-interactive mode (no prompt)")
   .option("--dry-run", "Print planned work without writing files or running installs", false)
   .action(async (opts: SmartUpdateOptions) => {
-    const isAppDirectory = existsSync(join(process.cwd(), "fusebase.json"));
-    const shouldRunAppFlow = isAppDirectory && opts.skipApp !== true;
+    const isProductDirectory = existsSync(join(process.cwd(), "fusebase.json"));
+    const shouldRunProductFlow = isProductDirectory && opts.skipProduct !== true;
 
-    if (shouldRunAppFlow) {
-      await runAppUpdate(opts);
+    if (shouldRunProductFlow) {
+      await runProductUpdate(opts);
       return;
     }
 

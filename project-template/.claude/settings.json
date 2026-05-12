@@ -18,8 +18,8 @@
           },
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quality-check-features.js",
-            "statusMessage": "Quality assesment of the feature…",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/quality-check-apps.js",
+            "statusMessage": "Quality assesment of the app…",
             "timeout": 30
           }
         ]

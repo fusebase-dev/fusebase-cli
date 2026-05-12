@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Root typecheck: for each feature (from fusebase.json or features/), run TypeScript
+// Root typecheck: for each app (from fusebase.json or apps/), run TypeScript
 // the same way deploy would surface errors — without running Vite.
 // - Prefer package.json "typecheck" script when present.
 // - Else if tsconfig.json has project references → npx tsc -b --noEmit
 // - Else if tsconfig.json exists → npx tsc --noEmit -p tsconfig.json
 // - Else if only tsconfig.app.json → npx tsc --noEmit -p tsconfig.app.json
-// - Otherwise skip (no TS project in that feature).
+// - Otherwise skip (no TS project in that app).
 
 const fs = require("fs");
 const path = require("path");
@@ -13,12 +13,12 @@ const { spawnSync } = require("child_process");
 
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
-function loadFeatureDirs() {
+function loadAppDirs() {
   const fusebasePath = path.join(projectDir, "fusebase.json");
   if (fs.existsSync(fusebasePath)) {
     try {
       const cfg = JSON.parse(fs.readFileSync(fusebasePath, "utf8"));
-      const paths = (cfg.features || []).map((f) => f.path).filter(Boolean);
+      const paths = (cfg.apps || []).map((f) => f.path).filter(Boolean);
       if (paths.length > 0) {
         return paths.map((p) => path.join(projectDir, p));
       }
@@ -26,7 +26,7 @@ function loadFeatureDirs() {
       // fall through to scan
     }
   }
-  const featuresDir = path.join(projectDir, "features");
+  const featuresDir = path.join(projectDir, "apps");
   if (!fs.existsSync(featuresDir)) return [];
   return fs
     .readdirSync(featuresDir, { withFileTypes: true })
@@ -34,8 +34,8 @@ function loadFeatureDirs() {
     .map((d) => path.join(featuresDir, d.name));
 }
 
-function decideCommand(featureDir) {
-  const pkgPath = path.join(featureDir, "package.json");
+function decideCommand(appDir) {
+  const pkgPath = path.join(appDir, "package.json");
   if (fs.existsSync(pkgPath)) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
@@ -46,7 +46,7 @@ function decideCommand(featureDir) {
       // ignore
     }
   }
-  const tsRoot = path.join(featureDir, "tsconfig.json");
+  const tsRoot = path.join(appDir, "tsconfig.json");
   if (fs.existsSync(tsRoot)) {
     try {
       const ts = JSON.parse(fs.readFileSync(tsRoot, "utf8"));
@@ -66,7 +66,7 @@ function decideCommand(featureDir) {
       label: "tsc",
     };
   }
-  const tsApp = path.join(featureDir, "tsconfig.app.json");
+  const tsApp = path.join(appDir, "tsconfig.app.json");
   if (fs.existsSync(tsApp)) {
     return {
       command: npxCommand(),
@@ -86,20 +86,20 @@ function npxCommand() {
 }
 
 function main() {
-  const dirs = loadFeatureDirs();
+  const dirs = loadAppDirs();
   if (dirs.length === 0) {
     process.exit(0);
   }
 
   const failures = [];
-  for (const featureDir of dirs) {
-    if (!fs.existsSync(featureDir)) continue;
-    const decision = decideCommand(featureDir);
+  for (const appDir of dirs) {
+    if (!fs.existsSync(appDir)) continue;
+    const decision = decideCommand(appDir);
     if (!decision) continue;
 
-    const rel = path.relative(projectDir, featureDir);
+    const rel = path.relative(projectDir, appDir);
     const result = spawnSync(decision.command, decision.args, {
-      cwd: featureDir,
+      cwd: appDir,
       encoding: "utf-8",
       // Windows + Node 18.20.4+ / 20.15.1+ / 22+: spawnSync to npm.cmd/npx.cmd without shell returns EINVAL (CVE-2024-27980).
       shell: process.platform === "win32",
@@ -109,7 +109,7 @@ function main() {
       const errorLine = result.error ? `${result.error.message}\n` : "";
       const out = [errorLine, result.stdout, result.stderr].filter(Boolean).join("");
       failures.push(
-        `Feature "${rel}" (${decision.label}):\n${out || "(no output)"}`,
+        `App "${rel}" (${decision.label}):\n${out || "(no output)"}`,
       );
     }
   }

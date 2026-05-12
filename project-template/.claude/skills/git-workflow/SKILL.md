@@ -49,7 +49,7 @@ Use `revert` by default on shared branches.
 
 ## Operations That Commonly Need Separate Commits
 
-- `fusebase feature create/update` (`fusebase.json` changes)
+- `fusebase app create/update` (`fusebase.json` changes)
 - `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` (`AGENTS.md`, `.claude/*` changes)
 - `fusebase config ide` / `fusebase integrations` (IDE MCP config changes)
 - `fusebase env create` (`.env` local changes; usually not committed)
@@ -91,7 +91,7 @@ After successful deploy:
 
 - record deployed `git rev-parse HEAD` in report,
 - optionally add tag:
-  - `git tag -a deploy/<feature-or-app>/<timestamp> -m "Deploy trace marker"`
+  - `git tag -a deploy/<app-or-app>/<timestamp> -m "Deploy trace marker"`
 
 ### Report Requirements
 

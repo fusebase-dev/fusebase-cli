@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { spawn } from "child_process";
 import { basename } from "path";
-import { fetchApp } from "./api";
+import { fetchProduct } from "./api";
 import { getConfig, getEnv, loadFuseConfig } from "./config";
 import { isInsideGitWorkTree, runGitInitInDirectory } from "./git-local";
 
@@ -134,7 +134,7 @@ function resolveGitLabConfig(): {
   };
 }
 
-async function resolveProjectName(options: {
+export async function resolveProjectName(options: {
   cwd: string;
   env: "dev" | "prod";
   appSubdomain?: string;
@@ -148,7 +148,7 @@ async function resolveProjectName(options: {
   }
   const fusebaseConfig = loadFuseConfig();
   const orgId = String(fusebaseConfig?.orgId ?? "").trim();
-  const appId = String(fusebaseConfig?.appId ?? "").trim();
+  const productId = String(fusebaseConfig?.productId ?? "").trim();
   const apiKey = String(getConfig().apiKey ?? "").trim();
 
   if (appSubdomain || appTitle) {
@@ -160,17 +160,17 @@ async function resolveProjectName(options: {
     });
   }
 
-  if (orgId && appId && apiKey) {
+  if (orgId && productId && apiKey) {
     try {
-      const app = await fetchApp(apiKey, orgId, appId);
+      const product = await fetchProduct(apiKey, orgId, productId);
       return composeRepoName({
         env,
-        appTitle: app.title,
-        subdomain: app.sub,
+        appTitle: product.title,
+        subdomain: product.sub,
         fallbackName: basename(cwd),
       });
     } catch {
-      // Fallback to folder name if app lookup fails.
+      // Fallback to folder name if product lookup fails.
     }
   }
 

@@ -106,7 +106,7 @@ export async function flushReport(): Promise<void> {
       errorMessage,
       stackTrace: stackTrace || undefined,
       cliVersion: VERSION,
-      appId: fuseConfig?.appId,
+      appId: fuseConfig?.productId,
       env: getEnv(),
       command: process.argv.slice(2).join(" "),
       s3Path,

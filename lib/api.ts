@@ -35,7 +35,11 @@ export interface OrganizationsResponse {
   organizations: Organization[];
 }
 
-export interface App {
+/**
+ * Top-level container that an organization owns. Renamed from `App`.
+ * Public API: /v1/orgs/{orgId}/products
+ */
+export interface Product {
   id: string;
   orgId: string;
   title: string;
@@ -45,72 +49,76 @@ export interface App {
   updatedAt: number;
 }
 
-export interface AppsResponse {
-  apps: App[];
+export interface ProductsResponse {
+  products: Product[];
 }
 
-export type AppFeatureAccessPrincipalType =
+export type AppAccessPrincipalType =
   | "user"
   | "orgRole"
   | "orgGroup"
   | "visitor";
 
-export interface AppFeatureAccessPrincipal {
-  type: AppFeatureAccessPrincipalType;
+export interface AppAccessPrincipal {
+  type: AppAccessPrincipalType;
   id?: string;
 }
 
-// Feature permissions types
-export type AppFeaturePermissionType = "dashboardView" | "database" | "gate";
-export type AppFeatureResourcePermissionPrivilege = "read" | "write";
-export type AppFeatureGatePermissionPrivilege = string;
+// App permissions types
+export type AppPermissionType = "dashboardView" | "database" | "gate";
+export type AppResourcePermissionPrivilege = "read" | "write";
+export type AppGatePermissionPrivilege = string;
 
-export interface AppFeaturePermissionDashboardViewResource {
+export interface AppPermissionDashboardViewResource {
   dashboardId: string;
   viewId: string;
 }
 
-export interface AppFeaturePermissionDatabaseResource {
+export interface AppPermissionDatabaseResource {
   databaseId?: string;
   databaseAlias?: string;
 }
 
-export interface AppFeaturePermissionGateResource {
+export interface AppPermissionGateResource {
   kind?: string;
   ids?: string[];
 }
 
-export interface AppFeatureDashboardViewPermissionItem {
+export interface AppDashboardViewPermissionItem {
   type: "dashboardView";
-  resource: AppFeaturePermissionDashboardViewResource;
-  privileges: AppFeatureResourcePermissionPrivilege[];
+  resource: AppPermissionDashboardViewResource;
+  privileges: AppResourcePermissionPrivilege[];
 }
 
-export interface AppFeatureDatabasePermissionItem {
+export interface AppDatabasePermissionItem {
   type: "database";
-  resource: AppFeaturePermissionDatabaseResource;
-  privileges: AppFeatureResourcePermissionPrivilege[];
+  resource: AppPermissionDatabaseResource;
+  privileges: AppResourcePermissionPrivilege[];
 }
 
-export interface AppFeatureGatePermissionItem {
+export interface AppGatePermissionItem {
   type: "gate";
-  resource?: AppFeaturePermissionGateResource;
-  privileges: AppFeatureGatePermissionPrivilege[];
+  resource?: AppPermissionGateResource;
+  privileges: AppGatePermissionPrivilege[];
 }
 
-export type AppFeaturePermissionItem =
-  | AppFeatureDashboardViewPermissionItem
-  | AppFeatureDatabasePermissionItem
-  | AppFeatureGatePermissionItem;
+export type AppPermissionItem =
+  | AppDashboardViewPermissionItem
+  | AppDatabasePermissionItem
+  | AppGatePermissionItem;
 
-export interface AppFeaturePermissions {
-  items: AppFeaturePermissionItem[];
+export interface AppPermissions {
+  items: AppPermissionItem[];
 }
 
-export interface AppFeature {
+/**
+ * Sub-component inside a Product. Renamed from `AppFeature`.
+ * Public API: /v1/orgs/{orgId}/products/{productId}/apps
+ */
+export interface App {
   id: string;
   orgId: string;
-  appId: string;
+  productId: string;
   title: string;
   description?: string;
   sub?: string;
@@ -118,20 +126,24 @@ export interface AppFeature {
   createdAt: number;
   updatedAt: number;
   url: string;
-  accessPrincipals?: AppFeatureAccessPrincipal[];
-  permissions?: AppFeaturePermissions;
+  accessPrincipals?: AppAccessPrincipal[];
+  permissions?: AppPermissions;
   manifest?: Record<string, unknown>;
 }
 
-export interface AppFeaturesResponse {
-  features: AppFeature[];
+export interface AppsResponse {
+  apps: App[];
 }
 
-export interface AppFeatureVersion {
+/**
+ * App version. Renamed from `AppFeatureVersion`. Field `productId` was `appId`,
+ * `appId` was `appFeatureId`.
+ */
+export interface AppVersion {
   id: string;
   orgId: string;
+  productId: string;
   appId: string;
-  appFeatureId: string;
   s3Path: string;
   createdAt: number;
   updatedAt: number;
@@ -268,13 +280,13 @@ export async function fetchOrg(
   return res as OrganizationDetails;
 }
 
-export async function fetchApps(
+export async function fetchProducts(
   apiKey: string,
   orgId: string,
-): Promise<AppsResponse> {
+): Promise<ProductsResponse> {
   const baseUrl = getBaseUrl();
-  logger.info("Fetching apps for org %s using base url %s", orgId, baseUrl);
-  const response = await fetch(`${baseUrl}/v1/orgs/${orgId}/apps`, {
+  logger.info("Fetching products for org %s using base url %s", orgId, baseUrl);
+  const response = await fetch(`${baseUrl}/v1/orgs/${orgId}/products`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -290,11 +302,107 @@ export async function fetchApps(
 
     logger.error({
       msg: "API request failed",
-      endpoint: `/v1/orgs/${orgId}/apps`,
+      endpoint: `/v1/orgs/${orgId}/products`,
       status: response.status,
       statusText: response.statusText,
       errorBody,
-      url: `${baseUrl}/v1/orgs/${orgId}/apps`,
+      url: `${baseUrl}/v1/orgs/${orgId}/products`,
+      timestamp: new Date().toISOString(),
+    });
+
+    throw new Error(
+      `Failed to fetch products: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+
+  const res = await response.json();
+
+  return res as ProductsResponse;
+}
+
+export async function fetchProduct(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+): Promise<Product> {
+  const products = await fetchProducts(apiKey, orgId);
+  const product = products.products.find((p) => p.id === productId);
+  if (!product) {
+    throw new Error(`Product not found: ${productId}`);
+  }
+  return product;
+}
+
+export async function fetchApp(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+  appId: string,
+): Promise<App> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      name?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps/${appId}`,
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
+      timestamp: new Date().toISOString(),
+    });
+
+    throw new Error(
+      `Failed to fetch app: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+
+  const res = await response.json();
+
+  return res as App;
+}
+
+export async function fetchApps(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+): Promise<AppsResponse> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      name?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps`,
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
       timestamp: new Date().toISOString(),
     });
 
@@ -308,120 +416,20 @@ export async function fetchApps(
   return res as AppsResponse;
 }
 
-export async function fetchApp(
-  apiKey: string,
-  orgId: string,
-  appId: string,
-): Promise<App> {
-  const apps = await fetchApps(apiKey, orgId);
-  const app = apps.apps.find((a) => a.id === appId);
-  if (!app) {
-    throw new Error(`App not found: ${appId}`);
-  }
-  return app;
-}
-
-export async function fetchAppFeature(
-  apiKey: string,
-  orgId: string,
-  appId: string,
-  featureId: string,
-): Promise<AppFeature> {
-  const baseUrl = getBaseUrl();
-  const response = await fetch(
-    `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${featureId}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-
-  if (!response.ok) {
-    const errorBody = (await response.json().catch(() => ({}))) as {
-      message?: string;
-      name?: string;
-    };
-
-    logger.error({
-      msg: "API request failed",
-      endpoint: `/v1/orgs/${orgId}/apps/${appId}/features/${featureId}`,
-      status: response.status,
-      statusText: response.statusText,
-      errorBody,
-      url: `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${featureId}`,
-      timestamp: new Date().toISOString(),
-    });
-
-    throw new Error(
-      `Failed to fetch app feature: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
-    );
-  }
-
-  const res = await response.json();
-
-  return res as AppFeature;
-}
-
-export async function fetchAppFeatures(
-  apiKey: string,
-  orgId: string,
-  appId: string,
-): Promise<AppFeaturesResponse> {
-  const baseUrl = getBaseUrl();
-  const response = await fetch(
-    `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-
-  if (!response.ok) {
-    const errorBody = (await response.json().catch(() => ({}))) as {
-      message?: string;
-      name?: string;
-    };
-
-    logger.error({
-      msg: "API request failed",
-      endpoint: `/v1/orgs/${orgId}/apps/${appId}/features`,
-      status: response.status,
-      statusText: response.statusText,
-      errorBody,
-      url: `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features`,
-      timestamp: new Date().toISOString(),
-    });
-
-    throw new Error(
-      `Failed to fetch app features: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
-    );
-  }
-
-  const res = await response.json();
-
-  return res as AppFeaturesResponse;
-}
-
-export interface FeatureTokenResponse {
+export interface AppTokenResponse {
   token: string;
 }
 
-export async function fetchFeatureToken(
+export async function fetchAppToken(
   apiKey: string,
   orgId: string,
+  productId: string,
   appId: string,
-  featureId: string,
   options?: { short?: boolean },
-): Promise<FeatureTokenResponse> {
+): Promise<AppTokenResponse> {
   const baseUrl = getBaseUrl();
   const startTime = Date.now();
-  let url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${featureId}/tokens`;
+  let url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/tokens`;
   if (options?.short) {
     url += "?short=true";
   }
@@ -449,7 +457,7 @@ export async function fetchFeatureToken(
     });
 
     throw new Error(
-      `Failed to fetch feature token: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      `Failed to fetch app token: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
     );
   }
 
@@ -459,31 +467,29 @@ export async function fetchFeatureToken(
 
   if (took > 1000) {
     logger.warn(
-      `⚠️  Slow response from fetchFeatureToken POST ${url}: ${took}ms for feature ${featureId}`,
+      `⚠️  Slow response from fetchAppToken POST ${url}: ${took}ms for app ${appId}`,
     );
   }
 
-  return res as FeatureTokenResponse;
+  return res as AppTokenResponse;
 }
 
-export async function createAppFeatureVersion(
+export async function createAppVersion(
   apiKey: string,
   orgId: string,
+  productId: string,
   appId: string,
-  appFeatureId: string,
-): Promise<AppFeatureVersion> {
+): Promise<AppVersion> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(
-    `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({}),
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/versions`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({}),
+  });
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({}))) as {
@@ -493,32 +499,32 @@ export async function createAppFeatureVersion(
 
     logger.error({
       msg: "API request failed",
-      endpoint: `/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions`,
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps/${appId}/versions`,
       status: response.status,
       statusText: response.statusText,
       errorBody,
-      url: `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions`,
+      url,
       timestamp: new Date().toISOString(),
     });
 
     throw new Error(
-      `Failed to create feature version: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      `Failed to create app version: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
     );
   }
 
   const res = await response.json();
 
-  return res as AppFeatureVersion;
+  return res as AppVersion;
 }
 
-export async function createApp(
+export async function createProduct(
   apiKey: string,
   orgId: string,
   title: string,
   sub?: string,
-): Promise<App> {
+): Promise<Product> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(`${baseUrl}/v1/orgs/${orgId}/apps`, {
+  const response = await fetch(`${baseUrl}/v1/orgs/${orgId}/products`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -535,11 +541,55 @@ export async function createApp(
 
     logger.error({
       msg: "API request failed",
-      endpoint: `/v1/orgs/${orgId}/apps`,
+      endpoint: `/v1/orgs/${orgId}/products`,
       status: response.status,
       statusText: response.statusText,
       errorBody,
-      url: `${baseUrl}/v1/orgs/${orgId}/apps`,
+      url: `${baseUrl}/v1/orgs/${orgId}/products`,
+      timestamp: new Date().toISOString(),
+    });
+
+    throw new Error(
+      `Failed to create product: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+
+  const res = await response.json();
+
+  return res as Product;
+}
+
+export async function createApp(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+  title: string,
+  sub: string,
+): Promise<App> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ title, path: "", sub }),
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      name?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps`,
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
       timestamp: new Date().toISOString(),
     });
 
@@ -553,78 +603,30 @@ export async function createApp(
   return res as App;
 }
 
-export async function createAppFeature(
-  apiKey: string,
-  orgId: string,
-  appId: string,
-  title: string,
-  sub: string,
-): Promise<AppFeature> {
-  const baseUrl = getBaseUrl();
-  const response = await fetch(
-    `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ title, path: "", sub }),
-    },
-  );
-
-  if (!response.ok) {
-    const errorBody = (await response.json().catch(() => ({}))) as {
-      message?: string;
-      name?: string;
-    };
-
-    logger.error({
-      msg: "API request failed",
-      endpoint: `/v1/orgs/${orgId}/apps/${appId}/features`,
-      status: response.status,
-      statusText: response.statusText,
-      errorBody,
-      url: `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features`,
-      timestamp: new Date().toISOString(),
-    });
-
-    throw new Error(
-      `Failed to create app feature: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
-    );
-  }
-
-  const res = await response.json();
-
-  return res as AppFeature;
-}
-
-export interface UpdateAppFeatureRequest {
+export interface UpdateAppRequest {
   title?: string;
-  accessPrincipals?: AppFeatureAccessPrincipal[];
-  permissions?: AppFeaturePermissions;
+  accessPrincipals?: AppAccessPrincipal[];
+  permissions?: AppPermissions;
   manifest?: Record<string, unknown>;
 }
 
-export async function updateAppFeature(
+export async function updateApp(
   apiKey: string,
   orgId: string,
+  productId: string,
   appId: string,
-  featureId: string,
-  updates: UpdateAppFeatureRequest,
-): Promise<AppFeature> {
+  updates: UpdateAppRequest,
+): Promise<App> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(
-    `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${featureId}`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(updates),
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}`;
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(updates),
+  });
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({}))) as {
@@ -634,45 +636,43 @@ export async function updateAppFeature(
 
     logger.error({
       msg: "API request failed",
-      endpoint: `/v1/orgs/${orgId}/apps/${appId}/features/${featureId}`,
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps/${appId}`,
       status: response.status,
       statusText: response.statusText,
       errorBody,
-      url: `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${featureId}`,
+      url,
       timestamp: new Date().toISOString(),
     });
 
     throw new Error(
-      `Failed to update app feature: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      `Failed to update app: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
     );
   }
 
   const res = await response.json();
 
-  return res as AppFeature;
+  return res as App;
 }
 
 export async function initUpload(
   apiKey: string,
   orgId: string,
+  productId: string,
   appId: string,
-  appFeatureId: string,
   versionId: string,
   files: string[],
   frontendHash?: string,
 ): Promise<InitUploadResponse> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(
-    `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions/${versionId}/init-upload`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(frontendHash ? { files, frontendHash } : { files }),
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/versions/${versionId}/init-upload`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(frontendHash ? { files, frontendHash } : { files }),
+  });
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({}))) as {
@@ -682,11 +682,11 @@ export async function initUpload(
 
     logger.error({
       msg: "API request failed",
-      endpoint: `/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions/${versionId}/init-upload`,
+      endpoint: url,
       status: response.status,
       statusText: response.statusText,
       errorBody,
-      url: `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions/${versionId}/init-upload`,
+      url,
       timestamp: new Date().toISOString(),
     });
 
@@ -773,7 +773,7 @@ export async function fetchDashboardInfo(
     });
 
     throw new Error(
-      `Failed to fetch app features: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      `Failed to fetch dashboard info: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
     );
   }
 
@@ -807,12 +807,12 @@ export async function fetchDatabaseInfo(
       status: response.status,
       statusText: response.statusText,
       errorBody,
-      url: `${baseUrl}/v1/dashboards/${databaseId}`,
+      url: `${baseUrl}/v1/databases/${databaseId}`,
       timestamp: new Date().toISOString(),
     });
 
     throw new Error(
-      `Failed to fetch app features: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      `Failed to fetch database info: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
     );
   }
 
@@ -834,9 +834,9 @@ export interface InitSourceUploadResponse {
 export interface Deploy {
   id: string;
   orgId: string;
+  productId: string;
   appId: string;
-  appFeatureId: string;
-  appFeatureVersionId: string;
+  appVersionId: string;
   status: DeployStatus;
   log?: string;
   createdAt: number;
@@ -847,8 +847,8 @@ export interface ActiveVersionResponse {
   id?: number;
   globalId?: string;
   orgId?: string;
+  productId?: string;
   appId?: string;
-  appFeatureId?: string;
   userId?: number;
   deployFqdn?: string;
   s3Path?: string;
@@ -861,11 +861,11 @@ export interface ActiveVersionResponse {
 export async function getActiveVersion(
   apiKey: string,
   orgId: string,
+  productId: string,
   appId: string,
-  appFeatureId: string,
 ): Promise<ActiveVersionResponse> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/active-version`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/active-version`;
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -899,13 +899,13 @@ export async function getActiveVersion(
 export async function initSourceUpload(
   apiKey: string,
   orgId: string,
+  productId: string,
   appId: string,
-  appFeatureId: string,
   versionId: string,
   backendHash?: string,
 ): Promise<InitSourceUploadResponse> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions/${versionId}/init-source-upload`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/versions/${versionId}/init-source-upload`;
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -944,11 +944,11 @@ export interface DeploySidecarDefinition {
   env?: Array<{ key: string; value: string }>;
   tier?: "small" | "medium" | "large";
   /**
-   * Whitelisted app feature secrets to inject as env vars into the sidecar
-   * container. Wire format is always-object — apps-cli normalizes string config
-   * entries (`"KEY"`) to `{from: "KEY", as: "KEY"}` at the deploy mapper
-   * boundary before sending. The static `env` overrides secret values on key
-   * conflict (resolved server-side in nimbus-ai).
+   * Whitelisted app secrets to inject as env vars into the sidecar container.
+   * Wire format is always-object — apps-cli normalizes string config entries
+   * (`"KEY"`) to `{from: "KEY", as: "KEY"}` at the deploy mapper boundary
+   * before sending. The static `env` overrides secret values on key conflict
+   * (resolved server-side in nimbus-ai).
    */
   secrets?: Array<{ from: string; as: string }>;
 }
@@ -964,14 +964,14 @@ export interface DeployJobDefinition {
 export async function createDeploy(
   apiKey: string,
   orgId: string,
+  productId: string,
   appId: string,
-  appFeatureId: string,
   versionId: string,
   jobs?: DeployJobDefinition[],
   sidecars?: DeploySidecarDefinition[],
 ): Promise<Deploy> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/versions/${versionId}/deploy`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/versions/${versionId}/deploy`;
 
   const body: Record<string, unknown> = { jobs: jobs ?? [] };
   if (sidecars && sidecars.length > 0) {
@@ -1015,7 +1015,7 @@ export async function getDeploy(
   deployId: string,
 ): Promise<Deploy> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/deploys/${deployId}`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/deploys/${deployId}/by-product`;
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -1053,7 +1053,7 @@ export async function copyBackendParams(
   sourceVersionId: string,
 ): Promise<void> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${targetVersionId}/copy-backend-params`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${targetVersionId}/copy-backend-params/by-product`;
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -1090,7 +1090,7 @@ export async function copyFrontendParams(
   sourceVersionId: string,
 ): Promise<void> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${targetVersionId}/copy-frontend-params`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${targetVersionId}/copy-frontend-params/by-product`;
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -1121,34 +1121,34 @@ export async function copyFrontendParams(
 }
 
 // ---------------------------------------------------------------------------
-// App Feature Secrets
+// App Secrets
 // ---------------------------------------------------------------------------
 
-export interface AppFeatureSecretInput {
+export interface AppSecretInput {
   key: string;
   value: string;
   description?: string;
 }
 
-export interface AppFeatureSecret {
+export interface AppSecret {
   key: string;
   value: string;
   description?: string;
 }
 
-export interface AppFeatureSecretsResponse {
-  secrets: AppFeatureSecret[];
+export interface AppSecretsResponse {
+  secrets: AppSecret[];
 }
 
-export async function setAppFeatureSecrets(
+export async function setAppSecrets(
   apiKey: string,
   orgId: string,
+  productId: string,
   appId: string,
-  appFeatureId: string,
-  secrets: AppFeatureSecretInput[],
-): Promise<AppFeatureSecretsResponse> {
+  secrets: AppSecretInput[],
+): Promise<AppSecretsResponse> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/secrets`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/secrets`;
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -1175,22 +1175,22 @@ export async function setAppFeatureSecrets(
     });
 
     throw new Error(
-      `Failed to set app feature secrets: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      `Failed to set app secrets: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
     );
   }
 
-  return (await response.json()) as AppFeatureSecretsResponse;
+  return (await response.json()) as AppSecretsResponse;
 }
 
-export async function fetchAppFeatureSecrets(
+export async function fetchAppSecrets(
   apiKey: string,
   orgId: string,
+  productId: string,
   appId: string,
-  appFeatureId: string,
-): Promise<AppFeatureSecretsResponse> {
+): Promise<AppSecretsResponse> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/features/${appFeatureId}/secrets`;
-  logger.info("Fetching secrets for feature %s", appFeatureId);
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/secrets`;
+  logger.info("Fetching secrets for app %s", appId);
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -1216,11 +1216,11 @@ export async function fetchAppFeatureSecrets(
     });
 
     throw new Error(
-      `Failed to fetch app feature secrets: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      `Failed to fetch app secrets: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
     );
   }
 
-  return (await response.json()) as AppFeatureSecretsResponse;
+  return (await response.json()) as AppSecretsResponse;
 }
 
 const MAX_API_ERROR_BODY_CHARS = 6000;
@@ -1480,7 +1480,7 @@ export interface BuildLogsResponse {
 
 /**
  * A single aggregated runtime log line. Emitted by Container Apps Console/System
- * log shipping; aggregated across the backend, sidecars, and jobs of a feature.
+ * log shipping; aggregated across the backend, sidecars, and jobs of an app.
  */
 export interface RuntimeLogEntry {
   /** ISO 8601 timestamp; empty string when the source line had no parseable timestamp. */
@@ -1503,17 +1503,17 @@ export interface RuntimeLogsResponse {
 }
 
 /**
- * Get build logs for an app feature (uses the latest deployed version).
+ * Get build logs for an app (uses the latest deployed version).
  */
-export async function getBuildLogsByFeature(
+export async function getBuildLogsByApp(
   apiKey: string,
   orgId: string,
-  featureId: string,
+  appId: string,
 ): Promise<BuildLogsResponse> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/features/${featureId}/build-logs`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/build-logs`;
 
-  logger.debug("Fetching build logs for feature %s", featureId);
+  logger.debug("Fetching build logs for app %s", appId);
 
   const response = await fetch(url, {
     method: "GET",
@@ -1530,7 +1530,7 @@ export async function getBuildLogsByFeature(
 
     logger.error({
       msg: "API request failed",
-      endpoint: "getBuildLogsByFeature",
+      endpoint: "getBuildLogsByApp",
       status: response.status,
       statusText: response.statusText,
       errorBody,
@@ -1546,7 +1546,7 @@ export async function getBuildLogsByFeature(
 }
 
 /**
- * Get build logs for a specific app feature version.
+ * Get build logs for a specific app version.
  */
 export async function getBuildLogsByVersion(
   apiKey: string,
@@ -1554,7 +1554,7 @@ export async function getBuildLogsByVersion(
   versionId: string,
 ): Promise<BuildLogsResponse> {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${versionId}/build-logs`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${versionId}/build-logs/by-product`;
 
   logger.debug("Fetching build logs for version %s", versionId);
 
@@ -1598,12 +1598,12 @@ export interface GetRuntimeLogsOptions {
 }
 
 /**
- * Get runtime logs for an app feature from Azure Container Apps.
+ * Get runtime logs for an app from Azure Container Apps.
  */
-export async function getRuntimeLogsByFeature(
+export async function getRuntimeLogsByApp(
   apiKey: string,
   orgId: string,
-  featureId: string,
+  appId: string,
   options?: GetRuntimeLogsOptions,
 ): Promise<RuntimeLogsResponse> {
   const baseUrl = getBaseUrl();
@@ -1614,9 +1614,9 @@ export async function getRuntimeLogsByFeature(
   if (options?.to) params.set("to", options.to);
 
   const queryString = params.toString();
-  const url = `${baseUrl}/v1/orgs/${orgId}/features/${featureId}/runtime-logs${queryString ? `?${queryString}` : ""}`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/runtime-logs${queryString ? `?${queryString}` : ""}`;
 
-  logger.debug("Fetching runtime logs for feature %s", featureId);
+  logger.debug("Fetching runtime logs for app %s", appId);
 
   const response = await fetch(url, {
     method: "GET",
@@ -1633,7 +1633,7 @@ export async function getRuntimeLogsByFeature(
 
     logger.error({
       msg: "API request failed",
-      endpoint: "getRuntimeLogsByFeature",
+      endpoint: "getRuntimeLogsByApp",
       status: response.status,
       statusText: response.statusText,
       errorBody,
@@ -1649,7 +1649,7 @@ export async function getRuntimeLogsByFeature(
 }
 
 /**
- * Get runtime logs for a specific app feature version from Azure Container Apps.
+ * Get runtime logs for a specific app version from Azure Container Apps.
  */
 export async function getRuntimeLogsByVersion(
   apiKey: string,
@@ -1665,7 +1665,7 @@ export async function getRuntimeLogsByVersion(
   if (options?.to) params.set("to", options.to);
 
   const queryString = params.toString();
-  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${versionId}/runtime-logs${queryString ? `?${queryString}` : ""}`;
+  const url = `${baseUrl}/v1/orgs/${orgId}/versions/${versionId}/runtime-logs/by-product${queryString ? `?${queryString}` : ""}`;
 
   logger.debug("Fetching runtime logs for version %s", versionId);
 
@@ -1742,25 +1742,22 @@ export async function sendCommandLog(
   }
 }
 
-
 export async function sendCodingStats(
   apiKey: string,
   orgId: string,
-  appId: string,
-  body: { codingAgent?: string; model?: string; appFeatureId?: string },
+  productId: string,
+  body: { codingAgent?: string; model?: string; appId?: string },
 ): Promise<void> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(
-    `${baseUrl}/v1/orgs/${orgId}/apps/${appId}/coding-stats`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/coding-stats`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(body),
+  });
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => ({}))) as {
@@ -1769,7 +1766,7 @@ export async function sendCodingStats(
 
     logger.error({
       msg: "Failed to send coding stats",
-      endpoint: `/v1/orgs/${orgId}/apps/${appId}/coding-stats`,
+      endpoint: url,
       status: response.status,
       statusText: response.statusText,
       errorBody,

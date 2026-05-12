@@ -8,7 +8,7 @@ Add a single command that safely refreshes a Fusebase app project in one run:
 2. Regenerate MCP tokens (`.env`) and refresh IDE MCP configs.
 3. Update CLI-managed SDK dependencies from `project-template/package.json` in:
    - app root `package.json`
-   - feature-level `package.json` files (from `fusebase.json.features[].path`)
+   - app-level `package.json` files (from `fusebase.json.apps[].path`)
 4. Run package manager install where dependency changes were applied.
 5. Offer a pre-update commit when project is a Git repo and working tree is dirty.
 
@@ -37,7 +37,7 @@ Running `fusebase app update` with no flags performs all update stages in this o
 2. Pre-update Git commit prompt (when applicable).
 3. Skills/agents refresh.
 4. MCP token refresh + IDE config refresh.
-5. Managed dependency refresh in root + feature package manifests.
+5. Managed dependency refresh in root + app package manifests.
 6. `npm install` in each changed package location.
 7. Summary output with changed files/paths.
 
@@ -65,7 +65,7 @@ Default values:
 
 Optional (phase 2):
 
-- `--features-only` - update only feature package manifests.
+- `--apps-only` - update only app package manifests.
 - `--root-only` - update only root package manifest.
 
 ---
@@ -78,7 +78,7 @@ Optional (phase 2):
 - Load global config (`~/.fusebase/config.json`) and app config (`fusebase.json`).
 - If MCP stage is enabled:
   - require `apiKey` in global config
-  - require `orgId` and `appId` in `fusebase.json`
+  - require `orgId` and `productId` in `fusebase.json`
 
 Failure policy:
 
@@ -181,7 +181,7 @@ These are the minimum managed dependencies for phase 1.
 Collect package manifests:
 
 1. Root: `<cwd>/package.json` (if exists).
-2. Features: for each `features[].path` from `fusebase.json`, include `<cwd>/<feature.path>/package.json` if exists.
+2. Apps: for each `apps[].path` from `fusebase.json`, include `<cwd>/<app.path>/package.json` if exists.
 
 ### 5.3 Merge algorithm (non-destructive)
 
@@ -192,7 +192,7 @@ For each target `package.json`:
   - if present with different version -> update version only
   - if missing:
     - root `package.json`: add dependency with template version
-    - feature `package.json`: do not add (only update if already present)
+    - app `package.json`: do not add (only update if already present)
 - Preserve all other keys unchanged:
   - scripts
   - devDependencies
@@ -225,7 +225,7 @@ Final summary should include:
 - files updated by skills stage
 - `.env` create/update status
 - IDE targets refreshed
-- manifests changed (root + feature paths)
+- manifests changed (root + app paths)
 - install results per location
 - pre-update commit SHA (if created)
 
@@ -263,8 +263,8 @@ Existing code to reuse directly:
 - Add command and full default flow.
 - Manage only two Fusebase SDK dependencies.
 - Read managed dependency allowlist from `project-template/package.json` metadata (`fusebaseCli.managedDependencies`).
-- Root + feature manifests update.
-- In features, update managed deps only when already present (no auto-add).
+- Root + app manifests update.
+- In apps, update managed deps only when already present (no auto-add).
 - Install only where managed deps changed.
 - Pre-update commit prompt.
 - MCP refresh trigger by Dashboards + Gate **permission policy fingerprints** (not SDK semver).
@@ -272,7 +272,7 @@ Existing code to reuse directly:
 
 ## Phase 2
 
-- Add richer targeting flags (`--features-only`, `--root-only`).
+- Add richer targeting flags (`--apps-only`, `--root-only`).
 - Add `--json` machine-readable output for CI.
 - Add optional backup file snapshot mode for non-git projects.
 - Optional: add explicit `MCP_POLICY_SCHEMA_VERSION` bumps in UI/docs when expanding permission sets beyond fingerprint drift.
@@ -284,7 +284,7 @@ Existing code to reuse directly:
 1. **User dependency conflicts**
    - Mitigation: update only managed dependency keys, never replace full manifest.
 
-2. **Install failures in some features**
+2. **Install failures in some apps**
    - Mitigation: isolate installs per directory and aggregate failure report.
 
 3. **Unexpected git behavior in non-interactive contexts**
@@ -302,7 +302,7 @@ Minimum automated coverage:
 1. Dirty git repo + accepted commit -> commit created before file changes.
 2. Dirty git repo + declined commit -> command continues safely.
 3. Managed deps are updated without deleting user deps/scripts.
-4. Root + multiple features: only existing `package.json` files are touched.
+4. Root + multiple apps: only existing `package.json` files are touched.
 5. `.env` merge preserves non-MCP variables.
 6. IDE configs refresh with force mode.
 7. `--skip-*` flags correctly gate stages.

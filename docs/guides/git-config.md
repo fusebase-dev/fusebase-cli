@@ -168,7 +168,7 @@ Default GitLab repo naming:
   2. current folder name,
   3. app subdomain.
 
-Example: `app-my-feature-dev`.
+Example: `app-my-app-dev`.
 
 ## 5) Common Troubleshooting
 

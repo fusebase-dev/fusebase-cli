@@ -1,8 +1,8 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import {
-  getBuildLogsByFeature,
-  getRuntimeLogsByFeature,
+  getBuildLogsByApp,
+  getRuntimeLogsByApp,
   type RuntimeLogEntry,
   type RuntimeLogType,
 } from "../api";
@@ -145,7 +145,7 @@ const buildCommand = new Command("build")
         `\n📋 Fetching build logs for feature: ${chalk.cyan(featureId)}`,
       );
 
-      const response = await getBuildLogsByFeature(apiKey, orgId, featureId);
+      const response = await getBuildLogsByApp(apiKey, orgId, featureId);
 
       printBuildLogs(response.log, response.status);
 
@@ -224,7 +224,7 @@ runtimeCommand.action(async (featureId: string, options) => {
       `\n📋 Fetching runtime logs for feature: ${chalk.cyan(featureId)}`,
     );
 
-    const response = await getRuntimeLogsByFeature(apiKey, orgId, featureId, {
+    const response = await getRuntimeLogsByApp(apiKey, orgId, featureId, {
       tail,
       type,
       from,

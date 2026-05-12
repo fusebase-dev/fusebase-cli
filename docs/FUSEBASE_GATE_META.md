@@ -1,8 +1,8 @@
 # Fusebase Gate meta (`fusebaseGateMeta`)
 
-This document describes how the CLI records **which Fusebase Gate SDK operations** your app uses and **which permission strings** the public API maps them to. The result is stored in the project’s **`fusebase.json`** under each feature’s **`fusebaseGateMeta`**.
+This document describes how the CLI records **which Fusebase Gate SDK operations** your app uses and **which permission strings** the public API maps them to. The result is stored in the project’s **`fusebase.json`** under each app’s **`fusebaseGateMeta`**.
 
-For the full feature permission model, including `dashboardView`, `database`, `gate`, and `feature update --sync-gate-permissions`, see [PERMISSIONS.md](PERMISSIONS.md).
+For the full app permission model, including `dashboardView`, `database`, `gate`, and `app update --sync-gate-permissions`, see [PERMISSIONS.md](PERMISSIONS.md).
 
 ## Purpose
 
@@ -26,7 +26,7 @@ Options:
 |--------|---------|--------|
 | `--operations` | `true` | Run the Gate SDK scan (only mode implemented today). |
 | `--json` | off | Print machine-readable JSON (includes `fusebaseGateMeta` fields when saved). |
-| `--feature <featureId>` | off | Analyze only one feature; otherwise analyze all configured features with `path`. |
+| `--feature <featureId>` | off | Analyze only one app; otherwise analyze all configured apps with `path`. |
 
 **Requirements**: `fusebase.json` in the project root (from `fusebase init`), `@fusebase/fusebase-gate-sdk` in `node_modules`, and a valid `tsconfig.json` that includes your app sources.
 
@@ -36,7 +36,7 @@ Options:
 
 1. **Allowlist** — Reads operation ids from the installed SDK (`node_modules/@fusebase/fusebase-gate-sdk/dist/apis/*.js`, `opId: "..."`).
 2. **TypeScript usage** — Builds a program from your `tsconfig`, walks source files (excluding `node_modules` and `.d.ts`), and records **method names** called on values typed as **`OrgUsersApi` | `TokensApi` | `HealthApi` | `SystemApi`**.
-3. **Snapshot** — Writes sorted **`usedOps`**, **`sdkVersion`**, and timestamps into the current feature’s **`fusebaseGateMeta`**.
+3. **Snapshot** — Writes sorted **`usedOps`**, **`sdkVersion`**, and timestamps into the current app’s **`fusebaseGateMeta`**.
 4. **Resolve permissions** (conditional) — If this run **changed** the `usedOps` set compared to the previous snapshot, calls **`resolveGateOperationPermissions`** with the current `usedOps` and merges the returned **`permissions`** array into the snapshot.
 
 Implementation lives in:
@@ -53,10 +53,10 @@ Current canonical location:
 
 ```json
 {
-  "features": [
+  "apps": [
     {
-      "id": "feature-id",
-      "path": "features/my-feature",
+      "id": "app-id",
+      "path": "apps/my-app",
       "fusebaseGateMeta": {
         "usedOps": ["listTokens"],
         "permissions": ["token.read"]

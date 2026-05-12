@@ -5,7 +5,7 @@ import { hasFlag } from "./config";
 /** Bump when fingerprint inputs change so old .env values force refresh once. */
 export const MCP_POLICY_SCHEMA_VERSION = 4 as const;
 
-/** Written to `.env` after token refresh — sole source of truth for policy drift checks (`fusebase app update`, `fusebase env create`). */
+/** Written to `.env` after token refresh — sole source of truth for policy drift checks (`fusebase product update`, `fusebase env create`). */
 export const DASHBOARDS_MCP_POLICY_FP_KEY = "DASHBOARDS_MCP_POLICY_FP";
 export const GATE_MCP_POLICY_FP_KEY = "GATE_MCP_POLICY_FP";
 

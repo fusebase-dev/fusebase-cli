@@ -1,19 +1,19 @@
 ---
 name: fusebase-cli
-description: "Complete guide for using the Fusebase CLI (fusebase) tool to initialize, develop, and deploy Fusebase Apps features. Use when: 1. Initializing new Fusebase Apps projects, 2. Creating or configuring features, 3. Running features locally or deploying them 4. Setting up feature permissions for dashboards."
+description: "Complete guide for using the Fusebase CLI (fusebase) tool to initialize, develop, and deploy Fusebase Apps apps. Use when: 1. Initializing new Fusebase Apps projects, 2. Creating or configuring apps, 3. Running apps locally or deploying them 4. Setting up app permissions for dashboards."
 ---
 
 # Fusebase CLI (fusebase)
 
-This skill describes how to use the Fusebase CLI tool to manage and deploy Fusebase Apps features.
+This skill describes how to use the Fusebase CLI tool to manage and deploy Fusebase Apps apps.
 
 ## Overview
 
 The Fusebase CLI (`fusebase`) is a command-line tool for:
 
 - Initializing new Fusebase Apps projects
-- Managing feature development with hot reload
-- Deploying features to the Fusebase platform
+- Managing app development with hot reload
+- Deploying apps to the Fusebase platform
 
 ## Installation & Authentication
 
@@ -29,13 +29,13 @@ This stores credentials in `~/.fusebase/config.json`.
 
 ## Project Configuration (fusebase.json)
 
-Every Fusebase Apps project requires a `fusebase.json` file in the project root. This file defines the app and its features.
+Every Fusebase Apps project requires a `fusebase.json` file in the project root. This file defines the app and its apps.
 
 For details on the `fusebase.json` schema, see references/fusebase-json-schema.md.
 
-## Feature Permissions
+## App Permissions
 
-Features can have permissions that define which dashboard views they can access. This is **required** when creating features that interact with specific dashboards.
+Apps can have permissions that define which dashboard views they can access. This is **required** when creating apps that interact with specific dashboards.
 
 ### Permission Format
 
@@ -54,27 +54,27 @@ Where:
 
 ### Setting Permissions
 
-**Always set permissions during feature creation** using `--permissions`. This is the correct time — do not skip it and do `feature update` later.
+**Always set permissions during app creation** using `--permissions`. This is the correct time — do not skip it and do `app update` later.
 
 ```bash
-fusebase feature create --name="Sales Report" --subdomain=sales-report --path=features/sales-report --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write"
+fusebase app create --name="Sales Report" --subdomain=sales-report --path=apps/sales-report --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write"
 ```
 
-**Only use `feature update` when changing existing permissions** (e.g. adding a new view, changing privileges):
+**Only use `app update` when changing existing permissions** (e.g. adding a new view, changing privileges):
 
 ```bash
-fusebase feature update <featureId> --permissions="dashboardView.dash123:view456.read;dashboardView.dash789:viewABC.read,write"
+fusebase app update <appId> --permissions="dashboardView.dash123:view456.read;dashboardView.dash789:viewABC.read,write"
 ```
 
-### When to Use `feature update` for Permissions
+### When to Use `app update` for Permissions
 
-Only use `feature update --permissions` when:
+Only use `app update --permissions` when:
 
-- Feature already exists and needs access to **additional** dashboard views
-- Changing from read-only to read-write (or vice versa) on an existing feature
-- Restricting access to fewer views on an existing feature
+- App already exists and needs access to **additional** dashboard views
+- Changing from read-only to read-write (or vice versa) on an existing app
+- Restricting access to fewer views on an existing app
 
-**Do NOT** use `feature update` to set permissions that should have been set at creation time.
+**Do NOT** use `app update` to set permissions that should have been set at creation time.
 
 ## CLI Commands
 
@@ -104,10 +104,9 @@ Options:
 - Global flag `git-init` also enables the same post-init Git offer automatically (`fusebase config set-flag git-init`)
 - Global flag `git-debug-commits` enables strict debug/deploy traceability section in the `git-workflow` skill (deploy preflight, commit-per-fix, SHA/tag references)
 - Global flag `app-business-docs` includes the `app-business-docs` skill (English `docs/en/business-logic.md` maintenance)
-- Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; FuseBase PostgreSQL Database emphasis)
-- FuseBase PostgreSQL Database guidance and `isolated_store.*` Gate permissions are included by default in generated apps; no dedicated flag is required
-- Global flag `legacy-dashboards-db` exposes dashboard DB management guidance in generated app templates/skills and enables dashboard-service write/create permissions in MCP tokens
-- Global flag `portal-specific-features` includes portal-specific prompts/guidance (`fusebase-portal-specific-features` skill, `{{CurrentPortal}}` filter references, and `/auth/context` portal runtime context notes)
+- Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; isolated stores emphasis)
+- Global flag `isolated-stores` enables isolated stores functionality (SQL/NoSQL), including required Fusebase Gate references and `isolated_store.*` permissions in `fusebase env create`
+- Global flag `portal-specific-apps` includes portal-specific prompts/guidance (`fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` filter references, and `/auth/context` portal runtime context notes)
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 
@@ -172,19 +171,19 @@ Use `fusebase init --git` to run the same flow automatically after app setup.
 fusebase dev start [FEATURE_ID_OR_PATH]
 ```
 
-FEATURE_ID_OR_PATH - id of the feature of relative path to it, for example if a feature is in `features/my-feature`, you can pass `my-feature` or `features/my-feature`.
+FEATURE_ID_OR_PATH - id of the app of relative path to it, for example if an app is in `apps/my-app`, you can pass `my-app` or `apps/my-app`.
 
 Starts the development environment:
 
-- **UI Server (port 4173)**: Displays features in iframes for testing
+- **UI Server (port 4173)**: Displays apps in iframes for testing
 - **API Proxy (port 4174)**: Proxies API requests with authentication
 
 The dev server automatically:
 
 - Injects your API credentials
-- Delivers feature tokens to iframes via `postMessage`
-- Refreshes tokens when features are selected
-- Creates per-session debug logs under the selected feature directory's `logs/dev-<timestamp>/`:
+- Delivers app tokens to iframes via `postMessage`
+- Refreshes tokens when apps are selected
+- Creates per-session debug logs under the selected app directory's `logs/dev-<timestamp>/`:
   - `browser-logs.jsonl`
   - `access-logs.jsonl`
   - `backend-logs.jsonl`
@@ -192,19 +191,19 @@ The dev server automatically:
 
 When debugging local runtime issues after starting the dev server, load skill **dev-debug-logs**. It explains which file to inspect for browser errors, proxied API traffic, frontend dev server output, and backend output.
 
-#### Create and Configure Feature
+#### Create and Configure App
 
 ```bash
-fusebase feature create --name <name> --subdomain <subdomain> --path <path> --dev-command <command> --build-command <command> --output-dir <dir> [options]
+fusebase app create --name <name> --subdomain <subdomain> --path <path> --dev-command <command> --build-command <command> --output-dir <dir> [options]
 ```
 
-This command **always creates a new feature** on Fusebase servers and configures its development parameters. All six core options are required.
+This command **always creates a new app** on Fusebase servers and configures its development parameters. All six core options are required.
 
 **Required Options:**
 
-- `--name <name>` - Name for the new feature
-- `--subdomain <subdomain>` - Subdomain for the feature (e.g., `my-feature`); the feature is served from the root of this subdomain
-- `--path <path>` - Relative path to the feature directory (e.g., `features/my-feature`)
+- `--name <name>` - Name for the new app
+- `--subdomain <subdomain>` - Subdomain for the app (e.g., `my-app`); the app is served from the root of this subdomain
+- `--path <path>` - Relative path to the app directory (e.g., `apps/my-app`)
 - `--dev-command <command>` - Dev server command (e.g., `npm run dev`)
 - `--build-command <command>` - Build command (e.g., `npm run build`)
 - `--output-dir <dir>` - Build output directory (e.g., `dist`)
@@ -213,9 +212,9 @@ This command **always creates a new feature** on Fusebase servers and configures
 
 - `--access <principals>` - Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`, `visitor,orgRole:guest`)
 - `--permissions <permissions>` - Set dashboard view permissions (format: `dashboardView.dashboardId:viewId.read,write;...`)
-- `--backend-dev-command <command>` - Backend dev command (e.g., `npm run dev`). Only if the feature has a `backend/` folder.
-- `--backend-build-command <command>` - Backend build command (e.g., `npm run build`). Only if the feature has a `backend/` folder.
-- `--backend-start-command <command>` - Backend start command for production (e.g., `npm run start`). Only if the feature has a `backend/` folder.
+- `--backend-dev-command <command>` - Backend dev command (e.g., `npm run dev`). Only if the app has a `backend/` folder.
+- `--backend-build-command <command>` - Backend build command (e.g., `npm run build`). Only if the app has a `backend/` folder.
+- `--backend-start-command <command>` - Backend start command for production (e.g., `npm run start`). Only if the app has a `backend/` folder.
 <% if (it.analytics) { %>
 - `--coding-agent <name>` - Coding agent identifier (e.g. `claude_code`, `cursor`, `copilot`, `codex`).  Populate this field with your name.
 - `--model <name>` - Model identifier (e.g. `claude-opus-4-6`, `gpt-5`). Populate this field with the model name currently used.
@@ -224,29 +223,29 @@ This command **always creates a new feature** on Fusebase servers and configures
 **Examples:**
 
 ```bash
-# Create a feature
-fusebase feature create --name="Dashboard Widget" --subdomain=dashboard-widget --path=features/dashboard --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist
+# Create an app
+fusebase app create --name="Dashboard Widget" --subdomain=dashboard-widget --path=apps/dashboard --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist
 
-# Create feature with permissions for specific dashboard views
-fusebase feature create --name="Sales Report" --subdomain=sales-report --path=features/sales-report --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write;dashboardView.dash789:viewABC.read"
+# Create app with permissions for specific dashboard views
+fusebase app create --name="Sales Report" --subdomain=sales-report --path=apps/sales-report --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write;dashboardView.dash789:viewABC.read"
 
-# Create feature with a backend
-fusebase feature create --name="My App" --subdomain=my-app --path=features/my-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --backend-dev-command="npm run dev" --backend-build-command="npm run build" --backend-start-command="npm run start"
+# Create app with a backend
+fusebase app create --name="My App" --subdomain=my-app --path=apps/my-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --backend-dev-command="npm run dev" --backend-build-command="npm run build" --backend-start-command="npm run start"
 ```
 
-### Update Feature Settings
+### Update App Settings
 
 ```bash
-fusebase feature update <featureId> [options]
+fusebase app update <appId> [options]
 ```
 
-Update settings for an existing feature.
+Update settings for an existing app.
 
 **Options:**
 
 - `--access <principals>` - Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`, `visitor,orgRole:guest`)
 - `--permissions <permissions>` - Set dashboard view permissions (format: `dashboardView.dashboardId:viewId.read,write;...`)
-- `--sync-gate-permissions` - Analyze Gate SDK calls in the feature's runtime code and sync the detected operations as Gate permissions on the feature. Required before a feature that uses `@fusebase/fusebase-gate-sdk` can be considered fully published.
+- `--sync-gate-permissions` - Analyze Gate SDK calls in the app's runtime code and sync the detected operations as Gate permissions on the app. Required before an app that uses `@fusebase/fusebase-gate-sdk` can be considered fully published.
 
 **Access Principals:**
 
@@ -258,7 +257,7 @@ The `--access` option replaces the entire access principal list. Principals are 
 | `orgRole:<id>` | `orgRole:member` | Org members with the given role. Valid ids: `guest`, `client`, `member`, `manager`, `owner`. |
 
 **Permissions:**
-The `--permissions` option specifies which dashboard views the feature can access and with what privileges.
+The `--permissions` option specifies which dashboard views the app can access and with what privileges.
 
 Format: `dashboardView.dashboardId:viewId.privileges` separated by semicolons for multiple views.
 
@@ -270,29 +269,29 @@ Format: `dashboardView.dashboardId:viewId.privileges` separated by semicolons fo
 **Examples:**
 
 ```bash
-# Make a feature publicly accessible (visitor = any unauthenticated user)
-fusebase feature update аgjg851jguanadi41 --access=visitor
+# Make an app publicly accessible (visitor = any unauthenticated user)
+fusebase app update аgjg851jguanadi41 --access=visitor
 
 # Allow org members only
-fusebase feature update аgjg851jguanadi41 --access=orgRole:member
+fusebase app update аgjg851jguanadi41 --access=orgRole:member
 
 # Allow multiple roles
-fusebase feature update аgjg851jguanadi41 --access=orgRole:member,orgRole:client
+fusebase app update аgjg851jguanadi41 --access=orgRole:member,orgRole:client
 
 # Public + org members
-fusebase feature update аgjg851jguanadi41 --access=visitor,orgRole:member
+fusebase app update аgjg851jguanadi41 --access=visitor,orgRole:member
 
 # Remove all access principals (pass empty string), it will allow access for every role in organization, but not for visitors
-fusebase feature update аgjg851jguanadi41 --access=""
+fusebase app update аgjg851jguanadi41 --access=""
 
 # Grant read access to a single dashboard view
-fusebase feature update аgjg851jguanadi41 --permissions="dashboardView.dashABC:view123.read"
+fusebase app update аgjg851jguanadi41 --permissions="dashboardView.dashABC:view123.read"
 
 # Grant read/write access to multiple views
-fusebase feature update аgjg851jguanadi41 --permissions="dashboardView.dash1:view1.read,write;dashboardView.dash2:view2.read"
+fusebase app update аgjg851jguanadi41 --permissions="dashboardView.dash1:view1.read,write;dashboardView.dash2:view2.read"
 
 # Update both access and permissions
-fusebase feature update аgjg851jguanadi41 --access=visitor --permissions="dashboardView.dash1:view1.read"
+fusebase app update аgjg851jguanadi41 --access=visitor --permissions="dashboardView.dash1:view1.read"
 ```
 
 ### Smart update (`fusebase update`)
@@ -305,7 +304,7 @@ Single update command for both CLI and app:
 
 - in app directory (`fusebase.json` exists): runs CLI self-update first (skip with `--skip-cli-update`; local linked/source mode auto-skips), then refreshes agent assets (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`), then runs selective MCP token refresh + IDE MCP config refresh, then syncs managed SDK deps and runs targeted `npm install`;
 - outside app directory: runs only CLI self-update;
-- use `--skip-app` to force CLI-only mode even inside an app directory.
+- use `--skip-product` to force CLI-only mode even inside an app directory.
 
 ### Create or update .env (MCP token)
 
@@ -341,17 +340,17 @@ fusebase integrations remove <name>    # or: delete
 
 During `fusebase init`, only **required** MCP servers (per the catalog, respecting flags) are written to IDE configs; run `fusebase integrations` afterward to add optional servers.
 
-### Create Feature Secrets
+### Create App Secrets
 
 ```bash
 fusebase secret create --feature <featureId> --secret <KEY:description> [--secret ...]
 ```
 
-Creates secrets (with empty values) for an app feature and prints the URL where you can set the actual values.
+Creates secrets (with empty values) for an app and prints the URL where you can set the actual values.
 
 **Required Options:**
 
-- `--feature <featureId>` - Feature ID to create secrets for
+- `--feature <featureId>` - App ID to create secrets for
 - `--secret <KEY:description>` - Secret to create. Format: `KEY` or `KEY:description`. **Repeatable** — pass multiple `--secret` flags to create several secrets at once.
 
 **Examples:**
@@ -367,11 +366,11 @@ fusebase secret create --feature abc123 \
   --secret "WEBHOOK_SECRET"
 ```
 
-After creating the secrets, the CLI prints `https://{org-domain}/dashboard/{orgId}/apps/features/{featureId}/secrets` — open that URL to fill in the actual secret values.
+After creating the secrets, the CLI prints `https://{org-domain}/dashboard/{orgId}/apps/apps/{appId}/secrets` — open that URL to fill in the actual secret values.
 
-### Scaffold a Feature
+### Scaffold an App
 
-Scaffold a new feature from a built-in template.
+Scaffold a new app from a built-in template.
 
 ```bash
 # List available templates (with descriptions)
@@ -392,15 +391,15 @@ Available templates:
 - Errors if any files in the target directory would be overwritten (no partial writes).
 - The `backend` template can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
 
-Then implement the feature. **After the code is complete**, register and start dev — **execute these automatically, do NOT list them as "next steps" for the user**:
+Then implement the app. **After the code is complete**, register and start dev — **execute these automatically, do NOT list them as "next steps" for the user**:
 
 ```bash
-# Register the feature (derive name/subdomain from context)
+# Register the app (derive name/subdomain from context)
 # add --permissions if dashboard access is needed
-fusebase feature create \
-  --name="<Feature Name>" \
-  --subdomain=<feature-sub> \
-  --path=features/<name> \
+fusebase app create \
+  --name="<App Name>" \
+  --subdomain=<app-sub> \
+  --path=apps/<name> \
   --dev-command="npm run dev" \
   --build-command="npm run build" \
   --output-dir=dist<% if (it.analytics) { %> \
@@ -408,33 +407,30 @@ fusebase feature create \
   --model=<model><% } %>
 
 # Start the dev server
-fusebase dev start features/<name>
+fusebase dev start apps/<name>
 ```
 
-### Deploy Features
+### Deploy Apps
 
 ```bash
 fusebase deploy
-fusebase deploy --force   # re-upload + redeploy every feature regardless of hashes
 ```
 
-Deploys all features to Fusebase:
+Deploys all apps to Fusebase:
 
-1. Installs dependencies and runs lint for each feature (if the feature has a `lint` script in `package.json`)
-2. Runs each feature's build command
+1. Installs dependencies and runs lint for each app (if the app has a `lint` script in `package.json`)
+2. Runs each app's build command
 3. Uploads the built files from `outputDir`
 4. Activates the new version on Fusebase
 
-A regular `fusebase deploy` (no `--force`) also auto-redeploys when only `fusebase.json`'s `backend` block or the registered secret-key list changed — for example a cron-schedule edit, a sidecar add/remove under `backend.sidecars[*]` or `backend.jobs[*].sidecars[*]`, or `fusebase secret create` adding a new key. Editing a secret **value** out-of-band (via the URL printed by `fusebase secret create`) does **not** change the key list and still requires `--force`.
-
-The project template includes ESLint (`npm run lint`) and root `npm run typecheck` (TypeScript across features — catches errors ESLint does not). Run both before saying "Done" so deploy succeeds; see AGENTS.md "Final Gate". Claude Code runs lint and typecheck on Stop via `.claude/settings.json` hooks.
+The project template includes ESLint (`npm run lint`) and root `npm run typecheck` (TypeScript across apps — catches errors ESLint does not). Run both before saying "Done" so deploy succeeds; see AGENTS.md "Final Gate". Claude Code runs lint and typecheck on Stop via `.claude/settings.json` hooks.
 
 ### Manage Sidecar Containers
 
-Sidecar containers are pre-built Docker images deployed alongside a feature's backend container, sharing the localhost network namespace. Max 3 sidecars per feature.
+Sidecar containers are pre-built Docker images deployed alongside an app's backend container, sharing the localhost network namespace. Max 3 sidecars per app.
 
 ```bash
-# Add a sidecar to a feature backend
+# Add a sidecar to an app backend
 fusebase sidecar add \
   --feature <featureId> \
   --name <name> \
@@ -452,18 +448,18 @@ fusebase sidecar list --feature <featureId>
 ```
 
 **Options for `sidecar add`:**
-- `--name` — unique name within the feature (used for log filtering and identification)
+- `--name` — unique name within the app (used for log filtering and identification)
 - `--image` — Docker image reference (e.g. `browserless/chrome:latest`)
 - `--port` — port the sidecar listens on (accessible via localhost from the backend)
 - `--tier` — resource tier: `small` (default), `medium`, or `large`
 - `--env` — environment variables as KEY=VALUE pairs (repeatable)
-- `--secret` — whitelist an app feature secret key (registered via `fusebase secret create`) to inject into the sidecar as an env var, repeatable. Use `KEY` to expose the secret under its own name, or `KEY:ALIAS` to rename it inside the sidecar. On collision between sidecar `env` and a whitelisted secret key, the sidecar's static `env` value wins. Deploy fails with a `ValidationError` listing every missing key if a referenced secret is not registered for the feature. See the **feature-sidecar** skill ("Whitelisting Secrets") for details.
+- `--secret` — whitelist an app secret key (registered via `fusebase secret create`) to inject into the sidecar as an env var, repeatable. Use `KEY` to expose the secret under its own name, or `KEY:ALIAS` to rename it inside the sidecar. On collision between sidecar `env` and a whitelisted secret key, the sidecar's static `env` value wins. Deploy fails with a `ValidationError` listing every missing key if a referenced secret is not registered for the app. See the **app-sidecar** skill ("Whitelisting Secrets") for details.
 
-Sidecars are stored in `fusebase.json` under `features[].backend.sidecars[]` and deployed on the next `fusebase deploy`.
+Sidecars are stored in `fusebase.json` under `apps[].backend.sidecars[]` and deployed on the next `fusebase deploy`.
 
 <% if (it.flags?.includes("job-sidecars")) { %>**Per-job sidecars (`--job <jobName>`):**
 
-Cron jobs declared under `features[].backend.jobs[]` deploy as **independent** Azure Container Apps Jobs and do **not** share the backend container app's network namespace. To give a specific cron job its own auxiliary container (e.g. a headless browser used only by a screenshot cron), pass `--job <jobName>` to all three subcommands:
+Cron jobs declared under `apps[].backend.jobs[]` deploy as **independent** Azure Container Apps Jobs and do **not** share the backend container app's network namespace. To give a specific cron job its own auxiliary container (e.g. a headless browser used only by a screenshot cron), pass `--job <jobName>` to all three subcommands:
 
 ```bash
 # Add a sidecar to a job
@@ -477,17 +473,17 @@ fusebase sidecar remove --feature <featureId> --job <jobName> --name <name>
 fusebase sidecar list --feature <featureId> --job <jobName>
 ```
 
-When `--job` is omitted, all three subcommands target backend sidecars exactly as before. Each job has its own 3-sidecar cap, independent of the backend cap. Sidecar names are unique per scope — the same name (e.g. `chromium`) may exist on the backend and on a job. Per-job sidecars are stored under `features[].backend.jobs[].sidecars[]` in `fusebase.json` and deployed on the next `fusebase deploy`. See the **feature-sidecar** skill for full details (networking, termination, examples).
+When `--job` is omitted, all three subcommands target backend sidecars exactly as before. Each job has its own 3-sidecar cap, independent of the backend cap. Sidecar names are unique per scope — the same name (e.g. `chromium`) may exist on the backend and on a job. Per-job sidecars are stored under `apps[].backend.jobs[].sidecars[]` in `fusebase.json` and deployed on the next `fusebase deploy`. See the **app-sidecar** skill for full details (networking, termination, examples).
 <% } %>
 
 ### Remote Logs (Deployed Backends)
 
-Fetch logs from deployed feature backends. **Only applicable to features with a `backend/` folder.** Use this for production issues, NOT for local development (for local dev, see the `dev-debug-logs` skill).
+Fetch logs from deployed app backends. **Only applicable to apps with a `backend/` folder.** Use this for production issues, NOT for local development (for local dev, see the `dev-debug-logs` skill).
 
 #### Build Logs
 
 ```bash
-fusebase remote-logs build <featureId>
+fusebase remote-logs build <appId>
 ```
 
 Fetch the build image logs from the most recent deployment. Shows the container image build output.
@@ -495,96 +491,77 @@ Fetch the build image logs from the most recent deployment. Shows the container 
 #### Runtime Logs
 
 ```bash
-fusebase remote-logs runtime <featureId> \
-  [--tail <number>] [--type <console|system>] \
-  [--from <iso>] [--to <iso>] [--container <name>]
+fusebase remote-logs runtime <appId> [--tail <number>] [--type <console|system>]
 ```
 
-Fetch persisted runtime logs (backend + sidecars + jobs) from the deployed feature. Each line is rendered as `[<source>] <ISO timestamp> <message>` so you can distinguish backend / sidecar / job output.
+Fetch runtime logs from the deployed container.
 
 **Options:**
 
-- `--tail <number>` - Number of log entries to fetch (default: 100, max: 1000)
+- `--tail <number>` - Number of log lines to fetch (default: 100, max: 300)
 - `--type <console|system>` - Log type: `console` for app output, `system` for container system logs (default: `console`)
-- `--from <iso>` - Inclusive lower bound of the log time window (ISO 8601). Default server-side: `to - 1h`. Range from..to is capped at 7 days.
-- `--to <iso>` - Inclusive upper bound of the log time window (ISO 8601). Default server-side: now.
-- `--container <name>` - Filter to a specific container. Use `api` for the backend, or the sidecar/job name.
 
 **Examples:**
 
 ```bash
-# Get build logs for a feature
+# Get build logs for an app
 fusebase remote-logs build abc123
 
-# Get last 100 runtime console logs from the last hour
+# Get last 100 runtime console logs
 fusebase remote-logs runtime abc123 --tail 100
-
-# Restrict to an explicit time window
-fusebase remote-logs runtime abc123 --from 2026-04-30T00:00:00Z --to 2026-04-30T23:59:59Z --tail 200
 
 # Get system logs (container lifecycle events)
 fusebase remote-logs runtime abc123 --type system
 ```
 
-## Creating a New Feature
+## Creating a New App
 
-1. **Scaffold** the feature: `fusebase scaffold --template spa --dir features/my-new-feature` (add `--template backend` for a backend).
-2. **Implement the feature code** — write all source files, components, and logic.
+1. **Scaffold** the app: `fusebase scaffold --template spa --dir apps/my-new-app` (add `--template backend` for a backend).
+2. **Implement the app code** — write all source files, components, and logic.
 
 3. **Register and start dev** — **execute these automatically after the code is written; do NOT list them as "next steps" for the user**:
 
-   a. **Run `fusebase feature create`** — include `--permissions` now if the feature needs dashboard access (do not save it for a separate `feature update` step later):
+   a. **Run `fusebase app create`** — include `--permissions` now if the app needs dashboard access (do not save it for a separate `app update` step later):
 
    ```bash
    # Without dashboard access
-   fusebase feature create --name="My New Feature" --subdomain=my-new-feature --path=features/my-new-feature --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist<% if (it.analytics) { %> --coding-agent=codex --model=gpt-5.4<% } %>
+   fusebase app create --name="My New App" --subdomain=my-new-app --path=apps/my-new-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist<% if (it.analytics) { %> --coding-agent=codex --model=gpt-5.4<% } %>
 
    # With dashboard view permissions (preferred: set at creation)
-   fusebase feature create --name="My New Feature" --subdomain=my-new-feature --path=features/my-new-feature --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write"<% if (it.analytics) { %> --coding-agent=claude_code --model=opus-4.7<% } %>
+   fusebase app create --name="My New App" --subdomain=my-new-app --path=apps/my-new-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write"<% if (it.analytics) { %> --coding-agent=claude_code --model=opus-4.7<% } %>
 
    # With a backend
-   fusebase feature create --name="My New Feature" --subdomain=my-new-feature --path=features/my-new-feature --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --backend-dev-command="npm run dev" --backend-build-command="npm run build" --backend-start-command="npm run start"<% if (it.analytics) { %> --coding-agent=copilot --model=sonnet-4.6<% } %>
+   fusebase app create --name="My New App" --subdomain=my-new-app --path=apps/my-new-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --backend-dev-command="npm run dev" --backend-build-command="npm run build" --backend-start-command="npm run start"<% if (it.analytics) { %> --coding-agent=copilot --model=sonnet-4.6<% } %>
    ```
 
-   This will create the feature on Fusebase and add it to `fusebase.json`
+   This will create the app on Fusebase and add it to `fusebase.json`
 
    b. **Run `fusebase dev start`** to test locally
 
-## Updating an Existing Feature
+## Updating an Existing App
 
-After changing feature code, run `fusebase feature update <featureId>` if any of these need to be updated:
+After changing app code, run `fusebase app update <appId>` if any of these need to be updated:
 
 - `--permissions` — dashboard view access added, removed, or modified
 - `--access` — access principals (visitor / org roles) changed
-- `--sync-gate-permissions` — always include for features using `@fusebase/fusebase-gate-sdk` at runtime
+- `--sync-gate-permissions` — always include for apps using `@fusebase/fusebase-gate-sdk` at runtime
 
 ```bash
 # Update permissions and sync Gate permissions
-fusebase feature update <featureId> --permissions="dashboardView.dash1:view1.read,write" --sync-gate-permissions
+fusebase app update <appId> --permissions="dashboardView.dash1:view1.read,write" --sync-gate-permissions
 ```
-
-### Required verification after `--sync-gate-permissions`
-
-Do not stop at "command succeeded". For Gate-integrated features, verify the result explicitly:
-
-1. Run `fusebase analyze gate --operations --json --feature <featureId>`
-2. Confirm `usedOps` is non-empty when runtime code uses `@fusebase/fusebase-gate-sdk`
-3. Run `fusebase feature list`
-4. Confirm the feature does **not** show `Permissions: none` unless the feature intentionally requires no runtime permissions
-
-If `usedOps` is empty or feature list still shows `Permissions: none`, treat publish as blocked and fix analysis/runtime call patterns before continuing.
 
 ## Typical Workflow
 
 1. `fusebase auth` - Authenticate (one-time setup)
 2. `fusebase init` - Initialize project
-3. `fusebase scaffold --template spa --dir features/<name>` - Scaffold feature files (dependencies are installed automatically)
-3a. Implement the feature code
-4. *(after code is written)* `fusebase feature create --name="Feature Name" --subdomain=feature-name --path=features/feature-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]`<% if (it.analytics) { %> `[--coding-agent=<agent> --model=<model>]`<% } %> - Register feature; **include `--permissions` at this step** if the feature needs dashboard access.<% if (it.analytics) { %> **Always include `--coding-agent` and `--model`.**<% } %> **Execute automatically — do NOT list as next steps for the user.**
+3. `fusebase scaffold --template spa --dir apps/<name>` - Scaffold app files (dependencies are installed automatically)
+3a. Implement the app code
+4. *(after code is written)* `fusebase app create --name="App Name" --subdomain=app-name --path=apps/app-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]`<% if (it.analytics) { %> `[--coding-agent=<agent> --model=<model>]`<% } %> - Register app; **include `--permissions` at this step** if the app needs dashboard access.<% if (it.analytics) { %> **Always include `--coding-agent` and `--model`.**<% } %> **Execute automatically — do NOT list as next steps for the user.**
 4a. *(after registering)* `fusebase dev start` - Start dev and test locally. **Execute automatically.**
-5. *(if feature settings changed)* `fusebase feature update <featureId> [--permissions="..."] [--sync-gate-permissions]` - Sync updated settings before deploying
+5. *(if app settings changed)* `fusebase app update <appId> [--permissions="..."] [--sync-gate-permissions]` - Sync updated settings before deploying
 6. `fusebase deploy` - Deploy to production
-7. `fusebase remote-logs build|runtime <featureId>` - Check logs if deployed app has issues (see `remote-logs` skill for more)
+7. `fusebase remote-logs build|runtime <appId>` - Check logs if deployed app has issues (see `remote-logs` skill for more)
 
 ## Troubleshooting
 
@@ -592,11 +569,11 @@ If `usedOps` is empty or feature list still shows `Permissions: none`, treat pub
 
 Run `fusebase auth` to set your API credentials.
 
-### Feature not showing in dev server
+### App not showing in dev server
 
-Ensure the feature is:
+Ensure the app is:
 
-- Registered via `fusebase feature create` (so it exists in Fusebase and `fusebase.json`)
+- Registered via `fusebase app create` (so it exists in Fusebase and `fusebase.json`)
 - Added to `fusebase.json` with correct `id`
 - Has a running dev server (the `dev.command` process is up)
 
@@ -604,8 +581,8 @@ Ensure the feature is:
 
 Check that:
 
-- `npm run lint` passes in the feature directory (deploy runs lint before build)
-- `npm run typecheck` passes from project root (or fix TypeScript errors from the feature’s `tsc` step — ESLint alone may not report them)
+- `npm run lint` passes in the app directory (deploy runs lint before build)
+- `npm run typecheck` passes from project root (or fix TypeScript errors from the app’s `tsc` step — ESLint alone may not report them)
 - `build.command` is correct
 - `build.outputDir` exists after build
-- All dependencies are installed in the feature directory (`npm install --include=dev`)
+- All dependencies are installed in the app directory (`npm install --include=dev`)

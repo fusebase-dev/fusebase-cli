@@ -1,15 +1,15 @@
 /**
- * E2E test for `fusebase dev start` running two features in parallel.
+ * E2E test for `fusebase dev start` running two apps in parallel.
  *
- * Spawns two CLI processes (one per feature) and asserts that both feature
+ * Spawns two CLI processes (one per app) and asserts that both app
  * dev servers come up on their advertised ports. Fully local — no Azure or
  * public-api calls are exercised by this test (the fake `apiKey` in the
  * seeded `~/.fusebase/config.json` only satisfies `dev start`'s minimum
  * "are you authed?" guard; the public-api `secrets` lookup that follows is
  * non-fatal and the CLI continues without secrets when it fails).
  *
- * Per JIRA NIM-40902, the CLI starts a single feature per invocation, so
- * "two features in parallel" means two `fusebase dev start <featureId>`
+ * Per JIRA NIM-40902, the CLI starts a single app per invocation, so
+ * "two apps in parallel" means two `fusebase dev start <appId>`
  * processes running concurrently.
  */
 
@@ -37,10 +37,10 @@ async function findFreePort(start: number, end: number): Promise<number> {
   throw new Error(`No free port available in [${start}, ${end}]`);
 }
 
-function writeTrivialDevServer(featureDir: string, port: number): void {
-  mkdirSync(featureDir, { recursive: true });
+function writeTrivialDevServer(appDir: string, port: number): void {
+  mkdirSync(appDir, { recursive: true });
   writeFileSync(
-    join(featureDir, "server.js"),
+    join(appDir, "server.js"),
     `const http = require("http");
 const port = ${port};
 const server = http.createServer((req, res) => {
@@ -78,7 +78,7 @@ async function pollUntil200(url: string, timeoutMs: number): Promise<void> {
   throw new Error(`Dev server at ${url} did not return 200 within ${timeoutMs}ms (last: ${reason})`);
 }
 
-describe("fusebase dev start — two features in parallel", () => {
+describe("fusebase dev start — two apps in parallel", () => {
   let workspace: ReturnType<typeof createCliWorkspace>;
   let portA = 0;
   let portB = 0;
@@ -93,8 +93,8 @@ describe("fusebase dev start — two features in parallel", () => {
       apiKey: "e2e-fake-test-key",
     });
 
-    writeTrivialDevServer(join(workspace.cwd, "features", "feat-a"), portA);
-    writeTrivialDevServer(join(workspace.cwd, "features", "feat-b"), portB);
+    writeTrivialDevServer(join(workspace.cwd, "apps", "feat-a"), portA);
+    writeTrivialDevServer(join(workspace.cwd, "apps", "feat-b"), portB);
 
     writeFileSync(
       join(workspace.cwd, "fusebase.json"),
@@ -102,17 +102,17 @@ describe("fusebase dev start — two features in parallel", () => {
         {
           env: "dev",
           orgId: "e2e-test-org",
-          appId: "e2e-test-app",
-          features: [
+          productId: "e2e-test-app",
+          apps: [
             {
               id: "feat-a",
-              path: "features/feat-a",
+              path: "apps/feat-a",
               dev: { command: "node server.js" },
               devUrl: `http://127.0.0.1:${portA}`,
             },
             {
               id: "feat-b",
-              path: "features/feat-b",
+              path: "apps/feat-b",
               dev: { command: "node server.js" },
               devUrl: `http://127.0.0.1:${portB}`,
             },
@@ -131,7 +131,7 @@ describe("fusebase dev start — two features in parallel", () => {
   });
 
   it(
-    "loads two features in parallel via their advertised ports",
+    "loads two apps in parallel via their advertised ports",
     async () => {
       const handleA = runCliStreaming(["dev", "start", "feat-a"], {
         cwd: workspace.cwd,

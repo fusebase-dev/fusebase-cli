@@ -21,7 +21,7 @@ This document is intentionally focused on the current Gate architecture:
 
 - separate physical stage databases per store/stage
 - app-owned SQL schema managed through migration bundles
-- feature-token or user-token runtime access through Gate
+- app-token or user-token runtime access through Gate
 - raw DDL blocked on `executeIsolatedStoreSql`
 
 It is not a generic PostgreSQL overview.
@@ -67,7 +67,7 @@ Recommended baseline:
 This is the best fit for Gate because:
 
 - `orgId` is already a first-class routing/auth concept in Gate
-- user-facing feature tokens already resolve a user context
+- user-facing app tokens already resolve a user context
 - midsize customers usually expect both:
   - strict tenant separation
   - user-level isolation inside a tenant
@@ -139,7 +139,7 @@ Reason:
 Gate already has the needed inputs:
 
 - `orgId` from the route and authz checks
-- `userId` from user auth or feature token auth context
+- `userId` from user auth or app token auth context
 - `clientId` from token client scope
 
 ### 2.3 Runtime path vs backend path
@@ -147,7 +147,7 @@ Gate already has the needed inputs:
 Recommended split:
 
 - **user-facing runtime path**
-  - use end-user or feature-token auth
+  - use end-user or app-token auth
   - Gate resolves `orgId` and `userId`
   - Gate injects RLS session context
 
@@ -210,7 +210,7 @@ Even with `FORCE`, the cleaner and safer model is still:
 
 ```mermaid
 flowchart TD
-  A["Feature token / user auth"] --> B["Gate auth context"]
+  A["App token / user auth"] --> B["Gate auth context"]
   B --> C["Gate resolves orgId + userId + clientId"]
   C --> D["Acquire runtime DB client"]
   D --> E["BEGIN"]

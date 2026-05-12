@@ -1,6 +1,6 @@
 ---
 name: file-upload
-description: "Canonical low-level Fusebase file upload lifecycle and file API guide. Use it when implementing temp -> stored -> display URL flows or building file descriptors for downstream features."
+description: "Canonical low-level Fusebase file upload lifecycle and file API guide. Use it when implementing temp -> stored -> display URL flows or building file descriptors for downstream apps."
 ---
 
 # File Upload

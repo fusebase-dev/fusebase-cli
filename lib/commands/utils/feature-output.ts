@@ -1,15 +1,15 @@
-import type { AppFeature, AppFeaturePermissionItem } from "../../api.ts";
-import type { AppFeaturePermissionItemEnriched } from "./get-feature-resources-info.ts";
+import type { App, AppPermissionItem } from "../../api.ts";
+import type { AppPermissionItemEnriched } from "./get-feature-resources-info.ts";
 
 interface PrintFeatureOptions {
   includeResourceAccess?: boolean;
 }
 
 interface PrintFeatureHelpData {
-  featurePermissionsData?: AppFeaturePermissionItemEnriched[];
+  featurePermissionsData?: AppPermissionItemEnriched[];
 }
 
-function getPermissionItems(feature: AppFeature): AppFeaturePermissionItem[] {
+function getPermissionItems(feature: App): AppPermissionItem[] {
   return feature.permissions?.items ?? [];
 }
 
@@ -20,8 +20,8 @@ interface PermissionRow {
 }
 
 function getPermissionRows(
-  feature: AppFeature,
-  featurePermissionsData: AppFeaturePermissionItemEnriched[] = [],
+  feature: App,
+  featurePermissionsData: AppPermissionItemEnriched[] = [],
 ): PermissionRow[] {
   if (featurePermissionsData.length > 0) {
     return featurePermissionsData.flatMap(({ permissionItem, additionalInfo }) => {
@@ -96,7 +96,7 @@ function printPermissionTable(rows: PermissionRow[]): void {
 }
 
 export function printFeature(
-  feature: AppFeature,
+  feature: App,
   options: PrintFeatureOptions = {},
   helpData: PrintFeatureHelpData = {},
 ): void {

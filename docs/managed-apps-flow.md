@@ -18,7 +18,7 @@ A managed app is a platform app whose runtime can be launched in a consumer org,
 
 The actual per-org data isolation is achieved by:
 
-1. Launching the feature with `roid=<targetOrgId>`
+1. Launching the app with `roid=<targetOrgId>`
 2. Calling `run-managed` in `nimbus-ai` on first launch for that target org
 3. Creating or reusing a target-org database in `dashboard-service` via `getOrCreateDatabase`
 4. Copying a template database by alias into the target org
@@ -27,10 +27,10 @@ The actual per-org data isolation is achieved by:
 ## Actors
 
 - Developer: initializes the local project with `apps-cli`
-- App owner org: the org that owns the app record and feature records
+- App owner org: the org that owns the app record and app records
 - Consumer org: the org where the managed app is actually launched
 - `app-wrapper`: runtime bootstrap layer that validates access, runs setup, and issues cookies/tokens
-- `nimbus-ai`: source of truth for apps, features, managed setup records, and downstream token issuance
+- `nimbus-ai`: source of truth for products, apps, managed setup records, and downstream token issuance
 - `dashboard-service`: source of truth for copied databases/dashboards/views/rows/relations
 - `fusebase-gate`: source of truth for isolated stores, stage instances, migration status, and restore/checkpoint mechanics
 
@@ -51,19 +51,19 @@ sequenceDiagram
     CLI->>Pub: POST /v1/orgs/{org}/apps
     Pub->>NAI: POST /orgs/{org}/apps
     NAI-->>Pub: create private app record
-    Pub-->>CLI: appId, orgId, sub
+    Pub-->>CLI: productId, orgId, sub
     CLI->>CLI: write fusebase.json { managed: true }
     CLI->>CLI: append AGENTS.managed.md
 
     Note over CLI,NAI: Local managed marker exists, but server app type is not changed by apps-cli init
 
     Studio->>Studio: build launch URL
-    Studio->>Wrap: open feature URL with ?roid={consumerOrgId}
+    Studio->>Wrap: open app URL with ?roid={consumerOrgId}
     Wrap->>Org: verify user role in consumer org
-    Wrap->>NAI: POST /orgs/{consumerOrg}/apps/{appId}/run-managed
+    Wrap->>NAI: POST /orgs/{consumerOrg}/apps/{productId}/run-managed
 
     alt first launch in consumer org
-        NAI->>NAI: check ManagedAppOrgSetup(appId, targetOrgId)
+        NAI->>NAI: check ManagedProductOrgSetup(productId, targetOrgId)
         NAI->>Dash: POST /databases/get-or-create?alias=...&scope=consumerOrg
         Dash->>Dash: find existing DB by alias+scope
         alt no DB found
@@ -71,17 +71,17 @@ sequenceDiagram
             Dash->>Dash: copy DB, dashboards, views, rows, data, relations
             Dash->>Dash: protect copied DB and dashboard items
         end
-        NAI->>NAI: create ManagedAppOrgSetup(firstUsedAt, lastAppVersion)
+        NAI->>NAI: create ManagedProductOrgSetup(firstUsedAt, lastAppVersion)
     else subsequent launch
-        NAI-->>Wrap: return existing ManagedAppOrgSetup
+        NAI-->>Wrap: return existing ManagedProductOrgSetup
     end
 
-    Wrap->>NAI: POST /orgs/{ownerOrRunOrg}/apps/{appId}/features/{featureId}/tokens { runOrgId }
+    Wrap->>NAI: POST /orgs/{ownerOrRunOrg}/apps/{productId}/apps/{appId}/tokens { runOrgId }
     NAI->>NAI: issue dashboard token scoped to consumer org
     NAI->>NAI: issue gate token scoped to consumer org + app client
     NAI-->>Wrap: dashboardToken + gateToken
-    Wrap->>Wrap: pack app token, set fbsfeaturetoken cookie
-    Wrap-->>Studio: redirect into feature runtime
+    Wrap->>Wrap: pack app token, set fbsapptoken cookie
+    Wrap-->>Studio: redirect into app runtime
 ```
 
 ## 1. What `apps-cli --managed` Actually Does
@@ -92,7 +92,7 @@ sequenceDiagram
 - appends `apps-cli/managed-template/AGENTS.managed.md` into local `AGENTS.md`
 - uses the managed marker only for local guidance and optional GitLab tagging
 
-The managed appendix tells feature authors to:
+The managed appendix tells app authors to:
 
 - never hardcode dashboard/database/view UUIDs
 - use aliases instead
@@ -114,9 +114,9 @@ In `nimbus-ai`, `getApps(orgId)` is intentionally asymmetric:
 
 This is why a consumer org can see a managed app that belongs to another org.
 
-Feature listing follows the same idea:
+App listing follows the same idea:
 
-- when the app is managed, `nimbus-ai` can serve feature metadata without normal org ownership checks
+- when the app is managed, `nimbus-ai` can serve app metadata without normal org ownership checks
 
 ## 3. Launch Path in Frontend Runtime
 
@@ -130,25 +130,25 @@ Flow:
 4. `app-wrapper` rejects `roid` for non-managed apps
 5. `app-wrapper` requires an authenticated user for managed launches
 
-Before the feature is entered, `app-wrapper` does two managed-specific checks:
+Before the app is entered, `app-wrapper` does two managed-specific checks:
 
 - verifies the user has access to the target org via `org-service`
-- calls `nimbus-ai` `POST /orgs/{org}/apps/{appId}/run-managed`
+- calls `nimbus-ai` `POST /orgs/{org}/apps/{productId}/run-managed`
 
-Only after that does it request service tokens for the feature.
+Only after that does it request service tokens for the app.
 
 ## 4. `run-managed` in `nimbus-ai`
 
-`runManagedApp(appId, targetOrgId)` is the server-side first-run initializer.
+`runManagedApp(productId, targetOrgId)` is the server-side first-run initializer.
 
 Behavior:
 
 1. Load app by `globalId` and require `type=managed`
-2. Check `ManagedAppOrgSetup` for `(appId, targetOrgId)`
+2. Check `ManagedProductOrgSetup` for `(productId, targetOrgId)`
 3. If setup already exists, return it immediately
 4. If no setup exists, provision resources from `app.appResources`
-5. Persist `ManagedAppOrgSetup` with:
-   - `appId`
+5. Persist `ManagedProductOrgSetup` with:
+   - `productId`
    - `targetOrgId`
    - `firstUsedAt`
    - `lastAppVersion = app.appVersion`
@@ -236,26 +236,26 @@ This is exactly what `AGENTS.managed.md` instructs local app projects to do.
 
 After `run-managed`, `app-wrapper` asks `nimbus-ai` to create downstream service tokens.
 
-Key behavior in `createAppFeatureToken(...)`:
+Key behavior in `createAppToken(...)`:
 
 - `effectiveOrgId = runOrgId ?? orgId`
 - `runOrgId` is only allowed for managed apps
 - dashboard token scopes are created for `effectiveOrgId`
 - gate token scopes are created for:
   - org = `effectiveOrgId`
-  - client = `appId`
+  - client = `productId`
 
 Dashboard token resource scope has two layers:
 
 1. baseline allow rule:
-   - `databases: ["aliasLike:app_<featureId>_*"]`
-   - this covers feature-created app databases
-2. explicit rules from feature permissions:
+   - `databases: ["aliasLike:app_<appId>_*"]`
+   - this covers app-created app databases
+2. explicit rules from app permissions:
    - database permissions can resolve to `globalId:<databaseId>`
    - or `aliasLike:<databaseAlias>`
    - dashboardView permissions are expanded to the parent database
 
-`app-wrapper` then wraps dashboard token + gate token into the final encrypted app token and writes `fbsfeaturetoken`.
+`app-wrapper` then wraps dashboard token + gate token into the final encrypted app token and writes `fbsapptoken`.
 
 For managed apps it also persists `roid` in a cookie so token refresh can continue using the consumer org.
 
@@ -265,7 +265,7 @@ There is an important difference between local `apps-cli dev` and deployed/app-w
 
 Local dev path:
 
-- `apps-cli` dev UI calls `POST /api/orgs/{orgId}/apps/{appId}/features/{featureId}/tokens`
+- `apps-cli` dev UI calls `POST /api/orgs/{orgId}/apps/{productId}/apps/{appId}/tokens`
 - that flow uses `public-api` local dev token generation
 - it does not pass `runOrgId`
 - it does not call `run-managed`
@@ -307,7 +307,7 @@ This is a real mismatch against older tests and the shape of `AppResourceDatabas
 
 ### Gap 3: `lastAppVersion` is stored but not used for upgrades
 
-`ManagedAppOrgSetup` stores `lastAppVersion`, but `runManagedApp()` currently does:
+`ManagedProductOrgSetup` stores `lastAppVersion`, but `runManagedApp()` currently does:
 
 - return existing setup immediately if it exists
 
@@ -351,12 +351,12 @@ Primary files behind this flow:
 
 - `apps-cli/lib/commands/init.ts`
 - `apps-cli/managed-template/AGENTS.managed.md`
-- `studio-frontend/packages/features/feature-apps/src/buildAppFeatureLaunchUrl.ts`
+- `studio-frontend/packages/apps/app-apps/src/buildAppLaunchUrl.ts`
 - `nx-frontend/apps/app-wrapper/src/routes/auth.ts`
-- `nx-frontend/apps/app-wrapper/src/lib/app-feature-token.ts`
-- `nx-frontend/apps/app-wrapper/src/routes/feature-proxy.ts`
+- `nx-frontend/apps/app-wrapper/src/lib/app-app-token.ts`
+- `nx-frontend/apps/app-wrapper/src/routes/app-proxy.ts`
 - `nimbus-ai/src/controllers/AppController.ts`
-- `nimbus-ai/src/controllers/AppFeatureController.ts`
+- `nimbus-ai/src/controllers/AppController.ts`
 - `nimbus-ai/src/api/controllers/app.ts`
 - `dashboard-service/src/controllers/databases/get-or-create.ts`
 - `dashboard-service/src/services/copy-service/copy-database.ts`
@@ -542,12 +542,12 @@ sequenceDiagram
     participant Dash as dashboard-service
     participant Gate as fusebase-gate
 
-    Studio->>Wrap: open managed feature with ?roid={consumerOrgId}
+    Studio->>Wrap: open managed app with ?roid={consumerOrgId}
     Wrap->>Org: verify user membership in consumer org
-    Wrap->>NAI: POST /orgs/{consumerOrg}/apps/{appId}/run-managed
+    Wrap->>NAI: POST /orgs/{consumerOrg}/apps/{productId}/run-managed
 
     alt first launch in consumer org
-        NAI->>NAI: lookup ManagedAppOrgSetup(appId, targetOrgId)
+        NAI->>NAI: lookup ManagedProductOrgSetup(productId, targetOrgId)
         par managed dashboards
             NAI->>Dash: getOrCreateDatabase(alias, scope, template_alias)
             Dash->>Dash: copy dashboard database resources if absent
@@ -561,12 +561,12 @@ sequenceDiagram
                 Gate->>Gate: persist template lineage + stage metadata
             end
         end
-        NAI->>NAI: save ManagedAppOrgSetup with dashboard mappings + store mappings + app version
+        NAI->>NAI: save ManagedProductOrgSetup with dashboard mappings + store mappings + app version
     else subsequent launch
         NAI-->>Wrap: reuse existing setup
     end
 
-    Wrap->>NAI: request feature token with runOrgId
+    Wrap->>NAI: request app token with runOrgId
     NAI->>NAI: issue dashboard token scoped to consumer org
     NAI->>NAI: issue Gate token scoped to consumer org + app client + target stage
     NAI-->>Wrap: app token bundle with both downstream tokens
@@ -579,7 +579,7 @@ Recommended resource model:
 - keep dashboard resources in `appResources.databases` for the dashboard-service path
 - add managed isolated-store resources explicitly, instead of overloading `appResources.databases`
 - keep owner-org template stores separate from consumer-org provisioned stores
-- record both dashboard mappings and target stage ids in `ManagedAppOrgSetup` or a linked setup table
+- record both dashboard mappings and target stage ids in `ManagedProductOrgSetup` or a linked setup table
 
 ## 16. Implementation Plan
 
@@ -635,7 +635,7 @@ Recommended MVP:
    Important detail:
 
 - use Gate checkpoint/restore as the copy primitive first
-- do not block the rollout on Neon-specific branching or provider-native clone features
+- do not block the rollout on Neon-specific branching or provider-native clone apps
 
 That keeps the external contract provider-neutral and matches existing Gate design docs.
 
@@ -648,7 +648,7 @@ Teach `runManagedApp()` to provision isolated stores alongside dashboard databas
 1. keep the existing dashboard provisioning path for `appResources.databases`
 2. load managed isolated-store resource definitions from the app
 3. call `getOrCreateIsolatedStore` for each isolated-store resource
-4. persist resulting store/stage ids into `ManagedAppOrgSetup`
+4. persist resulting store/stage ids into `ManagedProductOrgSetup`
 5. compare `app.appVersion` with stored setup version
 6. define explicit reconciliation behavior for upgrades
 
@@ -705,7 +705,7 @@ Lowest-risk order:
 1. Add isolated-store resources to app metadata and Nimbus models
 2. Keep dashboard provisioning unchanged for existing managed resources
 3. Wire `runManagedApp()` to `getOrCreateIsolatedStore` for isolated-store resources behind a feature flag
-4. Persist Gate lineage metadata in `ManagedAppOrgSetup`
+4. Persist Gate lineage metadata in `ManagedProductOrgSetup`
 5. Re-enable stage `resource_scope` enforcement
 6. Harden clone observability / recovery paths
 7. Migrate one managed pilot app that uses both dashboards and stores

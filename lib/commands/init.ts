@@ -18,10 +18,9 @@ import { embeddedFiles } from "bun";
 import AdmZip from "adm-zip";
 import {
   fetchOrgs,
-  fetchApps,
-  createApp,
+  createProduct,
   type Organization,
-  type App,
+  type Product,
 } from "../api";
 import { copyAgentsAndSkills } from "../copy-template";
 import { buildTemplateContext, renderTemplatesInDir } from "../template-engine";
@@ -651,9 +650,9 @@ export const initCommand = new Command("init")
           },
         }));
 
-      let selectedApp: App;
+      let selectedApp: Product;
       try {
-        selectedApp = await createApp(apiKey, selectedOrg.id, appTitle.trim());
+        selectedApp = await createProduct(apiKey, selectedOrg.id, appTitle.trim());
         console.log(`✓ Created app: ${selectedApp.title}`);
       } catch (error) {
         console.error(
@@ -772,7 +771,7 @@ export const initCommand = new Command("init")
       // Save fusebase.json (env so FUSEBASE_HOST / getEnv() are correct for this project)
       const fuseConfig: FuseConfig = {
         orgId: selectedOrg.id,
-        appId: selectedApp.id,
+        productId: selectedApp.id,
         env: getEnv() ?? "dev",
         ...(options.managed && { managed: true }),
       };

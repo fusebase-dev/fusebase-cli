@@ -1,11 +1,11 @@
 import {
   fetchDashboardInfo,
   fetchDatabaseInfo,
-  type AppFeaturePermissionItem,
+  type AppPermissionItem,
 } from "../../api";
 
-export type AppFeaturePermissionItemEnriched = {
-  permissionItem: AppFeaturePermissionItem,
+export type AppPermissionItemEnriched = {
+  permissionItem: AppPermissionItem,
   additionalInfo: {
     title: string;
   }
@@ -13,8 +13,8 @@ export type AppFeaturePermissionItemEnriched = {
 
 export async function fetchFeaturePermissionItemsInfo(args: {
   apiKey: string,
-  permissionItems: AppFeaturePermissionItem[] 
-}): Promise<AppFeaturePermissionItemEnriched[]> {
+  permissionItems: AppPermissionItem[] 
+}): Promise<AppPermissionItemEnriched[]> {
   const { apiKey } = args;
   const permissionItems = args.permissionItems.filter(
     (item) => item.type === "dashboardView" || item.type === "database",

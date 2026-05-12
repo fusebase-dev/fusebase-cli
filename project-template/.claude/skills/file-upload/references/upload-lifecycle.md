@@ -106,7 +106,7 @@ const CHUNK_RETRIES = 3;
 
 async function uploadLargeFile(
   file: File,
-  featureToken: string,
+  appToken: string,
   onProgress?: (loaded: number, total: number) => void,
 ): Promise<{ tempStoredFileName: string } | null> {
   const startForm = new FormData();
@@ -118,7 +118,7 @@ async function uploadLargeFile(
 
   const startRes = await fetch(UPLOAD_URL, {
     method: "POST",
-    headers: { "x-app-feature-token": featureToken },
+    headers: { "x-app-token": appToken },
     body: startForm,
   });
   if (!startRes.ok) return null;
@@ -173,7 +173,7 @@ async function uploadLargeFile(
 
   const finishRes = await fetch(UPLOAD_URL, {
     method: "POST",
-    headers: { "x-app-feature-token": featureToken },
+    headers: { "x-app-token": appToken },
     body: finishForm,
   });
   if (!finishRes.ok) return null;
@@ -278,7 +278,7 @@ If Gate returns `readUrl`, use it as-is for reads, links, or image `src`.
 
 ## File Descriptor
 
-A file descriptor is the object passed to downstream features after upload. Include fields returned by the stored-file response when available:
+A file descriptor is the object passed to downstream apps after upload. Include fields returned by the stored-file response when available:
 
 - `name`
 - `url`

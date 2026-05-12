@@ -158,7 +158,7 @@ function mcpPolicyFingerprintsMatchEnv(env: Map<string, string>): boolean {
   });
 }
 
-/** Exported for `fusebase app update` — true when all MCP URL/token/host vars are set. */
+/** Exported for `fusebase product update` — true when all MCP URL/token/host vars are set. */
 export function areMcpEnvTokensPresent(env: Map<string, string>): boolean {
   return hasMcpEnvVars(env);
 }
@@ -228,7 +228,7 @@ export async function createEnvFile(options: CreateEnvOptions): Promise<CreateEn
       }
     }
 
-    // Generate MCP tokens (selective refresh supported for `fusebase app update`).
+    // Generate MCP tokens (selective refresh supported for `fusebase product update`).
     const dashboardsToken = refreshDashboardsToken
       ? await generateMcpToken(apiKey, orgId)
       : undefined;

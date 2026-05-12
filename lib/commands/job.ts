@@ -41,7 +41,7 @@ const createCommand = new Command("create")
         process.exit(1);
       }
 
-      const features = fuseConfig.features ?? [];
+      const features = fuseConfig.apps ?? [];
       const featureIndex = features.findIndex((f) => f.id === opts.feature);
       if (featureIndex === -1) {
         console.error(
@@ -126,7 +126,7 @@ const deleteCommand = new Command("delete")
       process.exit(1);
     }
 
-    const features = fuseConfig.features ?? [];
+    const features = fuseConfig.apps ?? [];
     const featureIndex = features.findIndex((f) => f.id === opts.feature);
     if (featureIndex === -1) {
       console.error(

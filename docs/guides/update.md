@@ -13,7 +13,7 @@ This is the canonical update guide for Fusebase Apps CLI.
 1. Upgrade CLI only (works from any directory):
 
 ```bash
-fusebase update --skip-app
+fusebase update --skip-product
 ```
 
 2. Full project refresh (recommended after CLI/template changes):
@@ -48,7 +48,7 @@ Default flow:
 2. Pre-update Git checkpoint commit (optional prompt in TTY).
 3. Agent assets refresh (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`).
 4. MCP refresh (Dashboards/Gate tokens in `.env`) + IDE MCP config refresh.
-5. Managed dependency sync in root + feature `package.json`.
+5. Managed dependency sync in root + app `package.json`.
 6. `npm install` only where managed dependency versions changed.
 7. End-of-run summary block.
 
@@ -56,7 +56,7 @@ Default flow:
 
 | Flag | Effect |
 |---|---|
-| `--skip-app` | Skip app stages entirely (CLI update only) |
+| `--skip-product` | Skip app stages entirely (CLI update only) |
 | `--skip-cli-update` | Skip automatic CLI self-update stage |
 | `--skip-skills` | Skip agent assets refresh |
 | `--skip-mcp` | Skip MCP token + IDE refresh stage |
@@ -101,6 +101,6 @@ Commit format:
 - Managed package names come from `project-template/package.json`:
   - `fusebaseCli.managedDependencies`
 - Root `package.json`: managed deps can be added/updated.
-- Feature `package.json`: only update if managed dep already exists (no auto-add).
+- App `package.json`: only update if managed dep already exists (no auto-add).
 - `npm install` runs only in directories with actual managed version changes.
 
