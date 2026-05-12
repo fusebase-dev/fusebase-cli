@@ -5,9 +5,9 @@ Creating a personal authorization from the frontend involves several steps:
 
 ## Step 1: Initiate auth
 The user clicks "Connect" on a dedicated page on the frontend. After that, the user is redirected to
-`https://app.{FUSEBASE_HOST}/integrations/auth?templateId=<template id>&appId=<app id>&<returnTo>=<url of redirect>`
+`https://app.{FUSEBASE_HOST}/integrations/auth?templateId=<template id>&clientId=<product id>&<returnTo>=<url of redirect>`
 - `templateId` -- ID of the template that has to be connected. It can be obtained during app development using the `fusebase integrations list-templates` command.
-- `appId` -- ID of the current app
+- `clientId` -- ID of the current product
 - `returnTo` -- URL to which the user will be redirected after authorization is completed. It will be explained in more detail later.
 
 ## Step 2: Handling authorization completion
