@@ -145,8 +145,8 @@ if (hasFlag(MANAGED_INTEGRATIONS_FLAG)) {
         try {
           const gateToken = await readAppGateTokenOrExit(process.cwd());
           const fuseConfig = loadFuseConfig();
-          if (!fuseConfig?.appId) {
-            throw new Error("Invalid fusebase.json. Missing appId. Run 'fusebase init' first.");
+          if (!fuseConfig?.productId) {
+            throw new Error("Invalid fusebase.json. Missing productId. Run 'fusebase init' first.");
           }
 
           const server = await connectManagedMcpTemplate({
