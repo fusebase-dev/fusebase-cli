@@ -1,15 +1,15 @@
 ---
-name: feature-sidecar
-description: "Guide for managing sidecar containers alongside feature backends. Use when: (1) A feature backend needs auxiliary services like headless browsers, caches, or other tools, (2) Adding/removing/listing sidecar containers, (3) Configuring sidecar networking, env vars, or resource tiers."
+name: app-sidecar
+description: "Guide for managing sidecar containers alongside app backends. Use when: (1) An app backend needs auxiliary services like headless browsers, caches, or other tools, (2) Adding/removing/listing sidecar containers, (3) Configuring sidecar networking, env vars, or resource tiers."
 ---
 
-# Feature Sidecar Containers
+# App Sidecar Containers
 
-Sidecars are pre-built Docker images deployed alongside a feature backend in the same network namespace (sharing localhost). They enable auxiliary services that the backend communicates with over HTTP or other protocols on localhost.
+Sidecars are pre-built Docker images deployed alongside an app backend in the same network namespace (sharing localhost). They enable auxiliary services that the backend communicates with over HTTP or other protocols on localhost.
 
 ## Prerequisites
 
-1. Feature must have a `backend/` folder configured in `fusebase.json`
+1. App must have a `backend/` folder configured in `fusebase.json`
 
 ## Use Cases
 
@@ -62,7 +62,7 @@ fusebase sidecar list --feature <featureId>
 
 ## Whitelisting Secrets
 
-By default, app feature secrets registered via `fusebase secret create` are injected only into the main backend container (and into cron job containers). Sidecars receive **no** feature secrets unless you explicitly whitelist the keys you want each sidecar to see.
+By default, app secrets registered via `fusebase secret create` are injected only into the main backend container (and into cron job containers). Sidecars receive **no** app secrets unless you explicitly whitelist the keys you want each sidecar to see.
 
 Use the repeatable `--secret` option on `fusebase sidecar add` to opt in:
 
@@ -81,13 +81,13 @@ fusebase sidecar add --feature my-scraper --name redis \
 
 ### Source
 
-Secrets must be **registered** with the feature beforehand (or alongside) via:
+Secrets must be **registered** with the app beforehand (or alongside) via:
 
 ```bash
 fusebase secret create --feature <featureId> --secret "DB_PASSWORD:Redis auth"
 ```
 
-Set the actual values in the FuseBase web UI (the URL is printed by `secret create`). Only registered keys may be referenced from `--secret`. See the **feature-secrets** skill for the full secret lifecycle.
+Set the actual values in the FuseBase web UI (the URL is printed by `secret create`). Only registered keys may be referenced from `--secret`. See the **app-secrets** skill for the full secret lifecycle.
 
 ### Forms
 
@@ -103,7 +103,7 @@ Both forms can be mixed in the same sidecar's `secrets` array.
 - **CLI fail-fast** (during `sidecar add`):
   - empty `KEY` or `ALIAS` is rejected;
   - duplicate target env var name within the same sidecar is rejected (target = `ALIAS` if present, else `KEY`).
-- **Deploy-time strict validation** (during `fusebase deploy`): if any referenced secret key is not registered for the feature, the API returns a `ValidationError` listing **all** missing keys at once and **no** Azure resources are touched.
+- **Deploy-time strict validation** (during `fusebase deploy`): if any referenced secret key is not registered for the app, the API returns a `ValidationError` listing **all** missing keys at once and **no** Azure resources are touched.
 - **`env` overrides on collision**: a sidecar may legitimately list the same key in both `--env KEY=VALUE` and `--secret KEY` (`fusebase sidecar add` does not reject this). At deploy time the sidecar's static `env` value wins; the secret value is shadowed for that key only.
 
 ### Scope
@@ -112,14 +112,14 @@ Both forms can be mixed in the same sidecar's `secrets` array.
 
 ## Configuration Format
 
-Sidecars are stored in `fusebase.json` under each feature's `backend.sidecars` array:
+Sidecars are stored in `fusebase.json` under each app's `backend.sidecars` array:
 
 ```json
 {
-  "features": [
+  "apps": [
     {
       "id": "my-scraper",
-      "path": "features/my-scraper",
+      "path": "apps/my-scraper",
       "backend": {
         "dev": { "command": "npm run dev" },
         "build": { "command": "npm run build" },
@@ -177,9 +177,9 @@ Each sidecar can have its own resource tier:
 
 Default tier is `small` if not specified. Choose based on the sidecar's workload — headless browsers typically need `medium` or `large`.
 
-> ⚠️ Total CPU/memory across the backend (small tier: 0.5 / 1 Gi) + all sidecars must stay within **2.0 CPU / 4.0 Gi** (Azure Container Apps limit). See the **Total Resource Budget** section in the `feature-backend` skill.
+> ⚠️ Total CPU/memory across the backend (small tier: 0.5 / 1 Gi) + all sidecars must stay within **2.0 CPU / 4.0 Gi** (Azure Container Apps limit). See the **Total Resource Budget** section in the `app-backend` skill.
 
-Worked examples (numbers match the `feature-backend` skill):
+Worked examples (numbers match the `app-backend` skill):
 
 - backend (small) + chromium (medium) + redis (small) = 2.0 CPU / 4.0 Gi ✓
 - backend (small) + chromium (medium) + lightpanda (medium) = 2.5 CPU / 5 Gi ✗ → Azure rejects deploy, downgrade one sidecar to small.
@@ -191,17 +191,17 @@ Cron jobs are **excluded** from this budget — each cron job runs as its own co
 Sidecar env vars are isolated — they are NOT shared with the backend or other sidecars. Use them for sidecar-specific configuration:
 
 ```bash
-fusebase sidecar add --feature my-feature --name redis --image redis:7 \
+fusebase sidecar add --feature my-app --name redis --image redis:7 \
   --env REDIS_MAXMEMORY=256mb --env REDIS_MAXMEMORY_POLICY=allkeys-lru
 ```
 
-Feature secrets (registered via `fusebase secret create`) are **not** injected into sidecars by default. To grant a sidecar access to specific secrets, whitelist them with `--secret` on `fusebase sidecar add` (see [Whitelisting Secrets](#whitelisting-secrets) above). On collision between a sidecar's `env` and a whitelisted secret with the same env var name, the static `env` value wins.
+App secrets (registered via `fusebase secret create`) are **not** injected into sidecars by default. To grant a sidecar access to specific secrets, whitelist them with `--secret` on `fusebase sidecar add` (see [Whitelisting Secrets](#whitelisting-secrets) above). On collision between a sidecar's `env` and a whitelisted secret with the same env var name, the static `env` value wins.
 
 ## Limitations
 
-- **Max 3 sidecars per feature** — enforced by the CLI and API
+- **Max 3 sidecars per app** — enforced by the CLI and API
 - **Pre-built images only** — sidecars use existing Docker images, no custom builds from source
-- **Sidecar names must be unique** within a feature
+- **Sidecar names must be unique** within an app
 - **Sidecars do not run locally** — `fusebase dev start` does not start sidecar containers. For local development, run the sidecar image manually with Docker
 - **Port 3000 is reserved** — the backend app listens on port 3000; sidecars must not bind to it or they will crash with `EADDRINUSE`
 - **No shared volumes** — sidecars and backend communicate only via network
@@ -211,7 +211,7 @@ Feature secrets (registered via `fusebase secret create`) are **not** injected i
 ### View All Container Logs
 
 ```bash
-fusebase remote-logs runtime <featureId>
+fusebase remote-logs runtime <appId>
 ```
 
 Output includes logs from all containers, prefixed by name:
@@ -225,10 +225,10 @@ Output includes logs from all containers, prefixed by name:
 
 ```bash
 # Backend logs only
-fusebase remote-logs runtime <featureId> --container api
+fusebase remote-logs runtime <appId> --container api
 
 # Specific sidecar
-fusebase remote-logs runtime <featureId> --container chromium
+fusebase remote-logs runtime <appId> --container chromium
 ```
 
 ### Sidecar Not Available
@@ -242,7 +242,7 @@ If a sidecar fails to start, logs will show:
 Check the system logs for container startup issues:
 
 ```bash
-fusebase remote-logs runtime <featureId> --type system
+fusebase remote-logs runtime <appId> --type system
 ```
 
 ## Deployment
@@ -252,13 +252,13 @@ Sidecars are deployed automatically with `fusebase deploy`. The CLI reads the si
 ```bash
 fusebase deploy
 # Output includes:
-# Deploying feature "my-scraper" with sidecars: chromium
+# Deploying app "my-scraper" with sidecars: chromium
 ```
 <% if (it.flags?.includes("job-sidecars")) { %>
 
 ## Job Sidecars
 
-Cron jobs (declared under `features[].backend.jobs[]`) are deployed as **separate Azure Container Apps Jobs**, not as part of the backend container app. They do **not** share the backend's network namespace, so a job cannot reach the backend's sidecars on `localhost`.
+Cron jobs (declared under `apps[].backend.jobs[]`) are deployed as **separate Azure Container Apps Jobs**, not as part of the backend container app. They do **not** share the backend's network namespace, so a job cannot reach the backend's sidecars on `localhost`.
 
 To give a job its own auxiliary container (for example a headless browser used only by a screenshot cron), declare sidecars **on the job**.
 
@@ -303,7 +303,7 @@ Job sidecars live under each job entry in `fusebase.json`:
 
 ```json
 {
-  "features": [
+  "apps": [
     {
       "id": "my-scraper",
       "backend": {
@@ -379,7 +379,7 @@ When `process.exit(0)` runs, the replica completes and `chromium` is torn down w
 
 ## Checklist
 
-- [ ] Feature has a `backend/` folder and `backend` block in `fusebase.json`
+- [ ] App has a `backend/` folder and `backend` block in `fusebase.json`
 - [ ] Added sidecar(s) via `fusebase sidecar add`
 - [ ] Verified sidecar count is at most 3
 - [ ] Backend code uses `localhost:<port>` to communicate with sidecars

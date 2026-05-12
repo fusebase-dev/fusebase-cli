@@ -100,9 +100,9 @@ export function createDefaultOpenApiSpec(): string {
     {
       openapi: "3.1.0",
       info: {
-        title: "Feature Backend API",
+        title: "App Backend API",
         version: "1.0.0",
-        description: "Public callable API for this Fusebase feature.",
+        description: "Public callable API for this Fusebase app.",
       },
       servers: [{ url: "/api" }],
       paths: {

@@ -181,7 +181,7 @@ const addCommand = new Command("add")
         process.exit(1);
       }
 
-      const features = fuseConfig.features ?? [];
+      const features = fuseConfig.apps ?? [];
       const featureIndex = features.findIndex((f) => f.id === opts.feature);
       if (featureIndex === -1) {
         console.error(
@@ -339,7 +339,7 @@ const removeCommand = new Command("remove")
       process.exit(1);
     }
 
-    const features = fuseConfig.features ?? [];
+    const features = fuseConfig.apps ?? [];
     const featureIndex = features.findIndex((f) => f.id === opts.feature);
     if (featureIndex === -1) {
       console.error(
@@ -421,7 +421,7 @@ const listCommand = new Command("list")
       process.exit(1);
     }
 
-    const features = fuseConfig.features ?? [];
+    const features = fuseConfig.apps ?? [];
     const feature = features.find((f) => f.id === opts.feature);
     if (!feature) {
       console.error(

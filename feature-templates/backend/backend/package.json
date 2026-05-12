@@ -1,5 +1,5 @@
 {
-  "name": "feature-backend",
+  "name": "app-backend",
   "private": true,
   "type": "module",
   "scripts": {

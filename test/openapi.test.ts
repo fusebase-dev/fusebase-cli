@@ -13,7 +13,7 @@ describe("OpenAPI Phase 1 validator", () => {
     expect(result.issues).toEqual([]);
     expect(result.operationCount).toBe(1);
     expect(result.operationIds).toEqual(["getHealth"]);
-    expect(result.title).toBe("Feature Backend API");
+    expect(result.title).toBe("App Backend API");
     expect(result.version).toBe("1.0.0");
   });
 
@@ -76,7 +76,7 @@ describe("OpenAPI Phase 1 validator", () => {
     expect(manifest.kind).toBe("app-api-registry");
     expect(manifest.format).toBe("openapi");
     expect(manifest.sourceFile).toBe("openapi.json");
-    expect(manifest.info.title).toBe("Feature Backend API");
+    expect(manifest.info.title).toBe("App Backend API");
     expect(manifest.operations).toEqual([
       {
         operationId: "getHealth",

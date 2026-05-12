@@ -24,24 +24,24 @@ This document summarizes the gaps identified in the existing documentation and t
 
 ---
 
-### 2. Feature Lifecycle
+### 2. App Lifecycle
 
 **Status**: ⚠️ Partially explained
 
 **Gaps identified**:
-- **CLI-FLOWS.md**: Explains feature configuration but doesn't clarify the dual nature
-- **Missing**: Distinction between feature record (API) vs feature code (local)
-- **Missing**: How feature IDs, paths, and runtime URLs relate
+- **CLI-FLOWS.md**: Explains app configuration but doesn't clarify the dual nature
+- **Missing**: Distinction between app record (API) vs app code (local)
+- **Missing**: How app IDs, paths, and runtime URLs relate
 
 **Where gap exists**:
-- `docs/CLI-FLOWS.md` - Feature Configuration Flow section
-- `docs/CLI.md` - Feature configuration section
+- `docs/CLI-FLOWS.md` - App Configuration Flow section
+- `docs/CLI.md` - App configuration section
 
 **What was missing**:
-- Feature record is API-side entity (metadata)
-- Feature code is local source code (implementation)
-- They are linked via `fusebase.json` → `features[].id`
-- Runtime URL uses API-side feature path, not local directory path
+- App record is API-side entity (metadata)
+- App code is local source code (implementation)
+- They are linked via `fusebase.json` → `apps[].id`
+- Runtime URL uses API-side app path, not local directory path
 
 ---
 
@@ -60,7 +60,7 @@ This document summarizes the gaps identified in the existing documentation and t
 **What was missing**:
 - Manual verification steps
 - What to check if MCP fails
-- Impact of MCP unavailability on feature code and LLM assistance
+- Impact of MCP unavailability on app code and LLM assistance
 
 ---
 
@@ -134,8 +134,8 @@ This document summarizes the gaps identified in the existing documentation and t
 
 **Contents**:
 - App Lifecycle: API Entity vs Local Project
-- Feature Lifecycle: Record vs Code
-- Feature IDs, Paths, and Runtime URLs
+- App Lifecycle: Record vs Code
+- App IDs, Paths, and Runtime URLs
 - MCP vs SDK: Responsibility Split
 - How Capability Discovery Works (for Humans and LLMs)
 - Conceptual Data Access Flow
@@ -152,7 +152,7 @@ This document summarizes the gaps identified in the existing documentation and t
 **Additions**:
 1. **Conceptual Model section** (after Purpose & Scope):
    - Quick reference to CONCEPTS.md
-   - Key definitions (App, Local Project, Feature Record, Feature Code, MCP, SDK)
+   - Key definitions (App, Local Project, App Record, App Code, MCP, SDK)
 
 2. **Enhanced "How LLM Discovers Capabilities" section**:
    - Discovery → Implementation flow (3 phases)
@@ -170,8 +170,8 @@ This document summarizes the gaps identified in the existing documentation and t
    - Clarifies API-side vs local-side creation
    - Explains source of truth
 
-2. **Feature Configuration Flow - "Understanding Feature Records vs Feature Code" section**:
-   - Explains dual nature of features
+2. **App Configuration Flow - "Understanding App Records vs App Code" section**:
+   - Explains dual nature of apps
    - Clarifies relationship between API record and local code
 
 3. **MCP Preconfiguration Flow - Enhanced verification section**:
@@ -215,8 +215,8 @@ This document summarizes the gaps identified in the existing documentation and t
 **Consistent terms used**:
 - **"MCP tool"**: Refers to MCP protocol tools (for discovery)
 - **"SDK method"**: Refers to SDK functions (for execution)
-- **"Feature record"**: API-side entity (metadata)
-- **"Feature code"**: Local source code (implementation)
+- **"App record"**: API-side entity (metadata)
+- **"App code"**: Local source code (implementation)
 - **"Discovery"**: Process of finding available operations (MCP)
 - **"Execution"**: Process of calling operations (SDK)
 
@@ -237,7 +237,7 @@ All major docs now link to:
 
 **Verified consistency**:
 - ✅ App lifecycle: Consistent across all docs (API is source of truth)
-- ✅ Feature lifecycle: Consistent (record vs code distinction)
+- ✅ App lifecycle: Consistent (record vs code distinction)
 - ✅ MCP vs SDK: Consistent (discovery vs execution)
 - ✅ SDK usage: Consistent (use `@fusebase/dashboard-service-sdk`)
 - ✅ LLM guidance: Consistent (discover via MCP, execute via SDK)
@@ -251,7 +251,7 @@ All major docs now link to:
 
 ### Files Updated
 1. `docs/ARCHITECTURE.md` - Added conceptual model reference and enhanced LLM discovery section
-2. `docs/CLI-FLOWS.md` - Added clarifications on app/feature lifecycle and MCP verification
+2. `docs/CLI-FLOWS.md` - Added clarifications on app/app lifecycle and MCP verification
 3. `docs/CLI.md` - Enhanced SDK usage section and added links
 4. `README.md` - Added link to conceptual model
 

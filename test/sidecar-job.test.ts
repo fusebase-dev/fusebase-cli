@@ -76,11 +76,11 @@ function setupWorkspace(opts: { withFlag: boolean }): Workspace {
     JSON.stringify(
       {
         orgId: "org-1",
-        appId: "app-1",
-        features: [
+        productId: "app-1",
+        apps: [
           {
-            id: "feature-1",
-            path: "features/feature-1",
+            id: "app-1",
+            path: "apps/app-1",
             backend: {
               start: { command: "node server.js" },
               jobs: [
@@ -116,7 +116,7 @@ function setupWorkspace(opts: { withFlag: boolean }): Workspace {
 }
 
 function readFuseJson(ws: Workspace): {
-  features: Array<{
+  apps: Array<{
     id: string;
     backend?: {
       sidecars?: Array<{ name: string; image: string }>;
@@ -148,7 +148,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -166,7 +166,7 @@ describe("fusebase sidecar --job", () => {
       );
 
       const cfg = readFuseJson(ws);
-      const job = cfg.features[0]!.backend!.jobs!.find(
+      const job = cfg.apps[0]!.backend!.jobs!.find(
         (j) => j.name === "screenshot",
       )!;
       expect(job.sidecars).toEqual([
@@ -177,7 +177,7 @@ describe("fusebase sidecar --job", () => {
         },
       ]);
       // Backend-level sidecars must remain untouched.
-      expect(cfg.features[0]!.backend!.sidecars).toBeUndefined();
+      expect(cfg.apps[0]!.backend!.sidecars).toBeUndefined();
     });
 
     it("add --job rejects unknown job", async () => {
@@ -186,7 +186,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "missing",
           "--name",
@@ -203,7 +203,7 @@ describe("fusebase sidecar --job", () => {
     it("add --job rejects exceeding the 3-sidecar cap", async () => {
       // Pre-populate the job with 3 sidecars.
       const cfg = readFuseJson(ws);
-      const job = cfg.features[0]!.backend!.jobs!.find(
+      const job = cfg.apps[0]!.backend!.jobs!.find(
         (j) => j.name === "screenshot",
       )!;
       job.sidecars = [
@@ -218,7 +218,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -238,7 +238,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -253,7 +253,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -274,7 +274,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "chromium",
           "--image",
@@ -290,7 +290,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -303,10 +303,10 @@ describe("fusebase sidecar --job", () => {
       expect(jobRes.exitCode).toBe(0);
 
       const cfg = readFuseJson(ws);
-      expect(cfg.features[0]!.backend!.sidecars).toEqual([
+      expect(cfg.apps[0]!.backend!.sidecars).toEqual([
         { name: "chromium", image: "browserless/chrome:latest" },
       ]);
-      const job = cfg.features[0]!.backend!.jobs!.find(
+      const job = cfg.apps[0]!.backend!.jobs!.find(
         (j) => j.name === "screenshot",
       )!;
       expect(job.sidecars).toEqual([
@@ -320,7 +320,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -335,7 +335,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -351,7 +351,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "remove",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -362,7 +362,7 @@ describe("fusebase sidecar --job", () => {
       expect(removeRes.exitCode).toBe(0);
 
       const cfg = readFuseJson(ws);
-      const job = cfg.features[0]!.backend!.jobs!.find(
+      const job = cfg.apps[0]!.backend!.jobs!.find(
         (j) => j.name === "screenshot",
       )!;
       expect(job.sidecars).toEqual([{ name: "redis", image: "redis:7" }]);
@@ -374,7 +374,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -389,7 +389,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "remove",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -398,7 +398,7 @@ describe("fusebase sidecar --job", () => {
         ws,
       );
       const cfg = readFuseJson(ws);
-      const job = cfg.features[0]!.backend!.jobs!.find(
+      const job = cfg.apps[0]!.backend!.jobs!.find(
         (j) => j.name === "screenshot",
       )!;
       expect(job.sidecars).toBeUndefined();
@@ -410,7 +410,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "backend-redis",
           "--image",
@@ -423,7 +423,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -435,7 +435,7 @@ describe("fusebase sidecar --job", () => {
       );
 
       const listRes = await runCli(
-        ["sidecar", "list", "--feature", "feature-1", "--job", "screenshot"],
+        ["sidecar", "list", "--feature", "app-1", "--job", "screenshot"],
         ws,
       );
       expect(listRes.exitCode).toBe(0);
@@ -450,7 +450,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "backend-redis",
           "--image",
@@ -463,7 +463,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -475,11 +475,11 @@ describe("fusebase sidecar --job", () => {
       );
 
       const listRes = await runCli(
-        ["sidecar", "list", "--feature", "feature-1"],
+        ["sidecar", "list", "--feature", "app-1"],
         ws,
       );
       expect(listRes.exitCode).toBe(0);
-      expect(listRes.stdout).toContain('Sidecars for feature "feature-1"');
+      expect(listRes.stdout).toContain('Sidecars for feature "app-1"');
       expect(listRes.stdout).toContain("backend-redis");
       expect(listRes.stdout).not.toContain("chromium");
     });
@@ -496,7 +496,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -516,7 +516,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "remove",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -530,7 +530,7 @@ describe("fusebase sidecar --job", () => {
 
     it("list --job is rejected with a flag-required error", async () => {
       const res = await runCli(
-        ["sidecar", "list", "--feature", "feature-1", "--job", "screenshot"],
+        ["sidecar", "list", "--feature", "app-1", "--job", "screenshot"],
         ws,
       );
       expect(res.exitCode).not.toBe(0);
@@ -543,7 +543,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -553,7 +553,7 @@ describe("fusebase sidecar --job", () => {
       );
       expect(res.exitCode).toBe(0);
       const cfg = readFuseJson(ws);
-      expect(cfg.features[0]!.backend!.sidecars).toEqual([
+      expect(cfg.apps[0]!.backend!.sidecars).toEqual([
         { name: "redis", image: "redis:7" },
       ]);
     });

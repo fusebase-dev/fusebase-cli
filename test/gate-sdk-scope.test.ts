@@ -9,13 +9,13 @@ import {
   loadTsProgram,
 } from "../lib/gate-sdk-used-operations.ts";
 
-describe("collectUsedOperations scoped by feature path", () => {
+describe("collectUsedOperations scoped by app path", () => {
   it("collects only Gate operations from files under the requested scope root", () => {
     const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-scope-"));
-    const featureADir = join(dir, "features", "a");
-    const featureBDir = join(dir, "features", "b");
-    mkdirSync(featureADir, { recursive: true });
-    mkdirSync(featureBDir, { recursive: true });
+    const appADir = join(dir, "apps", "a");
+    const appBDir = join(dir, "apps", "b");
+    mkdirSync(appADir, { recursive: true });
+    mkdirSync(appBDir, { recursive: true });
 
     writeFileSync(
       join(dir, "tsconfig.json"),
@@ -27,7 +27,7 @@ describe("collectUsedOperations scoped by feature path", () => {
             moduleResolution: "Bundler",
             strict: false,
           },
-          include: ["features/**/*.ts"],
+          include: ["apps/**/*.ts"],
         },
         null,
         2,
@@ -42,7 +42,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     `;
 
     writeFileSync(
-      join(featureADir, "index.ts"),
+      join(appADir, "index.ts"),
       `${sharedPrelude}
       const api = new TokensApi();
       api.listTokens();
@@ -50,7 +50,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     );
 
     writeFileSync(
-      join(featureBDir, "index.ts"),
+      join(appBDir, "index.ts"),
       `${sharedPrelude}
       const api = new TokensApi();
       api.createToken();
@@ -64,7 +64,7 @@ describe("collectUsedOperations scoped by feature path", () => {
       loaded!.program,
       new Set(["listTokens", "createToken"]),
       new Set(["TokensApi"]),
-      featureADir,
+      appADir,
     );
 
     expect([...used]).toEqual(["listTokens"]);
@@ -74,9 +74,9 @@ describe("collectUsedOperations scoped by feature path", () => {
 
   it("recognizes SDK operations for API classes discovered from dist/apis", async () => {
     const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-access-"));
-    const featureDir = join(dir, "features", "membership");
+    const appDir = join(dir, "apps", "membership");
     const sdkApisDir = join(dir, "node_modules", "@fusebase", "fusebase-gate-sdk", "dist", "apis");
-    mkdirSync(featureDir, { recursive: true });
+    mkdirSync(appDir, { recursive: true });
     mkdirSync(sdkApisDir, { recursive: true });
 
     writeFileSync(
@@ -89,7 +89,7 @@ describe("collectUsedOperations scoped by feature path", () => {
             moduleResolution: "Bundler",
             strict: false,
           },
-          include: ["features/**/*.ts"],
+          include: ["apps/**/*.ts"],
         },
         null,
         2,
@@ -114,7 +114,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     writeFileSync(join(dir, "node_modules", "@fusebase", "fusebase-gate-sdk", "package.json"), `{"version":"0.0.0-test"}`);
 
     writeFileSync(
-      join(featureDir, "index.ts"),
+      join(appDir, "index.ts"),
       `
       class EmailsApi {
         sendOrgEmail() {}
@@ -135,7 +135,7 @@ describe("collectUsedOperations scoped by feature path", () => {
       loaded!.program,
       new Set(sdk.opIds),
       new Set(sdk.apiClassNames),
-      featureDir,
+      appDir,
     );
 
     expect(sdk.apiClassNames).toEqual(["EmailsApi"]);
@@ -144,10 +144,10 @@ describe("collectUsedOperations scoped by feature path", () => {
     rmSync(dir, { recursive: true });
   });
 
-  it("prefers feature-local tsconfig when analyzing a scoped feature", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-feature-tsconfig-"));
-    const featureDir = join(dir, "features", "workspace-permissions");
-    const featureSrcDir = join(featureDir, "src");
+  it("prefers app-local tsconfig when analyzing a scoped app", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-app-tsconfig-"));
+    const appDir = join(dir, "apps", "workspace-permissions");
+    const appSrcDir = join(appDir, "src");
     const sdkApisDir = join(
       dir,
       "node_modules",
@@ -156,10 +156,10 @@ describe("collectUsedOperations scoped by feature path", () => {
       "dist",
       "apis",
     );
-    mkdirSync(featureSrcDir, { recursive: true });
+    mkdirSync(appSrcDir, { recursive: true });
     mkdirSync(sdkApisDir, { recursive: true });
 
-    // Root tsconfig intentionally excludes feature files.
+    // Root tsconfig intentionally excludes app files.
     writeFileSync(
       join(dir, "tsconfig.json"),
       JSON.stringify(
@@ -177,7 +177,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     );
 
     writeFileSync(
-      join(featureDir, "tsconfig.json"),
+      join(appDir, "tsconfig.json"),
       JSON.stringify(
         {
           compilerOptions: {
@@ -217,7 +217,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     );
 
     writeFileSync(
-      join(featureSrcDir, "api.ts"),
+      join(appSrcDir, "api.ts"),
       `
       class WorkspacesApi {
         listWorkspaces() {}
@@ -230,7 +230,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     );
 
     writeFileSync(
-      join(featureSrcDir, "index.ts"),
+      join(appSrcDir, "index.ts"),
       `
       import { createWorkspacesApi } from "@/api";
 
@@ -241,19 +241,19 @@ describe("collectUsedOperations scoped by feature path", () => {
 
     const result = await analyzeGateSdkOperations({
       projectRoot: dir,
-      scopeRoot: featureDir,
+      scopeRoot: appDir,
     });
 
     expect(result.usedOps).toEqual(["listWorkspaces"]);
-    expect(result.tsconfig).toBe(join(featureDir, "tsconfig.json"));
+    expect(result.tsconfig).toBe(join(appDir, "tsconfig.json"));
 
     rmSync(dir, { recursive: true });
   });
 
   it("supports optional chaining and string element access for SDK calls", () => {
     const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-call-shapes-"));
-    const featureDir = join(dir, "features", "calls");
-    mkdirSync(featureDir, { recursive: true });
+    const appDir = join(dir, "apps", "calls");
+    mkdirSync(appDir, { recursive: true });
 
     writeFileSync(
       join(dir, "tsconfig.json"),
@@ -265,7 +265,7 @@ describe("collectUsedOperations scoped by feature path", () => {
             moduleResolution: "Bundler",
             strict: false,
           },
-          include: ["features/**/*.ts"],
+          include: ["apps/**/*.ts"],
         },
         null,
         2,
@@ -273,7 +273,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     );
 
     writeFileSync(
-      join(featureDir, "index.ts"),
+      join(appDir, "index.ts"),
       `
       class NotesApi {
         listWorkspaceNotes() {}
@@ -293,7 +293,7 @@ describe("collectUsedOperations scoped by feature path", () => {
       loaded!.program,
       new Set(["listWorkspaceNotes", "listWorkspaceNoteFolders"]),
       new Set(["NotesApi"]),
-      featureDir,
+      appDir,
     );
 
     expect([...used].sort()).toEqual([
@@ -304,20 +304,20 @@ describe("collectUsedOperations scoped by feature path", () => {
     rmSync(dir, { recursive: true });
   });
 
-  it("falls back to tsconfig.app and feature-local node_modules SDK", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-feature-sdk-root-"));
-    const featureDir = join(dir, "features", "workspace-permissions");
-    const featureSrcDir = join(featureDir, "src");
-    const featureSdkApisDir = join(
-      featureDir,
+  it("falls back to tsconfig.app and app-local node_modules SDK", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-app-sdk-root-"));
+    const appDir = join(dir, "apps", "workspace-permissions");
+    const appSrcDir = join(appDir, "src");
+    const appSdkApisDir = join(
+      appDir,
       "node_modules",
       "@fusebase",
       "fusebase-gate-sdk",
       "dist",
       "apis",
     );
-    mkdirSync(featureSrcDir, { recursive: true });
-    mkdirSync(featureSdkApisDir, { recursive: true });
+    mkdirSync(appSrcDir, { recursive: true });
+    mkdirSync(appSdkApisDir, { recursive: true });
 
     writeFileSync(
       join(dir, "tsconfig.json"),
@@ -336,7 +336,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     );
 
     writeFileSync(
-      join(featureDir, "tsconfig.app.json"),
+      join(appDir, "tsconfig.app.json"),
       JSON.stringify(
         {
           compilerOptions: {
@@ -352,7 +352,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     );
 
     writeFileSync(
-      join(featureSdkApisDir, "WorkspacesApi.js"),
+      join(appSdkApisDir, "WorkspacesApi.js"),
       `
       class WorkspacesApi {
         async listWorkspaces() {
@@ -368,17 +368,17 @@ describe("collectUsedOperations scoped by feature path", () => {
 
     writeFileSync(
       join(
-        featureDir,
+        appDir,
         "node_modules",
         "@fusebase",
         "fusebase-gate-sdk",
         "package.json",
       ),
-      `{"version":"0.0.0-test-feature-sdk"}`,
+      `{"version":"0.0.0-test-app-sdk"}`,
     );
 
     writeFileSync(
-      join(featureSrcDir, "index.ts"),
+      join(appSrcDir, "index.ts"),
       `
       class WorkspacesApi {
         listWorkspaces() {}
@@ -391,23 +391,23 @@ describe("collectUsedOperations scoped by feature path", () => {
 
     const result = await analyzeGateSdkOperations({
       projectRoot: dir,
-      scopeRoot: featureDir,
+      scopeRoot: appDir,
     });
 
     expect(result.usedOps).toEqual(["listWorkspaces"]);
-    expect(result.tsconfig).toBe(join(featureDir, "tsconfig.app.json"));
+    expect(result.tsconfig).toBe(join(appDir, "tsconfig.app.json"));
     expect(result.sdkRoot).toBe(
-      join(featureDir, "node_modules", "@fusebase", "fusebase-gate-sdk"),
+      join(appDir, "node_modules", "@fusebase", "fusebase-gate-sdk"),
     );
 
     rmSync(dir, { recursive: true });
   });
 
-  it("combines usedOps from feature and backend tsconfigs", async () => {
+  it("combines usedOps from app and backend tsconfigs", async () => {
     const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-backend-scope-"));
-    const featureDir = join(dir, "features", "ai-membership-landing");
-    const featureSrcDir = join(featureDir, "src");
-    const backendSrcDir = join(featureDir, "backend", "src");
+    const appDir = join(dir, "apps", "ai-membership-landing");
+    const appSrcDir = join(appDir, "src");
+    const backendSrcDir = join(appDir, "backend", "src");
     const sdkApisDir = join(
       dir,
       "node_modules",
@@ -416,12 +416,12 @@ describe("collectUsedOperations scoped by feature path", () => {
       "dist",
       "apis",
     );
-    mkdirSync(featureSrcDir, { recursive: true });
+    mkdirSync(appSrcDir, { recursive: true });
     mkdirSync(backendSrcDir, { recursive: true });
     mkdirSync(sdkApisDir, { recursive: true });
 
     writeFileSync(
-      join(featureDir, "tsconfig.json"),
+      join(appDir, "tsconfig.json"),
       JSON.stringify(
         {
           compilerOptions: {
@@ -437,7 +437,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     );
 
     writeFileSync(
-      join(featureDir, "backend", "tsconfig.json"),
+      join(appDir, "backend", "tsconfig.json"),
       JSON.stringify(
         {
           compilerOptions: {
@@ -486,7 +486,7 @@ describe("collectUsedOperations scoped by feature path", () => {
     );
 
     writeFileSync(
-      join(featureSrcDir, "index.ts"),
+      join(appSrcDir, "index.ts"),
       `
       class AccessApi {
         getMyOrgAccess() {}
@@ -509,11 +509,11 @@ describe("collectUsedOperations scoped by feature path", () => {
 
     const result = await analyzeGateSdkOperations({
       projectRoot: dir,
-      scopeRoot: featureDir,
+      scopeRoot: appDir,
     });
 
     expect(result.usedOps).toEqual(["getMyOrgAccess", "listOrgUsers"]);
-    expect(result.tsconfig).toBe(join(featureDir, "tsconfig.json"));
+    expect(result.tsconfig).toBe(join(appDir, "tsconfig.json"));
 
     rmSync(dir, { recursive: true });
   });

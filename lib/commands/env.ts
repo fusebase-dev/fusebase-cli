@@ -13,6 +13,7 @@ import {
   setupIdeConfig,
   type IdePreset,
 } from "./steps/ide-setup";
+import { normalizeRawFuseConfigShape } from "../config";
 
 const CONFIG_DIR = join(homedir(), ".fusebase");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
@@ -24,7 +25,7 @@ interface Config {
 
 interface FuseConfig {
   orgId?: string;
-  appId?: string;
+  productId?: string;
 }
 
 const ALL_IDE_PRESETS: IdePreset[] = ["claude-code", "cursor", "vscode", "opencode", "codex", "other"];
@@ -51,7 +52,9 @@ async function loadFuseConfig(cwd: string): Promise<FuseConfig> {
   const fuseJsonPath = join(cwd, FUSE_JSON);
   try {
     const data = await readFile(fuseJsonPath, "utf-8");
-    return JSON.parse(data) as FuseConfig;
+    const raw = JSON.parse(data) as Record<string, unknown>;
+    normalizeRawFuseConfigShape(raw);
+    return raw as FuseConfig;
   } catch {
     return {};
   }
@@ -71,8 +74,8 @@ export async function runEnvCreate(force: boolean = true): Promise<void> {
     console.error("Error: orgId not found in fusebase.json.");
     process.exit(1);
   }
-  if (!fuseConfig.appId) {
-    console.error("Error: appId not found in fusebase.json.");
+  if (!fuseConfig.productId) {
+    console.error("Error: productId not found in fusebase.json.");
     process.exit(1);
   }
 
@@ -86,7 +89,7 @@ export async function runEnvCreate(force: boolean = true): Promise<void> {
     targetDir: cwd,
     apiKey: config.apiKey,
     orgId: fuseConfig.orgId,
-    appId: fuseConfig.appId,
+    appId: fuseConfig.productId,
     force,
   });
 

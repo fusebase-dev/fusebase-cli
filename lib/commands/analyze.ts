@@ -89,7 +89,7 @@ analyzeCommand
           throw new Error("fusebase.json not found. Run fusebase init first.");
         }
 
-        const features = getAnalyzableFeatures(fuseConfig.features, opts.feature);
+        const features = getAnalyzableFeatures(fuseConfig.apps, opts.feature);
         const analyses: FeatureGateAnalysisOutput[] = [];
         const apiKey = getConfig().apiKey;
 

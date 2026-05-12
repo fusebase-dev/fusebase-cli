@@ -36,7 +36,7 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 **API-side** (source of truth):
 
 - App record in Fusebase API (if creating new app)
-- App has unique `appId` and belongs to an `orgId`
+- App has unique `productId` and belongs to an `orgId`
 - App exists permanently in Fusebase, independent of local project
 
 **Local-side** (workspace):
@@ -169,8 +169,8 @@ See [Configuration Files](#appendix-config-file-locations) for details.
   - **Dev mode**: Copy from `project-template/` directory
 - **Files created**:
   - All files from `project-template/` directory
-  - `features/` directory (created)
-- **Note**: `feature-templates/` directory is NOT copied during `fusebase init` - templates are only used when selected during `fusebase feature create`
+  - `apps/` directory (created)
+- **Note**: `feature-templates/` directory is NOT copied during `fusebase init` - templates are only used when selected during `fusebase app create`
 - **Placeholders replaced**:
   - `package.json`: `{{APP_NAME}}` → sanitized app name
   - `explore-databases.ts`: `{{ORG_ID}}` → selected org ID
@@ -216,7 +216,7 @@ See [Configuration Files](#appendix-config-file-locations) for details.
   ```json
   {
     "orgId": "<selected-org-id>",
-    "appId": "<selected-app-id>"
+    "productId": "<selected-app-id>"
   }
   ```
 
@@ -347,13 +347,13 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 ## 3. Dev Start Flow (Run Local Dev)
 
-**Entry command**: `fusebase dev start [feature]`
+**Entry command**: `fusebase dev start [app]`
 
 ### Preconditions
 
 - App must be initialized (`fusebase.json` must exist)
 - API key must be configured (`fusebase auth` must have been run)
-- At least one feature must be configured in `fusebase.json`
+- At least one app must be configured in `fusebase.json`
 
 ### Step-by-Step Flow
 
@@ -365,43 +365,43 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 - **Action**: Load `fusebase.json` from project root
 - **If missing**: Exit with error "App not initialized. Run 'fusebase init' first."
-- **If invalid**: Exit with error "Invalid fusebase.json. Missing orgId or appId."
+- **If invalid**: Exit with error "Invalid fusebase.json. Missing orgId or productId."
 
-#### Step 3: Check Features
+#### Step 3: Check Apps
 
-- **Action**: Check `fusebase.json.features` array
-- **If empty or missing**: Exit with error "No features configured in fusebase.json."
+- **Action**: Check `fusebase.json.apps` array
+- **If empty or missing**: Exit with error "No apps configured in fusebase.json."
 
 #### Step 4: Load API Key
 
 - **Action**: Read `~/.fusebase/config.json`
 - **If missing**: Exit with error "No API key configured. Run 'fusebase auth' first."
 
-#### Step 5: Select Feature
+#### Step 5: Select App
 
-- **If `[feature]` argument provided**: Find feature by ID or path
-- **If only one feature**: Auto-select (no prompt)
-- **If multiple features and no argument**: Prompt user
+- **If `[app]` argument provided**: Find app by ID or path
+- **If only one app**: Auto-select (no prompt)
+- **If multiple apps and no argument**: Prompt user
 
-**Prompt** (if multiple features and no argument):
+**Prompt** (if multiple apps and no argument):
 
-- **Question**: `"Select a feature to develop:"`
+- **Question**: `"Select an app to develop:"`
 - **Type**: `select` (single choice)
-- **Options**: Feature paths/IDs, with `(no dev command)` suffix if missing dev command
-- **Where stored**: `selectedFeature` variable
+- **Options**: App paths/IDs, with `(no dev command)` suffix if missing dev command
+- **Where stored**: `selectedApp` variable
 
 #### Step 6: Install Dependencies
 
-- **Action**: Check for `package.json` in feature directory
-- **If exists**: Run `npm install` in feature directory
+- **Action**: Check for `package.json` in app directory
+- **If exists**: Run `npm install` in app directory
 - **If not exists**: Skip
 
-#### Step 7: Start Feature Dev Server (if `dev.command` configured)
+#### Step 7: Start App Dev Server (if `dev.command` configured)
 
-- **Condition**: Only if `selectedFeature.dev?.command` exists
-- **Action**: Spawn feature's dev server process
-  - Command: `selectedFeature.dev.command`
-  - Working directory: Feature path (or project root if no path)
+- **Condition**: Only if `selectedApp.dev?.command` exists
+- **Action**: Spawn app's dev server process
+  - Command: `selectedApp.dev.command`
+  - Working directory: App path (or project root if no path)
   - Output: Captured from stdout/stderr for URL detection
 - **URL detection**: Parses stdout/stderr for dev server URL patterns
 - **If detected**: Stores URL in `devUrlState.url`
@@ -411,7 +411,7 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 - **Action**: Start Bun HTTP server on port 4174 (auto-finds available port)
 - **Routes**:
-  - `GET /api/features`: Returns features list with dev URLs
+  - `GET /api/apps`: Returns apps list with dev URLs
   - `* /api/*`: Proxies to Fusebase API with auth headers
 - **Port**: Auto-finds available port starting from 4174
 - **Output**: `"🚀 Dev API server running at http://localhost:{port}"`
@@ -436,15 +436,15 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 #### Step 11: Setup Signal Handlers
 
 - **Action**: Register SIGINT/SIGTERM handlers
-- **On cleanup**: Kill feature dev server, stop API server, close Vite server, exit
+- **On cleanup**: Kill app dev server, stop API server, close Vite server, exit
 
 ### Required Config
 
 **From `fusebase.json`**:
 
 - `orgId`: Organization ID
-- `appId`: App ID
-- `features[]`: At least one feature with `id` (and optionally `path`, `dev.command`)
+- `productId`: App ID
+- `apps[]`: At least one app with `id` (and optionally `path`, `dev.command`)
 
 **From `~/.fusebase/config.json`**:
 
@@ -452,7 +452,7 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 ### Interactive Prompts
 
-- **Feature selection** (if multiple features and no argument provided)
+- **App selection** (if multiple apps and no argument provided)
   - See Step 5 above
 
 ### Health Checks / Verification
@@ -462,20 +462,20 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 1. API proxy server is running: Check console for `"🚀 Dev API server running at http://localhost:{port}"`
 2. Frontend UI server is running: Check console for `"🚀 Dev UI server running at http://localhost:{port}"`
 3. Browser opened: Should see dev UI at `http://localhost:{vite-port}`
-4. Feature dev server (if configured): Check console for dev server output and URL detection
-5. Feature token delivery: Check browser console for `postMessage` with `type: 'featuretoken'`
+4. App dev server (if configured): Check console for dev server output and URL detection
+5. App token delivery: Check browser console for `postMessage` with `type: 'featuretoken'`
 
 **Common issues**:
 
 - Port conflicts: Servers auto-find available ports, but if issues persist, kill processes on 4173/4174
-- Feature token not received: Ensure feature iframe listens for `postMessage`
+- App token not received: Ensure app iframe listens for `postMessage`
 - Dev URL not detected: Manually enter URL in dev UI
 
 ---
 
-## 4. Feature Configuration Flow
+## 4. App Configuration Flow
 
-**Entry command**: `fusebase feature create [--path <path>]`
+**Entry command**: `fusebase app create [--path <path>]`
 
 ### Preconditions
 
@@ -488,76 +488,76 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 - **Action**: Load `fusebase.json` from project root
 - **If missing**: Exit with error "App not initialized. Run 'fusebase init' first."
-- **If invalid**: Exit with error "Invalid fusebase.json. Missing orgId or appId."
+- **If invalid**: Exit with error "Invalid fusebase.json. Missing orgId or productId."
 
 #### Step 2: Load API Key
 
 - **Action**: Read `~/.fusebase/config.json`
 - **If missing**: Exit with error "No API key configured. Run 'fusebase auth' first."
 
-#### Step 3: Fetch Features
+#### Step 3: Fetch Apps
 
-- **Action**: Call `fetchAppFeatures(apiKey, orgId, appId)` via API
-- **If error**: Exit with error "Failed to fetch app features."
+- **Action**: Call `fetchApps(apiKey, orgId, productId)` via API
+- **If error**: Exit with error "Failed to fetch apps."
 
-#### Step 4: Select or Create Feature
+#### Step 4: Select or Create App
 
-- **If no features exist**: Prompt to create new feature
-- **If features exist**: Prompt to select or create
+- **If no apps exist**: Prompt to create new app
+- **If apps exist**: Prompt to select or create
 
-**Prompts** (if no features exist):
+**Prompts** (if no apps exist):
 
-1. **Question**: `"Enter a title for the new feature:"`
+1. **Question**: `"Enter a title for the new app:"`
    - **Type**: `input`
    - **Validation**: Required, non-empty
-2. **Question**: `"Enter a path for the feature (e.g., dashboard):"`
+2. **Question**: `"Enter a path for the app (e.g., dashboard):"`
    - **Type**: `input`
    - **Validation**: Required, non-empty
 
-**Prompt** (if features exist):
+**Prompt** (if apps exist):
 
-- **Question**: `"Select a feature to develop:"`
+- **Question**: `"Select an app to develop:"`
 - **Type**: `select`
-- **Options**: Feature titles + descriptions, plus `"+ Create new feature"`
-- **If `"+ Create new feature"` selected**: Same prompts as above
+- **Options**: App titles + descriptions, plus `"+ Create new app"`
+- **If `"+ Create new app"` selected**: Same prompts as above
 
-**Action** (if creating new feature):
+**Action** (if creating new app):
 
-- Call `createAppFeature(apiKey, orgId, appId, title, path)` via API
-- **Where stored**: `selectedFeature` variable
+- Call `createApp(apiKey, orgId, productId, title, path)` via API
+- **Where stored**: `selectedApp` variable
 
-#### Step 5: Template Selection (if creating new feature)
+#### Step 5: Template Selection (if creating new app)
 
-- **Prompt**: `"Choose how to create the feature:"`
+- **Prompt**: `"Choose how to create the app:"`
 - **Type**: `select`
 - **Options**: Available templates (from `feature-templates/` directory) + "From scratch (manual setup)"
 - **If template selected**:
-  - Generate default path: `features/{pathFriendlyName}` (from feature URL path)
-  - Copy template files to feature directory
+  - Generate default path: `apps/{pathFriendlyName}` (from app URL path)
+  - Copy template files to app directory
   - Replace template variables (e.g., `{{FEATURE_NAME}}`)
   - Auto-detect dev/build commands from template's `package.json`
 
-#### Step 6: Get Feature Path
+#### Step 6: Get App Path
 
 - **If `--path` flag provided**: Use it (convert to relative path)
 - **If not provided**: Prompt user
 
 **Prompt** (if `--path` not provided):
 
-- **If `features/` directory exists with subdirectories**:
-  - **Question**: `"Select feature folder:"`
+- **If `apps/` directory exists with subdirectories**:
+  - **Question**: `"Select app folder:"`
   - **Type**: `select`
-  - **Options**: Detected folders in `features/`, `"Enter path manually"`, `"Skip (leave empty)"`
+  - **Options**: Detected folders in `apps/`, `"Enter path manually"`, `"Skip (leave empty)"`
   - **Default**: Existing path from config (if exists), else first detected folder
   - **If `"Enter path manually"` selected**: Prompt for manual input
 - **If no folders detected**:
-  - **Question**: `"Enter the feature path (relative to current directory, leave empty to skip):"`
+  - **Question**: `"Enter the app path (relative to current directory, leave empty to skip):"`
   - **Type**: `input`
   - **Default**: Existing path from config (if exists)
 
 #### Step 7: Detect/Get Dev Command
 
-- **Action**: Try to detect from `package.json` in feature directory
+- **Action**: Try to detect from `package.json` in app directory
   - Reads `package.json` and detects framework (Vite, Next.js, React, etc.)
   - Returns detected command or `null`
 - **If detected**: Use detected command (prints "Detected {framework} project")
@@ -571,7 +571,7 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 #### Step 8: Detect/Get Build Command
 
-- **Action**: Try to detect from `package.json` in feature directory
+- **Action**: Try to detect from `package.json` in app directory
 - **If detected**: Use detected command
 - **If not detected**: Prompt user
 
@@ -583,7 +583,7 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 #### Step 9: Detect/Get Build Output Directory
 
-- **Action**: Try to detect from `package.json` in feature directory
+- **Action**: Try to detect from `package.json` in app directory
 - **If detected**: Use detected output directory
 - **If not detected**: Prompt user
 
@@ -595,14 +595,14 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 #### Step 10: Update fusebase.json
 
-- **Action**: Update `fusebase.json` with feature configuration
+- **Action**: Update `fusebase.json` with app configuration
 - **Content added/updated**:
   ```json
   {
-    "features": [
+    "apps": [
       {
-        "id": "<feature-id>",
-        "path": "<feature-path>", // if provided
+        "id": "<app-id>",
+        "path": "<app-path>", // if provided
         "dev": {
           "command": "<dev-command>" // if provided
         },
@@ -614,64 +614,64 @@ See [Configuration Files](#appendix-config-file-locations) for details.
     ]
   }
   ```
-- **Behavior**: Updates existing feature config if `id` matches, otherwise appends
+- **Behavior**: Updates existing app config if `id` matches, otherwise appends
 
 ### Outputs / Side Effects
 
 **Files created/modified**:
 
-- `fusebase.json` (updated with feature config)
+- `fusebase.json` (updated with app config)
 
 **API calls**:
 
-- `fetchAppFeatures(apiKey, orgId, appId)`
-- `createAppFeature(apiKey, orgId, appId, title, path)` (if creating new feature)
+- `fetchApps(apiKey, orgId, productId)`
+- `createApp(apiKey, orgId, productId, title, path)` (if creating new app)
 
 **Console output**:
 
 - `"✓ Development mode configured"`
-- Feature details (path, dev command, build command, output dir)
+- App details (path, dev command, build command, output dir)
 
-### How Feature Selection Works
+### How App Selection Works
 
-- Features are fetched from API (not just from `fusebase.json`)
-- User can select existing feature or create new one
-- Selected feature is then configured with local paths and commands
-- Configuration is stored in `fusebase.json` → `features[]` array
+- Apps are fetched from API (not just from `fusebase.json`)
+- User can select existing app or create new one
+- Selected app is then configured with local paths and commands
+- Configuration is stored in `fusebase.json` → `apps[]` array
 
 ### What is Generated/Scaffolded
 
-- **If template selected**: Template files are copied to feature directory (e.g., `features/{url-path}/`)
+- **If template selected**: Template files are copied to app directory (e.g., `apps/{url-path}/`)
   - Template files include: `package.json`, `vite.config.ts`, `src/`, etc.
   - Template variables are replaced (e.g., `{{FEATURE_NAME}}`)
   - Dev/build commands are auto-detected from template's `package.json`
 - **If "From scratch" selected**: No files are scaffolded
-  - Local feature code must exist before running this command (or be created separately)
+  - Local app code must exist before running this command (or be created separately)
 
-### Understanding Feature Records vs Feature Code
+### Understanding App Records vs App Code
 
-**Feature Record** (API-side):
+**App Record** (API-side):
 
-- Created via `createAppFeature()` API call
+- Created via `createApp()` API call
 - Has: `id`, `title`, `path` (URL segment), `description`
 - Exists permanently in Fusebase
-- Source of truth for feature metadata
+- Source of truth for app metadata
 
-**Feature Code** (local):
+**App Code** (local):
 
-- Lives in `features/{name}/` directory
+- Lives in `apps/{name}/` directory
 - Written by developer (React/Vite app)
 - Configured in `fusebase.json` with:
-  - `id`: Must match API-side feature ID
-  - `path`: Local directory path (e.g., `"features/widget"`)
+  - `id`: Must match API-side app ID
+  - `path`: Local directory path (e.g., `"apps/widget"`)
   - `dev.command`: How to run locally
   - `build.command`: How to build for deployment
 
 **The relationship**:
 
-- Feature record (API) and feature code (local) are separate
+- App record (API) and app code (local) are separate
 - `fusebase.json` links them via the `id` field
-- Deployment uploads built code to create a new version of the feature record
+- Deployment uploads built code to create a new version of the app record
 
 ---
 
@@ -683,7 +683,7 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 - App must be initialized (`fusebase.json` must exist)
 - API key must be configured (`fusebase auth` must have been run)
-- At least one feature must have a `path` configured in `fusebase.json`
+- At least one app must have a `path` configured in `fusebase.json`
 
 ### Step-by-Step Flow
 
@@ -691,64 +691,64 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 
 - **Action**: Load `fusebase.json` from project root
 - **If missing**: Exit with error "App not initialized. Run 'fusebase init' first."
-- **If invalid**: Exit with error "Invalid fusebase.json. Missing orgId or appId."
+- **If invalid**: Exit with error "Invalid fusebase.json. Missing orgId or productId."
 
 #### Step 2: Load API Key
 
 - **Action**: Read `~/.fusebase/config.json`
 - **If missing**: Exit with error "No API key configured. Run 'fusebase auth' first."
 
-#### Step 3: Find Deployable Features
+#### Step 3: Find Deployable Apps
 
-- **Action**: Filter `fusebase.json.features[]` for features with `path` configured
-- **If none**: Exit with error "No features with path configured in fusebase.json."
+- **Action**: Filter `fusebase.json.apps[]` for apps with `path` configured
+- **If none**: Exit with error "No apps with path configured in fusebase.json."
 
-#### Step 4: Fetch App and Features
+#### Step 4: Fetch App and Apps
 
-- **Action**: Call `fetchApp(apiKey, orgId, appId)` and `fetchAppFeatures(apiKey, orgId, appId)` via API
-- **If error**: Exit with error "Failed to fetch app or features from API."
+- **Action**: Call `fetchApp(apiKey, orgId, productId)` and `fetchApps(apiKey, orgId, productId)` via API
+- **If error**: Exit with error "Failed to fetch app or apps from API."
 
-#### Step 5: Deploy Each Feature
+#### Step 5: Deploy Each App
 
-For each deployable feature:
+For each deployable app:
 
 1. **Check Path Exists**
-   - Verify feature path directory exists
-   - **If not**: Error, skip feature
+   - Verify app path directory exists
+   - **If not**: Error, skip app
 
 2. **Install Dependencies** (if `package.json` exists)
-   - Run `npm install` in feature directory
-   - **If error**: Error, skip feature
+   - Run `npm install` in app directory
+   - **If error**: Error, skip app
 
 3. **Run Build Command** (if `build.command` configured)
-   - Run build command in feature directory
-   - **If error**: Error, skip feature
+   - Run build command in app directory
+   - **If error**: Error, skip app
 
 4. **Determine Upload Directory**
-   - If `build.outputDir` configured: `{feature.path}/{build.outputDir}`
-   - Otherwise: `{feature.path}`
+   - If `build.outputDir` configured: `{app.path}/{build.outputDir}`
+   - Otherwise: `{app.path}`
    - Verify directory exists
-   - **If not**: Error, skip feature
+   - **If not**: Error, skip app
 
 5. **Collect Files**
    - Recursively collect all files from upload directory
-   - **If empty**: Error, skip feature
+   - **If empty**: Error, skip app
 
-6. **Create Feature Version**
-   - Call `createAppFeatureVersion(apiKey, orgId, appId, featureId)` via API
+6. **Create App Version**
+   - Call `createAppVersion(apiKey, orgId, productId, appId)` via API
    - Returns version ID
 
 7. **Initialize Upload**
-   - Call `initUpload(apiKey, orgId, appId, featureId, versionId, files)` via API
+   - Call `initUpload(apiKey, orgId, productId, appId, versionId, files)` via API
    - Returns signed upload URLs for each file
 
 8. **Upload Files**
    - Upload files in parallel (5 concurrent uploads)
    - Show progress bar with bytes and file count
-   - **If error**: Error, skip feature
+   - **If error**: Error, skip app
 
-9. **Build Feature URL**
-   - Format: `https://{app.sub}.{domain}/{feature.path}`
+9. **Build App URL**
+   - Format: `https://{app.sub}.{domain}/{app.path}`
    - Domain: `dev-thefusebase-app.com` (if dev env) or `thefusebase.app` (prod)
 
 ### Required Inputs
@@ -756,16 +756,16 @@ For each deployable feature:
 **From `fusebase.json`**:
 
 - `orgId`: Organization ID
-- `appId`: App ID
-- `features[]`: At least one feature with `path` configured
+- `productId`: App ID
+- `apps[]`: At least one app with `path` configured
 
 **From `~/.fusebase/config.json`**:
 
 - `apiKey`: API key for authentication
 
-**From feature directory**:
+**From app directory**:
 
-- Feature code files (in `path` or `path/{outputDir}`)
+- App code files (in `path` or `path/{outputDir}`)
 
 ### Interactive Confirmations
 
@@ -775,21 +775,21 @@ For each deployable feature:
 
 **Build artifacts** (if `build.command` configured):
 
-- Output directory: `{feature.path}/{build.outputDir}` (or `{feature.path}` if no `outputDir`)
+- Output directory: `{app.path}/{build.outputDir}` (or `{app.path}` if no `outputDir`)
 - All files in output directory are uploaded
 
 **Deployment artifacts**:
 
-- New feature version created in Fusebase
+- New app version created in Fusebase
 - Files uploaded to S3
-- Feature accessible at: `https://{app.sub}.{domain}/{feature.path}`
+- App accessible at: `https://{app.sub}.{domain}/{app.path}`
 
 ### Rollback Notes
 
 **No rollback command exists**. To rollback:
 
 - Deploy a previous version manually (not supported by CLI)
-- Or edit feature code and redeploy
+- Or edit app code and redeploy
 
 ---
 
@@ -827,13 +827,7 @@ For each deployable feature:
 - **Resource scope**: All databases, dashboards, views (`*`)
 - **Token name**: `"MCP Token (generated by CLI)"`
 
-Default dashboard MCP token behavior:
-
-- includes dashboard/view/database read permissions
-- includes `view.write` so MCP can update schema for existing views/dashboards (for example `updateViewIntent` to add custom columns)
-- does **not** include `database.write` or `dashboard.write`, so it cannot create new dashboard DBs or dashboards unless `legacy-dashboards-db` is enabled
-
-This token is for MCP/development usage only. It is separate from runtime feature permissions and separate from feature tokens used by deployed or locally served features.
+This token is for MCP/development usage only. It is separate from runtime app permissions and separate from app tokens used by deployed or locally served apps.
 
 #### Step 3: Create/Update .env File
 
@@ -886,7 +880,7 @@ The following must be true:
 
 **What happens if MCP is unavailable**:
 
-- Feature code using SDK may fail at runtime
+- App code using SDK may fail at runtime
 - LLM-assisted development cannot discover capabilities
 - Manual API knowledge required (not recommended)
 
@@ -945,22 +939,22 @@ fusebase init --ide "cursor" --force
 
 **Note**: Organization and app selection still require API access. If only one org/app exists, they are auto-selected. Otherwise, init will fail in non-TTY environments.
 
-#### Dev Feature Flow
+#### Dev App Flow
 
 ```bash
 # Skip path prompt
-fusebase feature create --path features/my-feature
+fusebase app create --path apps/my-app
 ```
 
-**Note**: Other prompts (feature selection, dev command, build command, output dir) will still appear if not auto-detected.
+**Note**: Other prompts (app selection, dev command, build command, output dir) will still appear if not auto-detected.
 
 #### Dev Start Flow
 
 ```bash
-# Skip feature selection prompt
-fusebase dev start my-feature-id
+# Skip app selection prompt
+fusebase dev start my-app-id
 # or
-fusebase dev start features/dashboard
+fusebase dev start apps/dashboard
 ```
 
 #### Deploy Flow
@@ -1012,7 +1006,7 @@ fusebase deploy
 **Note**: `fusebase init` may still fail in CI if multiple orgs/apps exist (requires interactive selection). Consider:
 
 - Using an API key that only has access to one org/app
-- Or pre-creating `fusebase.json` with correct `orgId` and `appId`
+- Or pre-creating `fusebase.json` with correct `orgId` and `productId`
 
 ---
 
@@ -1023,7 +1017,7 @@ fusebase deploy
 | File             | Location                       | Purpose                                       | Written By                                 |
 | ---------------- | ------------------------------ | --------------------------------------------- | ------------------------------------------ |
 | Global config    | `~/.fusebase/config.json`      | User-level API key and environment            | `fusebase auth`                            |
-| Project config   | `fusebase.json` (project root) | Project-level org/app IDs and feature configs | `fusebase init`, `fusebase feature create` |
+| Project config   | `fusebase.json` (project root) | Project-level org/app IDs and app configs | `fusebase init`, `fusebase app create` |
 | Environment file | `.env` (project root)          | MCP token and URL for local development       | `fusebase init` (if template used)         |
 | Error log        | `~/.fusebase/error.log`        | Detailed error logs (Pino JSON format)        | All commands (via logger)                  |
 
@@ -1033,18 +1027,18 @@ fusebase deploy
 | ---------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------- |
 | "App not initialized"              | `fusebase.json` missing                          | Run `fusebase init`                                              |
 | "No API key configured"            | `~/.fusebase/config.json` missing or invalid     | Run `fusebase auth --api-key=<api-key>`                          |
-| "No features configured"           | `fusebase.json.features[]` empty                 | Run `fusebase feature create`                                    |
+| "No apps configured"           | `fusebase.json.apps[]` empty                 | Run `fusebase app create`                                    |
 | "Invalid API key"                  | API key validation failed                        | Check API key is correct, run `fusebase auth` again              |
 | "Failed to fetch organizations"    | Network error or invalid API key                 | Check internet connection and API key                            |
 | Port conflicts (dev server)        | Ports 4173/4174 in use                           | Kill processes on those ports, servers auto-find available ports |
-| Feature token not received         | Iframe not listening for `postMessage`           | Ensure feature code listens for `type: 'featuretoken'` messages  |
+| App token not received         | Iframe not listening for `postMessage`           | Ensure app code listens for `type: 'featuretoken'` messages  |
 | Dev URL not detected               | Dev server output doesn't match patterns         | Manually enter URL in dev UI                                     |
-| "No features with path configured" | Features in `fusebase.json` missing `path` field | Run `fusebase feature create` to configure paths                 |
-| Build fails on deploy              | Build command or output directory incorrect      | Check `fusebase.json` → `features[]` → `build` config            |
+| "No apps with path configured" | Apps in `fusebase.json` missing `path` field | Run `fusebase app create` to configure paths                 |
+| Build fails on deploy              | Build command or output directory incorrect      | Check `fusebase.json` → `apps[]` → `build` config            |
 | MCP token not generated            | Template not used during init                    | Re-run `fusebase init` with template, or manually create `.env`  |
 
 ### Links
 
 - **Command Reference**: [CLI Commands & Interactive Prompts](CLI.md)
 - **Architecture**: [Architecture Documentation](ARCHITECTURE.md)
-- **Conceptual Model**: [Apps, Features, and Data Access](CONCEPTS.md)
+- **Conceptual Model**: [Products, Apps, and Data Access](CONCEPTS.md)

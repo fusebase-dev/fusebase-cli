@@ -1,15 +1,15 @@
 import { Command } from "commander";
 import { getConfig, loadFuseConfig } from "../config";
-import { fetchFeatureToken } from "../api";
+import { fetchAppToken } from "../api";
 
 export const tokenCreateCommand = new Command("create")
   .description("Create a short-lived app development token for a feature")
   .requiredOption("--feature <featureId>", "Feature ID to create token for")
   .action(async (options: { feature: string }) => {
     const fuseConfig = loadFuseConfig();
-    if (!fuseConfig || !fuseConfig.orgId || !fuseConfig.appId) {
+    if (!fuseConfig || !fuseConfig.orgId || !fuseConfig.productId) {
       console.error(
-        "Error: Invalid fusebase.json. Missing orgId or appId. Run 'fusebase init' first.",
+        "Error: Invalid fusebase.json. Missing orgId or productId. Run 'fusebase init' first.",
       );
       process.exit(1);
     }
@@ -21,10 +21,10 @@ export const tokenCreateCommand = new Command("create")
     }
 
     try {
-      const result = await fetchFeatureToken(
+      const result = await fetchAppToken(
         config.apiKey,
         fuseConfig.orgId,
-        fuseConfig.appId,
+        fuseConfig.productId,
         options.feature,
         { short: true },
       );

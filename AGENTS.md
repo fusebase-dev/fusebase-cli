@@ -25,13 +25,13 @@ lib/
   api.ts        # Fusebase API client functions
   dev-server/   # Local development proxy and logging sources
     server.ts   # Bun dev proxy server
-  feature-templates.ts  # Feature template utilities
+  feature-templates.ts  # App template utilities
   template-engine.ts    # Eta template rendering for skills/AGENTS.md
   commands/
     init.ts     # Initialize command
     deploy.ts   # Deploy command
     dev.ts      # Development server commands
-    feature.ts  # Feature list/create/update commands
+    app.ts  # App list/create/update commands
     env.ts      # Env commands (env create)
     skills.ts   # Skills update command
   steps/
@@ -40,17 +40,17 @@ lib/
 dev-server/
   vite.config.ts
   src/
-    App.tsx     # Dev UI for testing features in iframes
+    App.tsx     # Dev UI for testing apps in iframes
 project-template/
-  AGENTS.md     # Single source of truth for feature development
-  .claude/skills/  # Feature development skills in agentskills format
-    app-ui-design/SKILL.md  # UI/UX and visual design for generated app features
+  AGENTS.md     # Single source of truth for app development
+  .claude/skills/  # App development skills in agentskills format
+    app-ui-design/SKILL.md  # UI/UX and visual design for generated apps
     file-upload/SKILL.md  # File upload guide
     fusebase-cli/SKILL.md  # CLI documentation
     fusebase-dashboards/SKILL.md  # MCP + dashboards/data; SDK discovery for runtime
     fusebase-gate/SKILL.md  # Gate MCP/SDK; orgs, users, platform ecosystem
     handling-authentication-errors/SKILL.md  # Auth error handling
-feature-templates/  # Feature templates (copied only when selected)
+feature-templates/  # App templates (copied only when selected)
   hello-world/  # Hello World template (React + Vite + SDK)
 ide-configs/    # IDE-specific MCP configurations
 ```
@@ -67,24 +67,24 @@ bun index.ts [command]
 - `version` - Print CLI version (from package.json)
 - `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to initialize local Git and sync with configured GitLab remote; `--skip-git` to force-disable git init/sync for this run; optional `--git-tag-managed` to set `managed` topic in GitLab when app is managed; in interactive mode shows editable suggested repo name before sync; same behavior can be enabled globally with flag `git-init`)
 - `git` - Initialize a local Git repository in the current directory (`fusebase git`) and sync an existing local repo with configured GitLab remote (`fusebase git sync` or `fusebase git --git-sync`); requires global config keys `gitlabHost`, `gitlabToken`, `gitlabGroup`; baseline `.gitignore` rules are ensured automatically
-- `deploy` - Deploy features to Fusebase (runs lint then build per feature). Computes frontend/backend SHA-256 hashes and skips features whose frontend AND backend are unchanged; reuses the previous frontend bundle via `copyFrontendParams` when only the backend changed. The `backendHash` covers `backend/` source files **plus** the `backend` config block from `fusebase.json` (`jobs[*]`, `sidecars[*]`, per-job `jobs[*].sidecars[*]`) **plus** the sorted list of registered app feature secret **keys** — so cron-schedule edits, sidecar add/remove, and secret add/remove auto-redeploy on a regular `fusebase deploy`. Editing only a secret **value** out-of-band (via the URL from `fusebase secret create`) does not change the key list and still requires `--force`. Pass `--force` to override the skip and always re-upload + redeploy.
-- `feature list` - List all features for the current app with their URLs
-- `feature create` - Create and configure a feature (requires `--name`, `--subdomain`, `--path`, `--dev-command`, `--build-command`, `--output-dir`; optional `--access` for access principals e.g. `visitor`, `orgRole:member`; `--permissions` for manual `dashboardView/database` access)
-- `feature update <featureId>` - Update feature settings (`--access`, `--permissions` for manual `dashboardView/database`, `--sync-gate-permissions` for Gate analyze + sync)
-- `dev start` - Start the development server (creates per-session debug logs in the selected feature directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
+- `deploy` - Deploy apps to Fusebase (runs lint then build per app). Computes frontend/backend SHA-256 hashes and skips apps whose frontend AND backend are unchanged; reuses the previous frontend bundle via `copyFrontendParams` when only the backend changed. Pass `--force` to override the skip and always re-upload + redeploy.
+- `app list` - List all apps for the current app with their URLs
+- `app create` - Create and configure an app (requires `--name`, `--subdomain`, `--path`, `--dev-command`, `--build-command`, `--output-dir`; optional `--access` for access principals e.g. `visitor`, `orgRole:member`; `--permissions` for manual `dashboardView/database` access)
+- `app update <appId>` - Update app settings (`--access`, `--permissions` for manual `dashboardView/database`, `--sync-gate-permissions` for Gate analyze + sync)
+- `dev start` - Start the development server (creates per-session debug logs in the selected app directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
-- `secret create` - Create feature secrets with empty values (`--feature <id> --secret KEY:description`); prints URL to set values
-- `update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed deps/install), outside app directory runs CLI binary update only; use `--skip-app` for CLI-only mode even inside app
+- `secret create` - Create app secrets with empty values (`--feature <id> --secret KEY:description`); prints URL to set values
+- `update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed deps/install), outside app directory runs CLI binary update only; use `--skip-product` for CLI-only mode even inside app
 - `config set-flag <flag>` - Enable an experimental flag (e.g. `server`, `mcp-beta`)
 - `config remove-flag <flag>` - Disable an experimental flag
 - `config flags` - Manage experimental flags (interactive selector in TTY; use `--list` for non-interactive output)
 - `config ide` - Recreate IDE config in current project (optional `--ide <preset>`, `--force`)
 - `config gitlab` - Get/set GitLab sync config in `~/.fusebase/config.json` (`gitlabHost`, `gitlabGroup`, `gitlabToken`); supports interactive setup, `--show`, and direct flags (`--host`, `--group`, `--token`)
-- `integrations` - Configure optional MCP integrations (catalog + custom HTTP MCP in `fusebase.json`); `integrations add|disable|enable|remove`; `integrations list-templates` lists Gate MCP manager templates using `GATE_MCP_TOKEN` from app `.env`; `integrations connect-template --template-name=<name>` creates a managed MCP server connection scoped to the current app id; `--no-prompt` skips checkbox
-- `scaffold` - Scaffold a feature from a built-in template. Without options, lists available templates with descriptions. Use `--template <id> --dir <path>` to scaffold. Errors if any files would be overwritten. Templates: `spa` (React + Vite SPA, deployed directly into `<dir>`), `backend` (Node.js + Hono, deployed into `<dir>/backend/`). Backend can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
-- `sidecar add` - Add a sidecar container to a feature backend (`--feature <id> --name <name> --image <image> [--port <port>] [--tier small|medium|large] [--env KEY=VALUE...] [--secret KEY|KEY:ALIAS...] [--job <jobName>]`). Max 3 sidecars per scope. Pass `--job <jobName>` to attach the sidecar to a cron job instead of the backend; without `--job` the sidecar is added to the backend, as today. `--secret` (repeatable) whitelists app feature secret keys (registered via `fusebase secret create`) to inject as env vars into the sidecar; use `KEY:ALIAS` to expose the secret under a different env var name. On collision between sidecar `env` and a secret key, the sidecar's static `env` value wins. Deploy fails with a `ValidationError` if any referenced secret key is not registered for the feature.
+- `integrations` - Configure optional MCP integrations (catalog + custom HTTP MCP in `fusebase.json`); `integrations add|disable|enable|remove`; `--no-prompt` skips checkbox
+- `scaffold` - Scaffold an app from a built-in template. Without options, lists available templates with descriptions. Use `--template <id> --dir <path>` to scaffold. Errors if any files would be overwritten. Templates: `spa` (React + Vite SPA, deployed directly into `<dir>`), `backend` (Node.js + Hono, deployed into `<dir>/backend/`). Backend can be scaffolded on top of an existing SPA — only the `backend/` subfolder must be absent.
+- `sidecar add` - Add a sidecar container to an app backend (`--feature <id> --name <name> --image <image> [--port <port>] [--tier small|medium|large] [--env KEY=VALUE...] [--secret KEY|KEY:ALIAS...] [--job <jobName>]`). Max 3 sidecars per scope. Pass `--job <jobName>` to attach the sidecar to a cron job instead of the backend; without `--job` the sidecar is added to the backend, as today. `--secret` (repeatable) whitelists app secret keys (registered via `fusebase secret create`) to inject as env vars into the sidecar; use `KEY:ALIAS` to expose the secret under a different env var name. On collision between sidecar `env` and a secret key, the sidecar's static `env` value wins. Deploy fails with a `ValidationError` if any referenced secret key is not registered for the app.
 - `sidecar remove` - Remove a sidecar container by name (`--feature <id> --name <name> [--job <jobName>]`). With `--job`, removes from the named cron job; without `--job`, from the backend.
-- `sidecar list` - List configured sidecar containers for a feature (`--feature <id> [--job <jobName>]`). With `--job`, lists sidecars on that cron job; without `--job`, on the backend.
+- `sidecar list` - List configured sidecar containers for an app (`--feature <id> [--job <jobName>]`). With `--job`, lists sidecars on that cron job; without `--job`, on the backend.
 
 ## Configuration
 
@@ -111,14 +111,10 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `git-init` | Makes `fusebase init` automatically run Git initialization + GitLab sync flow (equivalent to `--git`; can be disabled per run with `--skip-git`) and includes Git workflow skill files in generated apps |
 | `git-debug-commits` | Enables strict traceability rules inside `git-workflow` skill: deploy preflight + dirty-tree guard, commit-per-fix, and SHA/tag references in debug/deploy reports |
 | `app-business-docs` | Includes the `app-business-docs` skill: maintain `docs/en/business-logic.md` (English) describing app business logic, flows, and scenarios; refresh after logic changes or on demand |
-| `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on FuseBase PostgreSQL Database debugging |
-| `legacy-dashboards-db` | Includes dashboard DB management guidance in generated app templates and skills, and enables dashboard-service write/create permissions in MCP tokens |
-| `portal-specific-features` | Includes portal-specific feature prompts and references (`fusebase-portal-specific-features`, `{{CurrentPortal}}` filters, and auth-context guidance for portal runtime) |
-| `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing feature code. Complements MCP discovery. |
-| `managed-integrations` | Enables managed third-party MCP integrations: `integrations list-templates` and `integrations connect-template` |
-| `managed-integrations-personal-auth` | Enables personal authorization for managed integrations; shared managed authorization remains gated by `managed-integrations` |
-
-FuseBase PostgreSQL Database support is part of the default app baseline and does not require a feature flag. By default, dashboard-service MCP tokens stay read-only enough for discovery/integration; dashboard DB creation and write/create permissions require `legacy-dashboards-db`.
+| `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |
+| `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); includes supporting `fusebase-gate` references and `isolated_store.*` permissions in `fusebase env create` |
+| `portal-specific-apps` | Includes portal-specific app prompts and references (`fusebase-portal-specific-apps`, `{{CurrentPortal}}` filters, and auth-context guidance for portal runtime) |
+| `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing app code. Complements MCP discovery. |
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 
@@ -126,28 +122,28 @@ Project-specific config is stored in `fusebase.json` in the project root:
 ```json
 {
  "orgId": "...",
- "appId": "...",
- "features": [
- { "id": "feature-id", "path": "features/my-feature", "dev": { "command": "npm run dev" }, "build": { "command": "npm run build", "outputDir": "dist" }, "devUrl": "http://localhost:3000" }
+ "productId": "...",
+ "apps": [
+ { "id": "app-id", "path": "apps/my-app", "dev": { "command": "npm run dev" }, "build": { "command": "npm run build", "outputDir": "dist" }, "devUrl": "http://localhost:3000" }
  ]
 }
 ```
 
-### Feature Token Flow
+### App Token Flow
 
-Apps running in the iframe need a feature token to communicate with Fusebase APIs. The token flow:
+Apps running in the iframe need an app token to communicate with Fusebase APIs. The token flow:
 
-1. Frontend fetches features from `/api/features` (includes `orgId`, `appId`)
-2. When a feature is selected, frontend calls `POST /api/orgs/{orgId}/apps/{appId}/features/{featureId}/tokens`
+1. Frontend fetches apps from `/api/apps` (includes `orgId`, `productId`)
+2. When an app is selected, frontend calls `POST /api/orgs/{orgId}/apps/{productId}/apps/{appId}/tokens`
 3. API proxy forwards to Fusebase API with auth header
-4. Dev tooling delivers the token to the feature runtime:
+4. Dev tooling delivers the token to the app runtime:
    - sends token to iframe via `postMessage`
    - sets cookie `fbsfeaturetoken` for same-origin runtime/backend requests
  ```javascript
  iframe.contentWindow.postMessage({ type: 'featuretoken', token: '...' }, '*')
  ```
 
-Important: deployed app backends must not rely on `x-app-feature-token` alone. Platform proxies may strip that header on `/api/*`, so backend handlers should read `x-app-feature-token` or fallback to cookie `fbsfeaturetoken`.
+Important: deployed app backends must not rely on `x-app-feature-token` alone. Platform proxies may strip that header on `/api/*`, so backend handlers should read `x-app-feature-token` or fallback to cookie `fbsfeaturetoken`. (Wire-protocol identifiers retain the legacy `feature` naming; rename is a separate cleanup ticket.)
 
 ### Reliable Token Delivery
 
@@ -215,10 +211,10 @@ When modifying CLI commands (adding/removing options, changing behavior, or addi
 - `AGENTS.md` - This file, update the Available Commands list
 - `project-template/.claude/skills/fusebase-cli/SKILL.md` - User-facing CLI documentation that gets copied into new projects
 - `project-template/AGENTS.md` - It may be updated as well, as it contains description of some commands
-- `docs/PERMISSIONS.md` - Canonical feature permissions model (`dashboardView`, `database`, `gate`, analyze + sync flow)
+- `docs/PERMISSIONS.md` - Canonical app permissions model (`dashboardView`, `database`, `gate`, analyze + sync flow)
 - `docs/FUSEBASE_GATE_META.md` - When changing `fusebase analyze gate` or `fusebaseGateMeta` in `fusebase.json`
 
-This ensures users have accurate documentation for the CLI features.
+This ensures users have accurate documentation for the CLI apps.
 
 ## API access
 
@@ -228,31 +224,31 @@ You can access the public API using the API key. The API spec is here https://pu
 
 The hidden command `fusebase analyze gate` writes **`fusebaseGateMeta`** into `fusebase.json` (used Gate SDK operations + resolved permissions). See **`docs/FUSEBASE_GATE_META.md`** for the full mechanism.
 
-## Feature permissions
+## App permissions
 
-The canonical documentation for feature permission behavior now lives in **`docs/PERMISSIONS.md`**. Use it when changing:
+The canonical documentation for app permission behavior now lives in **`docs/PERMISSIONS.md`**. Use it when changing:
 
-- `feature create` / `feature update`
+- `app create` / `app update`
 - manual `--permissions` parsing
 - `--sync-gate-permissions`
-- how the CLI merges local Gate analysis with remote feature permissions
+- how the CLI merges local Gate analysis with remote app permissions
 
 Important behavioral rule:
 
-- `deploy` publishes code only; it does not publish feature permissions
-- runtime permissions appear on the remote feature only after `feature create/update`
-- Gate-enabled features must run `feature update --sync-gate-permissions` before they should be treated as fully published
+- `deploy` publishes code only; it does not publish app permissions
+- runtime permissions appear on the remote app only after `app create/update`
+- Gate-enabled apps must run `app update --sync-gate-permissions` before they should be treated as fully published
 
-## Feature Development
+## App Development
 
 **Dashboard SDK data in generated apps:** When authoring or reviewing template guidance, any runtime code that calls dashboard data SDK methods must follow `project-template/CLAUDE.md` and **`fusebase-dashboards/references/data-patterns.md`** plus `sdk_describe` — do not guess response shapes.
 
-For guidance on developing Fusebase Apps features, see:
-- **`project-template/AGENTS.md`** - Single source of truth for feature development
-- **`project-template/.claude/skills/app-ui-design/SKILL.md`** - UI/UX and visual design for generated app features (shadcn/ui + Tailwind CSS v4)
+For guidance on developing Fusebase Apps apps, see:
+- **`project-template/AGENTS.md`** - Single source of truth for app development
+- **`project-template/.claude/skills/app-ui-design/SKILL.md`** - UI/UX and visual design for generated apps (shadcn/ui + Tailwind CSS v4)
 - **`project-template/.claude/skills/fusebase-dashboards/SKILL.md`** - Dashboard MCP flow, dashboard data, and SDK discovery for runtime code
-- **`project-template/.claude/skills/fusebase-portal-specific-features/SKILL.md`** - Guide for developing features that depend on the portal they are embedded in
+- **`project-template/.claude/skills/fusebase-portal-specific-apps/SKILL.md`** - Guide for developing apps that depend on the portal they are embedded in (enabled by flag `portal-specific-apps`)
 - **`project-template/.claude/skills/fusebase-gate/SKILL.md`** - Fusebase Gate MCP/SDK; orgs, user lists, tokens, and broader platform capabilities (e.g. email, automation) as exposed via Gate
 - **`project-template/.claude/skills/file-upload/SKILL.md`** - File upload guide
 
-**Important**: Features use MCP for discovery and SDK for execution.
+**Important**: Apps use MCP for discovery and SDK for execution.

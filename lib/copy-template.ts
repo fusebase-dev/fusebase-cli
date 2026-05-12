@@ -208,7 +208,7 @@ const FLAG_GATED_SKILLS: Record<string, string> = {
   "git-workflow": "git-init",
   "app-business-docs": "app-business-docs",
   "mcp-gate-debug": "mcp-gate-debug",
-  "fusebase-portal-specific-features": "portal-specific-features",
+  "fusebase-portal-specific-apps": "portal-specific-apps",
   "managed-integrations": "managed-integrations",
 };
 

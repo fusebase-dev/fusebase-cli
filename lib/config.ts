@@ -94,9 +94,9 @@ export interface FuseConfig {
   /** written but not used, only for debug purposes */
   env?: string;
   orgId: string;
-  appId: string;
-  features?: FeatureConfig[];
-  /** Legacy project-level Gate SDK analyze snapshot; canonical storage is now per-feature `features[].fusebaseGateMeta`. */
+  productId: string;
+  apps?: FeatureConfig[];
+  /** Legacy project-level Gate SDK analyze snapshot; canonical storage is now per-feature `apps[].fusebaseGateMeta`. */
   fusebaseGateMeta?: GateSdkOperationsSnapshot;
   [key: string]: unknown;
 }
@@ -139,8 +139,9 @@ export const KNOWN_FLAGS = [
   "git-debug-commits",
   "app-business-docs",
   "mcp-gate-debug",
+  "isolated-stores",
   "legacy-dashboards-db",
-  "portal-specific-features",
+  "portal-specific-apps",
   "api-exploration",
   "job-sidecars",
   MANAGED_INTEGRATIONS_FLAG,
@@ -155,12 +156,12 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
   "git-init": "Run Git initialization + GitLab sync automatically during `fusebase init`.",
   "git-debug-commits": "Enable mandatory commit-per-fix and strict debug/deploy traceability in git workflow skill.",
   "app-business-docs": "Include business-logic documentation skill in project template.",
-  "mcp-gate-debug":
-    "Include Gate MCP debug summary skill (focus on FuseBase PostgreSQL Database flows).",
+  "mcp-gate-debug": "Include Gate MCP debug summary skill (focus on isolated stores).",
+  "isolated-stores": "Enable isolated stores functionality (SQL/NoSQL).",
   "legacy-dashboards-db":
     "Expose dashboard DB/dashboard creation guidance and enable dashboard-service database/dashboard management permissions in MCP tokens.",
-  "portal-specific-features":
-    "Include portal-specific feature prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
+  "portal-specific-apps":
+    "Include portal-specific app prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
   "api-exploration":
     "Include api-exploration skill for verifying API endpoints with temporary tokens and test scripts.",
   "job-sidecars":
@@ -205,6 +206,45 @@ export function removeFlag(flag: string): void {
 
 let fuseConfigCache: FuseConfig | null = null;
 let fuseConfigLoaded = false;
+let legacyShapeWarningPrinted = false;
+
+/**
+ * Migrate fusebase.json legacy keys (`appId`, `features[]`) in-place to the new
+ * shape (`productId`, `apps[]`) and drop the legacy keys so subsequent
+ * read/modify/write cycles emit the new shape only. Prints a one-time warning
+ * the first time a legacy-shape file is observed in this process.
+ *
+ * Idempotent — safe to call on already-normalized objects (no-op).
+ */
+export function normalizeRawFuseConfigShape(
+  raw: Record<string, unknown>,
+): { migrated: boolean } {
+  let migrated = false;
+  if (raw.productId === undefined && typeof raw.appId === "string") {
+    raw.productId = raw.appId;
+    migrated = true;
+  }
+  if (raw.appId !== undefined) {
+    delete raw.appId;
+    migrated = true;
+  }
+  if (raw.apps === undefined && Array.isArray(raw.features)) {
+    raw.apps = raw.features;
+    migrated = true;
+  }
+  if (raw.features !== undefined) {
+    delete raw.features;
+    migrated = true;
+  }
+  if (migrated && !legacyShapeWarningPrinted) {
+    legacyShapeWarningPrinted = true;
+    console.warn(
+      "fusebase.json: legacy keys 'appId'/'features[]' detected and auto-migrated to 'productId'/'apps[]'. " +
+        "The next CLI write will persist the new shape.",
+    );
+  }
+  return { migrated };
+}
 
 export const loadFuseConfig = (): FuseConfig | null => {
   if (fuseConfigLoaded) {
@@ -215,7 +255,12 @@ export const loadFuseConfig = (): FuseConfig | null => {
   const fuseJsonPath = join(process.cwd(), "fusebase.json");
   if (existsSync(fuseJsonPath)) {
     try {
-      fuseConfigCache = JSON.parse(readFileSync(fuseJsonPath, "utf-8"));
+      const raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
+        string,
+        unknown
+      >;
+      normalizeRawFuseConfigShape(raw);
+      fuseConfigCache = raw as unknown as FuseConfig;
     } catch {
       // Ignore parse errors
     }
@@ -227,6 +272,11 @@ export const loadFuseConfig = (): FuseConfig | null => {
 export function invalidateFuseConfigCache(): void {
   fuseConfigCache = null;
   fuseConfigLoaded = false;
+}
+
+/** Test-only: reset the once-per-process legacy-shape warning state. */
+export function resetLegacyShapeWarningForTests(): void {
+  legacyShapeWarningPrinted = false;
 }
 
 function sortGateUsedOps(used: string[]): string[] {
@@ -319,10 +369,10 @@ function getFeatureIndexById(
   raw: Record<string, unknown>,
   featureId: string,
 ): number {
-  const features = Array.isArray(raw.features) ? raw.features : [];
-  return features.findIndex((feature) => {
-    if (!feature || typeof feature !== "object") return false;
-    return (feature as Record<string, unknown>).id === featureId;
+  const apps = Array.isArray(raw.apps) ? raw.apps : [];
+  return apps.findIndex((app) => {
+    if (!app || typeof app !== "object") return false;
+    return (app as Record<string, unknown>).id === featureId;
   });
 }
 
@@ -330,15 +380,15 @@ function readPreviousGateSnapshotForFeature(
   raw: Record<string, unknown>,
   featureId: string,
 ): GateSdkOperationsSnapshot | undefined {
-  const features = Array.isArray(raw.features) ? raw.features : [];
+  const apps = Array.isArray(raw.apps) ? raw.apps : [];
   const featureIndex = getFeatureIndexById(raw, featureId);
   if (featureIndex === -1) return undefined;
 
-  const featureRaw = features[featureIndex];
+  const featureRaw = apps[featureIndex];
   const featureSnapshot = readFeatureGateMetaFromFeatureRaw(featureRaw);
   if (featureSnapshot) return featureSnapshot;
 
-  if (features.length === 1) {
+  if (apps.length === 1) {
     return readLegacyProjectGateMetaFromFusebaseRaw(raw);
   }
 
@@ -350,15 +400,15 @@ function writeGateSnapshotToFeatureRaw(
   featureId: string,
   snapshot: GateSdkOperationsSnapshot,
 ): void {
-  const features = Array.isArray(raw.features) ? [...raw.features] : [];
+  const apps = Array.isArray(raw.apps) ? [...raw.apps] : [];
   const featureIndex = getFeatureIndexById(raw, featureId);
   if (featureIndex === -1) {
-    throw new Error(`Feature "${featureId}" not found in fusebase.json`);
+    throw new Error(`App "${featureId}" not found in fusebase.json`);
   }
 
-  const featureRaw = features[featureIndex];
+  const featureRaw = apps[featureIndex];
   if (!featureRaw || typeof featureRaw !== "object") {
-    throw new Error(`Feature "${featureId}" is invalid in fusebase.json`);
+    throw new Error(`App "${featureId}" is invalid in fusebase.json`);
   }
 
   const nextFeature = {
@@ -367,8 +417,8 @@ function writeGateSnapshotToFeatureRaw(
   };
   delete (nextFeature as Record<string, unknown>).gateSdkOperations;
 
-  features[featureIndex] = nextFeature;
-  raw.features = features;
+  apps[featureIndex] = nextFeature;
+  raw.apps = apps;
   delete raw.fusebaseGateMeta;
   delete raw.gateSdkOperations;
 }
@@ -436,6 +486,7 @@ export function writeGateSdkOperationsToFusebaseJson(
   } catch {
     throw new Error("Could not parse fusebase.json");
   }
+  normalizeRawFuseConfigShape(raw);
 
   const usedSorted = sortGateUsedOps(input.usedOps);
   const prev = readPreviousGateSnapshotForFeature(raw, featureId);
@@ -500,10 +551,11 @@ export function updateGateSdkPermissionsInFusebaseJson(
   } catch {
     throw new Error("Could not parse fusebase.json");
   }
+  normalizeRawFuseConfigShape(raw);
   const g = readPreviousGateSnapshotForFeature(raw, featureId);
   if (!g) {
     throw new Error(
-      `Feature-scoped fusebaseGateMeta missing or invalid for feature "${featureId}" in fusebase.json`,
+      `App-scoped fusebaseGateMeta missing or invalid for app "${featureId}" in fusebase.json`,
     );
   }
   const sorted = sortGateUsedOps(permissions);

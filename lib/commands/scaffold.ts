@@ -114,10 +114,10 @@ export const scaffoldCommand = new Command("scaffold")
         // If targetDir matches a registered feature, auto-add backend config to fusebase.json
         const fuseJsonPath = join(process.cwd(), "fusebase.json");
         const fuseConfig = loadFuseConfig();
-        if (fuseConfig?.features) {
+        if (fuseConfig?.apps) {
           const cwd = process.cwd();
           const relTargetDir = relative(cwd, targetDir).replace(/\\/g, "/");
-          const feature = fuseConfig.features.find(
+          const feature = fuseConfig.apps.find(
             (f) =>
               f.path &&
               (f.path === relTargetDir || resolve(cwd, f.path) === targetDir),

@@ -8,20 +8,20 @@ import cliProgress from "cli-progress";
 import { spawn } from "child_process";
 import * as tar from "tar";
 import {
-  createAppFeatureVersion,
+  createAppVersion,
   initUpload,
   initSourceUpload,
   getActiveVersion,
   createDeploy,
   getDeploy,
-  fetchApp,
-  fetchAppFeatures,
-  fetchAppFeatureSecrets,
+  fetchProduct,
+  fetchApps,
+  fetchAppSecrets,
   copyBackendParams,
   copyFrontendParams,
-  updateAppFeature,
+  updateApp,
+  type Product,
   type App,
-  type AppFeature,
   type Deploy,
   type DeployJobDefinition,
   type DeploySidecarDefinition,
@@ -479,7 +479,7 @@ async function publishOpenApiManifestIfPresent(params: {
       validation,
     });
 
-    await updateAppFeature(
+    await updateApp(
       params.apiKey,
       params.orgId,
       params.appId,
@@ -515,8 +515,8 @@ export const deployCommand = new Command("deploy")
       process.exit(1);
     }
 
-    if (!fuseConfig.orgId || !fuseConfig.appId) {
-      console.error("Error: Invalid fusebase.json. Missing orgId or appId.");
+    if (!fuseConfig.orgId || !fuseConfig.productId) {
+      console.error("Error: Invalid fusebase.json. Missing orgId or productId.");
       process.exit(1);
     }
 
@@ -527,8 +527,8 @@ export const deployCommand = new Command("deploy")
       process.exit(1);
     }
 
-    // Find features with path configured
-    const featuresConfig = fuseConfig.features || [];
+    // Find apps with path configured
+    const featuresConfig = fuseConfig.apps || [];
     const deployableFeatures = featuresConfig.filter(
       (config) => config.path && config.path.trim() !== "",
     );
@@ -545,23 +545,27 @@ export const deployCommand = new Command("deploy")
 
     console.log(`\nDeploying ${deployableFeatures.length} feature(s)...\n`);
 
-    // Fetch app and features to get sub and path for URLs
-    let app: App;
-    let features: AppFeature[];
+    // Fetch product and apps to get sub and path for URLs
+    let app: Product;
+    let features: App[];
     try {
-      app = await fetchApp(config.apiKey, fuseConfig.orgId, fuseConfig.appId);
-      const featuresResponse = await fetchAppFeatures(
+      app = await fetchProduct(
         config.apiKey,
         fuseConfig.orgId,
-        fuseConfig.appId,
+        fuseConfig.productId,
       );
-      features = featuresResponse.features;
+      const featuresResponse = await fetchApps(
+        config.apiKey,
+        fuseConfig.orgId,
+        fuseConfig.productId,
+      );
+      features = featuresResponse.apps;
     } catch (error) {
-      console.error("Error: Failed to fetch app or features from API.");
+      console.error("Error: Failed to fetch product or apps from API.");
       process.exit(1);
     }
 
-    logger.debug("Fetched app: %j", app);
+    logger.debug("Fetched product: %j", app);
 
     // Determine domain based on environment (same as FUSEBASE_APP_HOST)
     const domain = getFusebaseAppHost();
@@ -633,7 +637,7 @@ export const deployCommand = new Command("deploy")
           // Fetch the registered app feature secret **keys** (no values) so
           // CLI-driven add/remove of a key flips the backend hash; out-of-band
           // value edits keep the existing `--force` requirement.
-          const secretsResponse = await fetchAppFeatureSecrets(
+          const secretsResponse = await fetchAppSecrets(
             config.apiKey,
             fuseConfig.orgId,
             fuseConfig.appId,
@@ -662,7 +666,7 @@ export const deployCommand = new Command("deploy")
         const activeVersion = await getActiveVersion(
           config.apiKey,
           fuseConfig.orgId,
-          fuseConfig.appId,
+          fuseConfig.productId,
           featureId,
         ).catch(() => null);
 
@@ -697,10 +701,10 @@ export const deployCommand = new Command("deploy")
 
         // Create a new version (branches A, C, D)
         console.log(`   Creating version...`);
-        const version = await createAppFeatureVersion(
+        const version = await createAppVersion(
           config.apiKey,
           fuseConfig.orgId,
-          fuseConfig.appId,
+          fuseConfig.productId,
           featureId,
         );
 
@@ -759,7 +763,7 @@ export const deployCommand = new Command("deploy")
           const uploadResponse = await initUpload(
             config.apiKey,
             fuseConfig.orgId,
-            fuseConfig.appId,
+            fuseConfig.productId,
             featureId,
             version.id,
             files,
@@ -871,7 +875,7 @@ export const deployCommand = new Command("deploy")
             const { uploadUrl: serverUploadUrl } = await initSourceUpload(
               config.apiKey,
               fuseConfig.orgId,
-              fuseConfig.appId,
+              fuseConfig.productId,
               featureId,
               version.id,
               backendHash,
@@ -944,7 +948,7 @@ export const deployCommand = new Command("deploy")
             const deploy = await createDeploy(
               config.apiKey,
               fuseConfig.orgId,
-              fuseConfig.appId,
+              fuseConfig.productId,
               featureId,
               version.id,
               jobs,
@@ -971,7 +975,7 @@ export const deployCommand = new Command("deploy")
         await publishOpenApiManifestIfPresent({
           apiKey: config.apiKey,
           orgId: fuseConfig.orgId,
-          appId: fuseConfig.appId,
+          appId: fuseConfig.productId,
           featureId,
           featureBasePath,
         });

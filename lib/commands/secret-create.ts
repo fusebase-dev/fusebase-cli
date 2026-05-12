@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { setAppFeatureSecrets, fetchOrg } from "../api.ts";
+import { setAppSecrets, fetchOrg } from "../api.ts";
 import { getConfig, loadFuseConfig } from "../config.ts";
 
 function parseSecretArg(
@@ -47,9 +47,9 @@ export const secretCreateCommand = new Command("create")
 
       // Load fusebase.json
       const fuseConfig = loadFuseConfig();
-      if (!fuseConfig || !fuseConfig.orgId || !fuseConfig.appId) {
+      if (!fuseConfig || !fuseConfig.orgId || !fuseConfig.productId) {
         console.error(
-          "Error: Invalid fusebase.json. Missing orgId or appId. Run 'fusebase init' first.",
+          "Error: Invalid fusebase.json. Missing orgId or productId. Run 'fusebase init' first.",
         );
         process.exit(1);
       }
@@ -81,10 +81,10 @@ export const secretCreateCommand = new Command("create")
       }
 
       try {
-        const result = await setAppFeatureSecrets(
+        const result = await setAppSecrets(
           config.apiKey,
           fuseConfig.orgId,
-          fuseConfig.appId,
+          fuseConfig.productId,
           featureId,
           secrets,
         );

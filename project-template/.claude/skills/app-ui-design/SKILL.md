@@ -1,11 +1,11 @@
 ---
 name: app-ui-design
-description: "Guidance for visual design, UI and UX in Fusebase-generated app features. Use when building or refining feature UIs: pages, components, layouts, forms, feedback states, theming, or accessibility. Ensures consistent, clear, and distinctive interfaces using shadcn/ui."
+description: "Guidance for visual design, UI and UX in Fusebase-generated apps. Use when building or refining app UIs: pages, components, layouts, forms, feedback states, theming, or accessibility. Ensures consistent, clear, and distinctive interfaces using shadcn/ui."
 ---
 
 # App UI Design
 
-This skill guides UI/UX in **generated app features** (Fusebase Apps). Use **shadcn/ui** for all UI. Apply a clear design direction and avoid generic AI aesthetics.
+This skill guides UI/UX in **generated apps** (Fusebase Apps). Use **shadcn/ui** for all UI. Apply a clear design direction and avoid generic AI aesthetics.
 
 ---
 
@@ -23,7 +23,7 @@ This skill guides UI/UX in **generated app features** (Fusebase Apps). Use **sha
 
 ### Tailwind CSS v4
 
-Features use **Tailwind CSS v4** (via `@tailwindcss/postcss`). Key differences from v3:
+Apps use **Tailwind CSS v4** (via `@tailwindcss/postcss`). Key differences from v3:
 
 - **Import**: Use `@import "tailwindcss"` in `globals.css` (not `@tailwind base/components/utilities`).
 - **No `tailwind.config.js`**: Configuration is CSS-first. Use `@theme` in CSS to define custom tokens.
@@ -47,7 +47,7 @@ className="bg-[var(--card)] text-[var(--foreground)]"
 
 **Instead, use one of these approaches:**
 
-1. **Use Tailwind's built-in color palette** (preferred for most features):
+1. **Use Tailwind's built-in color palette** (preferred for most apps):
    ```tsx
    // ✅ Works — uses Tailwind's first-class utility classes
    className="bg-white text-slate-900 border-slate-200"
@@ -109,12 +109,12 @@ Do **NOT** add `* { margin: 0; padding: 0; box-sizing: border-box; }` in `global
 
 ### General Tailwind usage
 
-- **Typography**: Use Tailwind's typography scale (`text-sm`, `text-base`, `text-lg`, `font-semibold`, etc.) and keep heading/body consistent throughout the feature.
+- **Typography**: Use Tailwind's typography scale (`text-sm`, `text-base`, `text-lg`, `font-semibold`, etc.) and keep heading/body consistent throughout the app.
 - **Radius**: Use consistent rounding from the theme (`rounded-md` for cards and inputs; `rounded-full` for pills/avatars).
 - **Colors**: Choose ONE approach based on whether shadcn/ui theming is set up:
   - **With shadcn/ui**: Use its semantic tokens (`bg-background`, `text-foreground`, `bg-muted`, `text-muted-foreground`, `border`) — these are pre-registered and work out of the box.
   - **Without shadcn/ui**: Use Tailwind's built-in palette (`bg-white`, `text-slate-900`, `bg-slate-100`, `text-slate-500`, `border-slate-200`).
-  - **Never mix**: Don't use `bg-background` in a feature without shadcn/ui theming — it won't resolve. Reserve inline `style` for dynamic/computed colors only.
+  - **Never mix**: Don't use `bg-background` in an app without shadcn/ui theming — it won't resolve. Reserve inline `style` for dynamic/computed colors only.
 
 ### Hierarchy
 
@@ -153,7 +153,7 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 - **Forms**: Use `react-hook-form` with `zod` for validation. Wrap inputs in `<FormField>`, `<FormItem>`, `<FormLabel>`, `<FormControl>`, `<FormMessage>` from `@/components/ui/form`.
 - **Toast / notifications**: Use `sonner` (`toast.success(...)`, `toast.error(...)`) or shadcn/ui's `useToast` hook. Prefer `sonner` for simplicity.
 - **Composition**: Pass data and callbacks into components (e.g. `onSubmit`, `onClose`), not big config objects.
-- **Icons**: Use **Lucide React** (`lucide-react`) consistently throughout the feature. Apply `text-muted-foreground` or contextual color classes for icon meaning (e.g. status, category).
+- **Icons**: Use **Lucide React** (`lucide-react`) consistently throughout the app. Apply `text-muted-foreground` or contextual color classes for icon meaning (e.g. status, category).
 - **Loading**: Add `disabled` to the button and show a `<Loader2 className="animate-spin" />` icon inside it while a request is in flight; use `<Skeleton>` for content placeholders.
 
 ---
@@ -189,4 +189,4 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 - **shadcn/ui**: https://ui.shadcn.com — components, theming, and CLI usage.
 - **Radix UI**: Underlying primitive library providing accessible behavior for shadcn/ui components.
 - **Lucide React**: https://lucide.dev — icon set to use consistently.
-- **AGENTS.md**: Use shadcn/ui for feature UIs; auth and SDK usage are described there and in **fusebase-dashboards**, **handling-authentication-errors**.
+- **AGENTS.md**: Use shadcn/ui for app UIs; auth and SDK usage are described there and in **fusebase-dashboards**, **handling-authentication-errors**.

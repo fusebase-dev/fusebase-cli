@@ -1,11 +1,11 @@
 ---
 name: handling-authentication-errors
-description: "Required implementation pattern for handling AppTokenValidationError (401) responses when feature tokens expire. Use when: 1. Building any Fusebase Apps feature that makes API calls, 2. Implementing authentication error handling, 3. Creating AuthExpiredModal components, 4. Setting up global error handlers in App.tsx. All features MUST implement this pattern to handle token expiration gracefully."
+description: "Required implementation pattern for handling AppTokenValidationError (401) responses when app tokens expire. Use when: 1. Building any Fusebase Apps app that makes API calls, 2. Implementing authentication error handling, 3. Creating AuthExpiredModal components, 4. Setting up global error handlers in App.tsx. All apps MUST implement this pattern to handle token expiration gracefully."
 ---
 
 # Handling Authentication Errors
 
-All features **MUST** handle `AppTokenValidationError` responses from the API. When the feature token expires, the API returns a 401 with this body:
+All apps **MUST** handle `AppTokenValidationError` responses from the API. When the app token expires, the API returns a 401 with this body:
 
 ```json
 {
@@ -63,12 +63,12 @@ When `AuthTokenExpiredError` is caught at the UI level, display a centered modal
 
 Manage modal open/close state in `App.tsx` and pass an `onAuthError` callback to child components that make API calls.
 
-<% if (it.flags?.includes("portal-specific-features")) { %>
+<% if (it.flags?.includes("portal-specific-apps")) { %>
 ## Critical: `/auth/context` Behavior
 
 The `/auth/context` endpoint **MUST NOT** trigger `AuthTokenExpiredError` just because `user` is missing.
 
-When a feature is **public**, anonymous visitors may receive an auth context with no `user` field. This is expected — it means "not authenticated", NOT "session expired". Throwing `AuthTokenExpiredError` here causes the Session Expired modal to appear immediately for every anonymous visitor.
+When an app is **public**, anonymous visitors may receive an auth context with no `user` field. This is expected — it means "not authenticated", NOT "session expired". Throwing `AuthTokenExpiredError` here causes the Session Expired modal to appear immediately for every anonymous visitor.
 
 ```typescript
 type AuthContextResponse = {
@@ -86,12 +86,12 @@ type AuthContextResponse = {
 }
 
 export async function fetchAuthContext(
-  featureToken: string
+  appToken: string
 ): Promise<AuthContextResponse> {
   try {
     const response = await fetch(
       'https://app-api.{FUSEBASE_HOST}/v4/api/auth/context',
-      { headers: { 'x-app-feature-token': featureToken } }
+      { headers: { 'x-app-token': appToken } }
     )
     if (!response.ok) return {} // Do NOT throw AuthTokenExpiredError here
     return await response.json()
@@ -111,16 +111,16 @@ export async function fetchAuthContext(
 
 The `/users/me` endpoint **MUST NOT** trigger `AuthTokenExpiredError`.
 
-When a feature is **public**, anonymous visitors receive a 401 from `/users/me`. This is expected — it means "not authenticated", NOT "session expired". Throwing `AuthTokenExpiredError` here causes the Session Expired modal to appear immediately for every anonymous visitor.
+When an app is **public**, anonymous visitors receive a 401 from `/users/me`. This is expected — it means "not authenticated", NOT "session expired". Throwing `AuthTokenExpiredError` here causes the Session Expired modal to appear immediately for every anonymous visitor.
 
 ```typescript
 export async function fetchCurrentUser(
-  featureToken: string
+  appToken: string
 ): Promise<{ id: number; email: string } | null> {
   try {
     const response = await fetch(
       'https://app-api.{FUSEBASE_HOST}/v4/api/users/me',
-      { headers: { 'x-app-feature-token': featureToken } }
+      { headers: { 'x-app-token': appToken } }
     )
     if (!response.ok) return null // Do NOT throw AuthTokenExpiredError
     return await response.json()

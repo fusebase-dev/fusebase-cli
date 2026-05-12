@@ -75,11 +75,11 @@ function setupWorkspace(): Workspace {
     JSON.stringify(
       {
         orgId: "org-1",
-        appId: "app-1",
-        features: [
+        productId: "app-1",
+        apps: [
           {
-            id: "feature-1",
-            path: "features/feature-1",
+            id: "app-1",
+            path: "apps/app-1",
             backend: {
               start: { command: "node server.js" },
               jobs: [
@@ -109,7 +109,7 @@ function setupWorkspace(): Workspace {
 }
 
 interface FuseJsonShape {
-  features: Array<{
+  apps: Array<{
     id: string;
     backend?: {
       sidecars?: SidecarConfig[];
@@ -140,7 +140,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -152,7 +152,7 @@ describe("fusebase sidecar --secret", () => {
       );
       expect(res.exitCode).toBe(0);
       const cfg = readFuseJson(ws);
-      const sc = cfg.features[0]!.backend!.sidecars![0]!;
+      const sc = cfg.apps[0]!.backend!.sidecars![0]!;
       expect(sc.secrets).toEqual(["DB_PASSWORD"]);
     });
 
@@ -162,7 +162,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -174,7 +174,7 @@ describe("fusebase sidecar --secret", () => {
       );
       expect(res.exitCode).toBe(0);
       const cfg = readFuseJson(ws);
-      const sc = cfg.features[0]!.backend!.sidecars![0]!;
+      const sc = cfg.apps[0]!.backend!.sidecars![0]!;
       expect(sc.secrets).toEqual([
         { from: "DB_PASSWORD", as: "REDIS_PASSWORD" },
       ]);
@@ -186,7 +186,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -202,7 +202,7 @@ describe("fusebase sidecar --secret", () => {
       );
       expect(res.exitCode).toBe(0);
       const cfg = readFuseJson(ws);
-      const sc = cfg.features[0]!.backend!.sidecars![0]!;
+      const sc = cfg.apps[0]!.backend!.sidecars![0]!;
       expect(sc.secrets).toEqual([
         "API_KEY",
         { from: "DB_PASSWORD", as: "REDIS_PASSWORD" },
@@ -216,7 +216,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -232,7 +232,7 @@ describe("fusebase sidecar --secret", () => {
       expect(res.stderr).toMatch(/Duplicate secret target name/i);
       // File must not have been written.
       const cfg = readFuseJson(ws);
-      expect(cfg.features[0]!.backend!.sidecars).toBeUndefined();
+      expect(cfg.apps[0]!.backend!.sidecars).toBeUndefined();
     });
 
     it("rejects --secret X paired with --secret Y:X (alias collides with prior key)", async () => {
@@ -241,7 +241,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -256,7 +256,7 @@ describe("fusebase sidecar --secret", () => {
       expect(res.exitCode).not.toBe(0);
       expect(res.stderr).toMatch(/Duplicate secret target name/i);
       const cfg = readFuseJson(ws);
-      expect(cfg.features[0]!.backend!.sidecars).toBeUndefined();
+      expect(cfg.apps[0]!.backend!.sidecars).toBeUndefined();
     });
 
     it("rejects --secret with empty KEY (':FOO')", async () => {
@@ -265,7 +265,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -278,7 +278,7 @@ describe("fusebase sidecar --secret", () => {
       expect(res.exitCode).not.toBe(0);
       expect(res.stderr).toMatch(/Both KEY and ALIAS must be non-empty/);
       const cfg = readFuseJson(ws);
-      expect(cfg.features[0]!.backend!.sidecars).toBeUndefined();
+      expect(cfg.apps[0]!.backend!.sidecars).toBeUndefined();
     });
 
     it("rejects --secret with empty ALIAS ('FOO:')", async () => {
@@ -287,7 +287,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -300,7 +300,7 @@ describe("fusebase sidecar --secret", () => {
       expect(res.exitCode).not.toBe(0);
       expect(res.stderr).toMatch(/Both KEY and ALIAS must be non-empty/);
       const cfg = readFuseJson(ws);
-      expect(cfg.features[0]!.backend!.sidecars).toBeUndefined();
+      expect(cfg.apps[0]!.backend!.sidecars).toBeUndefined();
     });
 
     it("allows the same name in --env and --secret (env-override is server-side)", async () => {
@@ -309,7 +309,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -323,7 +323,7 @@ describe("fusebase sidecar --secret", () => {
       );
       expect(res.exitCode).toBe(0);
       const cfg = readFuseJson(ws);
-      const sc = cfg.features[0]!.backend!.sidecars![0]!;
+      const sc = cfg.apps[0]!.backend!.sidecars![0]!;
       expect(sc.env).toEqual({ DB_PASSWORD: "hardcoded" });
       expect(sc.secrets).toEqual(["DB_PASSWORD"]);
     });
@@ -334,7 +334,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--job",
           "screenshot",
           "--name",
@@ -351,8 +351,8 @@ describe("fusebase sidecar --secret", () => {
       expect(res.exitCode).toBe(0);
       const cfg = readFuseJson(ws);
       // Backend-level sidecars must remain untouched.
-      expect(cfg.features[0]!.backend!.sidecars).toBeUndefined();
-      const job = cfg.features[0]!.backend!.jobs!.find(
+      expect(cfg.apps[0]!.backend!.sidecars).toBeUndefined();
+      const job = cfg.apps[0]!.backend!.jobs!.find(
         (j) => j.name === "screenshot",
       )!;
       expect(job.sidecars![0]!.secrets).toEqual([
@@ -369,7 +369,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -382,7 +382,7 @@ describe("fusebase sidecar --secret", () => {
         ws,
       );
       const listRes = await runCli(
-        ["sidecar", "list", "--feature", "feature-1"],
+        ["sidecar", "list", "--feature", "app-1"],
         ws,
       );
       expect(listRes.exitCode).toBe(0);
@@ -397,7 +397,7 @@ describe("fusebase sidecar --secret", () => {
           "sidecar",
           "add",
           "--feature",
-          "feature-1",
+          "app-1",
           "--name",
           "redis",
           "--image",
@@ -406,7 +406,7 @@ describe("fusebase sidecar --secret", () => {
         ws,
       );
       const listRes = await runCli(
-        ["sidecar", "list", "--feature", "feature-1"],
+        ["sidecar", "list", "--feature", "app-1"],
         ws,
       );
       expect(listRes.exitCode).toBe(0);
