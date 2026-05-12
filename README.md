@@ -508,7 +508,7 @@ For custom app backends (`/api/*`), treat `x-app-token` as optional in deployed 
 
 One command to refresh a generated app after a CLI or template upgrade:
 
-1. **CLI binary update** — runs first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage.
+1. **CLI binary update** — runs first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage. On Windows, this launches the installer and exits so `fusebase.exe` can be replaced; after the installer finishes, run `fusebase update` again to continue app stages.
 2. **Agent assets** — refreshes `AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`.
 3. **MCP + IDE** — selectively regenerates Dashboards and/or Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh both regardless.
 4. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **app** `package.json` files are updated only if those deps already exist (nothing new is injected into apps).
@@ -520,7 +520,7 @@ One command to refresh a generated app after a CLI or template upgrade:
 
 Behavior by directory:
 
-- In an app directory (`fusebase.json` exists): runs full flow (CLI + app stages).
+- In an app directory (`fusebase.json` exists): runs full flow (CLI + app stages). On Windows, a CLI binary update exits after launching the installer; rerun the command after installation to run app stages.
 - Outside an app directory: runs only CLI binary update.
 - Use `--skip-product` to force CLI-only mode even inside an app directory.
 

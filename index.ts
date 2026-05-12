@@ -40,8 +40,14 @@ program
     console.log(VERSION);
   });
 
-checkForUpdates();
-
+const argv = process.argv.slice(2);
+const isUpdateCommand =
+  argv[0] === "update" ||
+  (argv[0] === "cli" && argv[1] === "update") ||
+  (argv[0] === "product" && argv[1] === "update");
+if (!isUpdateCommand) {
+  checkForUpdates();
+}
 program.addCommand(initCommand);
 program.addCommand(gitCommand);
 program.addCommand(deployCommand);

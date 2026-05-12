@@ -306,6 +306,8 @@ Single update command for both CLI and app:
 - outside app directory: runs only CLI self-update;
 - use `--skip-product` to force CLI-only mode even inside an app directory.
 
+On Windows, CLI self-update launches the installer and exits so `fusebase.exe` can be replaced. After the installer finishes, run `fusebase update` again to continue app stages.
+
 ### Create or update .env (MCP token)
 
 ```bash

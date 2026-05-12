@@ -74,7 +74,7 @@ bun index.ts [command]
 - `dev start` - Start the development server (creates per-session debug logs in the selected app directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
 - `secret create` - Create app secrets with empty values (`--feature <id> --secret KEY:description`); prints URL to set values
-- `update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed deps/install), outside app directory runs CLI binary update only; use `--skip-product` for CLI-only mode even inside app
+- `update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed deps/install), outside app directory runs CLI binary update only; use `--skip-product` for CLI-only mode even inside app. On Windows, CLI self-update launches the installer and exits; rerun after installation to continue app stages.
 - `config set-flag <flag>` - Enable an experimental flag (e.g. `server`, `mcp-beta`)
 - `config remove-flag <flag>` - Disable an experimental flag
 - `config flags` - Manage experimental flags (interactive selector in TTY; use `--list` for non-interactive output)
