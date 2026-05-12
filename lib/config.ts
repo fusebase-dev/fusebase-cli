@@ -1,5 +1,11 @@
 import { join } from "path";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  renameSync,
+} from "fs";
 import { homedir } from "os";
 
 export const CONFIG_DIR = join(homedir(), ".fusebase");
@@ -207,14 +213,18 @@ export function removeFlag(flag: string): void {
 let fuseConfigCache: FuseConfig | null = null;
 let fuseConfigLoaded = false;
 let legacyShapeWarningPrinted = false;
+let featuresFolderMigrationWarningPrinted = false;
 
 /**
- * Migrate fusebase.json legacy keys (`appId`, `features[]`) in-place to the new
- * shape (`productId`, `apps[]`) and drop the legacy keys so subsequent
- * read/modify/write cycles emit the new shape only. Prints a one-time warning
- * the first time a legacy-shape file is observed in this process.
+ * Migrate fusebase.json legacy shape in-place to the new shape:
+ *  - rename `appId` → `productId` and drop `appId`
+ *  - rename `features[]` → `apps[]` and drop `features[]`
+ *  - rewrite any `apps[].path` that still starts with `features/` to start
+ *    with `apps/` (independent of filesystem state — the on-disk folder
+ *    rename is handled separately by `migrateFeaturesFolderToAppsAtRoot`)
  *
- * Idempotent — safe to call on already-normalized objects (no-op).
+ * Prints a one-time warning the first time a legacy-shape file is observed
+ * in this process. Idempotent — safe to call on already-normalized objects.
  */
 export function normalizeRawFuseConfigShape(
   raw: Record<string, unknown>,
@@ -236,11 +246,21 @@ export function normalizeRawFuseConfigShape(
     delete raw.features;
     migrated = true;
   }
+  if (Array.isArray(raw.apps)) {
+    for (const app of raw.apps) {
+      if (!app || typeof app !== "object") continue;
+      const a = app as Record<string, unknown>;
+      if (typeof a.path === "string" && a.path.startsWith("features/")) {
+        a.path = "apps/" + a.path.slice("features/".length);
+        migrated = true;
+      }
+    }
+  }
   if (migrated && !legacyShapeWarningPrinted) {
     legacyShapeWarningPrinted = true;
     console.warn(
-      "fusebase.json: legacy keys 'appId'/'features[]' detected and auto-migrated to 'productId'/'apps[]'. " +
-        "The next CLI write will persist the new shape.",
+      "fusebase.json: legacy shape detected and auto-migrated to 'productId'/'apps[]' " +
+        "(including 'features/' → 'apps/' path prefixes). The new shape will be persisted on this run.",
     );
   }
   return { migrated };
@@ -252,14 +272,30 @@ export const loadFuseConfig = (): FuseConfig | null => {
   }
   fuseConfigLoaded = true;
 
-  const fuseJsonPath = join(process.cwd(), "fusebase.json");
+  const cwd = process.cwd();
+  const fuseJsonPath = join(cwd, "fusebase.json");
   if (existsSync(fuseJsonPath)) {
     try {
       const raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
         string,
         unknown
       >;
-      normalizeRawFuseConfigShape(raw);
+      const { migrated } = normalizeRawFuseConfigShape(raw);
+      const { renamed } = migrateFeaturesFolderToAppsAtRoot(cwd);
+      if (migrated || renamed) {
+        // Persist the normalized shape so subsequent CLI invocations read a
+        // clean new-shape file and the migration helpers stop firing.
+        try {
+          writeFileSync(
+            fuseJsonPath,
+            JSON.stringify(raw, null, 2) + "\n",
+            "utf-8",
+          );
+        } catch {
+          // Best-effort: in-memory normalization still stands; the next
+          // write helper (gate analyze / sidecar / etc.) will persist.
+        }
+      }
       fuseConfigCache = raw as unknown as FuseConfig;
     } catch {
       // Ignore parse errors
@@ -267,6 +303,61 @@ export const loadFuseConfig = (): FuseConfig | null => {
   }
   return fuseConfigCache;
 };
+
+/**
+ * Rename a leftover legacy `features/` directory at the project root to
+ * `apps/` so the on-disk layout matches the renamed `apps[]` entries in
+ * fusebase.json. Idempotent and best-effort:
+ *  - no-op if `features/` does not exist
+ *  - no-op (with a one-time warning) if `apps/` already exists alongside it
+ *  - otherwise `renameSync(features, apps)` and prints a one-time warning
+ *
+ * The in-memory `apps[].path` rewrite from `features/...` to `apps/...` is
+ * handled by `normalizeRawFuseConfigShape` because it is a fusebase.json
+ * shape concern, independent of filesystem state.
+ */
+export function migrateFeaturesFolderToAppsAtRoot(
+  projectRoot: string,
+): { renamed: boolean } {
+  const featuresDir = join(projectRoot, "features");
+  const appsDir = join(projectRoot, "apps");
+  if (!existsSync(featuresDir)) {
+    return { renamed: false };
+  }
+  if (existsSync(appsDir)) {
+    if (!featuresFolderMigrationWarningPrinted) {
+      featuresFolderMigrationWarningPrinted = true;
+      console.warn(
+        "fusebase: legacy 'features/' directory detected alongside 'apps/'; " +
+          "skipping auto-rename to avoid collision. Move contents manually.",
+      );
+    }
+    return { renamed: false };
+  }
+
+  try {
+    renameSync(featuresDir, appsDir);
+  } catch (error) {
+    if (!featuresFolderMigrationWarningPrinted) {
+      featuresFolderMigrationWarningPrinted = true;
+      console.warn(
+        `fusebase: failed to rename legacy 'features/' directory to 'apps/': ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    return { renamed: false };
+  }
+
+  if (!featuresFolderMigrationWarningPrinted) {
+    featuresFolderMigrationWarningPrinted = true;
+    console.warn(
+      "fusebase: renamed legacy 'features/' directory to 'apps/' to match the new naming.",
+    );
+  }
+
+  return { renamed: true };
+}
 
 /** Clear in-memory fusebase.json cache (call after writing fusebase.json). */
 export function invalidateFuseConfigCache(): void {
@@ -277,6 +368,11 @@ export function invalidateFuseConfigCache(): void {
 /** Test-only: reset the once-per-process legacy-shape warning state. */
 export function resetLegacyShapeWarningForTests(): void {
   legacyShapeWarningPrinted = false;
+}
+
+/** Test-only: reset the once-per-process features-folder migration warning state. */
+export function resetFeaturesFolderMigrationWarningForTests(): void {
+  featuresFolderMigrationWarningPrinted = false;
 }
 
 function sortGateUsedOps(used: string[]): string[] {

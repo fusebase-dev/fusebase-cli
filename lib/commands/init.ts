@@ -361,9 +361,8 @@ async function copyProjectTemplate(
     await writeFile(packageJsonPath, packageJson, "utf-8");
   }
 
-  // Create features folder
-  const featuresDir = join(targetDir, "features");
-  await mkdir(featuresDir, { recursive: true });
+  const appsDir = join(targetDir, "apps");
+  await mkdir(appsDir, { recursive: true });
 
   // Resolve conditional template blocks in project template files.
   const templateContext = buildTemplateContext();
