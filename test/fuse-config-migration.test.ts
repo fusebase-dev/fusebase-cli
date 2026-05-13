@@ -18,10 +18,13 @@ import {
   spyOn,
 } from "bun:test";
 import {
+  flushAgentAssetsRefreshAfterMigration,
   invalidateFuseConfigCache,
+  isAgentAssetsRefreshPendingForTests,
   loadFuseConfig,
   migrateFeaturesFolderToAppsAtRoot,
   normalizeRawFuseConfigShape,
+  resetAgentAssetsRefreshFlagForTests,
   resetFeaturesFolderMigrationWarningForTests,
   resetLegacyShapeWarningForTests,
   writeGateSdkOperationsToFusebaseJson,
@@ -39,6 +42,7 @@ describe("fusebase.json shape auto-migration", () => {
     invalidateFuseConfigCache();
     resetLegacyShapeWarningForTests();
     resetFeaturesFolderMigrationWarningForTests();
+    resetAgentAssetsRefreshFlagForTests();
     warnSpy = spyOn(console, "warn").mockImplementation(() => {});
   });
 
@@ -48,6 +52,7 @@ describe("fusebase.json shape auto-migration", () => {
     invalidateFuseConfigCache();
     resetLegacyShapeWarningForTests();
     resetFeaturesFolderMigrationWarningForTests();
+    resetAgentAssetsRefreshFlagForTests();
     warnSpy?.mockRestore();
   });
 
@@ -370,6 +375,90 @@ describe("fusebase.json shape auto-migration", () => {
       expect(existsSync(join(dir, "features"))).toBe(false);
       expect(existsSync(join(dir, "apps", "x"))).toBe(true);
       expect(cfg!.apps?.[0]?.path).toBe("apps/x");
+    });
+  });
+
+  describe("flushAgentAssetsRefreshAfterMigration", () => {
+    it("flips the pending flag when `normalizeRawFuseConfigShape` migrates legacy keys", () => {
+      expect(isAgentAssetsRefreshPendingForTests()).toBe(false);
+      normalizeRawFuseConfigShape({
+        orgId: "o",
+        appId: "p",
+        features: [],
+      });
+      expect(isAgentAssetsRefreshPendingForTests()).toBe(true);
+    });
+
+    it("does not flip the pending flag for already-new-shape input", () => {
+      normalizeRawFuseConfigShape({
+        orgId: "o",
+        productId: "p",
+        apps: [{ id: "a-1", path: "apps/x" }],
+      });
+      expect(isAgentAssetsRefreshPendingForTests()).toBe(false);
+    });
+
+    it("flips the pending flag when `migrateFeaturesFolderToAppsAtRoot` renames the folder", () => {
+      mkdirSync(join(dir, "features", "foo"), { recursive: true });
+      expect(isAgentAssetsRefreshPendingForTests()).toBe(false);
+      migrateFeaturesFolderToAppsAtRoot(dir);
+      expect(isAgentAssetsRefreshPendingForTests()).toBe(true);
+    });
+
+    it("refreshes AGENTS.md and .claude/skills from project-template when the pending flag is set", async () => {
+      writeFileSync(
+        join(dir, "fusebase.json"),
+        JSON.stringify({
+          orgId: "org-1",
+          appId: "prod-1",
+          features: [{ id: "app-1", path: "features/x" }],
+        }),
+      );
+      loadFuseConfig();
+      expect(isAgentAssetsRefreshPendingForTests()).toBe(true);
+
+      const result = await flushAgentAssetsRefreshAfterMigration(dir);
+      expect(result.refreshed).toBe(true);
+      expect(existsSync(join(dir, "AGENTS.md"))).toBe(true);
+      expect(existsSync(join(dir, ".claude", "skills"))).toBe(true);
+      // Pending flag is cleared after the first flush.
+      expect(isAgentAssetsRefreshPendingForTests()).toBe(false);
+    });
+
+    it("is a no-op when nothing was migrated", async () => {
+      writeFileSync(
+        join(dir, "fusebase.json"),
+        JSON.stringify({
+          orgId: "org-1",
+          productId: "prod-1",
+          apps: [{ id: "app-1", path: "apps/x" }],
+        }),
+      );
+      loadFuseConfig();
+      expect(isAgentAssetsRefreshPendingForTests()).toBe(false);
+
+      const result = await flushAgentAssetsRefreshAfterMigration(dir);
+      expect(result.refreshed).toBe(false);
+      expect(existsSync(join(dir, "AGENTS.md"))).toBe(false);
+      expect(existsSync(join(dir, ".claude"))).toBe(false);
+    });
+
+    it("is idempotent — second call within the same process is a no-op", async () => {
+      writeFileSync(
+        join(dir, "fusebase.json"),
+        JSON.stringify({
+          orgId: "org-1",
+          appId: "prod-1",
+          features: [],
+        }),
+      );
+      loadFuseConfig();
+
+      const first = await flushAgentAssetsRefreshAfterMigration(dir);
+      expect(first.refreshed).toBe(true);
+
+      const second = await flushAgentAssetsRefreshAfterMigration(dir);
+      expect(second.refreshed).toBe(false);
     });
   });
 });

@@ -214,6 +214,7 @@ let fuseConfigCache: FuseConfig | null = null;
 let fuseConfigLoaded = false;
 let legacyShapeWarningPrinted = false;
 let featuresFolderMigrationWarningPrinted = false;
+let agentAssetsRefreshNeeded = false;
 
 /**
  * Migrate fusebase.json legacy shape in-place to the new shape:
@@ -256,12 +257,15 @@ export function normalizeRawFuseConfigShape(
       }
     }
   }
-  if (migrated && !legacyShapeWarningPrinted) {
-    legacyShapeWarningPrinted = true;
-    console.warn(
-      "fusebase.json: legacy shape detected and auto-migrated to 'productId'/'apps[]' " +
-        "(including 'features/' → 'apps/' path prefixes). The new shape will be persisted on this run.",
-    );
+  if (migrated) {
+    agentAssetsRefreshNeeded = true;
+    if (!legacyShapeWarningPrinted) {
+      legacyShapeWarningPrinted = true;
+      console.warn(
+        "fusebase.json: legacy shape detected and auto-migrated to 'productId'/'apps[]' " +
+          "(including 'features/' → 'apps/' path prefixes). The new shape will be persisted on this run.",
+      );
+    }
   }
   return { migrated };
 }
@@ -349,6 +353,7 @@ export function migrateFeaturesFolderToAppsAtRoot(
     return { renamed: false };
   }
 
+  agentAssetsRefreshNeeded = true;
   if (!featuresFolderMigrationWarningPrinted) {
     featuresFolderMigrationWarningPrinted = true;
     console.warn(
@@ -357,6 +362,42 @@ export function migrateFeaturesFolderToAppsAtRoot(
   }
 
   return { renamed: true };
+}
+
+/**
+ * Run AGENTS.md + .claude assets refresh once per process when an earlier
+ * `loadFuseConfig` / `normalizeRawFuseConfigShape` / `migrateFeaturesFolderToAppsAtRoot`
+ * detected and applied a legacy → new-shape migration. Uses the same template
+ * extraction flow as `fusebase update` (`copyAgentsAndSkills`) so any
+ * project-template renames (`features/` → `apps/`, `fusebase feature *` →
+ * `fusebase app *`, etc.) propagate into the project's `.claude` directory
+ * without requiring the user to run `fusebase update` separately.
+ *
+ * Idempotent: the pending flag is cleared on the first call, so subsequent
+ * calls in the same process are no-ops.
+ */
+export async function flushAgentAssetsRefreshAfterMigration(
+  cwd: string,
+): Promise<{ refreshed: boolean }> {
+  if (!agentAssetsRefreshNeeded) {
+    return { refreshed: false };
+  }
+  agentAssetsRefreshNeeded = false;
+  try {
+    const { copyAgentsAndSkills } = await import("./copy-template");
+    await copyAgentsAndSkills(cwd);
+    console.log(
+      "fusebase: refreshed AGENTS.md, .claude/skills, .claude/agents, .claude/hooks and .claude/settings.json to match new naming.",
+    );
+    return { refreshed: true };
+  } catch (error) {
+    console.warn(
+      `fusebase: failed to refresh .claude assets after auto-migration: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return { refreshed: false };
+  }
 }
 
 /** Clear in-memory fusebase.json cache (call after writing fusebase.json). */
@@ -373,6 +414,16 @@ export function resetLegacyShapeWarningForTests(): void {
 /** Test-only: reset the once-per-process features-folder migration warning state. */
 export function resetFeaturesFolderMigrationWarningForTests(): void {
   featuresFolderMigrationWarningPrinted = false;
+}
+
+/** Test-only: reset the once-per-process pending agent-assets refresh flag. */
+export function resetAgentAssetsRefreshFlagForTests(): void {
+  agentAssetsRefreshNeeded = false;
+}
+
+/** Test-only: introspect the pending agent-assets refresh flag. */
+export function isAgentAssetsRefreshPendingForTests(): boolean {
+  return agentAssetsRefreshNeeded;
 }
 
 function sortGateUsedOps(used: string[]): string[] {
