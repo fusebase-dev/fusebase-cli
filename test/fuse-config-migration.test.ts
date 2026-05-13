@@ -26,7 +26,9 @@ import {
   normalizeRawFuseConfigShape,
   resetAgentAssetsRefreshFlagForTests,
   resetFeaturesFolderMigrationWarningForTests,
+  resetLegacyFeaturePathsWarningForTests,
   resetLegacyShapeWarningForTests,
+  rewriteLegacyFeaturePathsInRaw,
   writeGateSdkOperationsToFusebaseJson,
 } from "../lib/config";
 
@@ -41,6 +43,7 @@ describe("fusebase.json shape auto-migration", () => {
     process.chdir(dir);
     invalidateFuseConfigCache();
     resetLegacyShapeWarningForTests();
+    resetLegacyFeaturePathsWarningForTests();
     resetFeaturesFolderMigrationWarningForTests();
     resetAgentAssetsRefreshFlagForTests();
     warnSpy = spyOn(console, "warn").mockImplementation(() => {});
@@ -51,6 +54,7 @@ describe("fusebase.json shape auto-migration", () => {
     rmSync(dir, { recursive: true, force: true });
     invalidateFuseConfigCache();
     resetLegacyShapeWarningForTests();
+    resetLegacyFeaturePathsWarningForTests();
     resetFeaturesFolderMigrationWarningForTests();
     resetAgentAssetsRefreshFlagForTests();
     warnSpy?.mockRestore();
@@ -115,7 +119,25 @@ describe("fusebase.json shape auto-migration", () => {
       });
     });
 
-    it("rewrites `apps[].path` entries from `features/...` to `apps/...` (independent of filesystem)", () => {
+    it("does not touch `apps[].path` (path rewriting lives in `rewriteLegacyFeaturePathsInRaw`)", () => {
+      const raw: Record<string, unknown> = {
+        orgId: "o",
+        productId: "p",
+        apps: [
+          { id: "a-1", path: "features/x" },
+          { id: "a-2", path: "apps/y" },
+        ],
+      };
+      const { migrated } = normalizeRawFuseConfigShape(raw);
+      expect(migrated).toBe(false);
+      const apps = raw.apps as Array<Record<string, unknown>>;
+      expect(apps[0]!.path).toBe("features/x");
+      expect(apps[1]!.path).toBe("apps/y");
+    });
+  });
+
+  describe("rewriteLegacyFeaturePathsInRaw", () => {
+    it("rewrites `features/X` → `apps/X` when no projectRoot is supplied (legacy callers)", () => {
       const raw: Record<string, unknown> = {
         orgId: "o",
         productId: "p",
@@ -125,8 +147,8 @@ describe("fusebase.json shape auto-migration", () => {
           { id: "a-3" },
         ],
       };
-      const { migrated } = normalizeRawFuseConfigShape(raw);
-      expect(migrated).toBe(true);
+      const { rewritten } = rewriteLegacyFeaturePathsInRaw(raw);
+      expect(rewritten).toBe(true);
       const apps = raw.apps as Array<Record<string, unknown>>;
       expect(apps[0]!.path).toBe("apps/x");
       expect(apps[1]!.path).toBe("apps/y");
@@ -142,11 +164,41 @@ describe("fusebase.json shape auto-migration", () => {
           { id: "a-2", path: "featuresX/y" },
         ],
       };
-      const { migrated } = normalizeRawFuseConfigShape(raw);
-      expect(migrated).toBe(false);
+      const { rewritten } = rewriteLegacyFeaturePathsInRaw(raw);
+      expect(rewritten).toBe(false);
       const apps = raw.apps as Array<Record<string, unknown>>;
       expect(apps[0]!.path).toBe("nested/features/x");
       expect(apps[1]!.path).toBe("featuresX/y");
+    });
+
+    it("rewrites paths when `projectRoot` is supplied and `features/` is absent", () => {
+      const raw: Record<string, unknown> = {
+        productId: "p",
+        apps: [{ id: "a-1", path: "features/x" }],
+      };
+      // No `features/` on disk under `dir` — rewrite is safe.
+      const { rewritten } = rewriteLegacyFeaturePathsInRaw(raw, dir);
+      expect(rewritten).toBe(true);
+      expect((raw.apps as Array<Record<string, unknown>>)[0]!.path).toBe(
+        "apps/x",
+      );
+    });
+
+    it("NIM-41161: skips path rewrite when `features/` still exists at projectRoot", () => {
+      // Simulates the case where the on-disk `features/` → `apps/` rename
+      // failed (EPERM on Windows, antivirus lock, etc.). The path rewrite
+      // would otherwise persist `apps/X` paths pointing at directories that
+      // do not exist, breaking deploy.
+      mkdirSync(join(dir, "features", "x"), { recursive: true });
+      const raw: Record<string, unknown> = {
+        productId: "p",
+        apps: [{ id: "a-1", path: "features/x" }],
+      };
+      const { rewritten } = rewriteLegacyFeaturePathsInRaw(raw, dir);
+      expect(rewritten).toBe(false);
+      expect((raw.apps as Array<Record<string, unknown>>)[0]!.path).toBe(
+        "features/x",
+      );
     });
   });
 
@@ -375,6 +427,43 @@ describe("fusebase.json shape auto-migration", () => {
       expect(existsSync(join(dir, "features"))).toBe(false);
       expect(existsSync(join(dir, "apps", "x"))).toBe(true);
       expect(cfg!.apps?.[0]?.path).toBe("apps/x");
+    });
+
+    it("NIM-41161: leaves `apps[].path` pointing at `features/` when the FS rename does not happen", () => {
+      // Reproduces the deploy-time failure mode: `migrateFeaturesFolderToAppsAtRoot`
+      // returns without renaming (here because both directories already
+      // exist — the same shape as a rename that failed with EPERM), and
+      // the user's fusebase.json paths must keep pointing at the existing
+      // `features/X` directories on disk rather than at the empty
+      // `apps/X` slots.
+      writeFileSync(
+        join(dir, "fusebase.json"),
+        JSON.stringify({
+          orgId: "o",
+          appId: "p",
+          features: [{ id: "a-1", path: "features/x" }],
+        }),
+      );
+      mkdirSync(join(dir, "features", "x"), { recursive: true });
+      mkdirSync(join(dir, "apps"), { recursive: true });
+
+      const cfg = loadFuseConfig();
+      expect(cfg).not.toBeNull();
+      // FS rename was blocked by the collision; both directories are still there.
+      expect(existsSync(join(dir, "features", "x"))).toBe(true);
+      expect(existsSync(join(dir, "apps"))).toBe(true);
+      // Paths must stay aligned with what is actually on disk.
+      expect(cfg!.apps?.[0]?.path).toBe("features/x");
+      // Schema migration still happened (productId / apps[]); persisted on disk.
+      expect(cfg!.productId).toBe("p");
+      const onDisk = JSON.parse(
+        readFileSync(join(dir, "fusebase.json"), "utf-8"),
+      ) as Record<string, unknown>;
+      expect(onDisk.productId).toBe("p");
+      expect("appId" in onDisk).toBe(false);
+      expect("features" in onDisk).toBe(false);
+      const apps = onDisk.apps as Array<Record<string, unknown>>;
+      expect(apps[0]!.path).toBe("features/x");
     });
   });
 
