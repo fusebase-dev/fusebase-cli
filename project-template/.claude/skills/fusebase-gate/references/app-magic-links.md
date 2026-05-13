@@ -57,7 +57,7 @@ These operations expose one-click client onboarding for AI Apps. They mirror the
 - Successful response: `{ id, sessionToken, featureToken, dashboardToken, redirectPath, expiresAt, appFeatureId }`.
   - `sessionToken` — set as the `eversessionid` cookie on the app subdomain so subsequent calls authenticate.
   - `featureToken` — Gate feature token; persist via the existing scaffold convention (`postMessage`, cookie `fbsfeaturetoken`, etc.).
-  - `dashboardToken` — Dashboard feature token, scoped to the same app and target user; needed for `dashboard-service` SDK calls.
+  - `dashboardToken` — dashboard-service feature token, scoped to the same app and target user. The bundled SPA persists it as the `fbsdashboardtoken` cookie so dashboard SDK calls (`@fusebase/dashboard-service-sdk`) can authenticate after activation; in the deployed app-wrapper flow it is bundled inside the gate feature token JWT, but the magic-link activation hands both tokens out as discrete strings.
   - `redirectPath` — relative path to navigate to after token persistence (`/` if the invite did not request a deep link).
   - `expiresAt` is included so the SPA can mirror the same expired UI without a second round-trip.
 - Within the 24h TTL the link can be activated more than once (covers the "user opened the email twice" case).

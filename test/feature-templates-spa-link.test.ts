@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  DASHBOARD_TOKEN_COOKIE,
   FEATURE_TOKEN_COOKIE,
   MAGIC_LINK_ROUTE,
   SESSION_COOKIE,
@@ -148,15 +149,28 @@ describe('feature-templates/spa /link handler helpers', () => {
       ).toBe('/')
     })
 
-    it('builds cookie strings only for tokens that are present', () => {
+    it('builds cookie strings for every token returned by activation', () => {
+      // Regression for NIM-41013 round-3 CR: nimbus-ai's activation response carries
+      // featureToken (Gate), dashboardToken (dashboard-service), and sessionToken; the
+      // SPA must persist all three so dashboard SDK calls can authenticate post-activation.
       const outcome = selectActivationOutcome(
-        { sessionToken: 'sess', featureToken: 'feat', redirectPath: '/' },
+        {
+          sessionToken: 'sess',
+          featureToken: 'feat',
+          dashboardToken: 'dash',
+          redirectPath: '/',
+        },
         '/',
         cookieOpts,
       )
-      expect(outcome.cookies.map((c) => c.name)).toEqual([FEATURE_TOKEN_COOKIE, SESSION_COOKIE])
+      expect(outcome.cookies.map((c) => c.name)).toEqual([
+        FEATURE_TOKEN_COOKIE,
+        DASHBOARD_TOKEN_COOKIE,
+        SESSION_COOKIE,
+      ])
       expect(outcome.cookies[0]?.cookie).toBe('fbsfeaturetoken=feat; path=/; SameSite=Lax; Max-Age=60; Secure')
-      expect(outcome.cookies[1]?.cookie).toBe('eversessionid=sess; path=/; SameSite=Lax; Max-Age=60; Secure')
+      expect(outcome.cookies[1]?.cookie).toBe('fbsdashboardtoken=dash; path=/; SameSite=Lax; Max-Age=60; Secure')
+      expect(outcome.cookies[2]?.cookie).toBe('eversessionid=sess; path=/; SameSite=Lax; Max-Age=60; Secure')
     })
 
     it('omits cookies when tokens are absent', () => {
@@ -164,8 +178,22 @@ describe('feature-templates/spa /link handler helpers', () => {
         selectActivationOutcome({ redirectPath: '/' }, '/', cookieOpts).cookies,
       ).toEqual([])
       expect(
-        selectActivationOutcome({ sessionToken: '', featureToken: '', redirectPath: '/' }, '/', cookieOpts).cookies,
+        selectActivationOutcome(
+          { sessionToken: '', featureToken: '', dashboardToken: '', redirectPath: '/' },
+          '/',
+          cookieOpts,
+        ).cookies,
       ).toEqual([])
+    })
+
+    it('persists dashboardToken independently of the other two', () => {
+      const outcome = selectActivationOutcome(
+        { dashboardToken: 'dash-only', redirectPath: '/' },
+        '/',
+        cookieOpts,
+      )
+      expect(outcome.cookies.map((c) => c.name)).toEqual([DASHBOARD_TOKEN_COOKIE])
+      expect(outcome.cookies[0]?.cookie).toBe('fbsdashboardtoken=dash-only; path=/; SameSite=Lax; Max-Age=60; Secure')
     })
   })
 })

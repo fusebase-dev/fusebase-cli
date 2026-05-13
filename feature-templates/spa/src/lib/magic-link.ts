@@ -11,6 +11,11 @@
 export const MAGIC_LINK_ROUTE = '/link'
 export const FEATURE_TOKEN_COOKIE = 'fbsfeaturetoken'
 export const SESSION_COOKIE = 'eversessionid'
+// Separate from the Gate feature token: dashboard-service SDK calls authenticate
+// with a token scoped to the dashboard product. In the deployed app-wrapper flow
+// both tokens are bundled into a single JWT; the magic-link activation receives
+// them as discrete strings, so the SPA must persist both.
+export const DASHBOARD_TOKEN_COOKIE = 'fbsdashboardtoken'
 
 export type LinkActivationFailure = 'expired' | 'revoked' | 'not_found' | 'unknown'
 
@@ -108,6 +113,7 @@ export function buildLinkCookie(
 export interface ActivationResponseShape {
   sessionToken?: string | null
   featureToken?: string | null
+  dashboardToken?: string | null
   redirectPath?: string | null
 }
 
@@ -135,6 +141,12 @@ export function selectActivationOutcome(
     cookies.push({
       name: FEATURE_TOKEN_COOKIE,
       cookie: buildLinkCookie(FEATURE_TOKEN_COOKIE, response.featureToken, cookieOpts),
+    })
+  }
+  if (response.dashboardToken) {
+    cookies.push({
+      name: DASHBOARD_TOKEN_COOKIE,
+      cookie: buildLinkCookie(DASHBOARD_TOKEN_COOKIE, response.dashboardToken, cookieOpts),
     })
   }
   if (response.sessionToken) {
