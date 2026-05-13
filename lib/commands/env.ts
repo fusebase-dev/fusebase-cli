@@ -13,7 +13,10 @@ import {
   setupIdeConfig,
   type IdePreset,
 } from "./steps/ide-setup";
-import { normalizeRawFuseConfigShape } from "../config";
+import {
+  normalizeRawFuseConfigShape,
+  rewriteLegacyFeaturePathsInRaw,
+} from "../config";
 
 const CONFIG_DIR = join(homedir(), ".fusebase");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
@@ -54,6 +57,7 @@ async function loadFuseConfig(cwd: string): Promise<FuseConfig> {
     const data = await readFile(fuseJsonPath, "utf-8");
     const raw = JSON.parse(data) as Record<string, unknown>;
     normalizeRawFuseConfigShape(raw);
+    rewriteLegacyFeaturePathsInRaw(raw, cwd);
     return raw as FuseConfig;
   } catch {
     return {};

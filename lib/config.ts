@@ -213,6 +213,7 @@ export function removeFlag(flag: string): void {
 let fuseConfigCache: FuseConfig | null = null;
 let fuseConfigLoaded = false;
 let legacyShapeWarningPrinted = false;
+let legacyFeaturePathsWarningPrinted = false;
 let featuresFolderMigrationWarningPrinted = false;
 let agentAssetsRefreshNeeded = false;
 
@@ -220,9 +221,11 @@ let agentAssetsRefreshNeeded = false;
  * Migrate fusebase.json legacy shape in-place to the new shape:
  *  - rename `appId` → `productId` and drop `appId`
  *  - rename `features[]` → `apps[]` and drop `features[]`
- *  - rewrite any `apps[].path` that still starts with `features/` to start
- *    with `apps/` (independent of filesystem state — the on-disk folder
- *    rename is handled separately by `migrateFeaturesFolderToAppsAtRoot`)
+ *
+ * Does NOT touch `apps[].path` prefixes — that rewrite is filesystem-anchored
+ * (a path is a reference to a real on-disk directory) and is handled by
+ * `rewriteLegacyFeaturePathsInRaw`, which only rewrites when the legacy
+ * `features/` directory is already gone from disk.
  *
  * Prints a one-time warning the first time a legacy-shape file is observed
  * in this process. Idempotent — safe to call on already-normalized objects.
@@ -247,27 +250,65 @@ export function normalizeRawFuseConfigShape(
     delete raw.features;
     migrated = true;
   }
-  if (Array.isArray(raw.apps)) {
-    for (const app of raw.apps) {
-      if (!app || typeof app !== "object") continue;
-      const a = app as Record<string, unknown>;
-      if (typeof a.path === "string" && a.path.startsWith("features/")) {
-        a.path = "apps/" + a.path.slice("features/".length);
-        migrated = true;
-      }
-    }
-  }
   if (migrated) {
     agentAssetsRefreshNeeded = true;
     if (!legacyShapeWarningPrinted) {
       legacyShapeWarningPrinted = true;
       console.warn(
-        "fusebase.json: legacy shape detected and auto-migrated to 'productId'/'apps[]' " +
-          "(including 'features/' → 'apps/' path prefixes). The new shape will be persisted on this run.",
+        "fusebase.json: legacy shape detected and auto-migrated to 'productId'/'apps[]'. " +
+          "The new shape will be persisted on this run.",
       );
     }
   }
   return { migrated };
+}
+
+/**
+ * Rewrite legacy `features/X` prefixes in `apps[].path` to `apps/X` in-place,
+ * but only when it is safe to do so — i.e. when a `features/` directory does
+ * NOT exist at `projectRoot`. Callers that don't have filesystem context
+ * (omit `projectRoot`) get the pre-NIM-41161 behaviour and always rewrite.
+ *
+ * Skipping the rewrite is the fix for NIM-41161: if the on-disk
+ * `features/` → `apps/` rename failed (EPERM on Windows, permission
+ * collisions, etc.), an unconditional rewrite would persist paths pointing
+ * at a non-existent `apps/X` while the files still live under `features/X`,
+ * breaking deploy. Keeping the paths aligned with what is actually on disk
+ * means the existing project keeps working even when the FS rename can't be
+ * applied automatically.
+ *
+ * Prints a one-time warning the first time the rewrite fires. Idempotent.
+ */
+export function rewriteLegacyFeaturePathsInRaw(
+  raw: Record<string, unknown>,
+  projectRoot?: string,
+): { rewritten: boolean } {
+  if (!Array.isArray(raw.apps)) {
+    return { rewritten: false };
+  }
+  if (projectRoot !== undefined && existsSync(join(projectRoot, "features"))) {
+    return { rewritten: false };
+  }
+  let rewritten = false;
+  for (const app of raw.apps) {
+    if (!app || typeof app !== "object") continue;
+    const a = app as Record<string, unknown>;
+    if (typeof a.path === "string" && a.path.startsWith("features/")) {
+      a.path = "apps/" + a.path.slice("features/".length);
+      rewritten = true;
+    }
+  }
+  if (rewritten) {
+    agentAssetsRefreshNeeded = true;
+    if (!legacyFeaturePathsWarningPrinted) {
+      legacyFeaturePathsWarningPrinted = true;
+      console.warn(
+        "fusebase.json: rewrote legacy 'features/' → 'apps/' path prefixes " +
+          "in apps[] to match the renamed on-disk directory.",
+      );
+    }
+  }
+  return { rewritten };
 }
 
 export const loadFuseConfig = (): FuseConfig | null => {
@@ -286,7 +327,8 @@ export const loadFuseConfig = (): FuseConfig | null => {
       >;
       const { migrated } = normalizeRawFuseConfigShape(raw);
       const { renamed } = migrateFeaturesFolderToAppsAtRoot(cwd);
-      if (migrated || renamed) {
+      const { rewritten } = rewriteLegacyFeaturePathsInRaw(raw, cwd);
+      if (migrated || renamed || rewritten) {
         // Persist the normalized shape so subsequent CLI invocations read a
         // clean new-shape file and the migration helpers stop firing.
         try {
@@ -317,8 +359,9 @@ export const loadFuseConfig = (): FuseConfig | null => {
  *  - otherwise `renameSync(features, apps)` and prints a one-time warning
  *
  * The in-memory `apps[].path` rewrite from `features/...` to `apps/...` is
- * handled by `normalizeRawFuseConfigShape` because it is a fusebase.json
- * shape concern, independent of filesystem state.
+ * handled by `rewriteLegacyFeaturePathsInRaw`, which keys off the post-rename
+ * filesystem state so paths only update when the on-disk folder actually
+ * moved (NIM-41161).
  */
 export function migrateFeaturesFolderToAppsAtRoot(
   projectRoot: string,
@@ -409,6 +452,11 @@ export function invalidateFuseConfigCache(): void {
 /** Test-only: reset the once-per-process legacy-shape warning state. */
 export function resetLegacyShapeWarningForTests(): void {
   legacyShapeWarningPrinted = false;
+}
+
+/** Test-only: reset the once-per-process legacy-feature-paths warning state. */
+export function resetLegacyFeaturePathsWarningForTests(): void {
+  legacyFeaturePathsWarningPrinted = false;
 }
 
 /** Test-only: reset the once-per-process features-folder migration warning state. */
@@ -634,6 +682,7 @@ export function writeGateSdkOperationsToFusebaseJson(
     throw new Error("Could not parse fusebase.json");
   }
   normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
 
   const usedSorted = sortGateUsedOps(input.usedOps);
   const prev = readPreviousGateSnapshotForFeature(raw, featureId);
@@ -699,6 +748,7 @@ export function updateGateSdkPermissionsInFusebaseJson(
     throw new Error("Could not parse fusebase.json");
   }
   normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
   const g = readPreviousGateSnapshotForFeature(raw, featureId);
   if (!g) {
     throw new Error(

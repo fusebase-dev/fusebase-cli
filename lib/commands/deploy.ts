@@ -501,7 +501,7 @@ async function publishOpenApiManifestIfPresent(params: {
 }
 
 export const deployCommand = new Command("deploy")
-  .description("Deploy features to Fusebase")
+  .description("Deploy apps to Fusebase")
   .option(
     "--force",
     "Force re-upload and re-deploy regardless of frontend/backend hash match",
@@ -535,15 +535,15 @@ export const deployCommand = new Command("deploy")
 
     if (deployableFeatures.length === 0) {
       console.error(
-        "Error: No features with path configured in fusebase.json.",
+        "Error: No apps with path configured in fusebase.json.",
       );
       console.error(
-        "Use 'fusebase feature create' to configure a path for deployment.",
+        "Use 'fusebase app create' to configure a path for deployment.",
       );
       process.exit(1);
     }
 
-    console.log(`\nDeploying ${deployableFeatures.length} feature(s)...\n`);
+    console.log(`\nDeploying ${deployableFeatures.length} app(s)...\n`);
 
     // Fetch product and apps to get sub and path for URLs
     let app: Product;
@@ -583,7 +583,7 @@ export const deployCommand = new Command("deploy")
       const featureId = featureConfig.id;
       const featureBasePath = join(process.cwd(), featureConfig.path!);
 
-      console.log(`📦 Feature: ${featureId}`);
+      console.log(`📦 App: ${featureId}`);
       console.log(`   Source: ${featureConfig.path}`);
 
       try {
@@ -681,7 +681,7 @@ export const deployCommand = new Command("deploy")
         // ── Branch B: skip the whole feature (no version, no upload, no deploy) ─
         if (!force && frontendMatches && backendMatches) {
           console.log(
-            `   ✓ No changes for feature, skipping deploy\n`,
+            `   ✓ No changes for app, skipping deploy\n`,
           );
 
           const feature = features.find((f) => f.id === featureId);
