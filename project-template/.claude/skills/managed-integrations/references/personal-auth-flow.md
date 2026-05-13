@@ -32,3 +32,5 @@ new McpManagerApi(
     credentials: 'include',
   }),
 )
+```
+- The app must be able to handle the case when a user's personal authorization expires. The app can tell that this has happened if, when attempting to call an integration tool, it receives an HTTP 403 response. In this case, delete the saved server information and prompt the user to authorize again.
