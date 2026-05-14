@@ -8,7 +8,7 @@ import {
   type App,
   type AppPermissions,
 } from "../api.ts";
-import { getConfig, hasFlag, loadFuseConfig, type FeatureConfig } from "../config.ts";
+import { getConfig, loadFuseConfig, type FeatureConfig } from "../config.ts";
 import {
   formatPermissionItem,
   mergeFeaturePermissions,
@@ -146,7 +146,7 @@ export async function runAppCreate(options: AppCreateOptions): Promise<void> {
     process.exit(1);
   }
 
-  if (hasFlag("analytics") && (options.codingAgent || options.model)) {
+  if (options.codingAgent || options.model) {
     sendCodingStats(config.apiKey, fuseConfig.orgId, fuseConfig.productId, {
       codingAgent: options.codingAgent,
       model: options.model,

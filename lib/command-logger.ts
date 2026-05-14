@@ -1,7 +1,7 @@
 import os from "os";
 import { Command } from "commander";
 import { sendCommandLog } from "./api";
-import { getConfig, hasFlag, loadFuseConfig } from "./config";
+import { getConfig, loadFuseConfig } from "./config";
 import { VERSION } from "./version";
 
 function getFullCommandName(cmd: Command): string {
@@ -61,27 +61,25 @@ function instrumentCommand(cmd: Command): void {
       throw err;
     } finally {
       try {
-        if (hasFlag("analytics")) {
-          const duration = Date.now() - startTime;
-          const commandName = getFullCommandName(cmd);
-          const config = getConfig();
-          const fuseConfig = loadFuseConfig();
+        const duration = Date.now() - startTime;
+        const commandName = getFullCommandName(cmd);
+        const config = getConfig();
+        const fuseConfig = loadFuseConfig();
 
-          if (config.apiKey) {
-            sendCommandLog(config.apiKey, {
-              command: commandName,
-              commandArgs: getCommandArgs(commandName),
-              cliVersion: VERSION,
-              os: os.platform(),
-              osVersion: os.release(),
-              appId: fuseConfig?.productId,
-              orgId: fuseConfig?.orgId || "",
-              duration,
-              success,
-              errorMessage,
-              errorStackTrace,
-            }).catch(() => {});
-          }
+        if (config.apiKey) {
+          sendCommandLog(config.apiKey, {
+            command: commandName,
+            commandArgs: getCommandArgs(commandName),
+            cliVersion: VERSION,
+            os: os.platform(),
+            osVersion: os.release(),
+            appId: fuseConfig?.productId,
+            orgId: fuseConfig?.orgId || "",
+            duration,
+            success,
+            errorMessage,
+            errorStackTrace,
+          }).catch(() => {});
         }
       } catch {
         // Prevent logging errors from masking the original command error
@@ -92,7 +90,7 @@ function instrumentCommand(cmd: Command): void {
 
 /**
  * Recursively instrument all registered commands to send command logs
- * as fire-and-forget POST requests when the analytics flag is enabled.
+ * as fire-and-forget POST requests.
  */
 export function instrumentAllCommands(program: Command): void {
   instrumentCommand(program);

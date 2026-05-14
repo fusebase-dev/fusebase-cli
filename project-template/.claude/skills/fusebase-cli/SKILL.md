@@ -215,10 +215,8 @@ This command **always creates a new app** on Fusebase servers and configures its
 - `--backend-dev-command <command>` - Backend dev command (e.g., `npm run dev`). Only if the app has a `backend/` folder.
 - `--backend-build-command <command>` - Backend build command (e.g., `npm run build`). Only if the app has a `backend/` folder.
 - `--backend-start-command <command>` - Backend start command for production (e.g., `npm run start`). Only if the app has a `backend/` folder.
-<% if (it.analytics) { %>
 - `--coding-agent <name>` - Coding agent identifier (e.g. `claude_code`, `cursor`, `copilot`, `codex`).  Populate this field with your name.
 - `--model <name>` - Model identifier (e.g. `claude-opus-4-6`, `gpt-5`). Populate this field with the model name currently used.
-<% } %>
 
 **Examples:**
 
@@ -404,9 +402,9 @@ fusebase app create \
   --path=apps/<name> \
   --dev-command="npm run dev" \
   --build-command="npm run build" \
-  --output-dir=dist<% if (it.analytics) { %> \
+  --output-dir=dist \
   --coding-agent=<agent> \
-  --model=<model><% } %>
+  --model=<model>
 
 # Start the dev server
 fusebase dev start apps/<name>
@@ -527,13 +525,13 @@ fusebase remote-logs runtime abc123 --type system
 
    ```bash
    # Without dashboard access
-   fusebase app create --name="My New App" --subdomain=my-new-app --path=apps/my-new-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist<% if (it.analytics) { %> --coding-agent=codex --model=gpt-5.4<% } %>
+   fusebase app create --name="My New App" --subdomain=my-new-app --path=apps/my-new-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --coding-agent=codex --model=gpt-5.4
 
    # With dashboard view permissions (preferred: set at creation)
-   fusebase app create --name="My New App" --subdomain=my-new-app --path=apps/my-new-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write"<% if (it.analytics) { %> --coding-agent=claude_code --model=opus-4.7<% } %>
+   fusebase app create --name="My New App" --subdomain=my-new-app --path=apps/my-new-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write" --coding-agent=claude_code --model=opus-4.7
 
    # With a backend
-   fusebase app create --name="My New App" --subdomain=my-new-app --path=apps/my-new-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --backend-dev-command="npm run dev" --backend-build-command="npm run build" --backend-start-command="npm run start"<% if (it.analytics) { %> --coding-agent=copilot --model=sonnet-4.6<% } %>
+   fusebase app create --name="My New App" --subdomain=my-new-app --path=apps/my-new-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --backend-dev-command="npm run dev" --backend-build-command="npm run build" --backend-start-command="npm run start" --coding-agent=copilot --model=sonnet-4.6
    ```
 
    This will create the app on Fusebase and add it to `fusebase.json`
@@ -559,7 +557,7 @@ fusebase app update <appId> --permissions="dashboardView.dash1:view1.read,write"
 2. `fusebase init` - Initialize project
 3. `fusebase scaffold --template spa --dir apps/<name>` - Scaffold app files (dependencies are installed automatically)
 3a. Implement the app code
-4. *(after code is written)* `fusebase app create --name="App Name" --subdomain=app-name --path=apps/app-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]`<% if (it.analytics) { %> `[--coding-agent=<agent> --model=<model>]`<% } %> - Register app; **include `--permissions` at this step** if the app needs dashboard access.<% if (it.analytics) { %> **Always include `--coding-agent` and `--model`.**<% } %> **Execute automatically — do NOT list as next steps for the user.**
+4. *(after code is written)* `fusebase app create --name="App Name" --subdomain=app-name --path=apps/app-name --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist [--permissions="..."]` `[--coding-agent=<agent> --model=<model>]` - Register app; **include `--permissions` at this step** if the app needs dashboard access. **Always include `--coding-agent` and `--model`.** **Execute automatically — do NOT list as next steps for the user.**
 4a. *(after registering)* `fusebase dev start` - Start dev and test locally. **Execute automatically.**
 5. *(if app settings changed)* `fusebase app update <appId> [--permissions="..."] [--sync-gate-permissions]` - Sync updated settings before deploying
 6. `fusebase deploy` - Deploy to production
