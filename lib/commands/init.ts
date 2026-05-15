@@ -642,9 +642,9 @@ export const initCommand = new Command("init")
       const appTitle =
         options.name ??
         (await input({
-          message: "Enter a title for the new app:",
+          message: "Enter a title for the new product:",
           validate: (value) => {
-            if (!value.trim()) return "App title is required";
+            if (!value.trim()) return "Product title is required";
             return true;
           },
         }));
@@ -652,10 +652,10 @@ export const initCommand = new Command("init")
       let selectedApp: Product;
       try {
         selectedApp = await createProduct(apiKey, selectedOrg.id, appTitle.trim());
-        console.log(`✓ Created app: ${selectedApp.title}`);
+        console.log(`✓ Created product: ${selectedApp.title}`);
       } catch (error) {
         console.error(
-          "Error: Failed to create app.",
+          "Error: Failed to create product.",
           error instanceof Error ? error.message : "",
         );
         process.exit(1);
@@ -780,9 +780,9 @@ export const initCommand = new Command("init")
         JSON.stringify(fuseConfig, null, 2),
         "utf-8",
       );
-      console.log("✓ App initialized successfully");
+      console.log("✓ Product initialized successfully");
       console.log(`  Organization: ${selectedOrg.title}`);
-      console.log(`  App: ${selectedApp.title}`);
+      console.log(`  Product: ${selectedApp.title}`);
 
       // Run npm install if template was used
       if (needToCopyTemplate) {
