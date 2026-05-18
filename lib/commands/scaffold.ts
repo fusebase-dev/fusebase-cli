@@ -44,7 +44,7 @@ async function ensureOpenApiSpec(targetDir: string): Promise<void> {
 
 export const scaffoldCommand = new Command("scaffold")
   .description(
-    "Scaffold a new feature from a template. Without options, lists available templates.",
+    "Scaffold a new app from a template. Without options, lists available templates.",
   )
   .option(
     "-t, --template <templateId>",

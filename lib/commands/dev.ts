@@ -254,7 +254,7 @@ export const devCommand = new Command("dev").description(
 
 devCommand
   .command("start")
-  .description("Start the development server for a feature")
+  .description("Start the development server for an app")
   .argument("[feature]", "Feature ID or path (from fusebase.json features)")
   .action(async (featureIdOrPath?: string) => {
     // Print version

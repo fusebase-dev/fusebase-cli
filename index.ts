@@ -35,7 +35,7 @@ program.hook("preAction", async () => {
   await flushAgentAssetsRefreshAfterMigration(process.cwd());
 });
 
-program.name("fusebase").description("Fusebase Apps CLI").version(VERSION);
+program.name("fusebase").description("Fusebase Products CLI").version(VERSION);
 
 program.addCommand(authCommand);
 

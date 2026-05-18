@@ -26,7 +26,7 @@ function parseSecretArg(
 
 export const secretCreateCommand = new Command("create")
   .description(
-    "Create secrets (with empty values) for an app feature and print the URL to set their values",
+    "Create secrets (with empty values) for an app and print the URL to set their values",
   )
   .requiredOption("--feature <featureId>", "Feature ID to create secrets for")
   .requiredOption(

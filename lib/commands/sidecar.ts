@@ -124,7 +124,7 @@ function findJobOrExit(
 }
 
 const addCommand = new Command("add")
-  .description("Add a sidecar container to a feature backend in fusebase.json")
+  .description("Add a sidecar container to an app backend in fusebase.json")
   .requiredOption(
     "-f, --feature <featureId>",
     "Feature ID to add the sidecar to",
@@ -312,7 +312,7 @@ const addCommand = new Command("add")
 
 const removeCommand = new Command("remove")
   .description(
-    "Remove a sidecar container from a feature backend in fusebase.json",
+    "Remove a sidecar container from an app backend in fusebase.json",
   )
   .requiredOption(
     "-f, --feature <featureId>",
@@ -401,7 +401,7 @@ const removeCommand = new Command("remove")
   });
 
 const listCommand = new Command("list")
-  .description("List sidecar containers for a feature backend")
+  .description("List sidecar containers for an app backend")
   .requiredOption(
     "-f, --feature <featureId>",
     "Feature ID to list sidecars for",
@@ -472,7 +472,7 @@ const listCommand = new Command("list")
   });
 
 export const sidecarCommand = new Command("sidecar")
-  .description("Manage sidecar containers for a feature backend")
+  .description("Manage sidecar containers for an app backend")
   .addCommand(addCommand)
   .addCommand(removeCommand)
   .addCommand(listCommand);
