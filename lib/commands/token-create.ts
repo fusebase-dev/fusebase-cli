@@ -3,7 +3,7 @@ import { getConfig, loadFuseConfig } from "../config";
 import { fetchAppToken } from "../api";
 
 export const tokenCreateCommand = new Command("create")
-  .description("Create a short-lived app development token for a feature")
+  .description("Create a short-lived product development token for an app")
   .requiredOption("--feature <featureId>", "Feature ID to create token for")
   .action(async (options: { feature: string }) => {
     const fuseConfig = loadFuseConfig();

@@ -135,7 +135,7 @@ function validateIsoTimestamp(value: string, flag: string): string {
 
 // Build logs subcommand
 const buildCommand = new Command("build")
-  .description("Get build logs for a deployed feature")
+  .description("Get build logs for a deployed app")
   .argument("<featureId>", "Feature ID")
   .action(async (featureId: string) => {
     try {
@@ -162,7 +162,7 @@ const buildCommand = new Command("build")
 
 // Runtime logs subcommand
 const runtimeCommand = new Command("runtime")
-  .description("Get runtime logs from a deployed feature backend")
+  .description("Get runtime logs from a deployed app backend")
   .argument("<featureId>", "Feature ID")
   .option(
     "-t, --tail <number>",
@@ -253,6 +253,6 @@ runtimeCommand.action(async (featureId: string, options) => {
 
 // Main remote-logs command
 export const remoteLogsCommand = new Command("remote-logs")
-  .description("Fetch logs from deployed Fusebase app features")
+  .description("Fetch logs from deployed Fusebase product apps")
   .addCommand(buildCommand)
   .addCommand(runtimeCommand);

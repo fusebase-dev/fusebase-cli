@@ -10,7 +10,7 @@ import {
 const FUSE_JSON = "fusebase.json";
 
 const createCommand = new Command("create")
-  .description("Add a cron job to a feature's backend in fusebase.json")
+  .description("Add a cron job to an app's backend in fusebase.json")
   .requiredOption("-f, --feature <featureId>", "Feature ID to add the job to")
   .requiredOption("-n, --name <name>", "Job name (unique within the feature)")
   .requiredOption(
@@ -106,7 +106,7 @@ function detectIndent(src: string): number {
 }
 
 const deleteCommand = new Command("delete")
-  .description("Remove a cron job from a feature's backend in fusebase.json")
+  .description("Remove a cron job from an app's backend in fusebase.json")
   .requiredOption(
     "-f, --feature <featureId>",
     "Feature ID to remove the job from",
@@ -168,6 +168,6 @@ const deleteCommand = new Command("delete")
   });
 
 export const jobCommand = new Command("job")
-  .description("Manage cron jobs for a feature backend")
+  .description("Manage cron jobs for an app backend")
   .addCommand(createCommand)
   .addCommand(deleteCommand);

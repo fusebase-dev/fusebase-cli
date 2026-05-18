@@ -5,7 +5,7 @@ import {
 } from "../openapi";
 
 const validateCommand = new Command("validate")
-  .description("Validate the feature OpenAPI contract (Phase 1 MVP)")
+  .description("Validate the app OpenAPI contract (Phase 1 MVP)")
   .option("-f, --file <path>", "Path to the OpenAPI spec file")
   .action(async (options: { file?: string }) => {
     const filePath = await resolveOpenApiFile(process.cwd(), options.file);

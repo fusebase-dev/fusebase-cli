@@ -294,7 +294,7 @@ function printAllSetBanner(): void {
   row("  🚀 You're all set!");
   row("");
   row("  Open this folder in Your IDE and ask it to create");
-  row("  your first feature.");
+  row("  your first app.");
   row("");
   row("  Guide:");
   row("  https://nimb.ws/kPYHg4y");
@@ -468,8 +468,8 @@ async function promptSelect<T extends { id: string }>(
 }
 
 export const initCommand = new Command("init")
-  .description("Initialize a Fusebase app in the current directory")
-  .option("--name <name>", "App title/name")
+  .description("Initialize a Fusebase product in the current directory")
+  .option("--name <name>", "Product title/name")
   .option("--org <orgId>", "Organization ID (skips org selection)")
   .option(
     "--ide <preset>",
@@ -532,7 +532,7 @@ export const initCommand = new Command("init")
           await copyAgentsAndSkills(cwd);
           await replaceFusebaseHostPlaceholder(cwd);
           //agent configs = skills, hooks, AGENTS.md, etc.
-          console.log("✓ Updated app agent configs");
+          console.log("✓ Updated product agent configs");
           printAllSetBanner();
           await maybeRunGitInitAndSync({
             git: shouldSetupGit,
