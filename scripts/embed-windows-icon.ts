@@ -76,3 +76,20 @@ await rcedit(exePath, {
 });
 
 console.log("Icon embedded successfully");
+
+// rcedit leaves bun's residual `IDI_MYICON` RT_GROUP_ICON behind. Its
+// metadata still claims it's a 256x256 / 270600-byte icon but now points at
+// our 16x16 BMP — Windows resolves IDI_MYICON for some renders and ends up
+// scaling 16x16 → 256x256, which is the blurry-icon QA reported on
+// NIM-40683 even after we shipped a real 256x256 entry. Patch that entry in
+// place to point at our real 256x256 PNG.
+const fixIdiScript = path.join(projectRoot, "scripts", "fix-windows-idi-myicon.py");
+console.log(`Patching residual IDI_MYICON in ${exePath}`);
+const proc = Bun.spawn(["python3", fixIdiScript, exePath], {
+  stdout: "inherit",
+  stderr: "inherit",
+});
+const fixCode = await proc.exited;
+if (fixCode !== 0) {
+  throw new Error(`fix-windows-idi-myicon.py exited with code ${fixCode}`);
+}

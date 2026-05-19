@@ -18,10 +18,9 @@ import { embeddedFiles } from "bun";
 import AdmZip from "adm-zip";
 import {
   fetchOrgs,
-  fetchApps,
-  createApp,
+  createProduct,
   type Organization,
-  type App,
+  type Product,
 } from "../api";
 import { copyAgentsAndSkills } from "../copy-template";
 import { buildTemplateContext, renderTemplatesInDir } from "../template-engine";
@@ -295,7 +294,7 @@ function printAllSetBanner(): void {
   row("  🚀 You're all set!");
   row("");
   row("  Open this folder in Your IDE and ask it to create");
-  row("  your first feature.");
+  row("  your first app.");
   row("");
   row("  Guide:");
   row("  https://nimb.ws/kPYHg4y");
@@ -362,9 +361,8 @@ async function copyProjectTemplate(
     await writeFile(packageJsonPath, packageJson, "utf-8");
   }
 
-  // Create features folder
-  const featuresDir = join(targetDir, "features");
-  await mkdir(featuresDir, { recursive: true });
+  const appsDir = join(targetDir, "apps");
+  await mkdir(appsDir, { recursive: true });
 
   // Resolve conditional template blocks in project template files.
   const templateContext = buildTemplateContext();
@@ -470,8 +468,8 @@ async function promptSelect<T extends { id: string }>(
 }
 
 export const initCommand = new Command("init")
-  .description("Initialize a Fusebase app in the current directory")
-  .option("--name <name>", "App title/name")
+  .description("Initialize a Fusebase product in the current directory")
+  .option("--name <name>", "Product title/name")
   .option("--org <orgId>", "Organization ID (skips org selection)")
   .option(
     "--ide <preset>",
@@ -534,7 +532,7 @@ export const initCommand = new Command("init")
           await copyAgentsAndSkills(cwd);
           await replaceFusebaseHostPlaceholder(cwd);
           //agent configs = skills, hooks, AGENTS.md, etc.
-          console.log("✓ Updated app agent configs");
+          console.log("✓ Updated product agent configs");
           printAllSetBanner();
           await maybeRunGitInitAndSync({
             git: shouldSetupGit,
@@ -644,20 +642,20 @@ export const initCommand = new Command("init")
       const appTitle =
         options.name ??
         (await input({
-          message: "Enter a title for the new app:",
+          message: "Enter a title for the new product:",
           validate: (value) => {
-            if (!value.trim()) return "App title is required";
+            if (!value.trim()) return "Product title is required";
             return true;
           },
         }));
 
-      let selectedApp: App;
+      let selectedApp: Product;
       try {
-        selectedApp = await createApp(apiKey, selectedOrg.id, appTitle.trim());
-        console.log(`✓ Created app: ${selectedApp.title}`);
+        selectedApp = await createProduct(apiKey, selectedOrg.id, appTitle.trim());
+        console.log(`✓ Created product: ${selectedApp.title}`);
       } catch (error) {
         console.error(
-          "Error: Failed to create app.",
+          "Error: Failed to create product.",
           error instanceof Error ? error.message : "",
         );
         process.exit(1);
@@ -772,7 +770,7 @@ export const initCommand = new Command("init")
       // Save fusebase.json (env so FUSEBASE_HOST / getEnv() are correct for this project)
       const fuseConfig: FuseConfig = {
         orgId: selectedOrg.id,
-        appId: selectedApp.id,
+        productId: selectedApp.id,
         env: getEnv() ?? "dev",
         ...(options.managed && { managed: true }),
       };
@@ -782,9 +780,9 @@ export const initCommand = new Command("init")
         JSON.stringify(fuseConfig, null, 2),
         "utf-8",
       );
-      console.log("✓ App initialized successfully");
+      console.log("✓ Product initialized successfully");
       console.log(`  Organization: ${selectedOrg.title}`);
-      console.log(`  App: ${selectedApp.title}`);
+      console.log(`  Product: ${selectedApp.title}`);
 
       // Run npm install if template was used
       if (needToCopyTemplate) {

@@ -19,16 +19,16 @@ export interface ApiAppSummary {
 }
 
 export interface ApiClient {
-  /** GET /v1/orgs/{orgId}/apps — list apps in the test org. */
+  /** GET /v1/orgs/{orgId}/products — list products (top-level apps) in the test org. */
   listApps(): Promise<ApiAppSummary[]>;
-  /** GET /v1/orgs/{orgId}/apps/{appId} — fetch a single app. */
-  getApp(appId: string): Promise<ApiAppSummary>;
+  /** GET /v1/orgs/{orgId}/products/{productId} — fetch a single product. */
+  getApp(productId: string): Promise<ApiAppSummary>;
   /**
-   * DELETE /v1/orgs/{orgId}/apps/{appId} — teardown endpoint added under
+   * DELETE /v1/orgs/{orgId}/products/{productId} — teardown endpoint added under
    * NIM-40899; cascades to Azure cleanup via NIM-40898. Treats 404 as success
    * so callers can use it idempotently.
    */
-  deleteApp(appId: string): Promise<void>;
+  deleteApp(productId: string): Promise<void>;
   /** Generic JSON request helper for endpoints not covered above. */
   request<T = unknown>(method: string, path: string, body?: unknown): Promise<T>;
 }
@@ -67,20 +67,20 @@ export function createApiClient(env: E2eEnv): ApiClient {
   return {
     request,
     async listApps(): Promise<ApiAppSummary[]> {
-      const res = await request<{ apps?: ApiAppSummary[] }>(
+      const res = await request<{ products?: ApiAppSummary[] }>(
         "GET",
-        `/v1/orgs/${encodeURIComponent(env.orgId)}/apps`,
+        `/v1/orgs/${encodeURIComponent(env.orgId)}/products`,
       );
-      return res.apps ?? [];
+      return res.products ?? [];
     },
-    async getApp(appId: string): Promise<ApiAppSummary> {
+    async getApp(productId: string): Promise<ApiAppSummary> {
       return request<ApiAppSummary>(
         "GET",
-        `/v1/orgs/${encodeURIComponent(env.orgId)}/apps/${encodeURIComponent(appId)}`,
+        `/v1/orgs/${encodeURIComponent(env.orgId)}/products/${encodeURIComponent(productId)}`,
       );
     },
-    async deleteApp(appId: string): Promise<void> {
-      const url = `${env.apiBaseUrl}/v1/orgs/${encodeURIComponent(env.orgId)}/apps/${encodeURIComponent(appId)}`;
+    async deleteApp(productId: string): Promise<void> {
+      const url = `${env.apiBaseUrl}/v1/orgs/${encodeURIComponent(env.orgId)}/products/${encodeURIComponent(productId)}`;
       const response = await fetch(url, { method: "DELETE", headers: headers() });
       if (response.status === 404) return;
       if (!response.ok) {

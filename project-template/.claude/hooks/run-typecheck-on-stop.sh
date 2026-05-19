@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Claude Code Stop hook: run TypeScript typecheck across features before allowing stop.
-# Mirrors deploy-time tsc (without Vite). See run-typecheck-features.js.
+# Claude Code Stop hook: run TypeScript typecheck across apps before allowing stop.
+# Mirrors deploy-time tsc (without Vite). See run-typecheck-apps.js.
 # See https://code.claude.com/docs/en/hooks
 
 TYPECHECK_OUTPUT=$(npm run typecheck 2>&1) || TYPECHECK_EXIT=$?

@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { createHash } from "crypto";
 import { readFile, readdir, stat } from "fs/promises";
 import { join, relative } from "path";
 import { homedir } from "os";
@@ -7,19 +8,20 @@ import cliProgress from "cli-progress";
 import { spawn } from "child_process";
 import * as tar from "tar";
 import {
-  createAppFeatureVersion,
+  createAppVersion,
   initUpload,
   initSourceUpload,
   getActiveVersion,
   createDeploy,
   getDeploy,
-  fetchApp,
-  fetchAppFeatures,
+  fetchProduct,
+  fetchApps,
+  fetchAppSecrets,
   copyBackendParams,
   copyFrontendParams,
-  updateAppFeature,
+  updateApp,
+  type Product,
   type App,
-  type AppFeature,
   type Deploy,
   type DeployJobDefinition,
   type DeploySidecarDefinition,
@@ -30,6 +32,7 @@ import {
   getConfig,
   hasFlag,
   loadFuseConfig,
+  type BackendConfig,
   type FeatureConfig,
   type SidecarConfig,
 } from "../config";
@@ -42,6 +45,14 @@ import {
 const FUSE_JSON = "fusebase.json";
 const UPLOAD_CONCURRENCY = 5;
 const DEPLOY_POLL_INTERVAL_MS = 3000;
+
+// The active version's `backendHash` column is VARCHAR(64). A full SHA-256 hex
+// digest is 64 chars, so naively encoding the combined hash as
+// `${sourceHash}:${configHash}` produces 129 chars and overflows the column.
+// Truncate each half so the encoded hash fits in 64 chars while preserving
+// enough collision resistance for idempotency checks (128/124 bits).
+export const BACKEND_HASH_SOURCE_PREFIX_LEN = 32;
+export const BACKEND_HASH_CONFIG_PREFIX_LEN = 31;
 
 // Transform sidecar config for the deploy API.
 // - `env` Record<string,string> becomes an array of {key, value}.
@@ -204,12 +215,39 @@ async function runCommand(
 }
 
 /**
+ * Stable JSON serializer for arbitrary values: object keys are sorted
+ * recursively so reformatting / key reordering does not change the hash.
+ * Array order is preserved (job/sidecar order is treated as significant).
+ */
+export function canonicalJsonStringify(value: unknown): string {
+  if (value === undefined) {
+    return "null";
+  }
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return "[" + value.map(canonicalJsonStringify).join(",") + "]";
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj)
+    .filter((k) => obj[k] !== undefined)
+    .sort();
+  return (
+    "{" +
+    keys
+      .map((k) => JSON.stringify(k) + ":" + canonicalJsonStringify(obj[k]))
+      .join(",") +
+    "}"
+  );
+}
+
+/**
  * Calculate a deterministic SHA-256 hash of all files in a directory.
  * Files are sorted by path to ensure consistent ordering.
  * Excludes node_modules and hidden files.
  */
-async function calculateBackendHash(dir: string): Promise<string> {
-  const { createHash } = await import("crypto");
+export async function calculateBackendSourceHash(dir: string): Promise<string> {
   const files = await getAllFiles(dir, dir, ["node_modules"]);
   files.sort();
 
@@ -223,11 +261,62 @@ async function calculateBackendHash(dir: string): Promise<string> {
   return hash.digest("hex");
 }
 
+/**
+ * Hash the parts of the deploy that aren't source files: the entire
+ * `featureConfig.backend` block (so cron / sidecar / per-job sidecar edits
+ * are detected) and the sorted list of registered app secret **keys**
+ * (so adding/removing a key is detected). Secret *values* are intentionally
+ * excluded — out-of-band value edits still require `--force`.
+ */
+export function calculateBackendConfigHash(
+  backendConfig: BackendConfig | undefined,
+  secretKeys: string[],
+): string {
+  const sortedKeys = [...secretKeys].sort();
+  const payload =
+    canonicalJsonStringify(backendConfig ?? null) +
+    "|" +
+    JSON.stringify(sortedKeys);
+  return createHash("sha256").update(payload).digest("hex");
+}
+
+/**
+ * Combined backend hash. Encoded as `${sourceHash}:${configHash}` so callers
+ * can split the active version's stored hash and tell which part changed
+ * (e.g. "config/secrets only" → emit explanatory log line). Each half is
+ * truncated so the combined hash fits in the VARCHAR(64) `backendHash`
+ * column on the active version (see `BACKEND_HASH_*_PREFIX_LEN`).
+ */
+export async function calculateBackendHash(
+  dir: string,
+  backendConfig: BackendConfig | undefined,
+  secretKeys: string[],
+): Promise<string> {
+  const sourceHash = await calculateBackendSourceHash(dir);
+  const configHash = calculateBackendConfigHash(backendConfig, secretKeys);
+  return `${sourceHash.slice(0, BACKEND_HASH_SOURCE_PREFIX_LEN)}:${configHash.slice(
+    0,
+    BACKEND_HASH_CONFIG_PREFIX_LEN,
+  )}`;
+}
+
+/**
+ * Split a stored backend hash into its source / config parts. Hashes written
+ * by older CLI versions don't contain a `:` and are treated as source-only.
+ */
+export function splitBackendHash(
+  hash: string | undefined,
+): { source?: string; config?: string } {
+  if (!hash) return {};
+  const idx = hash.indexOf(":");
+  if (idx === -1) return { source: hash };
+  return { source: hash.slice(0, idx), config: hash.slice(idx + 1) };
+}
+
 async function calculateFrontendHash(
   dir: string,
   exclude: string[] = [],
 ): Promise<string> {
-  const { createHash } = await import("crypto");
   const files = await getAllFiles(dir, dir, ["node_modules", ...exclude]);
   files.sort();
 
@@ -390,7 +479,7 @@ async function publishOpenApiManifestIfPresent(params: {
       validation,
     });
 
-    await updateAppFeature(
+    await updateApp(
       params.apiKey,
       params.orgId,
       params.appId,
@@ -412,7 +501,7 @@ async function publishOpenApiManifestIfPresent(params: {
 }
 
 export const deployCommand = new Command("deploy")
-  .description("Deploy features to Fusebase")
+  .description("Deploy apps to Fusebase")
   .option(
     "--force",
     "Force re-upload and re-deploy regardless of frontend/backend hash match",
@@ -426,8 +515,8 @@ export const deployCommand = new Command("deploy")
       process.exit(1);
     }
 
-    if (!fuseConfig.orgId || !fuseConfig.appId) {
-      console.error("Error: Invalid fusebase.json. Missing orgId or appId.");
+    if (!fuseConfig.orgId || !fuseConfig.productId) {
+      console.error("Error: Invalid fusebase.json. Missing orgId or productId.");
       process.exit(1);
     }
 
@@ -438,41 +527,45 @@ export const deployCommand = new Command("deploy")
       process.exit(1);
     }
 
-    // Find features with path configured
-    const featuresConfig = fuseConfig.features || [];
+    // Find apps with path configured
+    const featuresConfig = fuseConfig.apps || [];
     const deployableFeatures = featuresConfig.filter(
       (config) => config.path && config.path.trim() !== "",
     );
 
     if (deployableFeatures.length === 0) {
       console.error(
-        "Error: No features with path configured in fusebase.json.",
+        "Error: No apps with path configured in fusebase.json.",
       );
       console.error(
-        "Use 'fusebase feature create' to configure a path for deployment.",
+        "Use 'fusebase app create' to configure a path for deployment.",
       );
       process.exit(1);
     }
 
-    console.log(`\nDeploying ${deployableFeatures.length} feature(s)...\n`);
+    console.log(`\nDeploying ${deployableFeatures.length} app(s)...\n`);
 
-    // Fetch app and features to get sub and path for URLs
-    let app: App;
-    let features: AppFeature[];
+    // Fetch product and apps to get sub and path for URLs
+    let app: Product;
+    let features: App[];
     try {
-      app = await fetchApp(config.apiKey, fuseConfig.orgId, fuseConfig.appId);
-      const featuresResponse = await fetchAppFeatures(
+      app = await fetchProduct(
         config.apiKey,
         fuseConfig.orgId,
-        fuseConfig.appId,
+        fuseConfig.productId,
       );
-      features = featuresResponse.features;
+      const featuresResponse = await fetchApps(
+        config.apiKey,
+        fuseConfig.orgId,
+        fuseConfig.productId,
+      );
+      features = featuresResponse.apps;
     } catch (error) {
-      console.error("Error: Failed to fetch app or features from API.");
+      console.error("Error: Failed to fetch product or apps from API.");
       process.exit(1);
     }
 
-    logger.debug("Fetched app: %j", app);
+    logger.debug("Fetched product: %j", app);
 
     // Determine domain based on environment (same as FUSEBASE_APP_HOST)
     const domain = getFusebaseAppHost();
@@ -490,7 +583,7 @@ export const deployCommand = new Command("deploy")
       const featureId = featureConfig.id;
       const featureBasePath = join(process.cwd(), featureConfig.path!);
 
-      console.log(`📦 Feature: ${featureId}`);
+      console.log(`📦 App: ${featureId}`);
       console.log(`   Source: ${featureConfig.path}`);
 
       try {
@@ -537,9 +630,34 @@ export const deployCommand = new Command("deploy")
         logger.info("Frontend hash: %s", frontendHash);
 
         let backendHash: string | undefined;
+        let backendSourceHash: string | undefined;
+        let secretKeys: string[] = [];
         if (hasBackendDir) {
           console.log(`   Calculating backend hash...`);
-          backendHash = await calculateBackendHash(backendDir);
+          // Fetch the registered app feature secret **keys** (no values) so
+          // CLI-driven add/remove of a key flips the backend hash; out-of-band
+          // value edits keep the existing `--force` requirement.
+          const secretsResponse = await fetchAppSecrets(
+            config.apiKey,
+            fuseConfig.orgId,
+            fuseConfig.appId,
+            featureId,
+          );
+          secretKeys = secretsResponse.secrets.map((s) => s.key);
+          backendSourceHash = await calculateBackendSourceHash(backendDir);
+          // Inline `calculateBackendHash` so the read of `backendDir` happens
+          // once and `backendSourceHash` can be reused for the later
+          // "source unchanged, config-only changed" log-line check. Truncation
+          // matches `calculateBackendHash` so the encoded hash fits the
+          // VARCHAR(64) `backendHash` column.
+          const backendConfigHash = calculateBackendConfigHash(
+            featureConfig.backend,
+            secretKeys,
+          );
+          backendHash = `${backendSourceHash.slice(
+            0,
+            BACKEND_HASH_SOURCE_PREFIX_LEN,
+          )}:${backendConfigHash.slice(0, BACKEND_HASH_CONFIG_PREFIX_LEN)}`;
           logger.info("Backend hash: %s", backendHash);
         }
 
@@ -548,7 +666,7 @@ export const deployCommand = new Command("deploy")
         const activeVersion = await getActiveVersion(
           config.apiKey,
           fuseConfig.orgId,
-          fuseConfig.appId,
+          fuseConfig.productId,
           featureId,
         ).catch(() => null);
 
@@ -563,7 +681,7 @@ export const deployCommand = new Command("deploy")
         // ── Branch B: skip the whole feature (no version, no upload, no deploy) ─
         if (!force && frontendMatches && backendMatches) {
           console.log(
-            `   ✓ No changes for feature, skipping deploy\n`,
+            `   ✓ No changes for app, skipping deploy\n`,
           );
 
           const feature = features.find((f) => f.id === featureId);
@@ -583,10 +701,10 @@ export const deployCommand = new Command("deploy")
 
         // Create a new version (branches A, C, D)
         console.log(`   Creating version...`);
-        const version = await createAppFeatureVersion(
+        const version = await createAppVersion(
           config.apiKey,
           fuseConfig.orgId,
-          fuseConfig.appId,
+          fuseConfig.productId,
           featureId,
         );
 
@@ -645,7 +763,7 @@ export const deployCommand = new Command("deploy")
           const uploadResponse = await initUpload(
             config.apiKey,
             fuseConfig.orgId,
-            fuseConfig.appId,
+            fuseConfig.productId,
             featureId,
             version.id,
             files,
@@ -724,6 +842,19 @@ export const deployCommand = new Command("deploy")
               activeVersion.globalId,
             );
           } else {
+            // Distinguish "source unchanged, only config/secrets changed" so the
+            // user understands why a redeploy is happening without source edits.
+            const remoteParts = splitBackendHash(activeVersion?.backendHash);
+            if (
+              !force &&
+              backendSourceHash &&
+              remoteParts.source ===
+                backendSourceHash.slice(0, BACKEND_HASH_SOURCE_PREFIX_LEN)
+            ) {
+              console.log(
+                "   Backend config or secrets changed, redeploying without source change",
+              );
+            }
             console.log(
               "   Backend hash does not match active version, proceeding with deploy (local ",
               backendHash,
@@ -744,7 +875,7 @@ export const deployCommand = new Command("deploy")
             const { uploadUrl: serverUploadUrl } = await initSourceUpload(
               config.apiKey,
               fuseConfig.orgId,
-              fuseConfig.appId,
+              fuseConfig.productId,
               featureId,
               version.id,
               backendHash,
@@ -817,7 +948,7 @@ export const deployCommand = new Command("deploy")
             const deploy = await createDeploy(
               config.apiKey,
               fuseConfig.orgId,
-              fuseConfig.appId,
+              fuseConfig.productId,
               featureId,
               version.id,
               jobs,
@@ -844,7 +975,7 @@ export const deployCommand = new Command("deploy")
         await publishOpenApiManifestIfPresent({
           apiKey: config.apiKey,
           orgId: fuseConfig.orgId,
-          appId: fuseConfig.appId,
+          appId: fuseConfig.productId,
           featureId,
           featureBasePath,
         });

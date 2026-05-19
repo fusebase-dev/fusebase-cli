@@ -8,18 +8,18 @@ function App() {
   if (typeof window !== 'undefined' && window.location.pathname === MAGIC_LINK_ROUTE) {
     return <MagicLinkActivator />
   }
-  return <FeatureApp />
+  return <AppContent />
 }
 
-function FeatureApp() {
-  const [featureToken, setFeatureToken] = useState<string | null>(null)
+function AppContent() {
+  const [appToken, setAppToken] = useState<string | null>(null)
   const [authExpired, setAuthExpired] = useState<AuthTokenExpiredError | null>(null)
 
   useEffect(() => {
-    setFeatureToken(getFeatureToken())
+    setAppToken(getFeatureToken())
   }, [])
 
-  if (!featureToken) {
+  if (!appToken) {
     return (
       <div className="flex items-center justify-center min-h-screen text-gray-500">
         Loading...
@@ -31,16 +31,16 @@ function FeatureApp() {
     <>
       <main className="p-6">
         {/*
-          Feature content goes here.
-          Pass featureToken to child components that make API calls.
+          App content goes here.
+          Pass appToken to child components that make API calls.
           On AppTokenValidationError, use authErrorFromAppTokenFailure(err) (reason + optional server `hint`),
           or extractAppTokenValidationReason / extractAppTokenValidationHint with new AuthTokenExpiredError(...),
           then call onAuthError(err) from the catch block.
 
           Example:
-            <MyComponent featureToken={featureToken} onAuthError={(err) => setAuthExpired(err)} />
+            <MyComponent appToken={appToken} onAuthError={(err) => setAuthExpired(err)} />
         */}
-        <h1 className="text-2xl font-bold">Feature App</h1>
+        <h1 className="text-2xl font-bold">App</h1>
       </main>
 
       {authExpired && (

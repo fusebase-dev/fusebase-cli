@@ -1,13 +1,13 @@
 ---
-name: feature-backend
-description: "Guide for adding a backend layer (REST API, WebSockets, cron jobs) to Fusebase Apps features. Use when: (1) A feature needs a server-side API beyond the Dashboard SDK, (2) Adding REST endpoints or WebSocket support, (3) Setting up the backend/ folder structure, (4) Scheduling cron jobs for periodic tasks. The backend is OPTIONAL — only add when the feature genuinely requires server-side logic."
+name: app-backend
+description: "Guide for adding a backend layer (REST API, WebSockets, cron jobs) to Fusebase Apps apps. Use when: (1) An app needs a server-side API beyond the Dashboard SDK, (2) Adding REST endpoints or WebSocket support, (3) Setting up the backend/ folder structure, (4) Scheduling cron jobs for periodic tasks. The backend is OPTIONAL — only add when the app genuinely requires server-side logic."
 ---
 
-# Feature Backend
+# App Backend
 
 ## Multi-User Architecture
 
-**Features are always multi-user.** The backend serves requests from many users concurrently. Every design decision must account for this.
+**Apps are always multi-user.** The backend serves requests from many users concurrently. Every design decision must account for this.
 
 **Per-user vs. shared state:**
 
@@ -35,11 +35,11 @@ For any persisted per-user data, derive the partition key from stable identity o
 - Normalize to a canonical key (example: `user:<userId>`) in one helper
 - Use the same key on **all** read/write paths
 
-Do not derive partition keys from runtime feature/session tokens. Tokens rotate, so token-derived keys cause "missing records after relogin" while data still exists under old keys.
+Do not derive partition keys from runtime app/session tokens. Tokens rotate, so token-derived keys cause "missing records after relogin" while data still exists under old keys.
 
 ## When to Add a Backend
 
-A backend is **optional**. Most features work fine with the Dashboard SDK alone (client-side calls to the dashboard service). Only add `backend/` when the feature genuinely needs:
+A backend is **optional**. Most apps work fine with the Dashboard SDK alone (client-side calls to the dashboard service). Only add `backend/` when the app genuinely needs:
 
 - Custom business logic (aggregations, validations, workflows)
 - Real-time push via WebSockets
@@ -48,7 +48,7 @@ A backend is **optional**. Most features work fine with the Dashboard SDK alone 
 
 ## Sidecar Containers
 
-Sidecars are pre-built Docker images that run alongside the feature backend in the same network namespace, sharing localhost. They are useful for auxiliary services like headless browsers (Chromium, Lightpanda), caches (Redis), or other tools the backend needs to communicate with over HTTP.
+Sidecars are pre-built Docker images that run alongside the app backend in the same network namespace, sharing localhost. They are useful for auxiliary services like headless browsers (Chromium, Lightpanda), caches (Redis), or other tools the backend needs to communicate with over HTTP.
 
 ### When to Use Sidecars
 
@@ -59,11 +59,11 @@ Sidecars are pre-built Docker images that run alongside the feature backend in t
 ### Adding a Sidecar
 
 ```bash
-# Add a sidecar to a feature backend
+# Add a sidecar to an app backend
 fusebase sidecar add --feature <featureId> --name chromium --image browserless/chrome:latest --port 9222
 ```
 
-The sidecar is accessible from the backend at `http://localhost:<port>`. Max 3 sidecars per feature.
+The sidecar is accessible from the backend at `http://localhost:<port>`. Max 3 sidecars per app.
 
 **Important:** Port 3000 is reserved for the backend app. If a sidecar image defaults to port 3000, override it via env vars (e.g. `--env PORT=9222` for browserless).
 
@@ -87,13 +87,13 @@ fusebase sidecar add --feature <featureId> --name redis --image redis:7 --port 6
 
 ### Debugging Sidecars
 
-Use `fusebase remote-logs runtime <featureId>` to see logs from all containers. Filter to a specific sidecar:
+Use `fusebase remote-logs runtime <appId>` to see logs from all containers. Filter to a specific sidecar:
 
 ```bash
-fusebase remote-logs runtime <featureId> --container chromium
+fusebase remote-logs runtime <appId> --container chromium
 ```
 
-For full sidecar documentation, see the **feature-sidecar** skill.
+For full sidecar documentation, see the **app-sidecar** skill.
 
 ## Total Resource Budget
 
@@ -152,7 +152,7 @@ If a revision would exceed the cap, downgrade one of the sidecars to a smaller t
 ## Structure
 
 ```
-features/my-feature/
+apps/my-app/
   package.json              ← SPA deps (unchanged)
   vite.config.ts
   src/                      ← SPA code
@@ -169,7 +169,7 @@ Key points:
 
 - `backend/` has its **own `package.json`** — keeps backend deps (Hono, ws libs) out of the SPA bundle
 - **No code is shared between SPA and backend** — each side defines its own types independently. Do not create a `shared/` directory
-- **Backends are not shared among features** — only the feature that owns the `backend/` folder can access it. Each feature must have its own backend if it needs one; one feature cannot call another feature's backend.
+- **Backends are not shared among apps** — only the app that owns the `backend/` folder can access it. Each app must have its own backend if it needs one; one app cannot call another app's backend.
 - The SPA `package.json` remains unchanged — no backend deps leak in
 
 ## Framework: Hono
@@ -180,7 +180,7 @@ Use **Hono** for the backend. It is TypeScript-first, lightweight, and has built
 
 ```json
 {
-  "name": "my-feature-server",
+  "name": "my-app-server",
   "private": true,
   "type": "module",
   "scripts": {
@@ -273,16 +273,16 @@ injectWebSocket(server);
 
 ## Routing: `/api` is Reserved for the Backend
 
-When a feature has a backend, the `/api` path prefix is **reserved for the backend**. The SPA must not define client-side routes under `/api`.
+When an app has a backend, the `/api` path prefix is **reserved for the backend**. The SPA must not define client-side routes under `/api`.
 
 - Backend routes: `/api/*` (REST endpoints, WebSocket upgrades)
 - SPA routes: everything else (`/`, `/items/:id`, `/settings`, etc.)
 
 ## Webhooks and External WebSocket Callbacks (Inbound)
 
-Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsfeaturetoken` cookie or `x-app-feature-token` header.
+Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsapptoken` cookie or `x-app-token` header.
 
-The platform proxy skips feature-token auth for any path under `/api/webhooks/`, including both HTTP routes and WebSocket upgrade routes.
+The platform proxy skips app-token auth for any path under `/api/webhooks/`, including both HTTP routes and WebSocket upgrade routes.
 
 ### Secret path segment
 
@@ -299,26 +299,26 @@ For external WebSocket integrations, use a path under `/api/webhooks/...` as wel
 
 ### Service-account token for webhooks
 
-Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token.
+Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_APP_TOKEN` — a platform-issued service-account token.
 
-**Security rule**: use `FBS_FEATURE_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid feature token — do not fall back to the service-account token.
+**Security rule**: use `FBS_APP_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid app token — do not fall back to the service-account token.
 
 ## Dev Proxy
 
 `fusebase dev start` automatically proxies `/api` HTTP requests and WebSocket upgrades to the backend dev server.
 
-The `BACKEND_PORT` env var is assigned by `fusebase dev start` and injected into both the SPA and backend processes, allowing multiple features to run backends concurrently without port conflicts.
+The `BACKEND_PORT` env var is assigned by `fusebase dev start` and injected into both the SPA and backend processes, allowing multiple apps to run backends concurrently without port conflicts.
 
 ## fusebase.json Backend Config
 
-When a feature has a backend, add the `backend` block to its entry in `fusebase.json`:
+When an app has a backend, add the `backend` block to its entry in `fusebase.json`:
 
 ```json
 {
-  "features": [
+  "apps": [
     {
-      "id": "feature-id",
-      "path": "features/my-feature",
+      "id": "app-id",
+      "path": "apps/my-app",
       "dev": { "command": "npm run dev" },
       "build": { "command": "npm run build", "outputDir": "dist" },
       "backend": {
@@ -331,11 +331,11 @@ When a feature has a backend, add the `backend` block to its entry in `fusebase.
 }
 ```
 
-Backend commands (`dev`, `build`, `start`) run from the `backend/` subdirectory of the feature path.
+Backend commands (`dev`, `build`, `start`) run from the `backend/` subdirectory of the app path.
 
 ## Deriving the Public Base URL from the Request
 
-**NEVER hardcode `localhost` in callback/redirect URLs** (e.g. OAuth redirect URIs, webhook URLs, links sent to external services). A feature's backend runs behind a proxy — `localhost` only works during local dev and breaks in production.
+**NEVER hardcode `localhost` in callback/redirect URLs** (e.g. OAuth redirect URIs, webhook URLs, links sent to external services). An app's backend runs behind a proxy — `localhost` only works during local dev and breaks in production.
 
 Instead, derive the public base URL from the incoming request headers:
 
@@ -371,7 +371,7 @@ This works in both environments:
 
 ## Calling the Backend from the SPA
 
-Use standard `fetch` with relative URLs. Same-origin requests automatically include the `fbsfeaturetoken` cookie, so the backend can authenticate on behalf of the user without depending on a custom header surviving the deployed platform proxy:
+Use standard `fetch` with relative URLs. Same-origin requests automatically include the `fbsapptoken` cookie, so the backend can authenticate on behalf of the user without depending on a custom header surviving the deployed platform proxy:
 
 ```typescript
 // In SPA code
@@ -379,25 +379,25 @@ const res = await fetch("/api/items");
 const data = await res.json();
 ```
 
-If you still send `x-app-feature-token` from the SPA, treat it as a best-effort dev/proxy optimization only. Backend handlers must always support both sources:
+If you still send `x-app-token` from the SPA, treat it as a best-effort dev/proxy optimization only. Backend handlers must always support both sources:
 
 ```typescript
 import { getCookie } from "hono/cookie";
 
-const featureToken =
-  c.req.header("x-app-feature-token") || getCookie(c, "fbsfeaturetoken");
+const appToken =
+  c.req.header("x-app-token") || getCookie(c, "fbsapptoken");
 
-if (!featureToken) {
-  return c.json({ error: "Missing feature token" }, 401);
+if (!appToken) {
+  return c.json({ error: "Missing app token" }, 401);
 }
 ```
 
 ### Gate security: fail closed for user-facing routes
 
-When backend routes call Gate on behalf of the current user, keep auth in feature-token context only.
+When backend routes call Gate on behalf of the current user, keep auth in app-token context only.
 
 - Do not silently fall back to service-account/service-token auth in user-facing routes.
-- On missing/invalid feature token or Gate auth rejection, return `401/403` and require re-auth/permission sync.
+- On missing/invalid app token or Gate auth rejection, return `401/403` and require re-auth/permission sync.
 - Service-token usage is allowed only for explicitly system/admin routes, not as an automatic fallback path.
 
 For WebSockets:
@@ -457,7 +457,7 @@ config.refreshToken = tokens.refresh_token; // lost on restart
 
 ## Dev Workflow
 
-1. `cd features/my-feature/backend && npm install` — install backend deps
+1. `cd apps/my-app/backend && npm install` — install backend deps
 2. `fusebase secret create --feature <id> --secret "KEY:description"` — register secrets (if needed), set values via the printed URL
 3. `fusebase dev start` — starts both SPA and backend; secrets are injected automatically as env vars
 
@@ -467,7 +467,7 @@ config.refreshToken = tokens.refresh_token; // lost on restart
 
 Before adding a backend:
 
-- [ ] Confirmed the feature **genuinely needs** backend logic (not just dashboard CRUD)
+- [ ] Confirmed the app **genuinely needs** backend logic (not just dashboard CRUD)
 - [ ] Created `backend/` with its own `package.json` and `tsconfig.json`
 - [ ] Set up Hono with `.basePath('/api')`
 - [ ] Verified `fusebase dev start` proxies `/api` to backend (automatic when `backend` block exists in `fusebase.json`)
@@ -480,9 +480,9 @@ Before adding a backend:
 
 ## Scheduled Tasks (Cron Jobs)
 
-> **⚠️ Cron jobs do NOT run with `fusebase dev start`.** Local dev mode does not schedule or execute jobs. Run `fusebase deploy` to deploy the feature — jobs will be scheduled and executed in the cloud after deployment.
+> **⚠️ Cron jobs do NOT run with `fusebase dev start`.** Local dev mode does not schedule or execute jobs. Run `fusebase deploy` to deploy the app — jobs will be scheduled and executed in the cloud after deployment.
 
-Cron jobs run on a schedule using the **same Docker image** as the feature backend. Each job is an independent process that executes a command on a cron schedule and exits.
+Cron jobs run on a schedule using the **same Docker image** as the app backend. Each job is an independent process that executes a command on a cron schedule and exits.
 
 > **⚠️ Cron jobs cannot reach backend sidecars on `localhost`.** Cron jobs are deployed as **independent Azure Container Apps Jobs**, not as part of the backend container app, so they do not share the backend's network namespace. A cron container that calls `http://localhost:9222` (or any other backend sidecar port) will fail with `fetch failed`.<% if (it.flags?.includes("job-sidecars")) { %> If a cron needs an auxiliary container, declare a **per-job sidecar** — see [Job Sidecars](#job-sidecars) below.<% } else { %> If a cron needs an auxiliary container, call back to the main backend over its public URL (`/api/...`), where the backend can use its own sidecars.<% } %>
 
@@ -496,7 +496,7 @@ fusebase job create \
   --command "npm run cron:my-job"
 ```
 
-**Job name** must be unique within the feature. Use kebab-case (e.g. `send-reports`, `cleanup-old-data`).
+**Job name** must be unique within the app. Use kebab-case (e.g. `send-reports`, `cleanup-old-data`).
 
 **Cron expression** uses standard 5-field syntax: `minute hour day-of-month month day-of-week`. All times are UTC.
 
@@ -553,7 +553,7 @@ This removes the job from `backend.jobs` in `fusebase.json`. On the next `fuseba
 <% if (it.flags?.includes("job-sidecars")) { %>
 ### Job Sidecars
 
-Each cron job can declare its own sidecar containers under `features[].backend.jobs[].sidecars`. Sidecars share the **job replica's** network namespace, not the backend's, so the main job container talks to them on `localhost:<port>` exactly the way the backend talks to its own sidecars.
+Each cron job can declare its own sidecar containers under `apps[].backend.jobs[].sidecars`. Sidecars share the **job replica's** network namespace, not the backend's, so the main job container talks to them on `localhost:<port>` exactly the way the backend talks to its own sidecars.
 
 Add a sidecar to a job:
 
@@ -590,13 +590,13 @@ Key constraints:
 - Replica completion is determined by the **main job container's exit**. Non-exiting sidecars (headless browsers, Redis, etc.) are torn down with the replica; no custom shutdown logic is needed. `replicaTimeout=3600s` is the hard ceiling.
 - `fusebase dev start` still does **not** run cron jobs nor any sidecars — job sidecars take effect only after `fusebase deploy`.
 
-For full details (config format, networking, debugging), see the **feature-sidecar** skill.
+For full details (config format, networking, debugging), see the **app-sidecar** skill.
 
 <% } %>### Cron Jobs Checklist
 
-- [ ] Feature already has a `backend/` folder and a `backend` block in `fusebase.json` (backend is scaffolded first)
+- [ ] App already has a `backend/` folder and a `backend` block in `fusebase.json` (backend is scaffolded first)
 - [ ] Added `cron:<job-name>` npm script to `backend/package.json`
 - [ ] Ran `fusebase job create` to register the job
-- [ ] Ran `fusebase deploy` to deploy the feature — **cron jobs only run after deployment**, not during `fusebase dev start`
+- [ ] Ran `fusebase deploy` to deploy the app — **cron jobs only run after deployment**, not during `fusebase dev start`
 <% if (it.flags?.includes("job-sidecars")) { %>- [ ] If the cron needs an auxiliary container (browser, cache, etc.), attached sidecars to the **job** via `fusebase sidecar add --job <jobName>` (not the backend)
 <% } %>

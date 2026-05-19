@@ -1,5 +1,11 @@
 import { join } from "path";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  renameSync,
+} from "fs";
 import { homedir } from "os";
 
 export const CONFIG_DIR = join(homedir(), ".fusebase");
@@ -91,11 +97,12 @@ export interface GateSdkOperationsSnapshot {
 
 // Read fusebase.json env config (takes precedence over process.env)
 export interface FuseConfig {
+  /** written but not used, only for debug purposes */
   env?: string;
   orgId: string;
-  appId: string;
-  features?: FeatureConfig[];
-  /** Legacy project-level Gate SDK analyze snapshot; canonical storage is now per-feature `features[].fusebaseGateMeta`. */
+  productId: string;
+  apps?: FeatureConfig[];
+  /** Legacy project-level Gate SDK analyze snapshot; canonical storage is now per-feature `apps[].fusebaseGateMeta`. */
   fusebaseGateMeta?: GateSdkOperationsSnapshot;
   [key: string]: unknown;
 }
@@ -128,36 +135,45 @@ export function getUpdateChannel(): "prod" | "dev" {
 }
 
 /** Known experimental flags. */
+export const MANAGED_INTEGRATIONS_FLAG = "managed-integrations";
+export const PERSONAL_MANAGED_INTEGRATIONS_FLAG = "managed-integrations-personal-auth";
+
 export const KNOWN_FLAGS = [
-  "analytics",
   "mcp-beta",
   "git-init",
   "git-debug-commits",
   "app-business-docs",
   "mcp-gate-debug",
   "isolated-stores",
-  "portal-specific-features",
+  "legacy-dashboards-db",
+  "portal-specific-apps",
   "api-exploration",
   "job-sidecars",
+  MANAGED_INTEGRATIONS_FLAG,
   "app-api-registry",
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
 /** Short descriptions for known experimental flags (used in interactive UX/help text). */
 export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
-  analytics: "Enable anonymous usage analytics (coding agent, model, OS stats).",
   "mcp-beta": "Enable beta MCP servers in integrations catalog.",
   "git-init": "Run Git initialization + GitLab sync automatically during `fusebase init`.",
   "git-debug-commits": "Enable mandatory commit-per-fix and strict debug/deploy traceability in git workflow skill.",
   "app-business-docs": "Include business-logic documentation skill in project template.",
   "mcp-gate-debug": "Include Gate MCP debug summary skill (focus on isolated stores).",
   "isolated-stores": "Enable isolated stores functionality (SQL/NoSQL).",
-  "portal-specific-features":
-    "Include portal-specific feature prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
+  "legacy-dashboards-db":
+    "Expose dashboard DB/dashboard creation guidance and enable dashboard-service database/dashboard management permissions in MCP tokens.",
+  "portal-specific-apps":
+    "Include portal-specific app prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
   "api-exploration":
     "Include api-exploration skill for verifying API endpoints with temporary tokens and test scripts.",
   "job-sidecars":
     "Enable per-job sidecar containers for cron jobs (`fusebase sidecar add --job <name>`).",
+  [MANAGED_INTEGRATIONS_FLAG]:
+    "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
+  // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
+    // "Enable personal authorization for managed integrations.",
   "app-api-registry":
     "Enable publishing app OpenAPI manifests to the control-plane registry during deploy.",
 };
@@ -194,6 +210,104 @@ export function removeFlag(flag: string): void {
 
 let fuseConfigCache: FuseConfig | null = null;
 let fuseConfigLoaded = false;
+let legacyShapeWarningPrinted = false;
+let legacyFeaturePathsWarningPrinted = false;
+let featuresFolderMigrationWarningPrinted = false;
+let agentAssetsRefreshNeeded = false;
+
+/**
+ * Migrate fusebase.json legacy shape in-place to the new shape:
+ *  - rename `appId` → `productId` and drop `appId`
+ *  - rename `features[]` → `apps[]` and drop `features[]`
+ *
+ * Does NOT touch `apps[].path` prefixes — that rewrite is filesystem-anchored
+ * (a path is a reference to a real on-disk directory) and is handled by
+ * `rewriteLegacyFeaturePathsInRaw`, which only rewrites when the legacy
+ * `features/` directory is already gone from disk.
+ *
+ * Prints a one-time warning the first time a legacy-shape file is observed
+ * in this process. Idempotent — safe to call on already-normalized objects.
+ */
+export function normalizeRawFuseConfigShape(
+  raw: Record<string, unknown>,
+): { migrated: boolean } {
+  let migrated = false;
+  if (raw.productId === undefined && typeof raw.appId === "string") {
+    raw.productId = raw.appId;
+    migrated = true;
+  }
+  if (raw.appId !== undefined) {
+    delete raw.appId;
+    migrated = true;
+  }
+  if (raw.apps === undefined && Array.isArray(raw.features)) {
+    raw.apps = raw.features;
+    migrated = true;
+  }
+  if (raw.features !== undefined) {
+    delete raw.features;
+    migrated = true;
+  }
+  if (migrated) {
+    agentAssetsRefreshNeeded = true;
+    if (!legacyShapeWarningPrinted) {
+      legacyShapeWarningPrinted = true;
+      console.warn(
+        "fusebase.json: legacy shape detected and auto-migrated to 'productId'/'apps[]'. " +
+          "The new shape will be persisted on this run.",
+      );
+    }
+  }
+  return { migrated };
+}
+
+/**
+ * Rewrite legacy `features/X` prefixes in `apps[].path` to `apps/X` in-place,
+ * but only when it is safe to do so — i.e. when a `features/` directory does
+ * NOT exist at `projectRoot`. Callers that don't have filesystem context
+ * (omit `projectRoot`) get the pre-NIM-41161 behaviour and always rewrite.
+ *
+ * Skipping the rewrite is the fix for NIM-41161: if the on-disk
+ * `features/` → `apps/` rename failed (EPERM on Windows, permission
+ * collisions, etc.), an unconditional rewrite would persist paths pointing
+ * at a non-existent `apps/X` while the files still live under `features/X`,
+ * breaking deploy. Keeping the paths aligned with what is actually on disk
+ * means the existing project keeps working even when the FS rename can't be
+ * applied automatically.
+ *
+ * Prints a one-time warning the first time the rewrite fires. Idempotent.
+ */
+export function rewriteLegacyFeaturePathsInRaw(
+  raw: Record<string, unknown>,
+  projectRoot?: string,
+): { rewritten: boolean } {
+  if (!Array.isArray(raw.apps)) {
+    return { rewritten: false };
+  }
+  if (projectRoot !== undefined && existsSync(join(projectRoot, "features"))) {
+    return { rewritten: false };
+  }
+  let rewritten = false;
+  for (const app of raw.apps) {
+    if (!app || typeof app !== "object") continue;
+    const a = app as Record<string, unknown>;
+    if (typeof a.path === "string" && a.path.startsWith("features/")) {
+      a.path = "apps/" + a.path.slice("features/".length);
+      rewritten = true;
+    }
+  }
+  if (rewritten) {
+    agentAssetsRefreshNeeded = true;
+    if (!legacyFeaturePathsWarningPrinted) {
+      legacyFeaturePathsWarningPrinted = true;
+      console.warn(
+        "fusebase.json: rewrote legacy 'features/' → 'apps/' path prefixes " +
+          "in apps[] to match the renamed on-disk directory.",
+      );
+    }
+  }
+  return { rewritten };
+}
 
 export const loadFuseConfig = (): FuseConfig | null => {
   if (fuseConfigLoaded) {
@@ -201,10 +315,32 @@ export const loadFuseConfig = (): FuseConfig | null => {
   }
   fuseConfigLoaded = true;
 
-  const fuseJsonPath = join(process.cwd(), "fusebase.json");
+  const cwd = process.cwd();
+  const fuseJsonPath = join(cwd, "fusebase.json");
   if (existsSync(fuseJsonPath)) {
     try {
-      fuseConfigCache = JSON.parse(readFileSync(fuseJsonPath, "utf-8"));
+      const raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
+        string,
+        unknown
+      >;
+      const { migrated } = normalizeRawFuseConfigShape(raw);
+      const { renamed } = migrateFeaturesFolderToAppsAtRoot(cwd);
+      const { rewritten } = rewriteLegacyFeaturePathsInRaw(raw, cwd);
+      if (migrated || renamed || rewritten) {
+        // Persist the normalized shape so subsequent CLI invocations read a
+        // clean new-shape file and the migration helpers stop firing.
+        try {
+          writeFileSync(
+            fuseJsonPath,
+            JSON.stringify(raw, null, 2) + "\n",
+            "utf-8",
+          );
+        } catch {
+          // Best-effort: in-memory normalization still stands; the next
+          // write helper (gate analyze / sidecar / etc.) will persist.
+        }
+      }
+      fuseConfigCache = raw as unknown as FuseConfig;
     } catch {
       // Ignore parse errors
     }
@@ -212,10 +348,128 @@ export const loadFuseConfig = (): FuseConfig | null => {
   return fuseConfigCache;
 };
 
+/**
+ * Rename a leftover legacy `features/` directory at the project root to
+ * `apps/` so the on-disk layout matches the renamed `apps[]` entries in
+ * fusebase.json. Idempotent and best-effort:
+ *  - no-op if `features/` does not exist
+ *  - no-op (with a one-time warning) if `apps/` already exists alongside it
+ *  - otherwise `renameSync(features, apps)` and prints a one-time warning
+ *
+ * The in-memory `apps[].path` rewrite from `features/...` to `apps/...` is
+ * handled by `rewriteLegacyFeaturePathsInRaw`, which keys off the post-rename
+ * filesystem state so paths only update when the on-disk folder actually
+ * moved (NIM-41161).
+ */
+export function migrateFeaturesFolderToAppsAtRoot(
+  projectRoot: string,
+): { renamed: boolean } {
+  const featuresDir = join(projectRoot, "features");
+  const appsDir = join(projectRoot, "apps");
+  if (!existsSync(featuresDir)) {
+    return { renamed: false };
+  }
+  if (existsSync(appsDir)) {
+    if (!featuresFolderMigrationWarningPrinted) {
+      featuresFolderMigrationWarningPrinted = true;
+      console.warn(
+        "fusebase: legacy 'features/' directory detected alongside 'apps/'; " +
+          "skipping auto-rename to avoid collision. Move contents manually.",
+      );
+    }
+    return { renamed: false };
+  }
+
+  try {
+    renameSync(featuresDir, appsDir);
+  } catch (error) {
+    if (!featuresFolderMigrationWarningPrinted) {
+      featuresFolderMigrationWarningPrinted = true;
+      console.warn(
+        `fusebase: failed to rename legacy 'features/' directory to 'apps/': ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    return { renamed: false };
+  }
+
+  agentAssetsRefreshNeeded = true;
+  if (!featuresFolderMigrationWarningPrinted) {
+    featuresFolderMigrationWarningPrinted = true;
+    console.warn(
+      "fusebase: renamed legacy 'features/' directory to 'apps/' to match the new naming.",
+    );
+  }
+
+  return { renamed: true };
+}
+
+/**
+ * Run AGENTS.md + .claude assets refresh once per process when an earlier
+ * `loadFuseConfig` / `normalizeRawFuseConfigShape` / `migrateFeaturesFolderToAppsAtRoot`
+ * detected and applied a legacy → new-shape migration. Uses the same template
+ * extraction flow as `fusebase update` (`copyAgentsAndSkills`) so any
+ * project-template renames (`features/` → `apps/`, `fusebase feature *` →
+ * `fusebase app *`, etc.) propagate into the project's `.claude` directory
+ * without requiring the user to run `fusebase update` separately.
+ *
+ * Idempotent: the pending flag is cleared on the first call, so subsequent
+ * calls in the same process are no-ops.
+ */
+export async function flushAgentAssetsRefreshAfterMigration(
+  cwd: string,
+): Promise<{ refreshed: boolean }> {
+  if (!agentAssetsRefreshNeeded) {
+    return { refreshed: false };
+  }
+  agentAssetsRefreshNeeded = false;
+  try {
+    const { copyAgentsAndSkills } = await import("./copy-template");
+    await copyAgentsAndSkills(cwd);
+    console.log(
+      "fusebase: refreshed AGENTS.md, .claude/skills, .claude/agents, .claude/hooks and .claude/settings.json to match new naming.",
+    );
+    return { refreshed: true };
+  } catch (error) {
+    console.warn(
+      `fusebase: failed to refresh .claude assets after auto-migration: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return { refreshed: false };
+  }
+}
+
 /** Clear in-memory fusebase.json cache (call after writing fusebase.json). */
 export function invalidateFuseConfigCache(): void {
   fuseConfigCache = null;
   fuseConfigLoaded = false;
+}
+
+/** Test-only: reset the once-per-process legacy-shape warning state. */
+export function resetLegacyShapeWarningForTests(): void {
+  legacyShapeWarningPrinted = false;
+}
+
+/** Test-only: reset the once-per-process legacy-feature-paths warning state. */
+export function resetLegacyFeaturePathsWarningForTests(): void {
+  legacyFeaturePathsWarningPrinted = false;
+}
+
+/** Test-only: reset the once-per-process features-folder migration warning state. */
+export function resetFeaturesFolderMigrationWarningForTests(): void {
+  featuresFolderMigrationWarningPrinted = false;
+}
+
+/** Test-only: reset the once-per-process pending agent-assets refresh flag. */
+export function resetAgentAssetsRefreshFlagForTests(): void {
+  agentAssetsRefreshNeeded = false;
+}
+
+/** Test-only: introspect the pending agent-assets refresh flag. */
+export function isAgentAssetsRefreshPendingForTests(): boolean {
+  return agentAssetsRefreshNeeded;
 }
 
 function sortGateUsedOps(used: string[]): string[] {
@@ -308,10 +562,10 @@ function getFeatureIndexById(
   raw: Record<string, unknown>,
   featureId: string,
 ): number {
-  const features = Array.isArray(raw.features) ? raw.features : [];
-  return features.findIndex((feature) => {
-    if (!feature || typeof feature !== "object") return false;
-    return (feature as Record<string, unknown>).id === featureId;
+  const apps = Array.isArray(raw.apps) ? raw.apps : [];
+  return apps.findIndex((app) => {
+    if (!app || typeof app !== "object") return false;
+    return (app as Record<string, unknown>).id === featureId;
   });
 }
 
@@ -319,15 +573,15 @@ function readPreviousGateSnapshotForFeature(
   raw: Record<string, unknown>,
   featureId: string,
 ): GateSdkOperationsSnapshot | undefined {
-  const features = Array.isArray(raw.features) ? raw.features : [];
+  const apps = Array.isArray(raw.apps) ? raw.apps : [];
   const featureIndex = getFeatureIndexById(raw, featureId);
   if (featureIndex === -1) return undefined;
 
-  const featureRaw = features[featureIndex];
+  const featureRaw = apps[featureIndex];
   const featureSnapshot = readFeatureGateMetaFromFeatureRaw(featureRaw);
   if (featureSnapshot) return featureSnapshot;
 
-  if (features.length === 1) {
+  if (apps.length === 1) {
     return readLegacyProjectGateMetaFromFusebaseRaw(raw);
   }
 
@@ -339,15 +593,15 @@ function writeGateSnapshotToFeatureRaw(
   featureId: string,
   snapshot: GateSdkOperationsSnapshot,
 ): void {
-  const features = Array.isArray(raw.features) ? [...raw.features] : [];
+  const apps = Array.isArray(raw.apps) ? [...raw.apps] : [];
   const featureIndex = getFeatureIndexById(raw, featureId);
   if (featureIndex === -1) {
-    throw new Error(`Feature "${featureId}" not found in fusebase.json`);
+    throw new Error(`App "${featureId}" not found in fusebase.json`);
   }
 
-  const featureRaw = features[featureIndex];
+  const featureRaw = apps[featureIndex];
   if (!featureRaw || typeof featureRaw !== "object") {
-    throw new Error(`Feature "${featureId}" is invalid in fusebase.json`);
+    throw new Error(`App "${featureId}" is invalid in fusebase.json`);
   }
 
   const nextFeature = {
@@ -356,8 +610,8 @@ function writeGateSnapshotToFeatureRaw(
   };
   delete (nextFeature as Record<string, unknown>).gateSdkOperations;
 
-  features[featureIndex] = nextFeature;
-  raw.features = features;
+  apps[featureIndex] = nextFeature;
+  raw.apps = apps;
   delete raw.fusebaseGateMeta;
   delete raw.gateSdkOperations;
 }
@@ -425,6 +679,8 @@ export function writeGateSdkOperationsToFusebaseJson(
   } catch {
     throw new Error("Could not parse fusebase.json");
   }
+  normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
 
   const usedSorted = sortGateUsedOps(input.usedOps);
   const prev = readPreviousGateSnapshotForFeature(raw, featureId);
@@ -489,10 +745,12 @@ export function updateGateSdkPermissionsInFusebaseJson(
   } catch {
     throw new Error("Could not parse fusebase.json");
   }
+  normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
   const g = readPreviousGateSnapshotForFeature(raw, featureId);
   if (!g) {
     throw new Error(
-      `Feature-scoped fusebaseGateMeta missing or invalid for feature "${featureId}" in fusebase.json`,
+      `App-scoped fusebaseGateMeta missing or invalid for app "${featureId}" in fusebase.json`,
     );
   }
   const sorted = sortGateUsedOps(permissions);

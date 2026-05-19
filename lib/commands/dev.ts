@@ -25,7 +25,7 @@ import {
   type FuseConfig,
 } from "../config";
 import { detectDevServerUrl } from "../framework-detect";
-import { fetchAppFeatureSecrets } from "../api";
+import { fetchAppSecrets } from "../api";
 import packageJson from "../../package.json";
 import { logger } from "../logger";
 
@@ -97,7 +97,7 @@ function findFeature(
   fuseConfig: FuseConfig,
   featureIdOrPath: string,
 ): FeatureConfig | undefined {
-  return fuseConfig.features?.find(
+  return fuseConfig.apps?.find(
     (f) =>
       f.id === featureIdOrPath ||
       f.path === featureIdOrPath ||
@@ -254,7 +254,7 @@ export const devCommand = new Command("dev").description(
 
 devCommand
   .command("start")
-  .description("Start the development server for a feature")
+  .description("Start the development server for an app")
   .argument("[feature]", "Feature ID or path (from fusebase.json features)")
   .action(async (featureIdOrPath?: string) => {
     // Print version
@@ -270,15 +270,15 @@ devCommand
 
     // Load fusebase.json
     const fuseConfig = loadFuseConfig();
-    if (!fuseConfig || !fuseConfig.orgId || !fuseConfig.appId) {
-      console.error("Error: Invalid fusebase.json. Missing orgId or appId.");
+    if (!fuseConfig || !fuseConfig.orgId || !fuseConfig.productId) {
+      console.error("Error: Invalid fusebase.json. Missing orgId or productId.");
       process.exit(1);
     }
 
-    // Check if there are any features configured
-    if (!fuseConfig.features || fuseConfig.features.length === 0) {
-      console.error("Error: No features configured in fusebase.json.");
-      console.error("Add features to fusebase.json first.");
+    // Check if there are any apps configured
+    if (!fuseConfig.apps || fuseConfig.apps.length === 0) {
+      console.error("Error: No apps configured in fusebase.json.");
+      console.error("Add apps to fusebase.json first.");
       process.exit(1);
     }
 
@@ -296,19 +296,19 @@ devCommand
       selectedFeature = findFeature(fuseConfig, featureIdOrPath);
       if (!selectedFeature) {
         console.error(
-          `Error: Feature '${featureIdOrPath}' not found in fusebase.json.`,
+          `Error: App '${featureIdOrPath}' not found in fusebase.json.`,
         );
-        console.error("Available features:");
-        for (const f of fuseConfig.features) {
+        console.error("Available apps:");
+        for (const f of fuseConfig.apps) {
           console.error(`  - ${f.path || f.id} (id: ${f.id})`);
         }
         process.exit(1);
       }
-    } else if (fuseConfig.features.length === 1) {
-      // Auto-select if there's only one feature
-      selectedFeature = fuseConfig.features[0];
+    } else if (fuseConfig.apps.length === 1) {
+      // Auto-select if there's only one app
+      selectedFeature = fuseConfig.apps[0];
     } else {
-      selectedFeature = await promptFeatureSelection(fuseConfig.features);
+      selectedFeature = await promptFeatureSelection(fuseConfig.apps);
     }
 
     if (!selectedFeature) {
@@ -337,10 +337,10 @@ devCommand
     let secretsEnv: Record<string, string> = {};
     try {
       console.log("🔑 Fetching feature secrets...");
-      const secretsResponse = await fetchAppFeatureSecrets(
+      const secretsResponse = await fetchAppSecrets(
         config.apiKey,
         fuseConfig.orgId,
-        fuseConfig.appId,
+        fuseConfig.productId,
         selectedFeature.id,
       );
       if (secretsResponse.secrets.length > 0) {

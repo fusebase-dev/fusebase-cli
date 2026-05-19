@@ -24,5 +24,5 @@
 ## Summary
 
 1. Use **aliases** for all database/dashboard/view identifiers in app logic and when creating entities.
-2. Resolve aliases to IDs at runtime via **resolveAliases** (MCP during development, SDK in feature code).
+2. Resolve aliases to IDs at runtime via **resolveAliases** (MCP during development, SDK in app code).
 3. Never hardcode database, dashboard, or view UUIDs from the dashboards-service.

@@ -1,7 +1,7 @@
 ---
 version: "1.4.2"
 mcp_prompt: domain.dashboardSchema
-last_synced: "2026-04-17"
+last_synced: "2026-05-07"
 title: "Dashboard Schema"
 category: core
 ---
@@ -165,8 +165,8 @@ category: core
 
 **Note on examples**: Examples below sometimes omit required path/query parameters (e.g. dashboardId, viewId). Always pass all required parameters as shown by `tools_describe` for each operation.
 
-**Creating a Dashboard:**
-- **For `rootEntity=custom`**: The dashboard must belong to a database. If no database exists, create the database first (e.g. getOrCreateDatabase or createDatabase), then create the dashboard in it (pass `database_id` in the create request).
+**Creating a Dashboard (only when the corresponding MCP tools are visible):**
+- **For `rootEntity=custom`**: The dashboard must belong to a database. In default app flows, attach it to an existing project database. Only use database-creation flows if your MCP session explicitly exposes them.
 1. Discover: `tools_search(queries: ["create dashboard", "intent"])`
 2. Inspect: `tools_describe(name: "createDashboardIntent", schemaMode: "input")`
 3. Execute: `tool_call({ opId: "createDashboardIntent", args: { schema: { items_intent: [...] } } })`
@@ -493,5 +493,5 @@ Use updateViewIntent with schema_patch.add. New columns appear in the view and a
 
 - **Version**: 1.4.2
 - **Category**: core
-- **Last synced**: 2026-04-17
+- **Last synced**: 2026-05-07
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

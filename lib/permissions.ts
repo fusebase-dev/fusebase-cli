@@ -1,27 +1,27 @@
 import type {
-  AppFeatureAccessPrincipal,
-  AppFeatureGatePermissionItem,
-  AppFeaturePermissionItem,
-  AppFeaturePermissions,
-  AppFeatureResourcePermissionPrivilege,
+  AppAccessPrincipal,
+  AppGatePermissionItem,
+  AppPermissionItem,
+  AppPermissions,
+  AppResourcePermissionPrivilege,
 } from "./api.ts";
 
 const VALID_ORG_ROLES = ['guest', 'client', 'member', 'manager', 'owner'];
-const VALID_RESOURCE_PRIVILEGES: AppFeatureResourcePermissionPrivilege[] = ["read", "write"];
+const VALID_RESOURCE_PRIVILEGES: AppResourcePermissionPrivilege[] = ["read", "write"];
 
 /**
- * Parse access principals string into AppFeatureAccessPrincipal array.
+ * Parse access principals string into AppAccessPrincipal array.
  * Format: comma-separated list of "type" or "type:id"
  * Examples:
  *   "visitor" → [{ type: "visitor", id: "0" }]
  *   "orgRole:member" → [{ type: "orgRole", id: "member" }]
  *   "visitor,orgRole:member,orgRole:guest" → [visitor, member, guest]
  */
-export function parsePrincipals(input: string): AppFeatureAccessPrincipal[] {
+export function parsePrincipals(input: string): AppAccessPrincipal[] {
   if (!input.trim()) return [];
 
   const parts = input.split(',').map(p => p.trim()).filter(p => p);
-  const principals: AppFeatureAccessPrincipal[] = [];
+  const principals: AppAccessPrincipal[] = [];
 
   for (const part of parts) {
     const colonIdx = part.indexOf(':');
@@ -54,7 +54,7 @@ export function parsePrincipals(input: string): AppFeatureAccessPrincipal[] {
 }
 
 /**
- * Parse permissions string into AppFeaturePermissions object.
+ * Parse permissions string into AppPermissions object.
  * Format:
  *   "dashboardView.dashboardId:viewId.read,write"
  *   "database.id:databaseId.read,write"
@@ -63,8 +63,8 @@ export function parsePrincipals(input: string): AppFeatureAccessPrincipal[] {
  * Each permission item is separated by semicolon.
  * Each item format: type.resource.privileges (privileges comma-separated)
  */
-export function parsePermissions(permissionsStr: string): AppFeaturePermissions {
-  const items: AppFeaturePermissionItem[] = [];
+export function parsePermissions(permissionsStr: string): AppPermissions {
+  const items: AppPermissionItem[] = [];
 
   const parts = permissionsStr.split(';').map(p => p.trim()).filter(p => p);
 
@@ -90,7 +90,7 @@ export function parsePermissions(permissionsStr: string): AppFeaturePermissions 
       .filter((p) => p);
 
     for (const priv of privileges) {
-      if (!VALID_RESOURCE_PRIVILEGES.includes(priv as AppFeatureResourcePermissionPrivilege)) {
+      if (!VALID_RESOURCE_PRIVILEGES.includes(priv as AppResourcePermissionPrivilege)) {
         throw new Error(`Invalid privilege "${priv}". Allowed values: ${VALID_RESOURCE_PRIVILEGES.join(', ')}`);
       }
     }
@@ -121,7 +121,7 @@ export function parsePermissions(permissionsStr: string): AppFeaturePermissions 
       items.push({
         type: "dashboardView",
         resource: { dashboardId, viewId },
-        privileges: privileges as AppFeatureResourcePermissionPrivilege[],
+        privileges: privileges as AppResourcePermissionPrivilege[],
       });
       continue;
     }
@@ -142,7 +142,7 @@ export function parsePermissions(permissionsStr: string): AppFeaturePermissions 
         items.push({
           type: "database",
           resource: { databaseId: resourceValue },
-          privileges: privileges as AppFeatureResourcePermissionPrivilege[],
+          privileges: privileges as AppResourcePermissionPrivilege[],
         });
         continue;
       }
@@ -151,7 +151,7 @@ export function parsePermissions(permissionsStr: string): AppFeaturePermissions 
         items.push({
           type: "database",
           resource: { databaseAlias: resourceValue },
-          privileges: privileges as AppFeatureResourcePermissionPrivilege[],
+          privileges: privileges as AppResourcePermissionPrivilege[],
         });
         continue;
       }
@@ -177,7 +177,7 @@ function normalizeGatePermissionStrings(permissionStrings: string[]): string[] {
 
 function buildGatePermissionItems(
   permissionStrings: string[],
-): AppFeatureGatePermissionItem[] {
+): AppGatePermissionItem[] {
   const privileges = normalizeGatePermissionStrings(permissionStrings);
   if (privileges.length === 0) {
     return [];
@@ -187,10 +187,10 @@ function buildGatePermissionItems(
 }
 
 export function mergeFeaturePermissions(args: {
-  manualPermissions?: AppFeaturePermissions;
-  existingPermissions?: AppFeaturePermissions;
+  manualPermissions?: AppPermissions;
+  existingPermissions?: AppPermissions;
   gatePermissions?: string[];
-}): AppFeaturePermissions | undefined {
+}): AppPermissions | undefined {
   const { manualPermissions, existingPermissions, gatePermissions } = args;
 
   if (!manualPermissions && gatePermissions === undefined) {
@@ -205,7 +205,7 @@ export function mergeFeaturePermissions(args: {
   const gateItems =
     gatePermissions === undefined
       ? existingItems.filter(
-          (item): item is AppFeatureGatePermissionItem => item.type === "gate",
+          (item): item is AppGatePermissionItem => item.type === "gate",
         )
       : buildGatePermissionItems(gatePermissions);
 
@@ -214,7 +214,7 @@ export function mergeFeaturePermissions(args: {
   };
 }
 
-export function formatPermissionItem(item: AppFeaturePermissionItem): string {
+export function formatPermissionItem(item: AppPermissionItem): string {
   if (item.type === "dashboardView") {
     return `${item.type} ${item.resource.dashboardId}:${item.resource.viewId} [${item.privileges.join(", ")}]`;
   }

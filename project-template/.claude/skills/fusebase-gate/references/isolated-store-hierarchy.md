@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-store-hierarchy.md"
-last_synced: "2026-05-06"
+last_synced: "2026-05-07"
 title: "Isolated stores hierarchy: Gate vs Neon"
 category: specialized
 ---
@@ -68,7 +68,7 @@ In other words:
   A store is bound to:
   - an org
   - a source scope such as `app`
-  - an engine / store type (`sql/postgres`, `nosql/mongodb_atlas`)
+  - an engine / store type; for the current app-facing skills and MCP guidance, the active baseline is `sql/postgres`
 
 - **Stage instance**
   Environment boundary for the store.
@@ -314,4 +314,4 @@ So:
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-05-06
+- **Last synced**: 2026-05-07

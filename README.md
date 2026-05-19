@@ -1,6 +1,6 @@
 # Fusebase Apps CLI
 
-A command-line tool for managing Fusebase applications. Build, develop, and deploy features to the Fusebase platform.
+A command-line tool for managing Fusebase applications. Build, develop, and deploy apps to the Fusebase platform.
 
 ## Architecture
 
@@ -10,14 +10,14 @@ For deeper understanding of:
 - MCP integration
 - API client layers (legacy vs SDK)
 - LLM capability discovery
-- Core concepts (apps, features, data access)
+- Core concepts (products, apps, data access)
 
 See:
 - [Architecture Documentation](docs/ARCHITECTURE.md)
 - [CLI Flows](docs/CLI-FLOWS.md)
 - [Git Configuration Guide](docs/guides/git-config.md)
 - [Conceptual Model](docs/CONCEPTS.md)
-- [Feature Permissions](docs/PERMISSIONS.md) — canonical model for `dashboardView`, `database`, `gate`, and `feature update`
+- [App Permissions](docs/PERMISSIONS.md) — canonical model for `dashboardView`, `database`, `gate`, and `app update`
 - [Fusebase Gate meta (`fusebaseGateMeta`)](docs/FUSEBASE_GATE_META.md) — Gate SDK analyze flow and `fusebase.json` snapshot
 - [E2E tests](test/e2e/README.md) — CLI end-to-end smoke + dev-start parallel tests, env vars, and CI variables
 
@@ -141,7 +141,7 @@ Creates a `fusebase.json` file with the following structure:
 ```json
 {
   "orgId": "your-org-id",
-  "appId": "your-app-id"
+  "productId": "your-app-id"
 }
 ```
 
@@ -190,9 +190,9 @@ fusebase git sync --git-tag-managed
 
 ---
 
-### `fusebase feature list`
+### `fusebase app list`
 
-List all features for the current app with their URLs.
+List all apps for the current app with their URLs.
 
 **Arguments:** None
 
@@ -206,41 +206,41 @@ List all features for the current app with their URLs.
 **Example:**
 
 ```bash
-fusebase feature list
+fusebase app list
 ```
 
 **Output:**
 
 ```
-Features:
+Apps:
 
-  My Feature
-    ID:   feature-id-123
-    URL:  https://your-app-id.thefusebase.app/my-feature
+  My App
+    ID:   app-id-123
+    URL:  https://your-app-id.thefusebase.app/my-app
     Permissions:
       ID               Title             Type
       ---------------  ----------------  --------
       dashboard-id-123 Sales Dashboard   Table
       database-id-456  Customer Database Database
 
-Total: 1 feature(s)
+Total: 1 app(s)
 ```
 
 ---
 
 ### `fusebase deploy`
 
-Deploy features to Fusebase. For each feature this command will:
+Deploy apps to Fusebase. For each app this command will:
 
-1. Install dependencies and run lint (if the feature has a `lint` script in its `package.json`)
+1. Install dependencies and run lint (if the app has a `lint` script in its `package.json`)
 2. Run the build command (if configured)
 3. Compute a SHA-256 `frontendHash` of the upload directory and a `backendHash` of the `backend/` folder (if present)
 4. Compare those hashes against the active version and take one of:
-   - **No changes** → skip the feature entirely (no new version, no upload, no backend deploy). Logs `✓ No changes for feature, skipping deploy`.
+   - **No changes** → skip the app entirely (no new version, no upload, no backend deploy). Logs `✓ No changes for app, skipping deploy`.
    - **Frontend unchanged, backend changed** → create a new version, reuse the previous frontend bundle via `copyFrontendParams` (no upload), then re-deploy the backend.
    - **Frontend changed** → create a new version, upload files, persist the new `frontendHash`. Backend is handled per its own hash (skipped/copied or re-deployed).
-5. With `--force`, hash matches are ignored and a full upload + redeploy runs for every feature.
-6. If the feature contains `openapi.json` and the `app-api-registry` flag is enabled, validate it and publish the app API manifest to the feature registry.
+5. With `--force`, hash matches are ignored and a full upload + redeploy runs for every app.
+6. If the app contains `openapi.json` and the `app-api-registry` flag is enabled, validate it and publish the app API manifest to the app registry.
 
 **Arguments:** None
 
@@ -254,28 +254,28 @@ Deploy features to Fusebase. For each feature this command will:
 
 - App must be initialized (`fusebase init`)
 - API key must be configured (`fusebase auth`)
-- At least one feature must have a `path` configured in `fusebase.json`
+- At least one app must have a `path` configured in `fusebase.json`
 
 **Examples:**
 
 ```bash
-# Skips features with unchanged frontend + backend
+# Skips apps with unchanged frontend + backend
 fusebase deploy
 
 # Always uploads and redeploys
 fusebase deploy --force
 ```
 
-**Feature Configuration in `fusebase.json`:**
+**App Configuration in `fusebase.json`:**
 
 ```json
 {
   "orgId": "...",
-  "appId": "...",
-  "features": [
+  "productId": "...",
+  "apps": [
     {
-      "id": "feature-id",
-      "path": "features/my-feature",
+      "id": "app-id",
+      "path": "apps/my-app",
       "build": {
         "command": "npm run build",
         "outputDir": "dist"
@@ -289,7 +289,7 @@ fusebase deploy --force
 
 ### `fusebase api validate [--file <path>]`
 
-Validate the feature OpenAPI contract for the Phase 1 app API MVP.
+Validate the app OpenAPI contract for the Phase 1 app API MVP.
 
 Behavior:
 
@@ -317,15 +317,15 @@ fusebase api validate --file openapi.json
 
 ---
 
-### `fusebase feature update <featureId>`
+### `fusebase app update <appId>`
 
-Update settings for an existing feature.
+Update settings for an existing app.
 
 **Arguments:**
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `featureId` | Yes | The ID of the feature to update |
+| `appId` | Yes | The ID of the app to update |
 
 **Options:**
 
@@ -333,7 +333,7 @@ Update settings for an existing feature.
 |--------|-------------|
 | `--access <principals>` | Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`) |
 | `--permissions <permissions>` | Replace `dashboardView/database` permissions |
-| `--sync-gate-permissions` | Analyze the feature path and replace `gate` permissions |
+| `--sync-gate-permissions` | Analyze the app path and replace `gate` permissions |
 
 **Access Principals:**
 
@@ -347,43 +347,43 @@ The `--access` option replaces the entire access principal list. Principals are 
 **Examples:**
 
 ```bash
-# Make a feature publicly accessible
-fusebase feature update feat_abc123 --access=visitor
+# Make an app publicly accessible
+fusebase app update feat_abc123 --access=visitor
 
 # Allow org members only
-fusebase feature update feat_abc123 --access=orgRole:member
+fusebase app update feat_abc123 --access=orgRole:member
 
 # Allow multiple roles
-fusebase feature update feat_abc123 --access=orgRole:member,orgRole:client
+fusebase app update feat_abc123 --access=orgRole:member,orgRole:client
 
 # Public access + org members
-fusebase feature update feat_abc123 --access=visitor,orgRole:member
+fusebase app update feat_abc123 --access=visitor,orgRole:member
 
 # Replace dashboard/database permissions only
-fusebase feature update feat_abc123 --permissions="dashboardView.dash_1:view_1.read;database.id:db_1.write"
+fusebase app update feat_abc123 --permissions="dashboardView.dash_1:view_1.read;database.id:db_1.write"
 
 # Sync Gate permissions only
-fusebase feature update feat_abc123 --sync-gate-permissions
+fusebase app update feat_abc123 --sync-gate-permissions
 
 # Replace dashboard/database and Gate permissions in one request
-fusebase feature update feat_abc123 --permissions="dashboardView.dash_1:view_1.read" --sync-gate-permissions
+fusebase app update feat_abc123 --permissions="dashboardView.dash_1:view_1.read" --sync-gate-permissions
 ```
 
-See [Feature Permissions](docs/PERMISSIONS.md) for the full permissions model and merge semantics.
+See [App Permissions](docs/PERMISSIONS.md) for the full permissions model and merge semantics.
 
 ---
 
-### `fusebase feature create`
+### `fusebase app create`
 
-Create and configure a feature for development.
+Create and configure an app for development.
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `--name <name>` | **(Required)** Feature title |
-| `--subdomain <subdomain>` | **(Required)** Subdomain for the feature (e.g., `my-feature`) |
-| `--path <path>` | **(Required)** Local feature directory path (e.g., `features/my-feature`) |
+| `--name <name>` | **(Required)** App title |
+| `--subdomain <subdomain>` | **(Required)** Subdomain for the app (e.g., `my-app`) |
+| `--path <path>` | **(Required)** Local app directory path (e.g., `apps/my-app`) |
 | `--dev-command <command>` | **(Required)** Dev server command (e.g., `npm run dev`) |
 | `--build-command <command>` | **(Required)** Build command (e.g., `npm run build`) |
 | `--output-dir <dir>` | **(Required)** Build output directory (e.g., `dist`) |
@@ -393,13 +393,13 @@ Create and configure a feature for development.
 **Example:**
 
 ```bash
-fusebase feature create --name="My Feature" --subdomain=my-feature --path=features/my-feature --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist
+fusebase app create --name="My App" --subdomain=my-app --path=apps/my-app --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist
 ```
 
-If you later scaffold a backend into that feature with:
+If you later scaffold a backend into that app with:
 
 ```bash
-fusebase scaffold --template backend --dir features/my-feature
+fusebase scaffold --template backend --dir apps/my-app
 ```
 
 the CLI creates `openapi.json` automatically if it does not already exist.
@@ -411,11 +411,11 @@ The `spa` feature template ships a built-in **`/link`** route that handles app m
 ```json
 {
   "orgId": "...",
-  "appId": "...",
-  "features": [
+  "productId": "...",
+  "apps": [
     {
-      "id": "feature-id",
-      "path": "features/my-feature",
+      "id": "app-id",
+      "path": "apps/my-app",
       "dev": {
         "command": "npm run dev"
       },
@@ -430,21 +430,21 @@ The `spa` feature template ships a built-in **`/link`** route that handles app m
 
 ---
 
-### `fusebase dev start [feature]`
+### `fusebase dev start [app]`
 
-Start the development server for a feature. This command:
+Start the development server for an app. This command:
 
-1. Starts the feature's dev server (if `dev.command` is configured)
+1. Starts the app's dev server (if `dev.command` is configured)
 2. Starts the Fusebase dev server UI (port 4173)
 3. Starts the API proxy server (port 4174)
-4. Creates a per-session debug log folder under the selected feature directory at `logs/dev-<timestamp>/`
+4. Creates a per-session debug log folder under the selected app directory at `logs/dev-<timestamp>/`
 5. Opens the dev UI in your browser
 
 **Arguments:**
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `feature` | No | Feature ID or path (from fusebase.json features). If not provided, you'll be prompted to select one. |
+| `app` | No | App ID or path (from fusebase.json apps). If not provided, you'll be prompted to select one. |
 
 **Options:** None
 
@@ -452,47 +452,47 @@ Start the development server for a feature. This command:
 
 - App must be initialized (`fusebase init`)
 - API key must be configured (`fusebase auth`)
-- At least one feature must be configured in `fusebase.json`
+- At least one app must be configured in `fusebase.json`
 
 **Example:**
 
 ```bash
-# Interactive feature selection
+# Interactive app selection
 fusebase dev start
 
-# Start specific feature by ID
-fusebase dev start my-feature-id
+# Start specific app by ID
+fusebase dev start my-app-id
 
-# Start specific feature by path
-fusebase dev start features/dashboard
+# Start specific app by path
+fusebase dev start apps/dashboard
 ```
 
 **Dev Server Components:**
 
 | Component | Port | Description |
 |-----------|------|-------------|
-| Frontend UI | 4173 | React app that displays features in iframes |
+| Frontend UI | 4173 | React app that displays apps in iframes |
 | API Proxy | 4174 | Proxies requests to Fusebase API with authentication |
 
 **Per-session Debug Logs:**
 
-Each `fusebase dev start` run creates a session folder inside the selected feature directory:
+Each `fusebase dev start` run creates a session folder inside the selected app directory:
 
 ```text
-<feature-dir>/logs/dev-<timestamp>/
+<app-dir>/logs/dev-<timestamp>/
   browser-logs.jsonl
   access-logs.jsonl
   backend-logs.jsonl
   frontend-dev-server-logs.jsonl
 ```
 
-**Feature Token Flow:**
+**App Token Flow:**
 
-The dev server automatically handles feature token delivery:
-1. Fetches feature tokens from the Fusebase API
-2. Sends tokens to the feature iframe via `postMessage`
-3. Sets cookie `fbsfeaturetoken` so same-origin app backend requests can authenticate without relying on a custom header
-4. Your feature receives the token:
+The dev server automatically handles app token delivery:
+1. Fetches app tokens from the Fusebase API
+2. Sends tokens to the app iframe via `postMessage`
+3. Sets cookie `fbsapptoken` so same-origin app backend requests can authenticate without relying on a custom header
+4. Your app receives the token:
 
 ```javascript
 window.addEventListener('message', (event) => {
@@ -502,7 +502,7 @@ window.addEventListener('message', (event) => {
 });
 ```
 
-For custom app backends (`/api/*`), treat `x-app-feature-token` as optional in deployed mode and read `x-app-feature-token` or cookie `fbsfeaturetoken` on the server.
+For custom app backends (`/api/*`), treat `x-app-token` as optional in deployed mode and read `x-app-token` or cookie `fbsapptoken` on the server.
 
 ---
 
@@ -510,28 +510,28 @@ For custom app backends (`/api/*`), treat `x-app-feature-token` as optional in d
 
 One command to refresh a generated app after a CLI or template upgrade:
 
-1. **CLI binary update** — runs first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage.
+1. **CLI binary update** — runs first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage. On Windows, this launches the installer and exits so `fusebase.exe` can be replaced; after the installer finishes, run `fusebase update` again to continue app stages.
 2. **Agent assets** — refreshes `AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`.
 3. **MCP + IDE** — selectively regenerates Dashboards and/or Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh both regardless.
-4. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **feature** `package.json` files are updated only if those deps already exist (nothing new is injected into features).
+4. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **app** `package.json` files are updated only if those deps already exist (nothing new is injected into apps).
 5. **`npm install`** — runs **only** in directories where a managed dependency version actually changed.
 
 **Pre-update Git checkpoint:** In a TTY, you are prompted for an optional commit before changes (empty commit if the tree is clean). If current branch tracks a remote (upstream configured), the pre-update commit is pushed immediately. Without Git, you are warned about rollback risk and can initialize a repo first. Use **`--skip-commit`** to skip, or **`--commit`** to run the checkpoint in CI/non-interactive mode without prompts.
 
-**Prerequisites:** `fusebase.json` with `orgId` and `appId`; `fusebase auth` for stages that touch MCP tokens.
+**Prerequisites:** `fusebase.json` with `orgId` and `productId`; `fusebase auth` for stages that touch MCP tokens.
 
 Behavior by directory:
 
-- In an app directory (`fusebase.json` exists): runs full flow (CLI + app stages).
+- In an app directory (`fusebase.json` exists): runs full flow (CLI + app stages). On Windows, a CLI binary update exits after launching the installer; rerun the command after installation to run app stages.
 - Outside an app directory: runs only CLI binary update.
-- Use `--skip-app` to force CLI-only mode even inside an app directory.
+- Use `--skip-product` to force CLI-only mode even inside an app directory.
 
 **Examples:**
 
 ```bash
 fusebase update
 fusebase update --dry-run
-fusebase update --skip-app
+fusebase update --skip-product
 fusebase update --skip-skills --force-mcp
 fusebase update --skip-install
 fusebase update --skip-commit
@@ -541,7 +541,7 @@ fusebase update --skip-commit
 
 | Flag | Effect |
 |------|--------|
-| `--skip-app` | Skip app stages and run only CLI update |
+| `--skip-product` | Skip app stages and run only CLI update |
 | `--skip-cli-update` | Skip automatic CLI self-update stage |
 | `--skip-skills` | Skip agent asset refresh |
 | `--skip-mcp` | Skip MCP token + IDE refresh |
@@ -558,7 +558,7 @@ fusebase update --skip-commit
 
 ### `fusebase sidecar`
 
-Manage sidecar containers for a feature backend or for a specific cron job. Sidecars are pre-built Docker images that run alongside the main container, sharing its network namespace (reachable on `localhost`). Stored in `fusebase.json` under `features[].backend.sidecars[]` (backend) or `features[].backend.jobs[].sidecars[]` (per cron job).
+Manage sidecar containers for an app backend or for a specific cron job. Sidecars are pre-built Docker images that run alongside the main container, sharing its network namespace (reachable on `localhost`). Stored in `fusebase.json` under `apps[].backend.sidecars[]` (backend) or `apps[].backend.jobs[].sidecars[]` (per cron job).
 
 ```bash
 # Add a sidecar to the backend (default — same as today)
@@ -580,13 +580,13 @@ fusebase sidecar list --feature <featureId> [--job <jobName>]
 
 **Options:**
 
-- `--feature <featureId>` (required) — feature ID
+- `--feature <featureId>` (required) — app ID
 - `--name <name>` (required for add/remove) — sidecar name. Lowercase letters, digits, and hyphens; max 63 chars; must start with a lowercase letter.
 - `--image <image>` (required for add) — Docker image reference (e.g. `browserless/chrome:latest`)
 - `--port <port>` — port the sidecar listens on (informational; `localhost:<port>` from the main container)
 - `--tier small|medium|large` — resource tier (default: `small`)
 - `--env KEY=VALUE` — environment variables, repeatable
-- `--secret KEY|KEY:ALIAS` — whitelist an app feature secret key (registered via `fusebase secret create`) to inject into the sidecar as an env var, repeatable. Use `KEY:ALIAS` to expose the secret under a different env var name inside the sidecar. On collision between sidecar `env` and a secret key, the sidecar's static `env` value wins. Deploy fails with a `ValidationError` listing every missing key if any referenced secret is not registered for the feature.
+- `--secret KEY|KEY:ALIAS` — whitelist an app secret key (registered via `fusebase secret create`) to inject into the sidecar as an env var, repeatable. Use `KEY:ALIAS` to expose the secret under a different env var name inside the sidecar. On collision between sidecar `env` and a secret key, the sidecar's static `env` value wins. Deploy fails with a `ValidationError` listing every missing key if any referenced secret is not registered for the app.
 - `--job <jobName>` — attach the sidecar to the named cron job instead of the backend. **Requires the `job-sidecars` flag** (`fusebase config set-flag job-sidecars`). Without `--job`, all three subcommands target backend sidecars exactly as today.
 
 **Limits and rules:**
@@ -646,8 +646,8 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `app-business-docs` | Copies the `app-business-docs` skill into the app: keeps **`docs/en/business-logic.md`** (English) aligned with real behavior — domain rules, main user flows, edge cases; update after business-logic changes or when debugging unclear behavior |
 | `mcp-gate-debug` | Copies the `mcp-gate-debug` skill: after Fusebase Gate MCP tool runs, summarize smooth vs rough paths and suggest improvements to `.claude/skills/fusebase-gate`, prompts, or MCP server behavior — prioritize **isolated stores** (SQL/NoSQL) flows |
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); also turns on required template references and `isolated_store.*` permissions in `fusebase env create` |
-| `portal-specific-features` | Includes portal-specific feature guidance in prompts: `fusebase-portal-specific-features` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
-| `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`features[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `feature-sidecar` and `feature-backend` skill templates. |
+| `portal-specific-apps` | Includes portal-specific app guidance in prompts: `fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
+| `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`apps[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `app-sidecar` and `app-backend` skill templates. |
 
 Enable a flag globally, then refresh the project template:
 
@@ -655,7 +655,7 @@ Enable a flag globally, then refresh the project template:
 fusebase config set-flag app-business-docs   # Business-logic documentation skill
 fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summary skill
 fusebase config set-flag isolated-stores     # Isolated stores functionality (SQL/NoSQL)
-fusebase config set-flag portal-specific-features # Portal-specific features prompts/guidance
+fusebase config set-flag portal-specific-apps # Portal-specific apps prompts/guidance
 fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```
 
@@ -704,6 +704,8 @@ Interactive catalog (optional servers) plus custom HTTP MCP servers stored in `f
 fusebase integrations                  # checkbox: catalog optional + custom entries
 fusebase integrations --ide cursor     # limit writes to one IDE (optional)
 fusebase integrations --no-prompt      # skip UI; optional catalog = inferred from IDE configs
+fusebase integrations list-templates   # requires managed-integrations flag
+fusebase integrations connect-template --template-name github # requires managed-integrations flag; scopes to current appId
 
 # Custom server (GET reachability check by default; use --skip-check to skip)
 fusebase integrations add my-mcp --url https://example.com/mcp --type http [--token TOKEN]
@@ -722,11 +724,11 @@ Project-specific configuration in your app root:
 ```json
 {
   "orgId": "organization-id",
-  "appId": "app-id",
-  "features": [
+  "productId": "app-id",
+  "apps": [
     {
-      "id": "feature-uuid",
-      "path": "features/my-feature",
+      "id": "app-uuid",
+      "path": "apps/my-app",
       "dev": {
         "command": "npm run dev"
       },
@@ -754,9 +756,9 @@ Project-specific configuration in your app root:
    fusebase init
    ```
 
-3. **Configure** a feature for development:
+3. **Configure** an app for development:
    ```bash
-   fusebase feature create
+   fusebase app create
    ```
 
 4. **Start** the development server:

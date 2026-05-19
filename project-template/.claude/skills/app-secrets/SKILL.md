@@ -1,13 +1,13 @@
 ---
-name: feature-secrets
-description: "Guide for creating and using secrets in Fusebase Apps feature backends. Use when: (1) A feature backend needs API keys, passwords, or other sensitive config, (2) Creating secrets via the CLI, (3) Accessing secrets at runtime in backend code, (4) Deciding what should be a secret vs. a regular env var."
+name: app-secrets
+description: "Guide for creating and using secrets in Fusebase Apps app backends. Use when: (1) An app backend needs API keys, passwords, or other sensitive config, (2) Creating secrets via the CLI, (3) Accessing secrets at runtime in backend code, (4) Deciding what should be a secret vs. a regular env var."
 ---
 
-# Feature Secrets
+# App Secrets
 
-Secrets are encrypted key-value pairs stored in Fusebase and injected into the feature backend at runtime as environment variables. Use them for sensitive config that must not be committed to source control (API keys, passwords, tokens, etc.).
+Secrets are encrypted key-value pairs stored in Fusebase and injected into the app backend at runtime as environment variables. Use them for sensitive config that must not be committed to source control (API keys, passwords, tokens, etc.).
 
-**Secrets are only available in the feature server** (`backend/` directory). They are NOT accessible in the browser/SPA — never try to read secrets from the frontend.
+**Secrets are only available in the app server** (`backend/` directory). They are NOT accessible in the browser/SPA — never try to read secrets from the frontend.
 
 ## Creating Secrets
 
@@ -17,7 +17,7 @@ Use the CLI to register secret keys (values are set on the FuseBase website):
 fusebase secret create --feature <featureId> --secret "KEY:description" [--secret ...]
 ```
 
-- `featureId` — get it from `fusebase.json` (`features[].id`)
+- `appId` — get it from `fusebase.json` (`apps[].id`)
 - Each `--secret` is `KEY` or `KEY:human-readable description`
 - Pass multiple `--secret` flags to create several secrets at once
 - After running, the CLI prints the URL where you can fill in the actual values
@@ -39,7 +39,7 @@ After running, open the printed URL and fill in the secret values.
 
 ## Accessing Secrets at Runtime
 
-Secrets are injected as environment variables into the feature backend process. Read them via `process.env`:
+Secrets are injected as environment variables into the app backend process. Read them via `process.env`:
 
 ```typescript
 // backend/src/index.ts or any backend file
@@ -80,13 +80,13 @@ Secrets are **read-only** at runtime — the backend cannot update secret values
 
 Secrets (env vars) are best for **shared, deploy-time credentials** (API keys, service-account tokens). They are **not suitable** for per-user or dynamically obtained tokens because they cannot be written at runtime and the backend is stateless (no filesystem, no in-memory persistence across restarts).
 
-**For per-user credentials obtained at runtime** (e.g. OAuth refresh tokens from a callback), use **httpOnly cookies** instead — see skill **feature-backend**, "Stateless Backend" section. The cookie is sent by the browser on every request; the backend reads it and stays stateless. The env-var secret can serve as a fallback.
+**For per-user credentials obtained at runtime** (e.g. OAuth refresh tokens from a callback), use **httpOnly cookies** instead — see skill **app-backend**, "Stateless Backend" section. The cookie is sent by the browser on every request; the backend reads it and stays stateless. The env-var secret can serve as a fallback.
 
 
 ## Checklist
 
 - [ ] `fusebase secret create` run with all required keys and descriptions
-- [ ] Secret values filled in via the feature secret manager on the FuseBase website
+- [ ] Secret values filled in via the app secret manager on the FuseBase website
 - [ ] Secrets validated at backend startup (fail fast with a clear error)
 - [ ] No `backend/.env` file — secrets are injected by `fusebase dev start` automatically
 - [ ] No `dotenv` dependency in backend code

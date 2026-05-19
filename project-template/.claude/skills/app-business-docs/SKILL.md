@@ -16,7 +16,7 @@ Create `docs/en/` if it does not exist.
 
 1. **After business-logic changes** — routes, validation, state machines, permissions, multi-step flows, integrations, or copy that reflects real rules.
 2. **Revalidation** — the user asks to refresh the doc from the codebase, or debugging shows the doc (or mental model) is wrong or stale.
-3. **Onboarding** — initial fill after a feature or app reaches a coherent shape.
+3. **Onboarding** — initial fill after an app or app reaches a coherent shape.
 
 Do **not** treat this as API reference: no exhaustive endpoint lists unless they carry domain meaning. Prefer flows, invariants, and “if user does X then Y”.
 
@@ -30,12 +30,12 @@ Use clear headings, for example:
 - **Main scenarios** — numbered happy paths (step-by-step).
 - **Edge cases & failure behavior** — errors, empty states, retries, idempotency.
 - **Data & ownership** — what lives in dashboards vs Gate vs isolated stores (if any), at a conceptual level.
-- **Code map** — short table: scenario or area → primary paths (`features/...`, `backend/...`).
+- **Code map** — short table: scenario or area → primary paths (`apps/...`, `backend/...`).
 
 ## Workflow
 
 1. **Read** the current `docs/en/business-logic.md` if present.
-2. **Inspect** the code that implements the changed or unclear behavior (features, `backend/`, shared libs).
+2. **Inspect** the code that implements the changed or unclear behavior (apps, `backend/`, shared libs).
 3. **Update** the doc so it matches **observable** behavior, not intentions that are not implemented.
 4. If behavior is ambiguous, **state the ambiguity** and what you verified in code or runtime.
 

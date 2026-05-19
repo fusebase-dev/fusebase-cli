@@ -1,72 +1,72 @@
-# Conceptual Model: Apps, Features, and Data Access
+# Conceptual Model: Products, Apps, and Data Access
 
 This document explains the core concepts of the Fusebase Apps system from first principles, clarifying what entities exist, where they live, and how they relate.
 
-## App Lifecycle: API Entity vs Local Project
+## Product Lifecycle: API Entity vs Local Project
 
-### What is an "App"?
+### What is a "Product"?
 
-An **App** in Fusebase is a **server-side entity** that exists in the Fusebase API. It represents a container for features and has:
-- A unique ID (`appId`)
+A **Product** in Fusebase is a **server-side entity** that exists in the Fusebase API. It represents a container for apps and has:
+- A unique ID (`productId`)
 - A title and subdomain
 - An organization owner (`orgId`)
-- A collection of features
+- A collection of apps
 
 ### What is a "Local Project"?
 
 A **local project** is a directory on your machine that contains:
-- `fusebase.json` - Configuration file linking to an API-side app
-- Feature code directories (e.g., `features/my-feature/`)
+- `fusebase.json` - Configuration file linking to an API-side product
+- App code directories (e.g., `apps/my-app/`)
 - Build artifacts
 - Project template files (if used)
 
 ### Source of Truth
 
 **API is the source of truth** for:
-- App existence and metadata
-- Feature records (IDs, titles, paths)
-- Feature versions and deployments
+- Product existence and metadata
+- App records (IDs, titles, paths)
+- App versions and deployments
 
 **Local files are the source of truth** for:
-- Feature source code
-- Build configuration (`fusebase.json` → `features[].build`)
-- Development configuration (`fusebase.json` → `features[].dev`)
+- App source code
+- Build configuration (`fusebase.json` → `apps[].build`)
+- Development configuration (`fusebase.json` → `apps[].dev`)
 
-### Creating an App
+### Creating a Product
 
 When you run `fusebase init`:
 
-1. **API-side**: An app record is created (or selected) in the Fusebase API
-   - This happens via `createApp()` or selection from existing apps
-   - The app gets a unique `appId` and `orgId`
-   - This app exists permanently in Fusebase
+1. **API-side**: A product record is created (or selected) in the Fusebase API
+   - This happens via `createProduct()` or selection from existing products
+   - The product gets a unique `productId` and `orgId`
+   - This product exists permanently in Fusebase
 
 2. **Local-side**: A `fusebase.json` file is created
-   - Contains `orgId` and `appId` that reference the API-side app
-   - This file links your local project to the API-side app
+   - Contains `orgId` and `productId` that reference the API-side product
+   - This file links your local project to the API-side product
    - The project directory may be empty or contain template files
 
-**Key point**: The app exists in Fusebase regardless of whether you have a local project. The local project is just a workspace for developing features that belong to that app.
+**Key point**: The product exists in Fusebase regardless of whether you have a local project. The local project is just a workspace for developing apps that belong to that product.
 
 ---
 
-## Feature Lifecycle: Record vs Code
+## App Lifecycle: Record vs Code
 
-### What is a "Feature Record"?
+### What is an "App Record"?
 
-A **feature record** is a **server-side entity** in the Fusebase API that represents:
+An **app record** is a **server-side entity** in the Fusebase API that represents:
 - A deployable unit (e.g., a dashboard widget, form, or tool)
 - Metadata: ID, title, path (URL segment), description
 - Version history (each deployment creates a new version)
 - Runtime configuration
 
-### What is "Feature Code"?
+### What is "App Code"?
 
-**Feature code** is the **local source code** you write:
-- Lives in `features/{feature-name}/` directory
+**App code** is the **local source code** you write:
+- Lives in `apps/{app-name}/` directory
 - A React/Vite application (or other framework)
 - Contains UI, business logic, API calls
-- Gets built and deployed to become a feature version
+- Gets built and deployed to become an app version
 
 ### The Relationship
 
@@ -74,96 +74,96 @@ A **feature record** is a **server-side entity** in the Fusebase API that repres
 ┌─────────────────────────────────────────────────────────┐
 │ Fusebase API (Server-side)                              │
 │                                                          │
-│  App (appId: "app_123")                                 │
-│    └── Feature Record (id: "feat_456", path: "widget") │
-│         └── Feature Versions (v1, v2, v3...)            │
+│  Product (productId: "prod_123")                                 │
+│    └── App Record (id: "app_456", path: "widget") │
+│         └── App Versions (v1, v2, v3...)            │
 └─────────────────────────────────────────────────────────┘
                           ↕ (linked via fusebase.json)
 ┌─────────────────────────────────────────────────────────┐
 │ Local Project (Your Machine)                            │
 │                                                          │
 │  fusebase.json                                               │
-│    └── features[].id: "feat_456"                        │
-│         └── path: "features/widget"                      │
+│    └── apps[].id: "app_456"                        │
+│         └── path: "apps/widget"                      │
 │                                                          │
-│  features/widget/                                        │
+│  apps/widget/                                        │
 │    ├── src/App.tsx  (your code)                         │
 │    ├── package.json                                      │
 │    └── dist/  (build output → deployed)                 │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Creating a Feature
+### Creating an App
 
-When you create a feature:
+When you create an app:
 
-1. **API-side** (via `fusebase feature create` or Fusebase UI):
-   - Feature record is created with `id`, `title`, `path` (URL segment)
+1. **API-side** (via `fusebase app create` or Fusebase UI):
+   - App record is created with `id`, `title`, `path` (URL segment)
    - This record exists permanently in Fusebase
    - The `path` in the API is the URL segment (e.g., `"dashboard"`)
 
 2. **Local-side** (you write the code):
-   - Create `features/{feature-name}/` directory
+   - Create `apps/{app-name}/` directory
    - Write React/Vite application code
    - Configure in `fusebase.json`:
-     - `id`: Must match the API-side feature ID
-     - `path`: Local directory path (e.g., `"features/widget"`)
+     - `id`: Must match the API-side app ID
+     - `path`: Local directory path (e.g., `"apps/widget"`)
      - `dev.command`: How to run locally
      - `build.command`: How to build for deployment
 
 3. **Deployment** (via `fusebase deploy`):
    - Builds your local code
-   - Creates a new feature version in the API
+   - Creates a new app version in the API
    - Uploads built files
-   - Feature becomes accessible at: `https://{app.sub}.{domain}/{feature.path}`
+   - App becomes accessible at: `https://{product.sub}.{domain}/{app.path}`
 
 **Key points**:
-- Feature record (API) and feature code (local) are **separate entities**
-- The `id` in `fusebase.json` must match the API-side feature ID
+- App record (API) and app code (local) are **separate entities**
+- The `id` in `fusebase.json` must match the API-side app ID
 - The `path` in `fusebase.json` is the local directory; the `path` in the API is the URL segment
-- You can have a feature record without code, or code without a record (but both are needed for deployment)
+- You can have an app record without code, or code without a record (but both are needed for deployment)
 
 ---
 
-## Feature IDs, Paths, and Runtime URLs
+## App IDs, Paths, and Runtime URLs
 
-### Feature ID
+### App ID
 - **Format**: UUID or string identifier
-- **Source**: Generated by Fusebase API when feature record is created
-- **Purpose**: Unique identifier for the feature record
-- **Where used**: `fusebase.json` → `features[].id`, API calls
+- **Source**: Generated by Fusebase API when app record is created
+- **Purpose**: Unique identifier for the app record
+- **Where used**: `fusebase.json` → `apps[].id`, API calls
 
-### Feature Path (Local)
-- **Format**: Relative directory path (e.g., `"features/my-feature"`)
-- **Source**: You choose when creating the feature directory
+### App Path (Local)
+- **Format**: Relative directory path (e.g., `"apps/my-app"`)
+- **Source**: You choose when creating the app directory
 - **Purpose**: Where your source code lives locally
-- **Where used**: `fusebase.json` → `features[].path`
+- **Where used**: `fusebase.json` → `apps[].path`
 
-### Feature Path (API / URL Segment)
+### App Path (API / URL Segment)
 - **Format**: URL-safe string (e.g., `"dashboard"`, `"settings"`)
-- **Source**: Set when creating feature record (via `fusebase feature create` or UI)
-- **Purpose**: URL segment where feature is accessible
+- **Source**: Set when creating app record (via `fusebase app create` or UI)
+- **Purpose**: URL segment where app is accessible
 - **Where used**: Runtime URL construction
 
 ### Runtime URL Construction
 
-When a feature is deployed, it becomes accessible at:
+When an app is deployed, it becomes accessible at:
 
 ```
-https://{app.sub}.{domain}/{feature.path}
+https://{product.sub}.{domain}/{app.path}
 ```
 
 Where:
-- `{app.sub}`: App subdomain (from API-side app)
+- `{product.sub}`: Product subdomain (from API-side product)
 - `{domain}`: Environment domain (`dev-thefusebase-app.com` or `thefusebase.app`)
-- `{feature.path}`: URL segment from API-side feature record (NOT the local directory path)
+- `{app.path}`: URL segment from API-side app record (NOT the local directory path)
 
 **Example**:
-- App subdomain: `"my-app"`
-- Feature path (API): `"dashboard"`
-- Runtime URL: `https://my-app.thefusebase.app/dashboard`
+- Product subdomain: `"my-product"`
+- App path (API): `"dashboard"`
+- Runtime URL: `https://my-product.thefusebase.app/dashboard`
 
-**Important**: The local directory path (`features/my-feature`) and the URL segment (`dashboard`) are **independent**. They don't have to match, though matching them is often clearer.
+**Important**: The local directory path (`apps/my-app`) and the URL segment (`dashboard`) are **independent**. They don't have to match, though matching them is often clearer.
 
 ---
 
@@ -187,22 +187,22 @@ Where:
 
 **What MCP does NOT do**:
 - Execute operations in production code
-- Provide runtime APIs for feature code
-- Handle authentication in feature code
+- Provide runtime APIs for app code
+- Handle authentication in app code
 
 ### SDK (Software Development Kit)
 
-**Purpose**: Execution in feature code
+**Purpose**: Execution in app code
 
 **Used for**:
-- Actual API calls from feature code
+- Actual API calls from app code
 - Runtime data operations (read, write, upload)
 - Production execution of operations
 
 **When to use SDK**:
-- In feature source code (React components, utilities)
+- In app source code (React components, utilities)
 - For runtime data access
-- When building features that users interact with
+- When building apps that users interact with
 
 **Relationship to MCP**:
 - SDK methods mirror MCP tools 1:1 by operation ID
@@ -226,7 +226,7 @@ Where:
 ┌─────────────────────────────────────────────────────────┐
 │ Implementation Phase (SDK)                              │
 │                                                          │
-│  Feature Code:                                           │
+│  App Code:                                           │
 │    1. Import SDK method (mirrors MCP tool)              │
 │    2. Call SDK method with parameters                   │
 │    3. Handle response                                   │
@@ -260,7 +260,7 @@ Where:
    - Use same parameter schema as MCP tool
 
 4. **Implement**:
-   - Write feature code using SDK methods
+   - Write app code using SDK methods
    - Handle responses according to schemas from MCP
 
 ### For LLMs
@@ -282,7 +282,7 @@ Where:
 4. **Implementation Phase**:
    - LLM writes code using SDK methods (not MCP tools)
    - Uses operation IDs to find corresponding SDK methods
-   - Implements feature logic with SDK calls
+   - Implements app logic with SDK calls
 
 ### What NOT to Do
 
@@ -291,15 +291,15 @@ Where:
 - Don't assume endpoint patterns
 - Use MCP discovery to find correct operations
 
-**❌ Do NOT use MCP tools in feature code**:
+**❌ Do NOT use MCP tools in app code**:
 - MCP tools are for discovery/reasoning, not execution
-- Feature code should use SDK methods
-- MCP tools are called by the LLM/IDE, not by your feature
+- App code should use SDK methods
+- MCP tools are called by the LLM/IDE, not by your app
 
 **❌ Do NOT hardcode IDs**:
 - Database IDs, dashboard IDs, view IDs should be discovered
 - Use MCP discovery or existing project documentation to find IDs
-- Document discovered IDs in feature code as constants
+- Document discovered IDs in app code as constants
 
 ---
 
@@ -334,7 +334,7 @@ Organization
    - Handle pagination if needed
    - Extract values using helper functions (some fields are nested)
 
-4. **Process data**: Transform API response to feature's data model
+4. **Process data**: Transform API response to app's data model
 
 **Required IDs**:
 - `dashboardId`: UUID of the table
@@ -386,21 +386,21 @@ Organization
 
 **Required information**:
 - File object (from user input or generated)
-- Folder: Always `"apps"` for feature uploads
+- Folder: Always `"apps"` for app uploads
 - MIME type and size
 
 ---
 
 ## Summary: Key Concepts
 
-1. **Apps are API entities**; local projects are workspaces that link to apps via `fusebase.json`
+1. **Products are API entities**; local projects are workspaces that link to products via `fusebase.json`
 
-2. **Features have two parts**: API-side record (metadata) and local code (implementation)
+2. **Apps have two parts**: API-side record (metadata) and local code (implementation)
 
-3. **MCP is for discovery**; SDK is for execution in feature code
+3. **MCP is for discovery**; SDK is for execution in app code
 
 4. **IDs must be discovered**; don't guess or hardcode database/dashboard/view IDs
 
 5. **Data access is hierarchical**: Organization → Database → Dashboard → View → Rows → Columns
 
-6. **Use MCP + SDK** for all development: MCP for discovery, SDK for execution in feature code
+6. **Use MCP + SDK** for all development: MCP for discovery, SDK for execution in app code

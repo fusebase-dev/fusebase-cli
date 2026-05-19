@@ -1,5 +1,5 @@
 import { createServer } from "net";
-import { fetchFeatureToken } from "../api";
+import { fetchAppToken } from "../api";
 import { handleBrowserDebugRequest, injectBrowserDebugScript } from "./browser-debug";
 import { getConfig, loadFuseConfig } from "../config";
 import { Agent, fetch } from "undici";
@@ -359,24 +359,24 @@ async function maybeRewriteHtmlResponse(
   const config = await getConfig();
   const fuseConfig = await loadFuseConfig();
 
-  if (!config.apiKey || !fuseConfig?.orgId || !fuseConfig?.appId) {
+  if (!config.apiKey || !fuseConfig?.orgId || !fuseConfig?.productId) {
     console.warn("Warning: Missing config for fetching feature token.");
     console.warn("Config API key set?", config.apiKey ? "yes" : "no");
     console.warn("Fusebase config orgId:", fuseConfig?.orgId);
-    console.warn("Fusebase config appId:", fuseConfig?.appId);
+    console.warn("Fusebase config productId:", fuseConfig?.productId);
     throw new Error("Missing configuration for fetching feature token.");
   }
 
   const tokenStartTime = Date.now();
-  const tokenResponse = await fetchFeatureToken(
+  const tokenResponse = await fetchAppToken(
     config.apiKey,
     fuseConfig.orgId,
-    fuseConfig.appId,
+    fuseConfig.productId,
     selectedFeatureId || "",
   );
   const tokenDurationMs = Date.now() - tokenStartTime;
   if (tokenDurationMs > 1000) {
-    logger.warn(`⚠️  Slow response from fetchFeatureToken: ${tokenDurationMs}ms`);
+    logger.warn(`⚠️  Slow response from fetchAppToken: ${tokenDurationMs}ms`);
   }
 
   if (tokenResponse.token) {

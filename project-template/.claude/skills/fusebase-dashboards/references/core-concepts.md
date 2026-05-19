@@ -43,8 +43,8 @@ category: core
 - Identified by a UUID (`global_id`).
 - May have an optional human-readable alias.
 - **When creating a database** (createDatabase or getOrCreateDatabase when it creates):
-  - If **appId** is available (e.g. from fusebase.json or runtime env), set **alias** to `app_${appId}_{name}` where **name** is a slug derived from the database title or the requested name (lowercase, valid alias chars: letters, numbers, dots, underscores, hyphens). The total alias length must be 5–64 chars. Example: title "My Feedback" with appId "abc123" → alias `app_abc123_my_feedback`.
-  - If appId is not available, do NOT include the `alias` field unless the user explicitly requests it; omit it from the create request.
+  - If **productId** is available (e.g. from fusebase.json or runtime env), set **alias** to `app_${productId}_{name}` where **name** is a slug derived from the database title or the requested name (lowercase, valid alias chars: letters, numbers, dots, underscores, hyphens). The total alias length must be 5–64 chars. Example: title "My Feedback" with productId "abc123" → alias `app_abc123_my_feedback`.
+  - If productId is not available, do NOT include the `alias` field unless the user explicitly requests it; omit it from the create request.
 - **Opening in the Thefusebase UI**: To link the user to this database in the browser, use:
   `https://{{orgDomain}}/dashboard/{{orgId}}/tables/databases/{{databaseId}}`
   - **orgDomain**: The organization’s **CNAME** when a custom domain is configured; otherwise **`{orgSubdomain}.{FUSEBASE_WEB_CLIENT_HOST}`** (org subdomain on the Fusebase tenant host; pay attention that `{FUSEBASE_WEB_CLIENT_HOST}` may be different from `{FUSEBASE_HOST}`, used in `https://app.{FUSEBASE_HOST}/...` and `https://app-api.{FUSEBASE_HOST}/...` in these prompts). Ensure you know the exact value of `FUSEBASE_WEB_CLIENT_HOST`.

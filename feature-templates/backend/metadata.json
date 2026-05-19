@@ -1,6 +1,6 @@
 {
   "id": "backend",
   "name": "Node.js + Hono Backend",
-  "description": "Backend API template using Node.js and Hono framework. Scaffolds into a 'backend/' subfolder alongside an existing SPA feature.",
+  "description": "Backend API template using Node.js and Hono framework. Scaffolds into a 'backend/' subfolder alongside an existing SPA app.",
   "stack": "node.js, hono, typescript"
 }

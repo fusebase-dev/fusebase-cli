@@ -1,31 +1,31 @@
 #!/usr/bin/env node
 // Claude Code Stop hook:
-// 1. Ensure no feature has a non-"/" `base` in vite config.
-// 2. Ensure all feature directories are registered in fusebase.json.
+// 1. Ensure no app has a non-"/" `base` in vite config.
+// 2. Ensure all app directories are registered in fusebase.json.
 
 const fs = require("fs");
 const path = require("path");
 
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const featuresDir = path.join(projectDir, "features");
+const featuresDir = path.join(projectDir, "apps");
 
 if (!fs.existsSync(featuresDir)) {
   process.exit(0);
 }
 
-const featureNames = fs
+const appNames = fs
   .readdirSync(featuresDir, { withFileTypes: true })
   .filter((d) => d.isDirectory())
   .map((d) => d.name);
 
-if (featureNames.length === 0) {
+if (appNames.length === 0) {
   process.exit(0);
 }
 
 const errors = [];
 
 // --- Check 1: Vite base config ---
-for (const name of featureNames) {
+for (const name of appNames) {
   const fullPath = path.join(featuresDir, name);
   let viteConfigPath = null;
 
@@ -50,28 +50,28 @@ for (const name of featureNames) {
   const baseValue = match[2];
   if (baseValue !== "/") {
     errors.push(
-      `Feature "${name}": vite config base is set to "${baseValue}" — this is not allowed. base must be "/" or not set at all.`
+      `App "${name}": vite config base is set to "${baseValue}" — this is not allowed. base must be "/" or not set at all.`
     );
   }
 }
 
-// --- Check 2: Features must be registered in fusebase.json ---
+// --- Check 2: Apps must be registered in fusebase.json ---
 const fusebasePath = path.join(projectDir, "fusebase.json");
 if (fs.existsSync(fusebasePath)) {
   try {
     const fusebaseConfig = JSON.parse(fs.readFileSync(fusebasePath, "utf-8"));
-    const registeredPaths = (fusebaseConfig.features || []).map((f) => f.path);
+    const registeredPaths = (fusebaseConfig.apps || []).map((f) => f.path);
 
-    const unregistered = featureNames.filter((name) => {
-      const featurePath = `features/${name}`;
-      return !registeredPaths.includes(featurePath);
+    const unregistered = appNames.filter((name) => {
+      const appPath = `apps/${name}`;
+      return !registeredPaths.includes(appPath);
     });
 
     if (unregistered.length > 0) {
       errors.push(
-        `The following feature directories are not registered in fusebase.json:\n` +
-          unregistered.map((n) => `  - features/${n}`).join("\n") +
-          `\n\nEach feature must be created using "fusebase feature create" so it is properly registered.`
+        `The following app directories are not registered in fusebase.json:\n` +
+          unregistered.map((n) => `  - apps/${n}`).join("\n") +
+          `\n\nEach app must be created using "fusebase app create" so it is properly registered.`
       );
     }
   } catch {

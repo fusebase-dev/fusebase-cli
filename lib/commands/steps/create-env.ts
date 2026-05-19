@@ -2,7 +2,7 @@
  * Create .env Step
  *
  * Creates or updates a .env file with MCP token and URL for the project.
- * Generates a new token with full permissions for the organization scope.
+ * Generates MCP tokens for the organization scope using the current CLI policy.
  * If .env exists, merges new values (preserves existing vars, updates MCP vars).
  */
 
@@ -158,7 +158,7 @@ function mcpPolicyFingerprintsMatchEnv(env: Map<string, string>): boolean {
   });
 }
 
-/** Exported for `fusebase app update` — true when all MCP URL/token/host vars are set. */
+/** Exported for `fusebase product update` — true when all MCP URL/token/host vars are set. */
 export function areMcpEnvTokensPresent(env: Map<string, string>): boolean {
   return hasMcpEnvVars(env);
 }
@@ -228,7 +228,7 @@ export async function createEnvFile(options: CreateEnvOptions): Promise<CreateEn
       }
     }
 
-    // Generate MCP tokens (selective refresh supported for `fusebase app update`).
+    // Generate MCP tokens (selective refresh supported for `fusebase product update`).
     const dashboardsToken = refreshDashboardsToken
       ? await generateMcpToken(apiKey, orgId)
       : undefined;

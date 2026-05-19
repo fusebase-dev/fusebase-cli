@@ -14,7 +14,7 @@ It covers:
 
 ## Scope
 
-This document focuses on the auth and token contract around apps and app features.
+This document focuses on the auth and token contract around apps and apps.
 
 ## Actors
 
@@ -24,15 +24,15 @@ This document focuses on the auth and token contract around apps and app feature
 - generated app frontend
   - SPA running in the browser
 - generated app backend
-  - optional feature-local backend at `/api/*`
+  - optional app-local backend at `/api/*`
 - `app-wrapper`
-  - deployed feature entrypoint and HTML/API proxy
+  - deployed app entrypoint and HTML/API proxy
 - `apps/api`
   - same-origin platform proxy to internal services such as dashboard-service and gate-service
 - `public-api`
   - API-key authenticated platform API used by CLI/dev flows
 - `nimbus-ai`
-  - feature access evaluation and runtime subtoken issuance
+  - app access evaluation and runtime subtoken issuance
 - `user-service`
   - session resolution
 - `org-service`
@@ -51,7 +51,7 @@ There are several different auth artifacts in play:
 | API key | `Authorization: Bearer <apiKey>` | CLI and developer auth | `public-api` |
 | Session exchange token | query param `se` | bridge from org auth UI into app-wrapper auth | `app-wrapper` |
 | User session id | cookie `eversessionid` or header `everhelper-session-id` | user session fallback and custom app auth | `apps/api`, app backends, app-wrapper localhost special case |
-| App feature token | cookie `fbsfeaturetoken`, sometimes header `x-app-feature-token` | feature-scoped runtime auth | frontend, app backend, `apps/api` |
+| App app token | cookie `fbsapptoken`, sometimes header `x-app-token` | app-scoped runtime auth | frontend, app backend, `apps/api` |
 | Dashboard subtoken | encrypted inside app JWT as `dst` | bearer auth to dashboard-service | `apps/api` dashboard proxy |
 | Gate subtoken | encrypted inside app JWT as `gst` | bearer auth to gate-service | `apps/api` gate proxy |
 
@@ -61,7 +61,7 @@ There are several different auth artifacts in play:
 
 ```mermaid
 flowchart LR
-  A["Browser / SPA"] --> B["fbsfeaturetoken cookie"]
+  A["Browser / SPA"] --> B["fbsapptoken cookie"]
   A --> C["/api/* app backend (optional)"]
   A --> D["/api/proxy/dashboard-service/*"]
   A --> E["/api/proxy/gate-service/*"]
@@ -103,15 +103,15 @@ sequenceDiagram
   participant DevProxy as apps-cli dev proxy
   participant PublicAPI as public-api
   participant Browser as Browser
-  participant Feature as Feature iframe
+  participant App as App iframe
 
-  DevUI->>DevProxy: POST /api/orgs/{org}/apps/{app}/features/{feature}/tokens
-  DevProxy->>PublicAPI: POST /v1/orgs/{org}/apps/{app}/features/{feature}/tokens<br/>Authorization: Bearer apiKey
+  DevUI->>DevProxy: POST /api/orgs/{org}/apps/{app}/apps/{app}/tokens
+  DevProxy->>PublicAPI: POST /v1/orgs/{org}/apps/{app}/apps/{app}/tokens<br/>Authorization: Bearer apiKey
   PublicAPI-->>DevProxy: { token: appJwt }
-  DevProxy-->>Browser: Set-Cookie fbsfeaturetoken=appJwt
-  DevUI-->>Feature: postMessage { type: "featuretoken", token }
-  Feature->>Feature: keep token in memory
-  Feature->>Browser: same-origin requests include fbsfeaturetoken cookie
+  DevProxy-->>Browser: Set-Cookie fbsapptoken=appJwt
+  DevUI-->>App: postMessage { type: "featuretoken", token }
+  App->>App: keep token in memory
+  App->>Browser: same-origin requests include fbsapptoken cookie
 ```
 
 Important current behavior:
@@ -119,7 +119,7 @@ Important current behavior:
 - `apps-cli` fetches a ready-made app JWT from `public-api`
 - dev tooling delivers it in two ways
   - `postMessage` to the iframe
-  - cookie `fbsfeaturetoken` for same-origin backend requests
+  - cookie `fbsapptoken` for same-origin backend requests
 - the issuance is API-key authenticated, so local dev is anchored to developer identity rather than browser session state
 - this is the flow used by `fusebase dev start`
 
@@ -136,8 +136,8 @@ sequenceDiagram
   participant Org as org-service
   participant Nimbus as nimbus-ai
 
-  Browser->>Wrapper: GET feature URL
-  Wrapper->>Wrapper: check fbsfeaturetoken
+  Browser->>Wrapper: GET app URL
+  Wrapper->>Wrapper: check fbsapptoken
   alt missing or invalid token
     Wrapper-->>Browser: redirect to org auth with appSuccess=currentUrl
     Browser->>OrgAuth: GET /auth?appSuccess=...
@@ -147,30 +147,30 @@ sequenceDiagram
     opt authenticated user
       Wrapper->>Org: load user role in org
     end
-    Wrapper->>Nimbus: evaluate app feature access
-    Wrapper->>Nimbus: create app feature token payload
+    Wrapper->>Nimbus: evaluate app access
+    Wrapper->>Nimbus: create app token payload
     Nimbus-->>Wrapper: dashboardToken + gateToken
     Wrapper->>Wrapper: wrap into app JWT
-    Wrapper-->>Browser: Set-Cookie fbsfeaturetoken=appJwt
-    Wrapper-->>Browser: redirect back to feature URL
+    Wrapper-->>Browser: Set-Cookie fbsapptoken=appJwt
+    Wrapper-->>Browser: redirect back to app URL
   else valid token
-    Wrapper->>Wrapper: proxy feature HTML or API
+    Wrapper->>Wrapper: proxy app HTML or API
   end
 ```
 
 In deployed mode, `app-wrapper` does the following:
 
-- resolves the current feature
+- resolves the current app
 - reads session from the session exchange flow
 - evaluates principals and app access through `nimbus-ai`
 - asks `nimbus-ai` to create:
   - `dashboardToken`
   - `gateToken`
-- wraps both subtokens into the encrypted app JWT and stores it in `fbsfeaturetoken`
+- wraps both subtokens into the encrypted app JWT and stores it in `fbsapptoken`
 
 ### 3. Runtime service call flow
 
-Once the feature is running, the frontend usually uses the app token to talk to platform proxies.
+Once the app is running, the frontend usually uses the app token to talk to platform proxies.
 
 ```mermaid
 sequenceDiagram
@@ -181,7 +181,7 @@ sequenceDiagram
   participant Gate as gate-service
   participant User as user-service
 
-  SPA->>API: request with x-app-feature-token
+  SPA->>API: request with x-app-token
   API->>Decode: verify app JWT
   alt dashboard-service request
     Decode-->>API: userId/sessionId + dst
@@ -227,9 +227,9 @@ sequenceDiagram
   participant API as apps/api proxy
 
   SPA->>AppBE: fetch("/api/...")
-  Cookie-->>AppBE: fbsfeaturetoken sent automatically
+  Cookie-->>AppBE: fbsapptoken sent automatically
   opt dev or explicit header
-    SPA->>AppBE: x-app-feature-token
+    SPA->>AppBE: x-app-token
   end
   AppBE->>AppBE: read header or fallback cookie
   AppBE->>API: request to dashboard/gate proxy or other platform APIs
@@ -237,25 +237,25 @@ sequenceDiagram
 
 Current best practice for app backends:
 
-- do not rely on `x-app-feature-token` only
+- do not rely on `x-app-token` only
 - deployed proxying may drop this custom header on the way to the app backend
 - backend handlers should read:
-  - `x-app-feature-token`
-  - or fallback cookie `fbsfeaturetoken`
+  - `x-app-token`
+  - or fallback cookie `fbsapptoken`
 
 ### 5. User session flow inside apps
 
-User session and app feature token are related but not the same thing.
+User session and app token are related but not the same thing.
 
 `eversessionid` represents the user session.
 
-`fbsfeaturetoken` represents the feature runtime context.
+`fbsapptoken` represents the app runtime context.
 
 This distinction matters a lot when apps add their own login or registration forms:
 
 - a backend may successfully authenticate a user server-to-server
 - but unless it explicitly sets a browser session cookie, the browser still has no user session
-- even if a browser session exists, an already-issued `fbsfeaturetoken` may still represent a visitor
+- even if a browser session exists, an already-issued `fbsapptoken` may still represent a visitor
 
 ## What Is Inside the App JWT Today
 
@@ -265,9 +265,9 @@ There are currently two different app JWT shapes in use.
 
 Current local dev token creation uses `public-api` and wraps only the basic app context:
 
-- `appId`
+- `productId`
 - `orgId`
-- `appFeatureId`
+- `appId`
 - optional `userId`
 - optional `sessionId`
 
@@ -275,7 +275,7 @@ It does not add:
 
 - `dashboardToken`
 - `gateToken`
-- `featureRowVersion`
+- `appRowVersion`
 
 In the current `apps-cli` dev path, this token is usually developer-authenticated through the API key and does not model the deployed browser session flow closely.
 
@@ -283,14 +283,14 @@ In the current `apps-cli` dev path, this token is usually developer-authenticate
 
 Current deployed token creation uses `nimbus-ai` plus app-wrapper wrapping:
 
-- `appId`
+- `productId`
 - `orgId`
-- `appFeatureId`
+- `appId`
 - optional `userId`
 - optional `sessionId`
 - `dashboardToken` stored as `dst`
 - `gateToken` stored as `gst`
-- `featureRowVersion` stored as `frv`
+- `appRowVersion` stored as `frv`
 
 ### Current consequence
 
@@ -305,42 +305,42 @@ That is one of the biggest sources of confusion and drift.
 Frontend:
 
 - local dev can receive the token via `postMessage`
-- generated app guidance reads `fbsfeaturetoken` from cookie on startup
-- direct SDK and platform proxy calls usually send it in `x-app-feature-token`
+- generated app guidance reads `fbsapptoken` from cookie on startup
+- direct SDK and platform proxy calls usually send it in `x-app-token`
 
 App backend:
 
-- should read `x-app-feature-token`
-- or fallback to `fbsfeaturetoken`
+- should read `x-app-token`
+- or fallback to `fbsapptoken`
 
 Platform proxy:
 
-- reads `x-app-feature-token`
+- reads `x-app-token`
 - falls back to `everhelper-session-id` or `eversessionid` when necessary
 
 ### Updating
 
-`fbsfeaturetoken` is updated today in a few different ways:
+`fbsapptoken` is updated today in a few different ways:
 
 - local dev:
-  - `apps-cli` fetches a token when a feature is selected
-  - HTML rewrite also sets `fbsfeaturetoken`
+  - `apps-cli` fetches a token when an app is selected
+  - HTML rewrite also sets `fbsapptoken`
 - deployed:
   - `app-wrapper` reissues the token when auth flow is re-entered
   - a stale token is also replaced when app-wrapper detects row-version mismatch
 
-`eversessionid` is updated separately by auth/login flows and is not automatically tied to `fbsfeaturetoken`.
+`eversessionid` is updated separately by auth/login flows and is not automatically tied to `fbsapptoken`.
 
 ### Practical consequence
 
-A user session can change without `fbsfeaturetoken` changing.
+A user session can change without `fbsapptoken` changing.
 
 Examples:
 
 - user logs in through a custom app form
 - backend gets a valid `sessionId`
 - backend stores `eversessionid`
-- `fbsfeaturetoken` still contains the old visitor context
+- `fbsapptoken` still contains the old visitor context
 
 This means:
 
@@ -364,11 +364,11 @@ Impact:
 - token lifecycle behavior differs between environments
 - public visitor and in-app login transitions are hard to reproduce faithfully in local dev
 
-### 2. Feature token and user session are separate but look interchangeable
+### 2. App token and user session are separate but look interchangeable
 
 Current state:
 
-- `fbsfeaturetoken` and `eversessionid` both influence auth
+- `fbsapptoken` and `eversessionid` both influence auth
 - generated apps often treat them as if they were the same thing
 
 Impact:
@@ -381,24 +381,24 @@ Impact:
 
 Current state:
 
-- frontend often sends `x-app-feature-token`
+- frontend often sends `x-app-token`
 - deployed platform proxy may not preserve that header on `/api/*`
 
 Impact:
 
-- app backend receives no feature token in deployed mode
+- app backend receives no app token in deployed mode
 - apps work in local dev and fail after deploy
 
 ### 4. No first-class app-token refresh contract
 
 Current state:
 
-- `fbsfeaturetoken` is refreshed mainly by re-entering app-wrapper auth flow
-- custom in-app auth changes session state but not necessarily feature-token state
+- `fbsapptoken` is refreshed mainly by re-entering app-wrapper auth flow
+- custom in-app auth changes session state but not necessarily app-token state
 
 Impact:
 
-- visitor-to-user transitions inside public features are awkward
+- visitor-to-user transitions inside public apps are awkward
 - apps need ad-hoc reload or redirect logic
 - frontend auth state and SDK auth state can diverge
 
@@ -407,7 +407,7 @@ Impact:
 Current state:
 
 - `/users/me` is a user-authenticated endpoint
-- public feature visitor tokens can still be valid even when `/users/me` returns 401
+- public app visitor tokens can still be valid even when `/users/me` returns 401
 
 Impact:
 
@@ -465,15 +465,15 @@ This is the single highest-value simplification.
 
 Target:
 
-- refresh `fbsfeaturetoken` from current session and current feature context without a full redirect dance
+- refresh `fbsapptoken` from current session and current app context without a full redirect dance
 
 Recommended change:
 
 - add a platform-managed refresh endpoint that:
-  - resolves the current feature
+  - resolves the current app
   - reads current browser session
   - re-evaluates access
-  - reissues `fbsfeaturetoken`
+  - reissues `fbsapptoken`
 
 Benefits:
 
@@ -491,7 +491,7 @@ Recommended change:
 
 - add a platform-level endpoint with this contract:
   - valid authenticated user -> `{ user: ... }`
-  - anonymous visitor in public feature -> `{ user: null }`
+  - anonymous visitor in public app -> `{ user: null }`
   - expired or invalid app token -> explicit auth error
 
 This removes the `/users/me` ambiguity for app authors.
@@ -500,7 +500,7 @@ This removes the `/users/me` ambiguity for app authors.
 
 Target:
 
-- app backends should receive the feature token through one guaranteed contract
+- app backends should receive the app token through one guaranteed contract
 
 Recommended change:
 
@@ -541,7 +541,7 @@ Recommended change:
   - has `sessionId`
   - has `dst`
   - has `gst`
-  - feature row version
+  - app row version
   - session cookie present or absent
 
 It should never expose the raw subtoken values.
@@ -551,8 +551,8 @@ It should never expose the raw subtoken values.
 The simplest stable mental model is:
 
 1. User session answers: "Who is the browser user?"
-2. App token answers: "What feature context is this runtime allowed to use?"
-3. Dashboard and Gate subtokens answer: "What may this feature do in downstream services?"
+2. App token answers: "What app context is this runtime allowed to use?"
+3. Dashboard and Gate subtokens answer: "What may this app do in downstream services?"
 
 ```mermaid
 sequenceDiagram
@@ -574,17 +574,17 @@ sequenceDiagram
 
   Browser->>Refresh: POST /api/app-auth/refresh
   Refresh->>User: resolve current session from eversessionid
-  Refresh->>Wrapper: issue app token for current feature + current user/session
+  Refresh->>Wrapper: issue app token for current app + current user/session
   Wrapper->>Nimbus: create dashboardToken + gateToken
   Nimbus-->>Wrapper: dst + gst
-  Wrapper-->>Browser: Set-Cookie fbsfeaturetoken
+  Wrapper-->>Browser: Set-Cookie fbsapptoken
 
-  Browser->>API: platform requests with x-app-feature-token
+  Browser->>API: platform requests with x-app-token
   API->>Dash: Bearer dst
   API->>Gate: Bearer gst
 
   Browser->>AppBE: same-origin /api/* requests
-  AppBE->>AppBE: read fbsfeaturetoken from guaranteed transport
+  AppBE->>AppBE: read fbsapptoken from guaranteed transport
 ```
 
 And the target runtime contract becomes:
@@ -601,7 +601,7 @@ Today the system works, but it is split across:
 
 - one dev-only token issuer contract
 - one deployed token issuer contract
-- separate feature token and user session lifecycles
+- separate app token and user session lifecycles
 - multiple implicit fallbacks
 
 The biggest simplification is to unify app token issuance and refresh around one canonical platform contract.

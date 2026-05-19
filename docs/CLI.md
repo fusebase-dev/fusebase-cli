@@ -2,13 +2,13 @@
 
 ## 1. Overview
 
-**Fusebase Apps CLI** (`fusebase`) is a command-line tool for managing Fusebase applications. It provides commands for authentication, project initialization, feature configuration, development, and deployment.
+**Fusebase Apps CLI** (`fusebase`) is a command-line tool for managing Fusebase applications. It provides commands for authentication, project initialization, app configuration, development, and deployment.
 
 ### Typical Usage Scenarios
 
-1. **Initial Setup**: Authenticate → Initialize app → Configure features
-2. **Development**: Start dev server → Develop features locally
-3. **Deployment**: Build features → Deploy to Fusebase
+1. **Initial Setup**: Authenticate → Initialize app → Configure apps
+2. **Development**: Start dev server → Develop apps locally
+3. **Deployment**: Build apps → Deploy to Fusebase
 
 ### Interactive Mode vs Flags
 
@@ -175,7 +175,7 @@ fusebase init [--ide <presets>] [--force]
   ```json
   {
     "orgId": "organization-id",
-    "appId": "app-id"
+    "productId": "app-id"
   }
   ```
 - If using template:
@@ -204,7 +204,7 @@ fusebase init --ide "cursor" --force
 
 ### `fusebase deploy`
 
-**Purpose**: Deploy features to Fusebase.
+**Purpose**: Deploy apps to Fusebase.
 
 **Syntax**:
 
@@ -218,32 +218,32 @@ fusebase deploy
 
 - App must be initialized (`fusebase init`)
 - API key must be configured (`fusebase auth`)
-- At least one feature must have a `path` configured in `fusebase.json`
+- At least one app must have a `path` configured in `fusebase.json`
 
 **Interactive Prompts**: None (fully automated)
 
 **Behavior**:
 
-1. Reads `fusebase.json` to get features with `path` configured
-2. For each feature:
-   - Runs `npm install --include=dev` if `package.json` exists in feature directory
+1. Reads `fusebase.json` to get apps with `path` configured
+2. For each app:
+   - Runs `npm install --include=dev` if `package.json` exists in app directory
    - Runs build command (if `build.command` configured)
-   - Creates new feature version via API
+   - Creates new app version via API
    - Initializes upload and gets signed URLs
-   - Uploads all files from output directory (or feature path if no `build.outputDir`)
+   - Uploads all files from output directory (or app path if no `build.outputDir`)
    - Shows progress bar with file count and bytes
 3. Prints deployment summary with version IDs and URLs
 
 **Output**:
 
-- Creates new feature versions in Fusebase
+- Creates new app versions in Fusebase
 - Uploads files to S3
 - Prints summary:
   ```
   ✓ Successful deployments:
-    • feature-id
+    • app-id
       Version ID: version-id
-      URL: https://app-sub.thefusebase.app/feature-path
+      URL: https://app-sub.thefusebase.app/app-path
   ```
 
 **Examples**:
@@ -254,21 +254,21 @@ fusebase deploy
 
 ---
 
-### `fusebase feature create`
+### `fusebase app create`
 
-**Purpose**: Create and configure a feature for development. All options are required.
+**Purpose**: Create and configure an app for development. All options are required.
 
 **Syntax**:
 
 ```bash
-fusebase feature create --name <name> --subdomain <subdomain> --path <path> --dev-command <command> --build-command <command> --output-dir <dir> [options]
+fusebase app create --name <name> --subdomain <subdomain> --path <path> --dev-command <command> --build-command <command> --output-dir <dir> [options]
 ```
 
 **Required Options**:
 
-- `--name <name>`: Feature title
-- `--subdomain <subdomain>`: Subdomain for the feature (e.g., `my-feature`); feature is served from the root of this subdomain
-- `--path <path>`: Path to the feature folder (e.g., `features/product-add`)
+- `--name <name>`: App title
+- `--subdomain <subdomain>`: Subdomain for the app (e.g., `my-app`); app is served from the root of this subdomain
+- `--path <path>`: Path to the app folder (e.g., `apps/product-add`)
 - `--dev-command <command>`: Dev server command (e.g., `npm run dev`)
 - `--build-command <command>`: Build command (e.g., `npm run build`)
 - `--output-dir <dir>`: Build output directory (e.g., `dist`)
@@ -285,14 +285,14 @@ fusebase feature create --name <name> --subdomain <subdomain> --path <path> --de
 
 **Output**:
 
-- Creates feature record in Fusebase API
-- Updates `fusebase.json` with feature configuration:
+- Creates app record in Fusebase API
+- Updates `fusebase.json` with app configuration:
   ```json
   {
-    "features": [
+    "apps": [
       {
-        "id": "feature-id",
-        "path": "features/my-feature",
+        "id": "app-id",
+        "path": "apps/my-app",
         "dev": {
           "command": "npm run dev"
         },
@@ -308,35 +308,35 @@ fusebase feature create --name <name> --subdomain <subdomain> --path <path> --de
 **Examples**:
 
 ```bash
-fusebase feature create --name="Dashboard" --subdomain=dashboard --path=features/dashboard --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist
+fusebase app create --name="Dashboard" --subdomain=dashboard --path=apps/dashboard --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist
 
-fusebase feature create --name="Sales Report" --subdomain=sales-report --path=features/sales-report --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write"
+fusebase app create --name="Sales Report" --subdomain=sales-report --path=apps/sales-report --dev-command="npm run dev" --build-command="npm run build" --output-dir=dist --permissions="dashboardView.dash123:view456.read,write"
 ```
 
 **Important**:
 
-- `fusebase deploy` publishes code only; it does not publish feature permissions
-- runtime permissions are stored on the remote feature record
-- use `fusebase feature update <featureId>` to change permissions after creation
-- if the feature uses Gate SDK at runtime, run `fusebase feature update <featureId> --sync-gate-permissions`
+- `fusebase deploy` publishes code only; it does not publish app permissions
+- runtime permissions are stored on the remote app record
+- use `fusebase app update <appId>` to change permissions after creation
+- if the app uses Gate SDK at runtime, run `fusebase app update <appId> --sync-gate-permissions`
 
 See [PERMISSIONS.md](PERMISSIONS.md) for the canonical permission workflow.
 
 ---
 
-### `fusebase dev start [feature]`
+### `fusebase dev start [app]`
 
-**Purpose**: Start the development server for a feature.
+**Purpose**: Start the development server for an app.
 
 **Syntax**:
 
 ```bash
-fusebase dev start [feature]
+fusebase dev start [app]
 ```
 
 **Arguments**:
 
-- `[feature]` (optional): Feature ID or path (from `fusebase.json` features). If not provided, prompts to select.
+- `[app]` (optional): App ID or path (from `fusebase.json` apps). If not provided, prompts to select.
 
 **Options**: None
 
@@ -344,21 +344,21 @@ fusebase dev start [feature]
 
 - App must be initialized (`fusebase init`)
 - API key must be configured (`fusebase auth`)
-- At least one feature must be configured in `fusebase.json`
+- At least one app must be configured in `fusebase.json`
 
 **Interactive Prompts**:
 
-1. **Feature Selection** (if `[feature]` not provided and multiple features exist):
-   - Prompt: `"Select a feature to develop:"`
+1. **App Selection** (if `[app]` not provided and multiple apps exist):
+   - Prompt: `"Select an app to develop:"`
    - Type: `select`
-   - Options: Feature paths/IDs, with `(no dev command)` suffix if missing dev command
-   - Auto-select: If only one feature exists
+   - Options: App paths/IDs, with `(no dev command)` suffix if missing dev command
+   - Auto-select: If only one app exists
 
 **Behavior**:
 
-1. Selects feature (via argument, auto-select, or prompt)
-2. Runs `npm install --include=dev` if `package.json` exists in feature directory
-3. Starts feature's dev server (if `dev.command` configured) and detects URL from stdout/stderr
+1. Selects app (via argument, auto-select, or prompt)
+2. Runs `npm install --include=dev` if `package.json` exists in app directory
+3. Starts app's dev server (if `dev.command` configured) and detects URL from stdout/stderr
 4. Starts API proxy server (port 4174, auto-finds available port)
 5. Starts frontend dev UI server (port 4173, auto-finds available port)
 6. Opens browser to dev UI
@@ -367,21 +367,21 @@ fusebase dev start [feature]
 **Output**:
 
 - Prints CLI version
-- Shows selected feature
+- Shows selected app
 - Shows detected dev server URL (if auto-detected)
 - Opens browser to `http://localhost:{vite-port}`
 
 **Examples**:
 
 ```bash
-# Interactive feature selection
+# Interactive app selection
 fusebase dev start
 
-# Start specific feature by ID
-fusebase dev start my-feature-id
+# Start specific app by ID
+fusebase dev start my-app-id
 
-# Start specific feature by path
-fusebase dev start features/dashboard
+# Start specific app by path
+fusebase dev start apps/dashboard
 ```
 
 ---
@@ -481,27 +481,27 @@ fusebase init --ide "cursor,vscode"
   - Options: App titles + descriptions, plus `"+ Create new app"`
   - If `"+ Create new app"` selected: Same prompts as above
 
-**Where choice is stored**: `fusebase.json` → `appId` (or creates new app via API)
+**Where choice is stored**: `fusebase.json` → `productId` (or creates new app via API)
 
 ---
 
-### Feature Selection
+### App Selection
 
 **When it appears**:
 
-- During `fusebase feature create`: If multiple features exist or no features exist
-- During `fusebase dev start`: If multiple features exist and no argument provided
+- During `fusebase app create`: If multiple apps exist or no apps exist
+- During `fusebase dev start`: If multiple apps exist and no argument provided
 
 **Prompt details**:
 
 - Type: `select` (single choice)
-- Message: `"Select a feature to develop:"` or `"Select a feature to develop:"`
-- Options: Feature titles + descriptions, plus `"+ Create new feature"` (in `fusebase feature create`)
-- Auto-select: If only one feature exists (in `fusebase dev start`)
+- Message: `"Select an app to develop:"` or `"Select an app to develop:"`
+- Options: App titles + descriptions, plus `"+ Create new app"` (in `fusebase app create`)
+- Auto-select: If only one app exists (in `fusebase dev start`)
 
 **Where choice is stored**:
 
-- `fusebase feature create`: Updates `fusebase.json` → `features[]`
+- `fusebase app create`: Updates `fusebase.json` → `apps[]`
 - `fusebase dev start`: No persistent storage (temporary selection)
 
 ---
@@ -556,11 +556,11 @@ fusebase init --ide "cursor,vscode"
 {
   "env": "dev", // optional, overrides global env
   "orgId": "organization-id",
-  "appId": "app-id",
-  "features": [
+  "productId": "app-id",
+  "apps": [
     {
-      "id": "feature-uuid",
-      "path": "features/my-feature",
+      "id": "app-uuid",
+      "path": "apps/my-app",
       "dev": {
         "command": "npm run dev"
       },
@@ -575,14 +575,14 @@ fusebase init --ide "cursor,vscode"
 
 **Written by**:
 
-- `fusebase init`: Creates file with `orgId` and `appId`
-- `fusebase feature create`: Updates `features[]` array
+- `fusebase init`: Creates file with `orgId` and `productId`
+- `fusebase app create`: Updates `apps[]` array
 
 **Read by**:
 
-- `fusebase deploy`: Reads features with `path` configured
-- `fusebase dev start`: Reads features list
-- `fusebase feature create`: Reads existing feature configs
+- `fusebase deploy`: Reads apps with `path` configured
+- `fusebase dev start`: Reads apps list
+- `fusebase app create`: Reads existing app configs
 
 ---
 
@@ -601,7 +601,7 @@ DASHBOARDS_MCP_TOKEN=generated-token-here
 
 - `fusebase init` (if project template used)
 
-**Read by**: Not read by CLI (intended for MCP servers and feature code)
+**Read by**: Not read by CLI (intended for MCP servers and app code)
 
 ---
 
@@ -623,14 +623,14 @@ DASHBOARDS_MCP_TOKEN=generated-token-here
 
 ## SDK Usage
 
-Features use `@fusebase/dashboard-service-sdk` for runtime execution:
+Apps use `@fusebase/dashboard-service-sdk` for runtime execution:
 
 **Notes**:
 
 - SDK is OpenAPI-based
 - SDK methods mirror MCP tools 1:1 by operation ID
 - Use MCP for discovering available operations (`tools_list`, `tools_search`)
-- Use SDK for executing operations in feature code
+- Use SDK for executing operations in app code
 
 **For conceptual understanding**, see [Conceptual Model](CONCEPTS.md) for details on MCP vs SDK usage.
 
@@ -654,16 +654,16 @@ fusebase auth --api-key=$API_KEY
 fusebase init --ide ""  # Skip IDE setup
 ```
 
-**Dev feature with path**:
+**Dev app with path**:
 
 ```bash
-fusebase feature create --path features/my-feature  # Skip path prompt
+fusebase app create --path apps/my-app  # Skip path prompt
 ```
 
-**Dev start with feature**:
+**Dev start with app**:
 
 ```bash
-fusebase dev start my-feature-id  # Skip feature selection
+fusebase dev start my-app-id  # Skip app selection
 ```
 
 ### CI Pipeline Recommendations
@@ -688,7 +688,7 @@ fusebase dev start my-feature-id  # Skip feature selection
 ### Safe Defaults
 
 - **IDE selection**: If not TTY and no `--ide` flag, IDE setup is skipped (empty set)
-- **Feature selection**: Auto-selects if only one feature exists
+- **App selection**: Auto-selects if only one app exists
 - **Organization selection**: Auto-selects if only one organization exists
 - **Template usage**: Defaults to `false` if directory is not empty
 
@@ -776,9 +776,9 @@ const selected = await checkbox({
 
 1. **"App not initialized"**: Run `fusebase init` first
 2. **"No API key configured"**: Run `fusebase auth` first
-3. **"No features configured"**: Run `fusebase feature create` to configure at least one feature
+3. **"No apps configured"**: Run `fusebase app create` to configure at least one app
 4. **Port conflicts**: Dev server auto-finds available ports, but if issues persist, kill processes on ports 4173/4174
-5. **Feature token not received**: Ensure feature iframe listens for `postMessage` with `type: 'featuretoken'`
+5. **App token not received**: Ensure app iframe listens for `postMessage` with `type: 'featuretoken'`
 
 ### Troubleshooting Interactive Issues
 
@@ -801,19 +801,19 @@ const selected = await checkbox({
 
 ### Glossary
 
-- **Feature**: A deployable unit in a Fusebase app (e.g., a dashboard, form, widget)
-- **Feature Token**: Authentication token for a feature to call Fusebase APIs (delivered via `postMessage` in dev server)
+- **App**: A deployable unit inside a Fusebase product (e.g., a dashboard, form, widget)
+- **App Token**: Authentication token for an app to call Fusebase APIs (delivered via `postMessage` in dev server)
 - **Dev Server**: Local development environment consisting of:
-  - Frontend UI (port 4173): React app that displays features in iframes
+  - Frontend UI (port 4173): React app that displays apps in iframes
   - API Proxy (port 4174): Proxies requests to Fusebase API with authentication
 - **MCP**: Model Context Protocol - configuration for AI assistants to interact with Fusebase
 - **Workspace**: The project directory (where `fusebase.json` lives)
-- **App**: A Fusebase application (contains multiple features)
-- **Organization**: Top-level entity that contains apps
+- **Product**: A Fusebase application container (contains multiple apps)
+- **Organization**: Top-level entity that contains products
 
 ### Related Documentation
 
 - **Architecture**: [Architecture Documentation](ARCHITECTURE.md)
 - **CLI Flows**: [Step-by-Step CLI Flows](CLI-FLOWS.md)
-- **Conceptual Model**: [Apps, Features, and Data Access](CONCEPTS.md)
+- **Conceptual Model**: [Products, Apps, and Data Access](CONCEPTS.md)
 - **Guide**: [Env + IDE MCP refresh rules](guides/env-mcp-refresh.md)

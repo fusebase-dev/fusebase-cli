@@ -1,12 +1,12 @@
 /**
  * Smoke deploy: drives the full Fusebase Apps CLI lifecycle against a real
  * environment (dev or prod). Per the NIM-40894 clarification round, every CLI
- * surface is exercised in **one feature** so this is a smoke test, not a full
+ * surface is exercised in **one app** so this is a smoke test, not a full
  * matrix:
  *
- *   auth → init → scaffold(spa) → scaffold(backend) → feature create →
+ *   auth → init → scaffold(spa) → scaffold(backend) → app create →
  *   sidecar add → job create → deploy → verify (HTTP + self-observable
- *   backend markers) → teardown via public-api `DELETE /v1/orgs/{orgId}/apps/{appId}`.
+ *   backend markers) → teardown via public-api `DELETE /v1/orgs/{orgId}/products/{productId}`.
  *
  * Verification surface: the deployed backend keeps an in-memory list of
  * markers it receives via `POST /api/touch` and serves them back through
@@ -91,15 +91,15 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
   });
 
   it(
-    "init → scaffold → feature create → sidecar → cron → deploy → verify",
+    "init → scaffold → app create → sidecar → cron → deploy → verify",
     async () => {
       const env = getE2eEnv();
       const api = createApiClient(env);
-      // Pre-computed feature URL — `getAppHost` mirrors the CLI's own
+      // Pre-computed app URL — `getAppHost` mirrors the CLI's own
       // `getFusebaseAppHost`, so cron can be wired to the URL via a secret
       // before the deploy completes. The URL printed by `fusebase deploy` is
       // cross-checked below for safety.
-      const featureUrl = `https://${FEATURE_SUBDOMAIN}.${getAppHost(env.env)}`;
+      const appUrl = `https://${FEATURE_SUBDOMAIN}.${getAppHost(env.env)}`;
 
       // 1. `auth --api-key` — the harness already seeded ~/.fusebase/config.json
       //    with the same key, so this command is technically redundant. We
@@ -119,23 +119,23 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
       expect(init.exitCode, debugOutput("init", init)).toBe(0);
       const fuseJsonPath = join(workspace.cwd, "fusebase.json");
       const initial = readFuseJson(fuseJsonPath);
-      expect(initial.appId).toBeTruthy();
+      expect(initial.productId).toBeTruthy();
       expect(initial.orgId).toBe(env.orgId);
-      // Record appId immediately so the afterAll teardown runs even if the
+      // Record productId immediately so the afterAll teardown runs even if the
       // rest of the test throws.
-      createdAppId = initial.appId;
+      createdAppId = initial.productId;
 
       // 3a. Scaffold the SPA shell.
-      const featureDir = "features/main";
+      const appDir = "apps/main";
       const spa = await runCli(
-        ["scaffold", "--template", "spa", "--dir", featureDir],
+        ["scaffold", "--template", "spa", "--dir", appDir],
         { cwd: workspace.cwd, home: workspace.home },
       );
       expect(spa.exitCode, debugOutput("scaffold spa", spa)).toBe(0);
 
       // 3b. Scaffold the backend on top of the SPA.
       const backend = await runCli(
-        ["scaffold", "--template", "backend", "--dir", featureDir],
+        ["scaffold", "--template", "backend", "--dir", appDir],
         { cwd: workspace.cwd, home: workspace.home },
       );
       expect(backend.exitCode, debugOutput("scaffold backend", backend)).toBe(
@@ -146,7 +146,7 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
       //    cron entrypoint. The backend keeps an in-memory list of markers it
       //    receives so the test can confirm both code paths executed for this
       //    specific run via the unique `runId`.
-      const backendDir = join(workspace.cwd, featureDir, "backend");
+      const backendDir = join(workspace.cwd, appDir, "backend");
       writeFileSync(
         join(backendDir, "src", "index.ts"),
         SMOKE_BACKEND_INDEX,
@@ -169,23 +169,23 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
         "utf-8",
       );
 
-      // 5. Register the feature. `--access visitor` is required: without an
+      // 5. Register the app. `--access visitor` is required: without an
       //    access principal the platform proxy answers /api/* with the
       //    Fusebase auth login page (HTML 200, see commit ce83e30 diagnostics
       //    on pipeline 263303). The smoke test calls the deployed backend
-      //    from CI with no session cookie, so the feature must allow
+      //    from CI with no session cookie, so the app must allow
       //    unauthenticated visitors for /api/healthz and /api/touch to reach
       //    the container.
-      const featureCreate = await runCli(
+      const appCreate = await runCli(
         [
-          "feature",
+          "app",
           "create",
           "--name",
           "main",
           "--subdomain",
           FEATURE_SUBDOMAIN,
           "--path",
-          featureDir,
+          appDir,
           "--dev-command",
           "npm run dev",
           "--build-command",
@@ -204,13 +204,13 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
         { cwd: workspace.cwd, home: workspace.home },
       );
       expect(
-        featureCreate.exitCode,
-        debugOutput("feature create", featureCreate),
+        appCreate.exitCode,
+        debugOutput("app create", appCreate),
       ).toBe(0);
 
-      const afterFeature = readFuseJson(fuseJsonPath);
-      const featureId = afterFeature.features?.[0]?.id;
-      expect(featureId).toBeTruthy();
+      const afterApp = readFuseJson(fuseJsonPath);
+      const appId = afterApp.apps?.[0]?.id;
+      expect(appId).toBeTruthy();
 
       // 6. Sidecar — verification is just "deploy succeeds with sidecar
       //    configured", per the clarification round. nginx:alpine is a
@@ -220,7 +220,7 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
           "sidecar",
           "add",
           "--feature",
-          featureId!,
+          appId!,
           "--name",
           "nginx",
           "--image",
@@ -237,7 +237,7 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
           "job",
           "create",
           "--feature",
-          featureId!,
+          appId!,
           "--name",
           "touch-cron",
           "--cron",
@@ -251,14 +251,14 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
 
       // 8. Inject secrets so the cron entrypoint knows which backend URL to
       //    POST to and which `runId` to tag the marker with. The endpoint
-      //    shape matches `setAppFeatureSecrets` in lib/api.ts. Backend reads
+      //    shape matches `setAppSecrets` in lib/api.ts. Backend reads
       //    the same `FUSEBASE_RUN_ID` only as a default fallback — markers
       //    are correlated by the `runId` field inside the request body.
       await api.request(
         "POST",
-        `/v1/orgs/${encodeURIComponent(env.orgId)}/apps/${encodeURIComponent(
+        `/v1/orgs/${encodeURIComponent(env.orgId)}/products/${encodeURIComponent(
           createdAppId!,
-        )}/features/${encodeURIComponent(featureId!)}/secrets`,
+        )}/apps/${encodeURIComponent(appId!)}/secrets`,
         {
           secrets: [
             {
@@ -268,8 +268,8 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
             },
             {
               key: "FUSEBASE_FEATURE_URL",
-              value: featureUrl,
-              description: "E2E smoke feature URL for cron callbacks (NIM-40901)",
+              value: appUrl,
+              description: "E2E smoke app URL for cron callbacks (NIM-40901)",
             },
           ],
         },
@@ -292,7 +292,7 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
       console.log(deploy.stdout.split("\n").slice(-60).join("\n"));
 
       // The deploy summary prints `    URL: https://...`. Capture the first
-      // such line — there is only one feature in this smoke test — and
+      // such line — there is only one app in this smoke test — and
       // assert it matches the URL we pre-computed. If they diverge, cron
       // will silently POST to the wrong host and the cron-marker assertion
       // below would still time out, but the explicit cross-check fails fast
@@ -300,43 +300,49 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
       const urlMatch = deploy.stdout.match(/URL:\s*(https:\/\/\S+)/);
       expect(
         urlMatch,
-        `Could not find feature URL in deploy output:\n${deploy.stdout}`,
+        `Could not find app URL in deploy output:\n${deploy.stdout}`,
       ).toBeTruthy();
-      const printedFeatureUrl = urlMatch![1]!.replace(/\/+$/, "");
+      const printedAppUrl = urlMatch![1]!.replace(/\/+$/, "");
       expect(
-        printedFeatureUrl,
-        `Pre-computed feature URL ${featureUrl} does not match the URL printed by the CLI (${printedFeatureUrl}). Cron secret would point at the wrong host.`,
-      ).toBe(featureUrl);
+        printedAppUrl,
+        `Pre-computed app URL ${appUrl} does not match the URL printed by the CLI (${printedAppUrl}). Cron secret would point at the wrong host.`,
+      ).toBe(appUrl);
 
-      // Mint a feature token so platform proxy lets server-to-server calls
+      // Mint an app token so platform proxy lets server-to-server calls
       // through. With only `--access visitor` the proxy routes /api/* through
       // a visitor-session bootstrap that requires cookie persistence —
       // `fetch` without a cookie jar trips a redirect loop (see commit
-      // 4977ed8 diagnostics on pipeline 263305). Sending a feature token via
-      // `x-app-feature-token` + the legacy `fbsfeaturetoken` cookie matches
-      // the contract documented in `apps-cli/AGENTS.md` ("Feature Token
-      // Flow"); the proxy strips the header upstream but accepts it as
-      // proof-of-auth at the edge.
+      // 4977ed8 diagnostics on pipeline 263305).
+      //
+      // We send both the renamed (`x-app-token` / `fbsapptoken`) and the
+      // legacy (`x-app-feature-token` / `fbsfeaturetoken`) header+cookie
+      // pairs. The wire-protocol rename is being rolled out alongside this
+      // story but the deployed runtime still emits the legacy names, so
+      // sending both keeps the smoke green across pre- and post-rollout
+      // deploys without coupling to the rollout order. Drop the legacy pair
+      // once nimbus-ai has fully cut over.
+
       const tokenRes = await api.request<{ token: string }>(
         "POST",
-        `/v1/orgs/${encodeURIComponent(env.orgId)}/apps/${encodeURIComponent(
+        `/v1/orgs/${encodeURIComponent(env.orgId)}/products/${encodeURIComponent(
           createdAppId!,
-        )}/features/${encodeURIComponent(featureId!)}/tokens`,
+        )}/apps/${encodeURIComponent(appId!)}/tokens`,
       );
-      const featureToken = tokenRes.token;
+      const appToken = tokenRes.token;
       expect(
-        featureToken,
-        `feature token endpoint returned no token`,
+        appToken,
+        `app token endpoint returned no token`,
       ).toBeTruthy();
-      const featureAuthHeaders: Record<string, string> = {
-        "x-app-feature-token": featureToken,
-        cookie: `fbsfeaturetoken=${featureToken}`,
+      const appAuthHeaders: Record<string, string> = {
+        "x-app-token": appToken,
+        "x-app-feature-token": appToken,
+        cookie: `fbsapptoken=${appToken}; fbsfeaturetoken=${appToken}`,
       };
 
       // 10. HTTP smoke. Azure may take a few minutes to route the new
       //     container app, so we poll up to 8 minutes. We assert both
       //     status===200 *and* a JSON body of `{ok:true}` *and* a JSON
-      //     content-type. The deployed feature includes a SPA whose
+      //     content-type. The deployed app includes a SPA whose
       //     static-file server returns `index.html` (HTML 200) for any
       //     `/api/*` path the backend does not handle — a status-only
       //     check would silently pass even when the backend is not
@@ -351,8 +357,8 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
       try {
         await pollUntil(
           async () => {
-            const res = await fetch(`${featureUrl}/api/healthz`, {
-              headers: featureAuthHeaders,
+            const res = await fetch(`${appUrl}/api/healthz`, {
+              headers: appAuthHeaders,
               redirect: "manual",
             }).catch((err) => {
               lastHealthzNetworkError =
@@ -382,7 +388,7 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(
           `${message}\n` +
-            `featureUrl=${featureUrl}\n` +
+            `appUrl=${appUrl}\n` +
             `lastStatus=${lastHealthzStatus ?? "n/a"} ` +
             `lastContentType=${lastHealthzContentType || "n/a"} ` +
             `lastLocation=${lastHealthzLocation || "n/a"} ` +
@@ -393,15 +399,15 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
 
       // 11. Trigger the backend write and verify the marker is present in
       //     the response body. We deliberately avoid a separate
-      //     `GET /api/markers` step: features deploy with `minReplicas: 0`
+      //     `GET /api/markers` step: apps deploy with `minReplicas: 0`
       //     (see `nimbus-ai/src/taskProcessors/deployFeatureBackendVersion.ts`),
       //     so the container can be torn down between requests and any
       //     in-memory store is wiped. Same-request assertion sidesteps this:
       //     POST /api/touch pushes the marker AND returns the current
       //     `markers` snapshot, all in one round trip on a single replica.
-      const touchRes = await fetch(`${featureUrl}/api/touch`, {
+      const touchRes = await fetch(`${appUrl}/api/touch`, {
         method: "POST",
-        headers: { ...featureAuthHeaders, "Content-Type": "application/json" },
+        headers: { ...appAuthHeaders, "Content-Type": "application/json" },
         body: JSON.stringify({ source: "http", runId: RUN_ID }),
       });
       const touchBodyText = await touchRes.text();
@@ -441,8 +447,8 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
 
 interface FuseConfigShape {
   orgId?: string;
-  appId?: string;
-  features?: Array<{ id: string; path?: string }>;
+  productId?: string;
+  apps?: Array<{ id: string; path?: string }>;
 }
 
 interface SmokeMarker {
@@ -546,23 +552,23 @@ serve({ fetch: app.fetch, port }, () => {
 `;
 
 // The cron entrypoint posts to /api/touch as a CLI-plumbing exercise (the
-// feature has a cron job configured and that job must build + run). The
+// app has a cron job configured and that job must build + run). The
 // smoke test does NOT assert the cron POST landed in the backend (Container
 // Apps min_replicas=0 means the marker store is wiped between calls and
 // there is no shared persistence we can use). Any error is logged but the
 // process exits 0 so a single transient network blip doesn't pollute the
 // Container Apps Job's run history.
-const SMOKE_CRON_SCRIPT = `const featureUrl = process.env.FUSEBASE_FEATURE_URL
+const SMOKE_CRON_SCRIPT = `const appUrl = process.env.FUSEBASE_FEATURE_URL
 const runId = process.env.FUSEBASE_RUN_ID
 
-if (!featureUrl || !runId) {
+if (!appUrl || !runId) {
   console.warn('cron: missing FUSEBASE_FEATURE_URL/FUSEBASE_RUN_ID — exiting cleanly')
   process.exit(0)
 }
 
 ;(async () => {
   try {
-    const res = await fetch(\`\${featureUrl}/api/touch\`, {
+    const res = await fetch(\`\${appUrl}/api/touch\`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source: 'cron', runId }),

@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-05-06"
+last_synced: "2026-05-09"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -11,9 +11,9 @@ category: specialized
 > **SOURCE**: This file is copied from `docs/isolated-sql-stores.md` in the fusebase-gate repo. Edit that file, then run `npm run mcp:skills:generate`.
 
 ---
-# Isolated SQL stores — production guide (Gate)
+# FuseBase PostgreSQL Database — production guide (Gate isolated stores)
 
-End-to-end reference for **`sql` / `postgres`** isolated stores: MCP tools, `@fusebase/fusebase-gate-sdk` (`IsolatedStoresApi`), permissions, migrations, and failure modes.  
+End-to-end reference for **FuseBase PostgreSQL Database** on the Gate `isolated-stores` contract: MCP tools, `@fusebase/fusebase-gate-sdk` (`IsolatedStoresApi`), permissions, migrations, and failure modes.  
 **Contracts:** `src/api/contracts/ops/isolated-stores/isolated-stores.ts`.
 For a hierarchy-focused reference, see [isolated-store-hierarchy.md](./isolated-store-hierarchy.md).
 That hierarchy reference now also explains the current stage model (`store -> stage instance -> revision -> physical database`) in practical terms.
@@ -28,7 +28,7 @@ Current stable baseline (2026-04-12):
 
 Current rollout position (2026-04-12):
 
-- dev rollout under `isolated-stores` flag is active;
+- app-facing PostgreSQL DB path is the primary baseline; old flag-gated wording is legacy;
 - production pilot target is our managed apps plus selected client projects, not broad public self-serve release;
 - current baseline provider path for `postgres` remains Azure;
 - `Neon` is under evaluation as a future provider option, not as a replacement for Gate contracts or the current `v1` rollout path.
@@ -45,6 +45,12 @@ Current rollout position (2026-04-12):
 | Seed / backfill data      | Structured row APIs or `importIsolatedStoreSqlRows` (CSV/TSV → `COPY`)                             |
 | Chat / MCP smoke test     | One small migration **or** status + dryRun; big bundles → **SDK/CI**                               |
 | Understand drift / 409    | Response `structuredIssues` / error `data.issues`; MCP prompt **`isolatedSqlMigrationDiscipline`** |
+
+Runtime note:
+
+- a custom app backend is **not required** for normal PostgreSQL runtime access;
+- browser/UI code can call Gate SDK methods directly with the feature token for frontend-safe reads and allowed structured writes;
+- add a backend only when you need privileged operations, secret-bearing integrations, heavy orchestration, or non-user-context work.
 
 ---
 
@@ -187,11 +193,13 @@ This keeps checksum generation canonical and avoids agent drift from ad-hoc hash
 Do this **per stage** you care about (usually **dev** first, then **prod**).
 
 1. **Load context** — MCP: `prompts_search` groups `authz`, `isolated`, `isolatedSql`, `sdk`; before touching bundles load **`isolatedSqlMigrationDiscipline`**.
-2. **Build the bundle** from repo files + manifest: strict increasing **`version`**, stable **`name`**, **`checksum`** = SHA-256 of **exact UTF-8 bytes** of **`sql`** (whitespace matters).
-3. **`getIsolatedStoreSqlMigrationStatus`** — same `storeId`, `stage`, **`bundle`** you will apply.
+2. **Build the bundle** from repo files + manifest with SDK helpers: strict increasing **`version`**, stable **`name`**, **`checksum`** = SHA-256 of canonicalized SQL (**`CRLF -> LF`**, trailing whitespace trimmed).
+3. **`getIsolatedStoreSqlMigrationStatus`** — same `storeId`, `stage`, and bundle line you want to compare.
+   - For lightweight status-only checks, each migration entry may use **`sql: ""`** when you only need metadata comparison (`version` / `name` / `checksum`) and drift/pending/head visibility.
+   - For status immediately before apply, you can still send the exact full bundle you plan to apply.
    - Check **`canApply`** / **`isDrifted`**, **`pendingCount`**, **`structuredIssues`**.
    - Optional optimistic lock: pass **`expectedLastAppliedVersion`** / **`expectedLastAppliedChecksum`** from your _previous_ status if you want Gate to **409** when someone else migrated first.
-4. **Optional preflight** — **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** (same body otherwise): validates prefix + locks, **no SQL executed**, no journal writes; response includes full **`status`**.
+4. **Optional preflight** — **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** (same body otherwise): validates the same pre-apply bundle rules as a real apply (including checksum/schema-only checks), **no SQL executed**, no journal writes; response includes full **`status`**.
 5. **`applyIsolatedStoreSqlMigrations`** — same bundle; prod may create an automatic **checkpoint** before pending migrations run.
 6. **Verify** — `listIsolatedStoreSqlTables`, `getIsolatedStoreSqlStats`, or `queryIsolatedStoreSql` (one statement per call).
 
@@ -205,13 +213,15 @@ Do this **per stage** you care about (usually **dev** first, then **prod**).
 
 - **`isDrifted`**: bundle prefix does not match journal → **`canApply`** is false, **`structuredIssues`** lists per-version mismatches (journal vs bundle; checksum issues may include **`bundleSqlContentSha256`** — not raw SQL).
 - Pending tail: **`pendingMigrations`** when not drifted.
+- Status can run with metadata-only bundle entries (`sql: ""`) when the caller only needs drift/head/pending visibility. This is useful for MCP/bootstrap checks that should not resend full SQL text on every probe.
 
-### Apply
+### Apply / dryRun
 
 - **200** — migrations ran (or **dryRun** returned validation only).
 - **409** — **`data.errorCode`**:
   - **`isolated_sql_migration_drift`** — prefix mismatch; **`data.issues`** mirrors structured drift rows.
   - **`isolated_sql_journal_head_mismatch`** — optimistic-lock fields disagree with journal tail.
+- **`dryRun: true`** now uses the same pre-apply bundle validation pipeline as a real apply. If the full bundle would fail on canonical checksum or schema-only rules, dryRun fails too.
 
 ### Transactions
 
@@ -254,11 +264,12 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 - Keep migration SQL **in a dedicated directory** in the repo — use **`postgres/migrations/`** so tooling and reviewers recognize it; avoid mixing with app source or ad-hoc scripts — ordering, review, and CI checksum checks stay obvious.
 - One SQL file per **`version`**; manifest with **`version`**, **`name`**, **`checksum`** aligned with the bytes Gate sends.
 - **CI** should verify checksums vs files — prompts are not a substitute.
-- **MUST flow:** file-first for schema changes — create/update files in `postgres/migrations/`, compute checksum from file bytes, run status, then apply.
+- **MUST flow:** file-first for schema changes — create/update files in `postgres/migrations/`, build bundle via `buildSqlMigrationBundle(...)` (includes canonical SQL/checksum), run status, then apply.
 - Bundle assembly should stay in scripts / CI / backend tooling; do not make browser runtime the source of truth for migration SQL or bundle order.
 - **MUST artifact after schema ops:** include migration file path, `version`, `name`, `checksum`, `storeId`, `stage`.
 - **Inline SQL in MCP:** only for one-off smoke/dev tests and explicitly marked temporary; not for persistent schema changes.
 - **Final gate:** do not finish if schema changed but `postgres/migrations/` has no matching new/updated migration file/manifest entry.
+- Do not patch drift by editing `checksum` to a transport-specific value or by storing local-only checksum notes; fix the bundle pipeline and rerun status/apply.
 
 ---
 
@@ -297,4 +308,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-05-06
+- **Last synced**: 2026-05-09

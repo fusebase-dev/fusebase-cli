@@ -1,6 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import { invalidateFuseConfigCache } from "./config";
+import {
+  invalidateFuseConfigCache,
+  normalizeRawFuseConfigShape,
+  rewriteLegacyFeaturePathsInRaw,
+} from "./config";
 import type { McpServerSpec } from "./mcp-server-spec";
 
 export type McpCustomIntegrationEntry = {
@@ -131,6 +135,8 @@ export function writeMcpIntegrationsToFusebaseJson(
   } catch {
     throw new Error("Could not parse fusebase.json");
   }
+  normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
 
   const cleaned: McpIntegrationsConfig = { ...next };
   if (cleaned.custom && Object.keys(cleaned.custom).length === 0) {

@@ -135,6 +135,35 @@ function mergeCustomBlocks(content: string, blocks: CapturedCustomBlock[]): stri
   return `${merged}\n`;
 }
 
+type OptionalSkillAudience = "dbManagement" | "dashboardManagement";
+
+function parseAudiencesFromFrontmatter(content: string): OptionalSkillAudience[] {
+  const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+  if (!frontmatterMatch) {
+    return [];
+  }
+
+  const audiencesLine = frontmatterMatch[1]
+    .split(/\r?\n/)
+    .find((line) => line.startsWith("audiences: "));
+  if (!audiencesLine) {
+    return [];
+  }
+
+  const rawValue = audiencesLine.slice("audiences: ".length).trim();
+  try {
+    const parsed: unknown = JSON.parse(rawValue);
+    return Array.isArray(parsed)
+      ? parsed.filter(
+          (value): value is OptionalSkillAudience =>
+            value === "dbManagement" || value === "dashboardManagement",
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 async function captureCustomBlocks(targetDir: string): Promise<Map<string, CapturedCustomBlock[]>> {
   const blocks = new Map<string, CapturedCustomBlock[]>();
   const agentsPath = join(targetDir, "AGENTS.md");
@@ -179,16 +208,14 @@ const FLAG_GATED_SKILLS: Record<string, string> = {
   "git-workflow": "git-init",
   "app-business-docs": "app-business-docs",
   "mcp-gate-debug": "mcp-gate-debug",
-  "fusebase-portal-specific-features": "portal-specific-features",
+  "fusebase-portal-specific-apps": "portal-specific-apps",
+  "managed-integrations": "managed-integrations",
 };
 
 /** Template paths that require a specific flag to be included. */
 const FLAG_GATED_PATH_PREFIXES: Record<string, string> = {
-  ".claude/skills/fusebase-gate/references/isolated.md": "isolated-stores",
-  ".claude/skills/fusebase-gate/references/isolated-nosql.md": "isolated-stores",
-  ".claude/skills/fusebase-gate/references/isolated-sql.md": "isolated-stores",
-  ".claude/skills/fusebase-gate/references/isolated-sql-stores.md": "isolated-stores",
-  ".claude/skills/fusebase-gate/references/isolated-sql-migration-discipline.md": "isolated-stores",
+  ".claude/skills/managed-integrations/references/personal-auth-flow.md":
+    "managed-integrations-personal-auth",
 };
 
 function normalizeTemplateEntryPath(name: string): string {
@@ -252,6 +279,56 @@ async function removeDisabledFlagGatedAssets(skillsDest: string): Promise<void> 
       }
     }
   }
+}
+
+async function pruneDisabledOptionalDashboardRefs(skillsDest: string): Promise<void> {
+  const dashboardsSkillDir = join(skillsDest, "fusebase-dashboards");
+  const referencesDir = join(dashboardsSkillDir, "references");
+  if (!(await fileExists(referencesDir))) {
+    return;
+  }
+
+  const enabledAudiences = new Set<OptionalSkillAudience>();
+  if (hasFlag("legacy-dashboards-db")) {
+    enabledAudiences.add("dbManagement");
+  }
+
+  const entries = await readdir(referencesDir, { withFileTypes: true });
+  const removedReferenceFiles: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".md")) {
+      continue;
+    }
+    const refPath = join(referencesDir, entry.name);
+    const content = await readFile(refPath, "utf-8");
+    const audiences = parseAudiencesFromFrontmatter(content);
+    const shouldRemove = audiences.some((audience) => !enabledAudiences.has(audience));
+    if (!shouldRemove) {
+      continue;
+    }
+    await rm(refPath, { force: true });
+    removedReferenceFiles.push(entry.name);
+  }
+
+  if (removedReferenceFiles.length === 0) {
+    return;
+  }
+
+  const skillPath = join(dashboardsSkillDir, "SKILL.md");
+  if (!(await fileExists(skillPath))) {
+    return;
+  }
+
+  const skillContent = await readFile(skillPath, "utf-8");
+  const filteredSkillContent = skillContent
+    .split(/\r?\n/)
+    .filter(
+      (line) =>
+        !removedReferenceFiles.some((file) => line.includes(`references/${file}`)),
+    )
+    .join("\n");
+  await writeFile(skillPath, filteredSkillContent, "utf-8");
 }
 
 /**
@@ -318,6 +395,7 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
   // Ensure flag-gated assets are removed even if template content was copied earlier
   // (for example init's full template extraction in binary mode).
   await removeDisabledFlagGatedAssets(skillsDest);
+  await pruneDisabledOptionalDashboardRefs(skillsDest);
 
   // Render Eta templates based on active flags
   const context = buildTemplateContext();

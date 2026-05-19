@@ -8,11 +8,12 @@ metadata:
 
 # Fusebase Dashboards MCP Skill
 
-This document describes how to use **MCP (Model Context Protocol)** for working with Fusebase dashboards **during LLM development**. MCP is used for discovery and execution from the LLM; the **SDK** is used only in **runtime code** (feature/browser). See the Fusebase Dashboards SDK skill for SDK usage.
+This document describes how to use **MCP (Model Context Protocol)** for working with Fusebase dashboards **during LLM development**. MCP is used for discovery and execution from the LLM; the **SDK** is used only in **runtime code** (app/browser). See the Fusebase Dashboards SDK skill for SDK usage.
 
 For rules and checklists, see `AGENTS.md`.
 
 - **For runtime SDK code** that reads or writes dashboard data (`getDashboardViewData`, `batchPutDashboardData`, etc.), **`references/data-patterns.md` is required** — it defines the real response/request shapes; use it together with `sdk_describe` (do not infer `data.rows` vs top-level `data` from memory).
+- **Default-path rule** — this skill is for existing dashboard surfaces and explicitly dashboard-oriented tasks. It is **not** the default storage-planning skill for new app-owned structured data. Do not ask the user to choose between PostgreSQL and a new dashboard/database unless the user explicitly requested dashboards or the project is extending an existing dashboard surface.
 
 ## References
 
@@ -75,7 +76,7 @@ Each reference is in a separate file under `references/`. Load the file when you
    - For config (`.env`, MCP config files, `fusebase init`), see **AGENTS.md** or the `mcp/` directory.
    - Do not proceed with dashboard operations until the connection is available.
 
-**MCP** is for development and dashboard access from the LLM. **SDK** is only for runtime code in the feature.
+**MCP** is for development and dashboard access from the LLM. **SDK** is only for runtime code in the app.
 
 ---
 
@@ -83,9 +84,9 @@ Each reference is in a separate file under `references/`. Load the file when you
 ## MCP vs SDK (reminder)
 
 - **MCP tools** (`tools_list`, `tools_search`, `tools_describe`, `tool_call`, `bootstrap`, `prompts_list`, `prompts_search`, etc.) — for performing actions **inside the LLM session**: discovery, reading/writing data, creating/updating dashboards during development.
-- **SDK methods** — for **runtime code** only (feature/browser). The LLM uses `sdk_search` / `sdk_describe` to generate code that the feature will execute; the LLM does not execute SDK.
+- **SDK methods** — for **runtime code** only (app/browser). The LLM uses `sdk_search` / `sdk_describe` to generate code that the app will execute; the LLM does not execute SDK.
 
-Do not mix: use either the MCP chain (discovery → tool_call) for development, or the SDK chain (sdk_search → sdk_describe → insert code) for generating feature code. Each operation has the same `opId` in both MCP and SDK.
+Do not mix: use either the MCP chain (discovery → tool_call) for development, or the SDK chain (sdk_search → sdk_describe → insert code) for generating app code. Each operation has the same `opId` in both MCP and SDK.
 
 ---
 
@@ -228,7 +229,7 @@ Optional:
 
 1. By default always use **`tool_call`** to execute domain operations.
 2. Direct calls only when the tool is registered (from `tools_list`) and is a meta/built-in tool.
-3. Do not construct REST URLs from feature names; always rely on discovery (tools_list → tools_describe → tool_call) or the SDK.
+3. Do not construct REST URLs from app names; always rely on discovery (tools_list → tools_describe → tool_call) or the SDK.
 4. When creating entities (dashboard, view, row, etc.) use **`generate_id`** when needed (format: `uuid` for global_id, `nanoid` for short keys/aliases).
 
 ---
@@ -255,7 +256,7 @@ Optional:
 ### II.6 MCP vs SDK (in flow)
 
 - **MCP tools** — for performing actions **inside the LLM session** (discovery, tool_call for dashboards/data).
-- **SDK methods** — for **application/runtime code** only. Use `sdk_search` / `sdk_describe` when you need to **generate** code for the feature; same `opId` and input schema as the MCP tool.
+- **SDK methods** — for **application/runtime code** only. Use `sdk_search` / `sdk_describe` when you need to **generate** code for the app; same `opId` and input schema as the MCP tool.
 
 Do not mix in one scenario: either the MCP chain (discovery → tool_call) or the SDK chain (sdk_search → sdk_describe → code generation).
 
@@ -325,6 +326,6 @@ Tooling flow **after** the connection is established:
 ## Summary
 
 - **MCP = LLM development**: used for discovery and dashboard access from the LLM; configure fusebase-dashboards in your IDE and verify connection before use.
-- **SDK = runtime only**: used only in feature code; see the Fusebase Dashboards SDK skill.
+- **SDK = runtime only**: used only in app code; see the Fusebase Dashboards SDK skill.
 - **Connection check**: Always verify fusebase-dashboards MCP is connected; if not, ask the user to check connected MCP servers.
 - **Flow**: Bootstrap/context → have domain knowledge (prompts or skill in context) → tools_search/tools_list → tools_describe → tool_call → handle response.

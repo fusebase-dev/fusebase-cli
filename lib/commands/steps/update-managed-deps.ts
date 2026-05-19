@@ -79,7 +79,7 @@ export async function syncManagedDependencies(options: {
   if (await fileExists(join(cwd, "package.json"))) {
     targets.push({ rel: "package.json", mode: "root" });
   }
-  const features = fuseConfig.features ?? [];
+  const features = fuseConfig.apps ?? [];
   for (const f of features) {
     const p = f.path?.trim();
     if (!p) continue;

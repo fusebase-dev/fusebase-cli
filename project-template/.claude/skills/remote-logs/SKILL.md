@@ -1,13 +1,13 @@
 ---
 name: remote-logs
-description: "Use when debugging a deployed feature backend. Explains how to fetch build logs and runtime logs using the `fusebase remote-logs` command. Only applicable to features with a backend/ folder. For local development, use dev-debug-logs skill instead."
+description: "Use when debugging a deployed app backend. Explains how to fetch build logs and runtime logs using the `fusebase remote-logs` command. Only applicable to apps with a backend/ folder. For local development, use dev-debug-logs skill instead."
 ---
 
 # Remote Logs
 
-**This skill applies only to features with a `backend/` folder.** Frontend-only features do not produce remote logs.
+**This skill applies only to apps with a `backend/` folder.** Frontend-only apps do not produce remote logs.
 
-When a feature backend has been deployed using `fusebase deploy`, you can fetch logs from the cloud:
+When an app backend has been deployed using `fusebase deploy`, you can fetch logs from the cloud:
 
 1. **Build logs** - Output from the container image build process
 2. **Runtime logs** - Live stdout/stderr and system logs from the running backend
@@ -16,10 +16,10 @@ When a feature backend has been deployed using `fusebase deploy`, you can fetch 
 
 | Context | Command | What It Reads |
 |---------|---------|---------------|
-| **Local development** | `fusebase dev start` | Log files in `<feature>/logs/dev-*/` |
+| **Local development** | `fusebase dev start` | Log files in `<app>/logs/dev-*/` |
 | **Deployed backend** | `fusebase remote-logs` | Cloud build and runtime logs |
 
-If the feature is running locally via `fusebase dev start`, use the **dev-debug-logs** skill instead.
+If the app is running locally via `fusebase dev start`, use the **dev-debug-logs** skill instead.
 
 ## Commands
 
@@ -28,7 +28,7 @@ If the feature is running locally via `fusebase dev start`, use the **dev-debug-
 Fetch build/deployment logs from the most recent deploy:
 
 ```bash
-fusebase remote-logs build <featureId>
+fusebase remote-logs build <appId>
 ```
 
 Output includes:
@@ -41,35 +41,28 @@ Output includes:
 Fetch live logs from the running backend:
 
 ```bash
-# Default: last 100 console (stdout/stderr) entries from the last hour
-fusebase remote-logs runtime <featureId>
+# Default: last 100 console (stdout/stderr) entries
+fusebase remote-logs runtime <appId>
 
-# Specify tail count (1-1000)
-fusebase remote-logs runtime <featureId> --tail 200
+# Specify tail count (0-300)
+fusebase remote-logs runtime <appId> --tail 200
 
 # Get system logs instead of console logs
-fusebase remote-logs runtime <featureId> --type system
+fusebase remote-logs runtime <appId> --type system
 
-# Restrict the time window (ISO 8601, max 7d range)
-fusebase remote-logs runtime <featureId> \
-  --from 2026-04-30T00:00:00Z --to 2026-04-30T23:59:59Z
-
-# Filter to a specific container (backend, sidecar, or job)
-fusebase remote-logs runtime <featureId> --container api
-fusebase remote-logs runtime <featureId> --container my-sidecar
-fusebase remote-logs runtime <featureId> --container cron-daily
+# Filter to a specific container (backend or sidecar)
+fusebase remote-logs runtime <appId> --container api
+fusebase remote-logs runtime <appId> --container my-sidecar
 ```
 
 Options:
-- `--tail <n>` - Number of log entries (1-1000, default: 100)
+- `--tail <n>` - Number of log entries (0-300, default: 100)
 - `--type <type>` - Log type: `console` (stdout/stderr) or `system` (service/infrastructure logs)
-- `--from <iso>` - Inclusive lower bound of the log time window (ISO 8601). Default server-side: `to - 1h`. Range from..to is capped at 7 days.
-- `--to <iso>` - Inclusive upper bound of the log time window (ISO 8601). Default server-side: now.
-- `--container <name>` - Filter logs to a specific container. Use `api` for the main backend, or the sidecar/job name for sidecar/job containers.
+- `--container <name>` - Filter logs to a specific container. Use `api` for the main backend, or the sidecar name for sidecar containers
 
 ### Log Format with Sidecars
 
-When a feature backend has sidecar containers, runtime logs include output from all containers. Each log line is prefixed with the container name:
+When an app backend has sidecar containers, runtime logs include output from all containers. Each log line is prefixed with the container name:
 
 ```
 [api]: Backend server started on port 3000
@@ -82,10 +75,10 @@ Use `--container` to filter to a single container output:
 
 ```bash
 # Show only sidecar logs
-fusebase remote-logs runtime <featureId> --container chromium
+fusebase remote-logs runtime <appId> --container chromium
 
 # Show only backend logs
-fusebase remote-logs runtime <featureId> --container api
+fusebase remote-logs runtime <appId> --container api
 ```
 
 ## When to Use Each Log Type
@@ -120,8 +113,8 @@ Use for:
 
 ## Prerequisites
 
-1. Feature **must have a `backend/` folder** — frontend-only features do not produce remote logs
-2. Feature must be deployed via `fusebase deploy`
+1. App **must have a `backend/` folder** — frontend-only apps do not produce remote logs
+2. App must be deployed via `fusebase deploy`
 3. Deployment must have completed successfully (for runtime logs)
 4. API key configured via `fusebase auth`
 
@@ -129,9 +122,9 @@ Use for:
 
 | Error | Meaning | Fix |
 |-------|---------|-----|
-| "No deploy found for AppFeature" | Feature has never been deployed | Run `fusebase deploy` first |
+| "No deploy found for App" | App has never been deployed | Run `fusebase deploy` first |
 | "No successful deploy found" | Latest deploy failed | Check build logs, fix, redeploy |
-| "Missing resource information" | Deploy metadata incomplete | Redeploy the feature |
+| "Missing resource information" | Deploy metadata incomplete | Redeploy the app |
 
 ## Example Debug Flow
 
@@ -157,5 +150,5 @@ Use for:
 
 5. Sidecar misbehaving -> Check sidecar-specific logs:
    ```bash
-   fusebase remote-logs runtime <featureId> --container my-sidecar --tail 200
+   fusebase remote-logs runtime <appId> --container my-sidecar --tail 200
    ```
