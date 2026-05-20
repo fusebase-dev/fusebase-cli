@@ -117,7 +117,7 @@ export function createSdkClient(appToken: string) {
   return createClient({
     baseUrl: BASE_URL,
     defaultHeaders: {
-      'x-app-token': appToken,
+      'x-app-feature-token': appToken,
     },
   })
 }
@@ -158,7 +158,7 @@ To open a database in the Thefusebase UI in the browser, use this URL pattern:
 - **SDK = app runtime only**: used in browser/UI code when the app is running; never executed by the LLM.
 - **MCP = LLM development**: discovery and execution during development.
 - **Discovery**: MCP first (tools_search, tools_describe, tool_call), then sdk_search / sdk_describe to generate SDK code for the app.
-- **Token**: SDK uses the app token (`x-app-token`); MCP uses the connection token from the environment.
+- **Token**: SDK uses the app token (`x-app-feature-token`); MCP uses the connection token from the environment.
 ---
 
 ## Version

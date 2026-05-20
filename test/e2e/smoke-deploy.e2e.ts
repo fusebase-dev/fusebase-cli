@@ -313,14 +313,6 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
       // a visitor-session bootstrap that requires cookie persistence —
       // `fetch` without a cookie jar trips a redirect loop (see commit
       // 4977ed8 diagnostics on pipeline 263305).
-      //
-      // We send both the renamed (`x-app-token` / `fbsapptoken`) and the
-      // legacy (`x-app-feature-token` / `fbsfeaturetoken`) header+cookie
-      // pairs. The wire-protocol rename is being rolled out alongside this
-      // story but the deployed runtime still emits the legacy names, so
-      // sending both keeps the smoke green across pre- and post-rollout
-      // deploys without coupling to the rollout order. Drop the legacy pair
-      // once nimbus-ai has fully cut over.
 
       const tokenRes = await api.request<{ token: string }>(
         "POST",
@@ -334,7 +326,6 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
         `app token endpoint returned no token`,
       ).toBeTruthy();
       const appAuthHeaders: Record<string, string> = {
-        "x-app-token": appToken,
         "x-app-feature-token": appToken,
         cookie: `fbsapptoken=${appToken}; fbsfeaturetoken=${appToken}`,
       };

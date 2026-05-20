@@ -280,7 +280,7 @@ When an app has a backend, the `/api` path prefix is **reserved for the backend*
 
 ## Webhooks and External WebSocket Callbacks (Inbound)
 
-Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsapptoken` cookie or `x-app-token` header.
+Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsapptoken` cookie or `x-app-feature-token` header.
 
 The platform proxy skips app-token auth for any path under `/api/webhooks/`, including both HTTP routes and WebSocket upgrade routes.
 
@@ -379,13 +379,13 @@ const res = await fetch("/api/items");
 const data = await res.json();
 ```
 
-If you still send `x-app-token` from the SPA, treat it as a best-effort dev/proxy optimization only. Backend handlers must always support both sources:
+If you still send `x-app-feature-token` from the SPA, treat it as a best-effort dev/proxy optimization only. Backend handlers must always support both sources:
 
 ```typescript
 import { getCookie } from "hono/cookie";
 
 const appToken =
-  c.req.header("x-app-token") || getCookie(c, "fbsapptoken");
+  c.req.header("x-app-feature-token") || getCookie(c, "fbsapptoken");
 
 if (!appToken) {
   return c.json({ error: "Missing app token" }, 401);

@@ -502,7 +502,7 @@ window.addEventListener('message', (event) => {
 });
 ```
 
-For custom app backends (`/api/*`), treat `x-app-token` as optional in deployed mode and read `x-app-token` or cookie `fbsapptoken` on the server.
+For custom app backends (`/api/*`), treat `x-app-feature-token` as optional in deployed mode and read `x-app-feature-token` or cookie `fbsapptoken` on the server.
 
 ---
 

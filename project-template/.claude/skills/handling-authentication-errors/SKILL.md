@@ -91,7 +91,7 @@ export async function fetchAuthContext(
   try {
     const response = await fetch(
       'https://app-api.{FUSEBASE_HOST}/v4/api/auth/context',
-      { headers: { 'x-app-token': appToken } }
+      { headers: { 'x-app-feature-token': appToken } }
     )
     if (!response.ok) return {} // Do NOT throw AuthTokenExpiredError here
     return await response.json()
@@ -120,7 +120,7 @@ export async function fetchCurrentUser(
   try {
     const response = await fetch(
       'https://app-api.{FUSEBASE_HOST}/v4/api/users/me',
-      { headers: { 'x-app-token': appToken } }
+      { headers: { 'x-app-feature-token': appToken } }
     )
     if (!response.ok) return null // Do NOT throw AuthTokenExpiredError
     return await response.json()

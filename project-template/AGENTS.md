@@ -138,14 +138,14 @@ SDK token usage in app runtime:
 <% } %>
 - `.env` is NOT accessible in browser
 - LLM must never assume `.env` tokens in UI code
-- Direct SDK / Fusebase proxy calls pass the token via `x-app-token`
-- Calls to the app's own backend (`/api/*`) must assume deployed platform proxies may strip `x-app-token`; backend handlers must read header or fallback to cookie `fbsapptoken`
+- Direct SDK / Fusebase proxy calls pass the token via `x-app-feature-token`
+- Calls to the app's own backend (`/api/*`) must assume deployed platform proxies may strip `x-app-feature-token`; backend handlers must read header or fallback to cookie `fbsapptoken`
 - For user-facing Gate flows, auth must stay in user context (app token). Do not silently fall back to service-account tokens.
 
 **Rules**:
 
 - LLM must NOT use SDK token during development
-- Browser runtime authenticates direct SDK / Fusebase proxy calls using `x-app-token`
+- Browser runtime authenticates direct SDK / Fusebase proxy calls using `x-app-feature-token`
 - App backend auth must be implemented as `header || cookie('fbsapptoken')`
 - User-facing Gate endpoints must fail closed on missing/invalid app token (`401/403`) instead of using a service-token fallback path
 
@@ -187,9 +187,9 @@ SDK token usage in app runtime:
 ### SDK = Runtime Execution (browser and optional app backend)
 
 <% if (it.flags?.includes("portal-specific-apps")) { %>
-**Token**: App token from global runtime variable `window.FBS_APP_TOKEN` (fallback: cookie `fbsapptoken`); direct SDK / Fusebase API calls pass it via `x-app-token`, but app backend handlers must support `header || cookie`
+**Token**: App token from global runtime variable `window.FBS_APP_TOKEN` (fallback: cookie `fbsapptoken`); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 <% } else { %>
-**Token**: App token from cookie `fbsapptoken` (fallback: `window.FBS_APP_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-token`, but app backend handlers must support `header || cookie`
+**Token**: App token from cookie `fbsapptoken` (fallback: `window.FBS_APP_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 <% } %>
 
 **SDK Structure**:
@@ -290,7 +290,7 @@ const BASE_URL =
 export function createSdkClient(appToken: string) {
   return createClient({
     baseUrl: BASE_URL,
-    defaultHeaders: { "x-app-token": appToken },
+    defaultHeaders: { "x-app-feature-token": appToken },
   });
 }
 
@@ -311,7 +311,7 @@ export function createDatabasesApi(appToken: string): DatabasesApi {
 
 ```typescript
 // Same-origin requests automatically include the fbsapptoken cookie.
-// In deployed mode, do not rely on x-app-token surviving the platform proxy.
+// In deployed mode, do not rely on x-app-feature-token surviving the platform proxy.
 const res = await fetch("/api/items");
 ```
 
@@ -321,7 +321,7 @@ Backend handlers must read the app token from header first and cookie second:
 import { getCookie } from "hono/cookie";
 
 const appToken =
-  c.req.header("x-app-token") || getCookie(c, "fbsapptoken");
+  c.req.header("x-app-feature-token") || getCookie(c, "fbsapptoken");
 
 if (!appToken) {
   return c.json({ error: "Missing app token" }, 401);
@@ -343,7 +343,7 @@ const GATE_BASE_URL =
 export function createGateSdkClient(appToken: string) {
   return createClient({
     baseUrl: GATE_BASE_URL,
-    defaultHeaders: { "x-app-token": appToken },
+    defaultHeaders: { "x-app-feature-token": appToken },
   });
 }
 

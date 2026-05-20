@@ -118,7 +118,7 @@ async function uploadLargeFile(
 
   const startRes = await fetch(UPLOAD_URL, {
     method: "POST",
-    headers: { "x-app-token": appToken },
+    headers: { "x-app-feature-token": appToken },
     body: startForm,
   });
   if (!startRes.ok) return null;
@@ -173,7 +173,7 @@ async function uploadLargeFile(
 
   const finishRes = await fetch(UPLOAD_URL, {
     method: "POST",
-    headers: { "x-app-token": appToken },
+    headers: { "x-app-feature-token": appToken },
     body: finishForm,
   });
   if (!finishRes.ok) return null;

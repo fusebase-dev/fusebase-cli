@@ -51,7 +51,7 @@ There are several different auth artifacts in play:
 | API key | `Authorization: Bearer <apiKey>` | CLI and developer auth | `public-api` |
 | Session exchange token | query param `se` | bridge from org auth UI into app-wrapper auth | `app-wrapper` |
 | User session id | cookie `eversessionid` or header `everhelper-session-id` | user session fallback and custom app auth | `apps/api`, app backends, app-wrapper localhost special case |
-| App app token | cookie `fbsapptoken`, sometimes header `x-app-token` | app-scoped runtime auth | frontend, app backend, `apps/api` |
+| App app token | cookie `fbsapptoken`, sometimes header `x-app-feature-token` | app-scoped runtime auth | frontend, app backend, `apps/api` |
 | Dashboard subtoken | encrypted inside app JWT as `dst` | bearer auth to dashboard-service | `apps/api` dashboard proxy |
 | Gate subtoken | encrypted inside app JWT as `gst` | bearer auth to gate-service | `apps/api` gate proxy |
 
@@ -181,7 +181,7 @@ sequenceDiagram
   participant Gate as gate-service
   participant User as user-service
 
-  SPA->>API: request with x-app-token
+  SPA->>API: request with x-app-feature-token
   API->>Decode: verify app JWT
   alt dashboard-service request
     Decode-->>API: userId/sessionId + dst
@@ -229,7 +229,7 @@ sequenceDiagram
   SPA->>AppBE: fetch("/api/...")
   Cookie-->>AppBE: fbsapptoken sent automatically
   opt dev or explicit header
-    SPA->>AppBE: x-app-token
+    SPA->>AppBE: x-app-feature-token
   end
   AppBE->>AppBE: read header or fallback cookie
   AppBE->>API: request to dashboard/gate proxy or other platform APIs
@@ -237,10 +237,10 @@ sequenceDiagram
 
 Current best practice for app backends:
 
-- do not rely on `x-app-token` only
+- do not rely on `x-app-feature-token` only
 - deployed proxying may drop this custom header on the way to the app backend
 - backend handlers should read:
-  - `x-app-token`
+  - `x-app-feature-token`
   - or fallback cookie `fbsapptoken`
 
 ### 5. User session flow inside apps
@@ -306,16 +306,16 @@ Frontend:
 
 - local dev can receive the token via `postMessage`
 - generated app guidance reads `fbsapptoken` from cookie on startup
-- direct SDK and platform proxy calls usually send it in `x-app-token`
+- direct SDK and platform proxy calls usually send it in `x-app-feature-token`
 
 App backend:
 
-- should read `x-app-token`
+- should read `x-app-feature-token`
 - or fallback to `fbsapptoken`
 
 Platform proxy:
 
-- reads `x-app-token`
+- reads `x-app-feature-token`
 - falls back to `everhelper-session-id` or `eversessionid` when necessary
 
 ### Updating
@@ -381,7 +381,7 @@ Impact:
 
 Current state:
 
-- frontend often sends `x-app-token`
+- frontend often sends `x-app-feature-token`
 - deployed platform proxy may not preserve that header on `/api/*`
 
 Impact:
@@ -579,7 +579,7 @@ sequenceDiagram
   Nimbus-->>Wrapper: dst + gst
   Wrapper-->>Browser: Set-Cookie fbsapptoken
 
-  Browser->>API: platform requests with x-app-token
+  Browser->>API: platform requests with x-app-feature-token
   API->>Dash: Bearer dst
   API->>Gate: Bearer gst
 

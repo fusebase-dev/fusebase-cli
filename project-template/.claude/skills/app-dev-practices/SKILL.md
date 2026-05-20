@@ -105,8 +105,8 @@ Apps run as the main window. The platform sets a `fbsapptoken` cookie automatica
 1. Read app token on app load: check `fbsapptoken` cookie first, fall back to `window.FBS_APP_TOKEN` if the cookie is absent
 <% } %>
 2. Render app once token is available (show loading state until then)
-3. Pass token via `x-app-token` for direct SDK / Fusebase proxy calls
-4. For calls to the app's own backend (`/api/*`), rely on the same-origin cookie and make backend handlers read `x-app-token` or fallback to `fbsapptoken`
+3. Pass token via `x-app-feature-token` for direct SDK / Fusebase proxy calls
+4. For calls to the app's own backend (`/api/*`), rely on the same-origin cookie and make backend handlers read `x-app-feature-token` or fallback to `fbsapptoken`
 
 **All apps MUST handle token expiration** (`AppTokenValidationError` / 401). See skill **handling-authentication-errors** for the implementation pattern.
 
@@ -131,7 +131,7 @@ type AuthContextResponse = {
 }
 
 const response = await fetch('https://app-api.{FUSEBASE_HOST}/v4/api/auth/context', {
-  headers: { 'x-app-token': appToken },
+  headers: { 'x-app-feature-token': appToken },
 })
 const authContext: AuthContextResponse = response.ok ? await response.json() : {}
 const user = authContext.user ?? null
@@ -150,7 +150,7 @@ Fetch current user:
 
 ```typescript
 const response = await fetch('https://app-api.{FUSEBASE_HOST}/v4/api/users/me', {
-  headers: { 'x-app-token': appToken },
+  headers: { 'x-app-feature-token': appToken },
 })
 const user = response.ok ? await response.json() : null
 // authenticated: { id: 4124, email: "testemail@gmail.com" }
