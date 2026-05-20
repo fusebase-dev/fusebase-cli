@@ -425,6 +425,8 @@ Covers:
 **Load when working with Fusebase Gate or platform-level flows** — organizations, org user lists and membership, Gate tokens and authorization scopes, health/bootstrap, and how to use the **Gate MCP** and **Gate SDK** during development vs runtime.
 
 The skill explains how to interact with the **broader Fusebase ecosystem** beyond dashboard data: for example org-scoped user operations, platform services, email and campaign-related flows, automation, and integrations **as exposed through Gate** (see `references/*.md` for each topic). **Verify the fusebase-gate MCP server** is available before gate `tool_call` work (see skill).
+
+For one-click client onboarding into AI Apps, load **`references/app-magic-links.md`**: it covers `createAppMagicLink` (owner invite), `requestAppMagicLink` (visitor self-service, generic-200 contract), and `activateAppMagicLink` (the `/link` route token-exchange endpoint), including the 24h TTL and the `reason=expired|revoked` branching the SPA scaffold relies on. For custom app domains, set `VITE_FUSEBASE_GATE_URL=https://<your-gate-host>/v4/api/proxy/gate-service/v1` at build time so the SPA's `/link` route can reach Gate (the auto-derived base URL only covers Fusebase-managed `*.thefusebase.app` / `*.dev-thefusebase-app.com` hosts).
 <% if (it.flags?.includes("isolated-stores")) { %>
 For isolated SQL schema work, loading only `fusebase-gate/SKILL.md` is insufficient. Also load and follow `references/isolated-sql-migration-discipline.md`, `references/isolated-sql.md`, and `references/isolated-sql-stores.md` as hard invariants.
 <% } %>

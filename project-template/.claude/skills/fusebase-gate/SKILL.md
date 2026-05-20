@@ -31,6 +31,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 **specialized**
 
 - [Fusebase Gate — Isolated SQL migration discipline](references/isolated-sql-migration-discipline.md)
+- [Fusebase Gate App Magic Link Operations](references/app-magic-links.md)
 - [Fusebase Gate Billing And Stripe Flows](references/billing.md)
 - [Fusebase Gate Email Operations](references/emails.md)
 - [Fusebase Gate Files Flows](references/files.md)
