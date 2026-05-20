@@ -1,7 +1,7 @@
 ---
-version: "1.0.0"
+version: "1.1.0"
 mcp_prompt: appMagicLinks
-last_synced: "2026-05-06"
+last_synced: "2026-05-20"
 title: "Fusebase Gate App Magic Link Operations"
 category: specialized
 ---
@@ -14,13 +14,27 @@ category: specialized
 ---
 ## Fusebase Gate App Magic Link Operations
 
-These operations expose one-click client onboarding for AI Apps. They mirror the portal magic-link flow but live on the app subdomain (`https://{featureSub}.{domain}/link?id=…&redirect=…`) and target the `nimbus-ai` storage layer through Gate.
+These operations expose one-click client onboarding for AI Apps. They mirror the portal magic-link flow but live on the app subdomain (`https://{appSubdomain}.{domain}/link?id=…&redirect=…`) and target the `nimbus-ai` storage layer through Gate.
+
+## Terminology: `product` / `app` vs the Gate wire contract
+
+FuseBase renamed its core entities: the old `app` is now a **`product`**, and the old `feature` is now an **`app`**. The Gate magic-link **wire contract still uses the pre-rename field names**, so those field names no longer match the CLI (`fusebase.json`, `fusebase app list`). Mixing the two ids up is the single most common cause of an `App not found` / `404` failure on `createAppMagicLink` — read this table before constructing any call.
+
+| New name | Old name | What it is | Gate magic-link field | Where the value comes from |
+| --- | --- | --- | --- | --- |
+| **Product** | `app` | The deployable project / container | `appId` **path segment** of `createAppMagicLink` | `productId` in `fusebase.json` (the project; `fusebase product`) |
+| **App** | `feature` | A host-bearing unit (one subdomain) inside a Product | `appFeatureId` in the activation response; the scope of `featureToken` | `apps[].id` in `fusebase.json` / `fusebase app list` / `fusebase app get` |
+
+- `createAppMagicLink` path is `POST /:orgId/apps/:appId/magic-links`. Despite the `apps/:appId` spelling, `:appId` must be the **Product id** (`productId` from `fusebase.json`). Passing an **App** id (`apps[].id`, the value printed by `fusebase app list`) here is the #1 cause of `App not found`.
+- `appFeatureId` returned by `activateAppMagicLink` is an **App** id in the new naming — the host-bearing unit you see in `fusebase app list`. It is not a Product id and must never be sent back as the `appId` path segment.
+- `featureToken` is the Gate token for that **App** (host unit); `dashboardToken` is the dashboard-service token for the same App.
+- The wire field names (`appId`, `appFeatureId`, `featureToken`, the `fbsfeaturetoken` cookie) are intentionally left at their pre-rename spelling for backward compatibility. Do not rename them in API calls or cookies — only the human-facing concepts were renamed, not the contract.
 
 ## Relevant Operations
 
-- `createAppMagicLink` — owner/admin invite flow. Creates a 24h magic link for an email and dispatches it via the `magic_link_app` mail template. Optionally provisions a brand-new user and adds a user principal to every feature of the app.
-- `requestAppMagicLink` — visitor self-service flow. Visitor enters their email; Gate forwards to nimbus-ai which sends a magic link only when the email already has access under the app's current `accessPrincipals`. Always returns `{ ok: true }` so it cannot be used to enumerate emails or access state.
-- `activateAppMagicLink` — visitor activation. Exchanges a magic-link `globalId` for a session token, a Gate feature token, and a Dashboard feature token, plus the `redirectPath` the SPA must navigate to.
+- `createAppMagicLink` — owner/admin invite flow. Creates a 24h magic link for an email and dispatches it via the `magic_link_app` mail template. Optionally provisions a brand-new user and adds a user principal to every App of the Product.
+- `requestAppMagicLink` — visitor self-service flow. Visitor enters their email; Gate forwards to nimbus-ai which sends a magic link only when the email already has access under the App's current `accessPrincipals`. Always returns `{ ok: true }` so it cannot be used to enumerate emails or access state.
+- `activateAppMagicLink` — visitor activation. Exchanges a magic-link `globalId` for a session token, a Gate app token (`featureToken`), and a Dashboard token (`dashboardToken`), plus the `redirectPath` the SPA must navigate to.
 
 ## When To Use Each Flow
 
@@ -30,16 +44,16 @@ These operations expose one-click client onboarding for AI Apps. They mirror the
 
 ## Identity And Scoping Rules
 
-- `createAppMagicLink` is org-scoped: `orgId` and `appId` are required path inputs, and the caller must hold `app_magic_link.write` on that org plus org access.
-- `requestAppMagicLink` is app-scoped by host: the `host` path param is the visitor's current hostname (`window.location.host`); Gate resolves it to an app feature.
+- `createAppMagicLink` is org- and Product-scoped: `orgId` and `appId` are required path inputs, and `appId` is the **Product id** (`productId`), not an App id. The caller must hold `app_magic_link.write` on that org plus org access.
+- `requestAppMagicLink` is App-scoped by host: the `host` path param is the visitor's current hostname (`window.location.host`); Gate resolves it to an App (the host-bearing unit, formerly `feature`).
 - `activateAppMagicLink` is link-scoped: `globalId` is the random id from the email URL; possession of the id is the only credential.
-- Treat `globalId`, `appId`, and `appFeatureId` as opaque strings. Reuse values returned by previous responses.
+- Treat `globalId`, `appId`, and `appFeatureId` as opaque strings. Reuse values returned by previous responses, and never swap an `appId` (a Product id) for an `appFeatureId` (an App id).
 - The visitor endpoints intentionally run with `AuthModuleContract.accessVisitor()`: do not attach a session cookie or feature token before calling them.
 
 ## Invite Flow Rules (`createAppMagicLink`)
 
-- Body fields: `email` (required), `redirectPath` (optional; defaults to `/`), `addToAccessPrincipals` (optional; defaults to true).
-- `addToAccessPrincipals: true` provisions the user record if needed and appends `{ type: "user", id: <userId> }` to every feature of the app, de-duplicated. Use this when inviting a brand-new client.
+- The `appId` path segment is the **Product id** (`productId` from `fusebase.json`) — see the Terminology section. Body fields: `email` (required), `redirectPath` (optional; defaults to `/`), `addToAccessPrincipals` (optional; defaults to true).
+- `addToAccessPrincipals: true` provisions the user record if needed and appends `{ type: "user", id: <userId> }` to every App of the Product, de-duplicated. Use this when inviting a brand-new client.
 - `addToAccessPrincipals: false` is only valid for emails that already have access. Sending it with an unknown email returns 404 — by design, so the caller does not silently dispatch a useless link.
 - The response is `{ id, magicLinkUrl, expiresAt }`. `id` is the `globalId` and is also embedded inside `magicLinkUrl`.
 - Mail dispatch errors are logged but do not roll the row back; the owner can still copy `magicLinkUrl` from the response.
@@ -56,9 +70,10 @@ These operations expose one-click client onboarding for AI Apps. They mirror the
 - The SPA at `/link` reads `id` and `redirect` from the query string, then activates the link by issuing `POST {gateBaseUrl}/apps/magic-links/{id}/activate`. The bundled SPA template currently calls this endpoint directly via `fetch` so it stays usable before `@fusebase/fusebase-gate-sdk` exposes `AppMagicLinksApi.activateAppMagicLink`. Once that SDK ships, prefer `activateAppMagicLink({ path: { globalId: id } })` over hand-rolled fetches; the wire request is identical (the server already stored `redirectPath` on the link row at create time, so the client never sends it on activation).
 - Successful response: `{ id, sessionToken, featureToken, dashboardToken, redirectPath, expiresAt, appFeatureId }`.
   - `sessionToken` — set as the `eversessionid` cookie on the app subdomain so subsequent calls authenticate.
-  - `featureToken` — Gate feature token; persist via the existing scaffold convention (`postMessage`, cookie `fbsfeaturetoken`, etc.).
-  - `dashboardToken` — dashboard-service feature token, scoped to the same app and target user. The bundled SPA persists it as the `fbsdashboardtoken` cookie so dashboard SDK calls (`@fusebase/dashboard-service-sdk`) can authenticate after activation; in the deployed app-wrapper flow it is bundled inside the gate feature token JWT, but the magic-link activation hands both tokens out as discrete strings.
+  - `featureToken` — Gate token scoped to the resolved **App** (host unit) and target user; persist via the existing scaffold convention (`postMessage`, cookie `fbsfeaturetoken`, etc.).
+  - `dashboardToken` — dashboard-service token, scoped to the same App and target user. The bundled SPA persists it as the `fbsdashboardtoken` cookie so dashboard SDK calls (`@fusebase/dashboard-service-sdk`) can authenticate after activation; in the deployed app-wrapper flow it is bundled inside the gate feature token JWT, but the magic-link activation hands both tokens out as discrete strings.
   - `redirectPath` — relative path to navigate to after token persistence (`/` if the invite did not request a deep link).
+  - `appFeatureId` — the resolved **App** id (host-bearing unit, formerly `feature`) the tokens are scoped to; it matches an `apps[].id` from `fusebase app list`, not a Product id.
   - `expiresAt` is included so the SPA can mirror the same expired UI without a second round-trip.
 - Within the 24h TTL the link can be activated more than once (covers the "user opened the email twice" case).
 - Failure modes are well-typed:
@@ -88,6 +103,7 @@ These operations expose one-click client onboarding for AI Apps. They mirror the
 ## Working Rules
 
 - Always inspect the exact contract with `tools_describe` or `sdk_describe` before integration work — the request and response shapes are versioned independently from this prompt.
+- When wiring `createAppMagicLink`, pass the **Product id** (`productId` from `fusebase.json`) as the `appId` path segment. If a call fails with `App not found` / `404`, the most likely cause is an App id (`apps[].id` from `fusebase app list`) used where the Product id belongs — re-read the Terminology section.
 - For app templates that ship with a sign-in form, wire the form to `requestAppMagicLink` and the `/link` route to `activateAppMagicLink`. Never persist the magic link `id` past activation; treat it as single-flow credential material.
 - For owner-side admin UI, prefer `createAppMagicLink` with `addToAccessPrincipals=true` for first-time invites and `addToAccessPrincipals=false` for re-invites of users who already have access.
 - If activation fails, do not assume `accessPrincipals` is the wrong shape; re-read the `reason` field and follow the expired-link handling rules above.
@@ -95,7 +111,7 @@ These operations expose one-click client onboarding for AI Apps. They mirror the
 
 ## Version
 
-- **Version**: 1.0.0
+- **Version**: 1.1.0
 - **Category**: specialized
-- **Last synced**: 2026-05-06
+- **Last synced**: 2026-05-20
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
