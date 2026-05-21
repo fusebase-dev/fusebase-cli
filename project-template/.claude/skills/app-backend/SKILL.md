@@ -299,9 +299,9 @@ For external WebSocket integrations, use a path under `/api/webhooks/...` as wel
 
 ### Service-account token for webhooks
 
-Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_APP_TOKEN` — a platform-issued service-account token.
+Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token.
 
-**Security rule**: use `FBS_APP_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid app token — do not fall back to the service-account token.
+**Security rule**: use `FBS_FEATURE_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid app token — do not fall back to the service-account token.
 
 ## Dev Proxy
 

@@ -126,9 +126,9 @@ SDK token usage in app runtime:
 **Browser/UI runtime**:
 
 <% if (it.flags?.includes("portal-specific-apps")) { %>
-- Uses app token from global runtime variable `window.FBS_APP_TOKEN`; if it's missing, fall back to cookie `fbsapptoken`
+- Uses app token from global runtime variable `window.FBS_FEATURE_TOKEN`; if it's missing, fall back to cookie `fbsapptoken`
 <% } else { %>
-- Uses app token from cookie `fbsapptoken`; if the cookie is absent, fall back to `window.FBS_APP_TOKEN`
+- Uses app token from cookie `fbsapptoken`; if the cookie is absent, fall back to `window.FBS_FEATURE_TOKEN`
 <% } %>
 - `.env` is NOT accessible in browser
 - LLM must never assume `.env` tokens in UI code
@@ -181,9 +181,9 @@ SDK token usage in app runtime:
 ### SDK = Runtime Execution (browser and optional app backend)
 
 <% if (it.flags?.includes("portal-specific-apps")) { %>
-**Token**: App token from global runtime variable `window.FBS_APP_TOKEN` (fallback: cookie `fbsapptoken`); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
+**Token**: App token from global runtime variable `window.FBS_FEATURE_TOKEN` (fallback: cookie `fbsapptoken`); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 <% } else { %>
-**Token**: App token from cookie `fbsapptoken` (fallback: `window.FBS_APP_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
+**Token**: App token from cookie `fbsapptoken` (fallback: `window.FBS_FEATURE_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 <% } %>
 
 **SDK Structure**:
@@ -293,9 +293,9 @@ export function createDatabasesApi(appToken: string): DatabasesApi {
 }
 
 <% if (it.flags?.includes("portal-specific-apps")) { %>
-// Usage: read app token from `window.FBS_APP_TOKEN` (fallback: `fbsapptoken` cookie), then e.g.:
+// Usage: read app token from `window.FBS_FEATURE_TOKEN` (fallback: `fbsapptoken` cookie), then e.g.:
 <% } else { %>
-// Usage: read app token from `fbsapptoken` cookie (fallback `window.FBS_APP_TOKEN`), then e.g.:
+// Usage: read app token from `fbsapptoken` cookie (fallback `window.FBS_FEATURE_TOKEN`), then e.g.:
 <% } %>
 // const databasesApi = createDatabasesApi(appToken)
 // const response = await databasesApi.listDatabases({})
