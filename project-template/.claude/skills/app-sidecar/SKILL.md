@@ -217,7 +217,7 @@ fusebase remote-logs runtime <appId>
 Output includes logs from all containers, prefixed by name:
 
 ```
-[api]: Server started on port 3001
+[api]: Server started on port 3000
 [chromium]: Browser ready on port 9222
 ```
 

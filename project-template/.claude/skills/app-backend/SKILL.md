@@ -233,7 +233,7 @@ app.get("/health", (c) => c.json({ ok: true }));
 // import { itemsRoutes } from './routes/items'
 // app.route('/items', itemsRoutes)
 
-const port = Number(process.env.BACKEND_PORT) || 3001;
+const port = Number(process.env.BACKEND_PORT) || 3000;
 
 serve({ fetch: app.fetch, port }, () => {
   console.log(`Server running on port ${port}`);
@@ -266,7 +266,7 @@ app.get(
   })),
 );
 
-const port = Number(process.env.BACKEND_PORT) || 3001;
+const port = Number(process.env.BACKEND_PORT) || 3000;
 const server = serve({ fetch: app.fetch, port });
 injectWebSocket(server);
 ```
@@ -280,7 +280,7 @@ When an app has a backend, the `/api` path prefix is **reserved for the backend*
 
 ## Webhooks and External WebSocket Callbacks (Inbound)
 
-Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsapptoken` cookie or `x-app-feature-token` header.
+Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsfeaturetoken` cookie or `x-app-feature-token` header.
 
 The platform proxy skips app-token auth for any path under `/api/webhooks/`, including both HTTP routes and WebSocket upgrade routes.
 
@@ -371,7 +371,7 @@ This works in both environments:
 
 ## Calling the Backend from the SPA
 
-Use standard `fetch` with relative URLs. Same-origin requests automatically include the `fbsapptoken` cookie, so the backend can authenticate on behalf of the user without depending on a custom header surviving the deployed platform proxy:
+Use standard `fetch` with relative URLs. Same-origin requests automatically include the `fbsfeaturetoken` cookie, so the backend can authenticate on behalf of the user without depending on a custom header surviving the deployed platform proxy:
 
 ```typescript
 // In SPA code
@@ -385,7 +385,7 @@ If you still send `x-app-feature-token` from the SPA, treat it as a best-effort 
 import { getCookie } from "hono/cookie";
 
 const appToken =
-  c.req.header("x-app-feature-token") || getCookie(c, "fbsapptoken");
+  c.req.header("x-app-feature-token") || getCookie(c, "fbsfeaturetoken");
 
 if (!appToken) {
   return c.json({ error: "Missing app token" }, 401);
