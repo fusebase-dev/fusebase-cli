@@ -704,6 +704,7 @@ export const initCommand = new Command("init")
         // skills that require flags.
         try {
           await copyAgentsAndSkills(cwd);
+          await replaceFusebaseHostPlaceholder(cwd);
         } catch (error) {
           console.error("Warning: Failed to apply skill filtering:", error);
         }
