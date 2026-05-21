@@ -17,10 +17,11 @@ This file is the **definitive guide** for AI agents and LLMs working with Fuseba
 - ✅ **verify API calls with test scripts** — when unsure about endpoint behavior or response shapes, use the **api-exploration** skill to create temporary tokens and run test scripts (`_test-api.ts` / `_test-sdk.ts`). These are **not** MCP workarounds; they test the real API directly. Clean up test files after verification.
 <% } %>
 
-**Inside the app (runtime code — UI and optional app `backend/`): use SDK ONLY.**
+**Inside the app (runtime code — UI and optional app `backend/`): use the SDK for every operation it covers.**
 
 - ✅ UI and app backend read/write via SDK methods with the app token — for `DashboardDataApi`, use **`path: { dashboardId, viewId }`** ([details](#dashboard-data-sdk-path-parameters-spa-and-backend))
 - ✅ SDK initialized with app token
+- ✅ a few operations have **no SDK method** — runtime code calls those documented endpoints directly with `fetch` (follow the relevant skill or the scaffold)
 - ❌ runtime code must not call MCP
 
 ## Type safety invariant (non-negotiable)
@@ -363,13 +364,15 @@ The app must be registered before it can run. Never leave these for the user to 
 
 ## Explicitly Forbidden
 
-### ❌ Manual HTTP Requests
+### ❌ Guessed or hand-built HTTP Requests
 
-**DO NOT** make manual HTTP requests to Fusebase APIs:
+**DO NOT** invent HTTP calls to Fusebase APIs:
 
 - Don't guess endpoints
-- Don't construct URLs manually
-- Use MCP tools during development, SDK methods in runtime
+- Don't hand-build URLs for operations the SDK already covers
+- Use MCP tools during development; in runtime, use the SDK for everything it covers
+
+**Allowed exception:** a few operations have no SDK method — runtime code may call the **documented** endpoint directly with `fetch`, as shown in the relevant skill or the scaffold. Calling a documented endpoint is fine; inventing one is not.
 
 ### ❌ Calling MCP from Runtime
 
@@ -530,7 +533,7 @@ When debugging local runtime issues through the CLI, load skill **dev-debug-logs
 
 See `fusebase-cli` skill for complete CLI documentation.
 
-The `fusebase` CLI is installed globally. **Always run it as `fusebase <command>` — never use `npx fusebase`.**
+The `fusebase` CLI is installed globally. **Always run it as `fusebase <command>` — never use `npx fusebase`** (other `npx` commands, e.g. `npx shadcn`, are allowed).
 
 Key commands:
 
