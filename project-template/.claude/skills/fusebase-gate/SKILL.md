@@ -30,6 +30,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 
 **specialized**
 
+- [Fusebase Auth For AI Apps](references/fusebase-auth.md)
 - [Fusebase Gate — Isolated SQL migration discipline](references/isolated-sql-migration-discipline.md)
 - [Fusebase Gate App Magic Link Operations](references/app-magic-links.md)
 - [Fusebase Gate Billing And Stripe Flows](references/billing.md)
@@ -101,7 +102,7 @@ After connection is established: discover operations via `tools_list` / `tools_s
 
 ## Gate SDK runtime patterns for reliable permission sync
 
-When runtime code uses `@fusebase/fusebase-gate-sdk`, `fusebase app update --sync-gate-permissions` relies on static analysis of SDK method calls. Prefer these patterns so operations are detected reliably:
+When runtime code uses `@fusebase/fusebase-gate-sdk`, `fusebase feature update --sync-gate-permissions` relies on static analysis of SDK method calls. Prefer these patterns so operations are detected reliably:
 
 1. Keep direct method calls on API instances:
    - `const api = createWorkspacesApi(token)`
@@ -136,8 +137,8 @@ For runtime code with `@fusebase/fusebase-gate-sdk`, enforce explicit operation-
 
 ## Security rule: no implicit service-token fallback
 
-For user-facing Gate flows (membership status, current user/org access, workspace visibility), do not silently switch from app-token auth to service-token auth when Gate returns auth errors.
+For user-facing Gate flows (membership status, current user/org access, workspace visibility), do not silently switch from feature-token auth to service-token auth when Gate returns auth errors.
 
 - Required behavior: fail closed (`401/403`) and surface a clear runtime error.
 - Forbidden behavior: "best-effort" fallback that returns data from owner/service context.
-- If an app truly needs service-token operations, keep them in explicit system/admin-only endpoints with audit logging and clear auth-source labeling.
+- If a feature truly needs service-token operations, keep them in explicit system/admin-only endpoints with audit logging and clear auth-source labeling.
