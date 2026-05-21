@@ -271,6 +271,67 @@ const server = serve({ fetch: app.fetch, port });
 injectWebSocket(server);
 ```
 
+## App API Contract: `openapi.json` Is Required
+
+When backend scaffold is present, the app root contains `openapi.json`. This file is **not decorative** and it is **not generated from Hono routes automatically**.
+
+`openapi.json` is the app's published API contract. Fusebase reads it during `fusebase deploy` and uses it for:
+
+- App API registry publication
+- Discovery in dashboard/App APIs SDK
+- Gate/MCP `list/search/describe/call` flows
+
+This means backend implementation and API contract are **two separate artifacts**:
+
+- **Implementation**: Hono routes in `backend/src/routes/*.ts`
+- **Contract**: `apps/<app>/openapi.json`
+
+If you add or change a backend route and do not update `openapi.json`, the route may still work over HTTP, but the platform will not know about it for registry/discovery/call purposes.
+
+### Rule: route change == `openapi.json` review
+
+Any change to the backend route surface must be treated as incomplete until you have checked whether `openapi.json` needs to change.
+
+Examples:
+
+- New `app.get("/tasks")` route → add/update the corresponding path + operation in `openapi.json`
+- New request/response shape → update `components.schemas`
+- Route removed or renamed → remove/update the operation in `openapi.json`
+
+Do not treat spec updates as optional follow-up documentation. They are part of the same backend change.
+
+### Required metadata
+
+Fusebase-specific metadata is expressed via OpenAPI `x-*` extensions.
+
+Allowed values:
+
+- `x-fusebase-visibility`: `org` or `private`
+- `x-fusebase-execution-mode`: `sync` or `async`
+
+Practical guidance:
+
+- Use `x-fusebase-visibility: org` for business operations that other apps/agents in the org may discover and call
+- Use `x-fusebase-visibility: private` for internal-only routes such as `health`, debug/admin endpoints, and routes that should not appear in org-wide discovery
+- Use `x-fusebase-execution-mode: sync` for normal request/response APIs
+- Use `x-fusebase-execution-mode: async` for long-running or async-style operations
+
+### Validation and deploy checks
+
+Before deploy, run:
+
+```bash
+fusebase api validate
+```
+
+During deploy, read the registry line carefully:
+
+```text
+Published OpenAPI registry: N operation(s) from openapi.json
+```
+
+If you added new backend operations and `N` did not increase as expected, assume `openapi.json` is stale until proven otherwise.
+
 ## Routing: `/api` is Reserved for the Backend
 
 When an app has a backend, the `/api` path prefix is **reserved for the backend**. The SPA must not define client-side routes under `/api`.
@@ -473,6 +534,13 @@ Before adding a backend:
 - [ ] Verified `fusebase dev start` proxies `/api` to backend (automatic when `backend` block exists in `fusebase.json`)
 - [ ] Updated `fusebase.json` with `backend` block
 - [ ] SPA does not define routes under `/api`
+- [ ] Reviewed app-root `openapi.json` as the canonical app API contract
+- [ ] Kept `openapi.json` in sync with every new/changed backend route
+- [ ] Used only valid Fusebase OpenAPI extensions:
+  - `x-fusebase-visibility`: `org | private`
+  - `x-fusebase-execution-mode`: `sync | async`
+- [ ] Ran `fusebase api validate`
+- [ ] Checked deploy output for `Published OpenAPI registry: N operation(s) from openapi.json`
 - [ ] No `.env` files or `dotenv` — secrets injected by `fusebase dev start`
 - [ ] Verified backend tier + all sidecar tiers sum to ≤ 2 CPU / 4 Gi
 

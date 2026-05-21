@@ -34,11 +34,15 @@ async function ensureOpenApiSpec(targetDir: string): Promise<void> {
   const openApiPath = join(targetDir, "openapi.json");
   try {
     await access(openApiPath);
-    console.log("✓ Reused existing openapi.json");
+    console.log(
+      "✓ Reused existing openapi.json (app API contract used for registry/discovery; keep it in sync with backend routes)",
+    );
     return;
   } catch {
     await writeFile(openApiPath, createDefaultOpenApiSpec(), "utf-8");
-    console.log("✓ Created openapi.json");
+    console.log(
+      "✓ Created openapi.json (app API contract used for registry/discovery; update it when backend routes change)",
+    );
   }
 }
 
