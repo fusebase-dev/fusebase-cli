@@ -111,7 +111,7 @@ export function createDefaultOpenApiSpec(): string {
             operationId: "getHealth",
             summary: "Health check",
             description: "Returns the backend health status.",
-            "x-fusebase-visibility": "private",
+            "x-fusebase-visibility": "org",
             "x-fusebase-execution-mode": "sync",
             responses: {
               "200": {
