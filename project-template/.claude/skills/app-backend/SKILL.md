@@ -453,6 +453,16 @@ if (!appToken) {
 }
 ```
 
+### Magic-link session exchange (Memberspace / `/link`)
+
+The bundled SPA `/link` route only activates the link and sets platform cookies; **that is not enough** for knowing which user opened the link. Implement in your app backend:
+
+1. `POST /api/account/from-magic-link` — body `{ featureToken, sessionToken, redirectPath? }` from `activateAppMagicLink` **before** redirect.
+2. Call Gate `GET /:orgId/me/access` with `x-app-feature-token` + **`EverHelper-Session-ID: <sessionToken>`** (not platform cookies alone).
+3. Issue an app-owned httpOnly session cookie (HMAC, bound to `userId`); `GET /api/account/me` reads only that cookie.
+
+See `fusebase-gate/references/app-magic-links.md` (§ App Session Exchange) and `fusebase-auth.md` (§ Magic-Link → App Session Exchange). Env: `FUSEBASE_ORG_ID`, `APP_SESSION_SECRET`.
+
 ### Gate security: fail closed for user-facing routes
 
 When backend routes call Gate on behalf of the current user, keep auth in app-token context only.

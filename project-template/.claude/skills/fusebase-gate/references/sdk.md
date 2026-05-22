@@ -1,7 +1,7 @@
 ---
-version: "1.6.1"
+version: "1.6.2"
 mcp_prompt: sdk
-last_synced: "2026-04-22"
+last_synced: "2026-05-22"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -45,6 +45,7 @@ For session-backed org access checks, use AccessApi.getMyOrgAccess instead of in
 After sign-up, sign-in, or provisioning writes, re-check AccessApi.getMyOrgAccess before unlocking org content.
 Treat `result: "invite"` from addOrgUser as pending membership rather than granted access.
 Do not treat a custom /me or account endpoint as the source of truth unless it delegates to getMyOrgAccess.
+For magic-link activation and other user-context Gate calls from an app backend, forward the activation `sessionToken` as header `EverHelper-Session-ID` together with `x-app-feature-token`. The activation `featureToken` (Gate bearer) alone does not resolve the authenticated user on `getMyOrgAccess`.
 For Stripe onboarding, product, checkout, and subscription-cancel flows, start with BillingApi methods such as getStripeOauth, createStripeProduct, updateStripeProduct, deleteStripeProduct, getStripePaymentLink, cancelStripeSubscription, and getStripePaymentState.
 Treat BillingApi.updateStripeMode as a compatibility surface for now rather than a normal app workflow: Gate billing should currently be considered live-mode only.
 Use stable app-owned `kind` and `kindId` values in BillingApi. Keep `kind` at 32 chars max and `kindId` at 64 chars max so webhook-backed payment state can be checked later for the same entitlement.
@@ -81,7 +82,7 @@ Always handle SDK operation failures explicitly.
 
 ## Version
 
-- **Version**: 1.6.1
+- **Version**: 1.6.2
 - **Category**: meta
-- **Last synced**: 2026-04-22
+- **Last synced**: 2026-05-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
