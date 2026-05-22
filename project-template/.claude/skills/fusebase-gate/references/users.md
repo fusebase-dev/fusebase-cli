@@ -1,7 +1,7 @@
 ---
-version: "1.0.0"
+version: "1.1.0"
 mcp_prompt: users
-last_synced: "2026-03-31"
+last_synced: "2026-05-22"
 title: "Fusebase Gate Users Operations"
 category: specialized
 ---
@@ -33,6 +33,7 @@ These operations manage organization membership flows exposed by Gate.
 - Treat orgId as required path input for both operations.
 - For addOrgUser, send the request body under body with the exact schema expected by the operation.
 - A 201 from addOrgUser is not proof that the current session or target user already has org access.
+- A 201 from addOrgUser is not proof that the user can receive **App** self-service magic links: org membership does not update App `accessPrincipals`. After inviting a member, set `fusebase app update <appId> --access=…` or use `createAppMagicLink` with `addToAccessPrincipals` (see `appMagicLinks` / `fusebaseAuth` prompts).
 - For access gating after provisioning, verify with getMyOrgAccess instead of inferring from addOrgUser success.
 - `autoConfirmClientInvite` is only valid for org-only invites with `orgRole: "client"`.
 - For workspace or portal flows, load the membership prompt group and inspect the operation contract before constructing payloads.
@@ -48,7 +49,7 @@ These operations manage organization membership flows exposed by Gate.
 
 ## Version
 
-- **Version**: 1.0.0
+- **Version**: 1.1.0
 - **Category**: specialized
-- **Last synced**: 2026-03-31
+- **Last synced**: 2026-05-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

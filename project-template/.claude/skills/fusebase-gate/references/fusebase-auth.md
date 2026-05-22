@@ -1,7 +1,7 @@
 ---
-version: "1.0.0"
+version: "1.1.0"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-05-21"
+last_synced: "2026-05-22"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -19,7 +19,7 @@ These operations help AI Apps add Fusebase account registration, login, logout, 
 ## Relevant Operations
 
 - `registerFusebaseUser` — visitor-safe email/password registration. Creates a Fusebase account through auth-form and returns a `sessionId` plus `userId` when registration succeeds. It does not add org membership.
-- `registerFusebaseOrgMember` — protected registration plus org provisioning. Creates the Fusebase account, then adds the new user to the path `orgId`. Requires `org.members.write` and org access. Use this only on registration, not on login.
+- `registerFusebaseOrgMember` — protected registration plus org provisioning. Creates the Fusebase account, then adds the new user to the path `orgId`. Requires `org.members.write` and org access. Use this only on registration, not on login. **Does not add the user to any App's `accessPrincipals`** — org membership and app access are separate (see below).
 - `loginFusebaseUser` — visitor-safe email/password login. Returns `sessionId` plus `userId`, or a challenge. Never provisions org membership.
 - `completeFusebaseAuthChallenge` — completes auth-form challenges such as CAPTCHA, OTP, mail OTP, two-factor, and MFA states returned by register/login.
 - `requestFusebasePasswordRestore` — sends restore email through auth-form. It returns a generic `{ ok: true }` and must not be used for account enumeration.
@@ -40,6 +40,25 @@ These operations help AI Apps add Fusebase account registration, login, logout, 
 - Default org role is `client`. Send `orgRole` only when the app intentionally grants another role and the caller has permission to do so.
 - The operation uses `org.members.write`; expose it only through a trusted app backend or a properly scoped feature token. Do not build an unauthenticated public form that can choose arbitrary org ids or roles.
 - If auth-form returns a challenge during registration, complete the challenge first and retry the registration flow as appropriate. Membership is added only after an authenticated registration response includes a `userId`.
+
+## App `accessPrincipals` Vs Org Membership
+
+Org membership (`registerFusebaseOrgMember`, `addOrgUser`, org invites) and **App** access (`accessPrincipals` on each host-bearing App, set via `fusebase app create/update --access`) are **different** control planes. Both may be required for the same person.
+
+- `registerFusebaseOrgMember` (and org-service membership writes) **never** append `{ type: user }` or `orgRole:*` principals to an App. A user can be `orgRole:member` in the org and still have **no** self-service magic-link email if the App's principals list does not include their role.
+- `requestAppMagicLink` (see the `appMagicLinks` prompt) dispatches mail only when the email resolves to a user who **matches** the App's current `accessPrincipals` (`user`, matching `orgRole`, or `orgGroup`). It always returns `{ ok: true }` — absence of mail is not an API error.
+- `createAppMagicLink` with `addToAccessPrincipals: true` (default) adds a **user** principal and is the usual path for first-time client invites; that is separate from org registration.
+- When an App ships a **Memberspace** or role-gated area plus self-service magic links, set principals at create time, e.g. `fusebase app create … --access=visitor,orgRole:client,orgRole:member,orgRole:manager,orgRole:owner` (adjust roles to the product). `--access=visitor` alone does **not** imply org members can request links.
+- An App with **empty** `accessPrincipals` falls back to "any org member" for self-service; a non-empty list (including only `visitor`) is evaluated strictly — do not assume org membership alone is enough.
+
+## Magic-Link → App Session Exchange
+
+For Apps that use `requestAppMagicLink` / `activateAppMagicLink` (load the `appMagicLinks` prompt for wire details), auth success is **not** complete when the SPA sets platform cookies alone.
+
+- After `activateAppMagicLink`, pass **both** `featureToken` and `sessionToken` to a trusted app backend **before** `window.location.replace` to a protected route. Platform cookie `fbsfeaturetoken` can be overwritten on the next HTML request by the app proxy to match whichever Fusebase user is logged into the **browser**, not the magic-link recipient.
+- User identity on Gate calls such as `getMyOrgAccess` requires forwarding `sessionToken` as header `EverHelper-Session-ID` together with `x-app-feature-token` (or your app's equivalent). **`featureToken` alone does not resolve the authenticated user** on those endpoints.
+- Recommended pattern: `POST /api/account/from-magic-link` with `{ featureToken, sessionToken }` in the **body** → backend builds a Gate client with both credentials → `getMyOrgAccess` → issue an **app-owned** session cookie (HMAC-signed, bound to `userId`) → redirect. Do not infer the recipient from `eversessionid` or `fbsfeaturetoken` alone after redirect.
+- Do not call `getMyOrgAccess` with only the app feature token for visitors or fresh magic-link users — that can return the **token owner's** identity (e.g. the app owner in dev, or a stale browser session in prod). Fail closed: show the sign-in / request-link UI instead.
 
 ## Challenge, 2FA, And MFA
 
@@ -70,7 +89,7 @@ These operations help AI Apps add Fusebase account registration, login, logout, 
 
 ## Version
 
-- **Version**: 1.0.0
+- **Version**: 1.1.0
 - **Category**: specialized
-- **Last synced**: 2026-05-21
+- **Last synced**: 2026-05-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
