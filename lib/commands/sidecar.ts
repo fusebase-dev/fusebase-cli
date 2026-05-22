@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import {
@@ -108,14 +108,14 @@ function ensureJobFlagOrExit(jobName: string | undefined): void {
 
 function findJobOrExit(
   feature: FeatureConfig,
-  featureId: string,
+  appId: string,
   jobName: string,
 ): BackendJobConfig {
   const jobs = feature.backend?.jobs ?? [];
   const job = jobs.find((j) => j.name === jobName);
   if (!job) {
     console.error(
-      `Error: Job "${jobName}" not found in feature "${featureId}". ` +
+      `Error: Job "${jobName}" not found in app "${appId}". ` +
         `Available jobs: ${jobs.map((j) => j.name).join(", ") || "(none)"}`,
     );
     process.exit(1);
@@ -123,15 +123,31 @@ function findJobOrExit(
   return job;
 }
 
+function resolveAppId(opts: {
+  app?: string;
+  feature?: string;
+}): string {
+  const appId = opts.app ?? opts.feature;
+  if (!appId) {
+    console.error("Error: --app is required.");
+    process.exit(1);
+  }
+  if (opts.feature && !opts.app) {
+    console.warn("[deprecated] --feature is deprecated; use --app instead.");
+  }
+  return appId;
+}
+
 const addCommand = new Command("add")
   .description("Add a sidecar container to an app backend in fusebase.json")
-  .requiredOption(
-    "-f, --feature <featureId>",
-    "Feature ID to add the sidecar to",
+  .option("-a, --app <appId>", "App ID to add the sidecar to")
+  .addOption(
+    new Option("-f, --feature <featureId>", "Deprecated alias for --app")
+      .hideHelp(),
   )
   .requiredOption(
     "-n, --name <name>",
-    "Sidecar name (unique within the feature)",
+    "Sidecar name (unique within the app)",
   )
   .requiredOption("-i, --image <image>", "Docker image (e.g. chromium:latest)")
   .option("-p, --port <port>", "Port the sidecar listens on", parseInt)
@@ -147,7 +163,7 @@ const addCommand = new Command("add")
   )
   .option(
     "-s, --secret <KEY|KEY:ALIAS...>",
-    "Whitelist app feature secret keys to inject as env vars (repeatable; use KEY:ALIAS to rename)",
+    "Whitelist app secret keys to inject as env vars (repeatable; use KEY:ALIAS to rename)",
     (val: string, prev: string[]) => [...prev, val],
     [] as string[],
   )
@@ -157,7 +173,8 @@ const addCommand = new Command("add")
   )
   .action(
     (opts: {
-      feature: string;
+      app?: string;
+      feature?: string;
       name: string;
       image: string;
       port?: number;
@@ -166,6 +183,7 @@ const addCommand = new Command("add")
       secret: string[];
       job?: string;
     }) => {
+      const appId = resolveAppId(opts);
       ensureJobFlagOrExit(opts.job);
 
       const fuseJsonPath = join(process.cwd(), FUSE_JSON);
@@ -182,10 +200,10 @@ const addCommand = new Command("add")
       }
 
       const features = fuseConfig.apps ?? [];
-      const featureIndex = features.findIndex((f) => f.id === opts.feature);
+      const featureIndex = features.findIndex((f) => f.id === appId);
       if (featureIndex === -1) {
         console.error(
-          `Error: Feature "${opts.feature}" not found in ${FUSE_JSON}. Available features: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+          `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
         );
         process.exit(1);
       }
@@ -194,8 +212,8 @@ const addCommand = new Command("add")
 
       if (!feature.backend) {
         console.error(
-          `Error: Feature "${opts.feature}" does not have a backend configured. ` +
-            `Add a "backend" block to this feature in ${FUSE_JSON} first.`,
+          `Error: App "${appId}" does not have a backend configured. ` +
+            `Add a "backend" block to this app in ${FUSE_JSON} first.`,
         );
         process.exit(1);
       }
@@ -219,7 +237,7 @@ const addCommand = new Command("add")
       }
 
       const job = opts.job
-        ? findJobOrExit(feature, opts.feature, opts.job)
+        ? findJobOrExit(feature, appId, opts.job)
         : null;
 
       const sidecars: SidecarConfig[] = job
@@ -227,8 +245,8 @@ const addCommand = new Command("add")
         : (feature.backend.sidecars ?? []);
 
       const scopeLabel = job
-        ? `job "${opts.job}" of feature "${opts.feature}"`
-        : `feature "${opts.feature}"`;
+        ? `job "${opts.job}" of app "${appId}"`
+        : `app "${appId}"`;
 
       if (sidecars.some((s) => s.name === opts.name)) {
         console.error(
@@ -293,8 +311,8 @@ const addCommand = new Command("add")
 
       console.log(
         job
-          ? `✓ Added sidecar "${opts.name}" to job "${opts.job}" of feature "${opts.feature}" in ${FUSE_JSON}`
-          : `✓ Added sidecar "${opts.name}" to feature "${opts.feature}" in ${FUSE_JSON}`,
+          ? `✓ Added sidecar "${opts.name}" to job "${opts.job}" of app "${appId}" in ${FUSE_JSON}`
+          : `✓ Added sidecar "${opts.name}" to app "${appId}" in ${FUSE_JSON}`,
       );
       console.log(`  Image: ${opts.image}`);
       if (opts.port !== undefined) console.log(`  Port:  ${opts.port}`);
@@ -314,103 +332,109 @@ const removeCommand = new Command("remove")
   .description(
     "Remove a sidecar container from an app backend in fusebase.json",
   )
-  .requiredOption(
-    "-f, --feature <featureId>",
-    "Feature ID to remove the sidecar from",
+  .option("-a, --app <appId>", "App ID to remove the sidecar from")
+  .addOption(
+    new Option("-f, --feature <featureId>", "Deprecated alias for --app")
+      .hideHelp(),
   )
   .requiredOption("-n, --name <name>", "Sidecar name to remove")
   .option(
     "-j, --job <jobName>",
     "Remove from the named cron job instead of the backend (requires 'job-sidecars' flag)",
   )
-  .action((opts: { feature: string; name: string; job?: string }) => {
-    ensureJobFlagOrExit(opts.job);
+  .action(
+    (opts: { app?: string; feature?: string; name: string; job?: string }) => {
+      const appId = resolveAppId(opts);
+      ensureJobFlagOrExit(opts.job);
 
-    const fuseJsonPath = join(process.cwd(), FUSE_JSON);
+      const fuseJsonPath = join(process.cwd(), FUSE_JSON);
 
-    if (!existsSync(fuseJsonPath)) {
-      console.error(`Error: ${FUSE_JSON} not found in current directory.`);
-      process.exit(1);
-    }
+      if (!existsSync(fuseJsonPath)) {
+        console.error(`Error: ${FUSE_JSON} not found in current directory.`);
+        process.exit(1);
+      }
 
-    const fuseConfig = loadFuseConfig();
-    if (!fuseConfig) {
-      console.error(`Error: Failed to parse ${FUSE_JSON}.`);
-      process.exit(1);
-    }
+      const fuseConfig = loadFuseConfig();
+      if (!fuseConfig) {
+        console.error(`Error: Failed to parse ${FUSE_JSON}.`);
+        process.exit(1);
+      }
 
-    const features = fuseConfig.apps ?? [];
-    const featureIndex = features.findIndex((f) => f.id === opts.feature);
-    if (featureIndex === -1) {
-      console.error(
-        `Error: Feature "${opts.feature}" not found in ${FUSE_JSON}. Available features: ${features.map((f) => f.id).join(", ") || "(none)"}`,
-      );
-      process.exit(1);
-    }
+      const features = fuseConfig.apps ?? [];
+      const featureIndex = features.findIndex((f) => f.id === appId);
+      if (featureIndex === -1) {
+        console.error(
+          `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+        );
+        process.exit(1);
+      }
 
-    const feature = features[featureIndex]!;
-    const job = opts.job
-      ? findJobOrExit(feature, opts.feature, opts.job)
-      : null;
+      const feature = features[featureIndex]!;
+      const job = opts.job
+        ? findJobOrExit(feature, appId, opts.job)
+        : null;
 
-    const sidecars: SidecarConfig[] = job
-      ? (job.sidecars ?? [])
-      : (feature.backend?.sidecars ?? []);
-    const sidecarIndex = sidecars.findIndex((s) => s.name === opts.name);
-    if (sidecarIndex === -1) {
-      const scopeLabel = job
-        ? `job "${opts.job}" of feature "${opts.feature}"`
-        : `feature "${opts.feature}"`;
-      console.error(
-        `Error: No sidecar named "${opts.name}" found for ${scopeLabel}.`,
-      );
-      process.exit(1);
-    }
+      const sidecars: SidecarConfig[] = job
+        ? (job.sidecars ?? [])
+        : (feature.backend?.sidecars ?? []);
+      const sidecarIndex = sidecars.findIndex((s) => s.name === opts.name);
+      if (sidecarIndex === -1) {
+        const scopeLabel = job
+          ? `job "${opts.job}" of app "${appId}"`
+          : `app "${appId}"`;
+        console.error(
+          `Error: No sidecar named "${opts.name}" found for ${scopeLabel}.`,
+        );
+        process.exit(1);
+      }
 
-    const nextSidecars = sidecars.filter((s) => s.name !== opts.name);
-    if (job) {
-      if (nextSidecars.length === 0) {
-        delete job.sidecars;
+      const nextSidecars = sidecars.filter((s) => s.name !== opts.name);
+      if (job) {
+        if (nextSidecars.length === 0) {
+          delete job.sidecars;
+        } else {
+          job.sidecars = nextSidecars;
+        }
       } else {
-        job.sidecars = nextSidecars;
+        feature.backend!.sidecars = nextSidecars;
+        if (feature.backend!.sidecars.length === 0) {
+          delete feature.backend!.sidecars;
+        }
       }
-    } else {
-      feature.backend!.sidecars = nextSidecars;
-      if (feature.backend!.sidecars.length === 0) {
-        delete feature.backend!.sidecars;
-      }
-    }
 
-    const raw = readFileSync(fuseJsonPath, "utf-8");
-    const indent = detectIndent(raw);
-    writeFileSync(
-      fuseJsonPath,
-      JSON.stringify(fuseConfig, null, indent) + "\n",
-      "utf-8",
-    );
-    invalidateFuseConfigCache();
+      const raw = readFileSync(fuseJsonPath, "utf-8");
+      const indent = detectIndent(raw);
+      writeFileSync(
+        fuseJsonPath,
+        JSON.stringify(fuseConfig, null, indent) + "\n",
+        "utf-8",
+      );
+      invalidateFuseConfigCache();
 
-    console.log(
-      job
-        ? `✓ Removed sidecar "${opts.name}" from job "${opts.job}" of feature "${opts.feature}" in ${FUSE_JSON}`
-        : `✓ Removed sidecar "${opts.name}" from feature "${opts.feature}" in ${FUSE_JSON}`,
-    );
-    console.log(
-      `  The sidecar will be removed from cloud infrastructure on the next fusebase deploy.`,
-    );
-  });
+      console.log(
+        job
+          ? `✓ Removed sidecar "${opts.name}" from job "${opts.job}" of app "${appId}" in ${FUSE_JSON}`
+          : `✓ Removed sidecar "${opts.name}" from app "${appId}" in ${FUSE_JSON}`,
+      );
+      console.log(
+        `  The sidecar will be removed from cloud infrastructure on the next fusebase deploy.`,
+      );
+    },
+  );
 
 const listCommand = new Command("list")
   .description("List sidecar containers for an app backend")
-  .requiredOption(
-    "-f, --feature <featureId>",
-    "Feature ID to list sidecars for",
+  .option("-a, --app <appId>", "App ID to list sidecars for")
+  .addOption(
+    new Option("-f, --feature <featureId>", "Deprecated alias for --app")
+      .hideHelp(),
   )
   .option(
     "-j, --job <jobName>",
     "List sidecars for the named cron job instead of the backend (requires 'job-sidecars' flag)",
   )
-  .action((opts: { feature: string; job?: string }) => {
+  .action((opts: { app?: string; feature?: string; job?: string }) => {
+    const appId = resolveAppId(opts);
     ensureJobFlagOrExit(opts.job);
 
     const fuseConfig = loadFuseConfig();
@@ -422,16 +446,16 @@ const listCommand = new Command("list")
     }
 
     const features = fuseConfig.apps ?? [];
-    const feature = features.find((f) => f.id === opts.feature);
+    const feature = features.find((f) => f.id === appId);
     if (!feature) {
       console.error(
-        `Error: Feature "${opts.feature}" not found in ${FUSE_JSON}. Available features: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+        `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
       );
       process.exit(1);
     }
 
     const job = opts.job
-      ? findJobOrExit(feature, opts.feature, opts.job)
+      ? findJobOrExit(feature, appId, opts.job)
       : null;
 
     const sidecars: SidecarConfig[] = job
@@ -441,16 +465,16 @@ const listCommand = new Command("list")
     if (sidecars.length === 0) {
       console.log(
         job
-          ? `No sidecars configured for job "${opts.job}" of feature "${opts.feature}".`
-          : `No sidecars configured for feature "${opts.feature}".`,
+          ? `No sidecars configured for job "${opts.job}" of app "${appId}".`
+          : `No sidecars configured for app "${appId}".`,
       );
       return;
     }
 
     console.log(
       job
-        ? `Sidecars for job "${opts.job}" of feature "${opts.feature}" (${sidecars.length}/${MAX_SIDECARS}):`
-        : `Sidecars for feature "${opts.feature}" (${sidecars.length}/${MAX_SIDECARS}):`,
+        ? `Sidecars for job "${opts.job}" of app "${appId}" (${sidecars.length}/${MAX_SIDECARS}):`
+        : `Sidecars for app "${appId}" (${sidecars.length}/${MAX_SIDECARS}):`,
     );
     console.log();
 

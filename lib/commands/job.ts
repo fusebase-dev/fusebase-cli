@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import {
@@ -9,10 +9,26 @@ import {
 
 const FUSE_JSON = "fusebase.json";
 
+function resolveAppId(opts: { app?: string; feature?: string }): string {
+  const appId = opts.app ?? opts.feature;
+  if (!appId) {
+    console.error("Error: --app is required.");
+    process.exit(1);
+  }
+  if (opts.feature && !opts.app) {
+    console.warn("[deprecated] --feature is deprecated; use --app instead.");
+  }
+  return appId;
+}
+
 const createCommand = new Command("create")
   .description("Add a cron job to an app's backend in fusebase.json")
-  .requiredOption("-f, --feature <featureId>", "Feature ID to add the job to")
-  .requiredOption("-n, --name <name>", "Job name (unique within the feature)")
+  .option("-a, --app <appId>", "App ID to add the job to")
+  .addOption(
+    new Option("-f, --feature <featureId>", "Deprecated alias for --app")
+      .hideHelp(),
+  )
+  .requiredOption("-n, --name <name>", "Job name (unique within the app)")
   .requiredOption(
     "-c, --cron <expression>",
     'Cron expression (5 fields, e.g. "0 * * * *")',
@@ -23,11 +39,13 @@ const createCommand = new Command("create")
   )
   .action(
     (opts: {
-      feature: string;
+      app?: string;
+      feature?: string;
       name: string;
       cron: string;
       command: string;
     }) => {
+      const appId = resolveAppId(opts);
       const fuseJsonPath = join(process.cwd(), FUSE_JSON);
 
       if (!existsSync(fuseJsonPath)) {
@@ -42,10 +60,10 @@ const createCommand = new Command("create")
       }
 
       const features = fuseConfig.apps ?? [];
-      const featureIndex = features.findIndex((f) => f.id === opts.feature);
+      const featureIndex = features.findIndex((f) => f.id === appId);
       if (featureIndex === -1) {
         console.error(
-          `Error: Feature "${opts.feature}" not found in ${FUSE_JSON}. Available features: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+          `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
         );
         process.exit(1);
       }
@@ -54,8 +72,8 @@ const createCommand = new Command("create")
 
       if (!feature.backend) {
         console.error(
-          `Error: Feature "${opts.feature}" does not have a backend configured. ` +
-            `Add a "backend" block to this feature in ${FUSE_JSON} first.`,
+          `Error: App "${appId}" does not have a backend configured. ` +
+            `Add a "backend" block to this app in ${FUSE_JSON} first.`,
         );
         process.exit(1);
       }
@@ -64,7 +82,7 @@ const createCommand = new Command("create")
       const existingIndex = jobs.findIndex((j) => j.name === opts.name);
       if (existingIndex !== -1) {
         console.error(
-          `Error: A job named "${opts.name}" already exists for feature "${opts.feature}". ` +
+          `Error: A job named "${opts.name}" already exists for app "${appId}". ` +
             `Use a different name or remove the existing job from ${FUSE_JSON} first.`,
         );
         process.exit(1);
@@ -90,7 +108,7 @@ const createCommand = new Command("create")
       invalidateFuseConfigCache();
 
       console.log(
-        `✓ Added cron job "${opts.name}" to feature "${opts.feature}" in ${FUSE_JSON}`,
+        `✓ Added cron job "${opts.name}" to app "${appId}" in ${FUSE_JSON}`,
       );
       console.log(`  Type:    cron`);
       console.log(`  Cron:    ${opts.cron}`);
@@ -107,12 +125,14 @@ function detectIndent(src: string): number {
 
 const deleteCommand = new Command("delete")
   .description("Remove a cron job from an app's backend in fusebase.json")
-  .requiredOption(
-    "-f, --feature <featureId>",
-    "Feature ID to remove the job from",
+  .option("-a, --app <appId>", "App ID to remove the job from")
+  .addOption(
+    new Option("-f, --feature <featureId>", "Deprecated alias for --app")
+      .hideHelp(),
   )
   .requiredOption("-n, --name <name>", "Job name to remove")
-  .action((opts: { feature: string; name: string }) => {
+  .action((opts: { app?: string; feature?: string; name: string }) => {
+    const appId = resolveAppId(opts);
     const fuseJsonPath = join(process.cwd(), FUSE_JSON);
 
     if (!existsSync(fuseJsonPath)) {
@@ -127,10 +147,10 @@ const deleteCommand = new Command("delete")
     }
 
     const features = fuseConfig.apps ?? [];
-    const featureIndex = features.findIndex((f) => f.id === opts.feature);
+    const featureIndex = features.findIndex((f) => f.id === appId);
     if (featureIndex === -1) {
       console.error(
-        `Error: Feature "${opts.feature}" not found in ${FUSE_JSON}. Available features: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+        `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
       );
       process.exit(1);
     }
@@ -140,7 +160,7 @@ const deleteCommand = new Command("delete")
     const jobIndex = jobs.findIndex((j) => j.name === opts.name);
     if (jobIndex === -1) {
       console.error(
-        `Error: No job named "${opts.name}" found for feature "${opts.feature}".`,
+        `Error: No job named "${opts.name}" found for app "${appId}".`,
       );
       process.exit(1);
     }
@@ -160,7 +180,7 @@ const deleteCommand = new Command("delete")
     invalidateFuseConfigCache();
 
     console.log(
-      `✓ Removed cron job "${opts.name}" from feature "${opts.feature}" in ${FUSE_JSON}`,
+      `✓ Removed cron job "${opts.name}" from app "${appId}" in ${FUSE_JSON}`,
     );
     console.log(
       `  The job will be deleted from cloud infrastructure on the next fusebase deploy.`,

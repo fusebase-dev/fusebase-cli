@@ -562,25 +562,25 @@ Manage sidecar containers for an app backend or for a specific cron job. Sidecar
 
 ```bash
 # Add a sidecar to the backend (default — same as today)
-fusebase sidecar add --feature <featureId> --name <name> --image <image> \
+fusebase sidecar add --app <appId> --name <name> --image <image> \
   [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
   [--secret KEY|KEY:ALIAS ...]
 
 # Add a sidecar to a specific cron job (requires the job-sidecars flag)
-fusebase sidecar add --feature <featureId> --job <jobName> --name <name> --image <image> \
+fusebase sidecar add --app <appId> --job <jobName> --name <name> --image <image> \
   [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
   [--secret KEY|KEY:ALIAS ...]
 
 # Remove a sidecar
-fusebase sidecar remove --feature <featureId> --name <name> [--job <jobName>]
+fusebase sidecar remove --app <appId> --name <name> [--job <jobName>]
 
 # List configured sidecars
-fusebase sidecar list --feature <featureId> [--job <jobName>]
+fusebase sidecar list --app <appId> [--job <jobName>]
 ```
 
 **Options:**
 
-- `--feature <featureId>` (required) — app ID
+- `--app <appId>` (required) — app ID. `--feature` (`-f`) is accepted as a deprecated alias.
 - `--name <name>` (required for add/remove) — sidecar name. Lowercase letters, digits, and hyphens; max 63 chars; must start with a lowercase letter.
 - `--image <image>` (required for add) — Docker image reference (e.g. `browserless/chrome:latest`)
 - `--port <port>` — port the sidecar listens on (informational; `localhost:<port>` from the main container)

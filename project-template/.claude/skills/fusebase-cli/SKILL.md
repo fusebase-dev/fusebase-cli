@@ -343,24 +343,24 @@ During `fusebase init`, only **required** MCP servers (per the catalog, respecti
 ### Create App Secrets
 
 ```bash
-fusebase secret create --feature <featureId> --secret <KEY:description> [--secret ...]
+fusebase secret create --app <appId> --secret <KEY:description> [--secret ...]
 ```
 
 Creates secrets (with empty values) for an app and prints the URL where you can set the actual values.
 
 **Required Options:**
 
-- `--feature <featureId>` - App ID to create secrets for
+- `--app <appId>` - App ID to create secrets for. `--feature` is accepted as a deprecated alias.
 - `--secret <KEY:description>` - Secret to create. Format: `KEY` or `KEY:description`. **Repeatable** — pass multiple `--secret` flags to create several secrets at once.
 
 **Examples:**
 
 ```bash
 # Create a single secret
-fusebase secret create --feature abc123 --secret "API_KEY:Third-party API key"
+fusebase secret create --app abc123 --secret "API_KEY:Third-party API key"
 
 # Create multiple secrets at once
-fusebase secret create --feature abc123 \
+fusebase secret create --app abc123 \
   --secret "API_KEY:Third-party API key" \
   --secret "DB_PASSWORD:Database connection password" \
   --secret "WEBHOOK_SECRET"
@@ -432,7 +432,7 @@ Sidecar containers are pre-built Docker images deployed alongside an app's backe
 ```bash
 # Add a sidecar to an app backend
 fusebase sidecar add \
-  --feature <featureId> \
+  --app <appId> \
   --name <name> \
   --image <image> \
   [--port <port>] \
@@ -441,11 +441,13 @@ fusebase sidecar add \
   [--secret KEY|KEY:ALIAS ...]
 
 # Remove a sidecar by name
-fusebase sidecar remove --feature <featureId> --name <name>
+fusebase sidecar remove --app <appId> --name <name>
 
 # List configured sidecars
-fusebase sidecar list --feature <featureId>
+fusebase sidecar list --app <appId>
 ```
+
+`--feature` (`-f`) is accepted as a deprecated alias for `--app` (`-a`).
 
 **Options for `sidecar add`:**
 - `--name` — unique name within the app (used for log filtering and identification)
@@ -463,14 +465,14 @@ Cron jobs declared under `apps[].backend.jobs[]` deploy as **independent** Azure
 
 ```bash
 # Add a sidecar to a job
-fusebase sidecar add --feature <featureId> --job <jobName> \
+fusebase sidecar add --app <appId> --job <jobName> \
   --name <name> --image <image> [--port <port>] [--tier ...] [--env ...] [--secret ...]
 
 # Remove a sidecar from a job
-fusebase sidecar remove --feature <featureId> --job <jobName> --name <name>
+fusebase sidecar remove --app <appId> --job <jobName> --name <name>
 
 # List sidecars on a job
-fusebase sidecar list --feature <featureId> --job <jobName>
+fusebase sidecar list --app <appId> --job <jobName>
 ```
 
 When `--job` is omitted, all three subcommands target backend sidecars exactly as before. Each job has its own 3-sidecar cap, independent of the backend cap. Sidecar names are unique per scope — the same name (e.g. `chromium`) may exist on the backend and on a job. Per-job sidecars are stored under `apps[].backend.jobs[].sidecars[]` in `fusebase.json` and deployed on the next `fusebase deploy`. See the **app-sidecar** skill for full details (networking, termination, examples).
