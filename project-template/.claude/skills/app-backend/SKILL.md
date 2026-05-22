@@ -60,7 +60,7 @@ Sidecars are pre-built Docker images that run alongside the app backend in the s
 
 ```bash
 # Add a sidecar to an app backend
-fusebase sidecar add --feature <featureId> --name chromium --image browserless/chrome:latest --port 9222
+fusebase sidecar add --app <appId> --name chromium --image browserless/chrome:latest --port 9222
 ```
 
 The sidecar is accessible from the backend at `http://localhost:<port>`. Max 3 sidecars per app.
@@ -82,7 +82,7 @@ const data = await response.json();
 Each sidecar can have its own env vars (not shared with the backend):
 
 ```bash
-fusebase sidecar add --feature <featureId> --name redis --image redis:7 --port 6379 --env REDIS_MAXMEMORY=256mb
+fusebase sidecar add --app <appId> --name redis --image redis:7 --port 6379 --env REDIS_MAXMEMORY=256mb
 ```
 
 ### Debugging Sidecars
@@ -458,7 +458,7 @@ config.refreshToken = tokens.refresh_token; // lost on restart
 ## Dev Workflow
 
 1. `cd apps/my-app/backend && npm install` — install backend deps
-2. `fusebase secret create --feature <id> --secret "KEY:description"` — register secrets (if needed), set values via the printed URL
+2. `fusebase secret create --app <id> --secret "KEY:description"` — register secrets (if needed), set values via the printed URL
 3. `fusebase dev start` — starts both SPA and backend; secrets are injected automatically as env vars
 
 **No `.env` files or `dotenv` needed** — `fusebase dev start` injects secrets into the backend process.
@@ -490,7 +490,7 @@ Cron jobs run on a schedule using the **same Docker image** as the app backend. 
 
 ```bash
 fusebase job create \
-  --feature <featureId> \
+  --app <appId> \
   --name <job-name> \
   --cron "0 * * * *" \
   --command "npm run cron:my-job"
@@ -545,7 +545,7 @@ Key points:
 ### Removing a Job
 
 ```bash
-fusebase job delete --feature <featureId> --name <job-name>
+fusebase job delete --app <appId> --name <job-name>
 ```
 
 This removes the job from `backend.jobs` in `fusebase.json`. On the next `fusebase deploy` the job will be automatically deleted from cloud infrastructure.
@@ -559,7 +559,7 @@ Add a sidecar to a job:
 
 ```bash
 fusebase sidecar add \
-  --feature <featureId> \
+  --app <appId> \
   --job <jobName> \
   --name <name> \
   --image <dockerImage> \
@@ -572,7 +572,7 @@ Example — a screenshot cron with its own headless browser:
 
 ```bash
 fusebase sidecar add \
-  --feature my-scraper \
+  --app my-scraper \
   --job screenshots \
   --name chromium \
   --image browserless/chrome:latest \

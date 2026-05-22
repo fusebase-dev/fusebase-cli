@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { setAppSecrets, fetchOrg } from "../api.ts";
 import { getConfig, loadFuseConfig } from "../config.ts";
 
@@ -28,7 +28,11 @@ export const secretCreateCommand = new Command("create")
   .description(
     "Create secrets (with empty values) for an app and print the URL to set their values",
   )
-  .requiredOption("--feature <featureId>", "Feature ID to create secrets for")
+  .option("--app <appId>", "App ID to create secrets for")
+  .addOption(
+    new Option("--feature <featureId>", "Deprecated alias for --app")
+      .hideHelp(),
+  )
   .requiredOption(
     "--secret <key:description>",
     "Secret to create (format: KEY or KEY:description). Repeatable for multiple secrets.",
@@ -37,9 +41,20 @@ export const secretCreateCommand = new Command("create")
   )
   .action(
     async (options: {
-      feature: string;
+      app?: string;
+      feature?: string;
       secret: { key: string; description?: string }[];
     }) => {
+      const appId = options.app ?? options.feature;
+      if (!appId) {
+        console.error("Error: --app is required.");
+        process.exit(1);
+      }
+      if (options.feature && !options.app) {
+        console.warn(
+          "[deprecated] --feature is deprecated; use --app instead.",
+        );
+      }
       if (options.secret.length === 0) {
         console.error("Error: At least one --secret is required.");
         process.exit(1);
@@ -63,7 +78,6 @@ export const secretCreateCommand = new Command("create")
         process.exit(1);
       }
 
-      const featureId = options.feature;
       const secrets = options.secret.map((s) => ({
         key: s.key,
         value: "",
@@ -85,7 +99,7 @@ export const secretCreateCommand = new Command("create")
           config.apiKey,
           fuseConfig.orgId,
           fuseConfig.productId,
-          featureId,
+          appId,
           secrets,
         );
         console.log(`✓ Created ${result.secrets.length} secret(s):`);
@@ -105,7 +119,7 @@ export const secretCreateCommand = new Command("create")
       // Print URL to set secret values
       try {
         const org = await fetchOrg(config.apiKey, fuseConfig.orgId);
-        const url = `https://${org.effectiveDomain}/dashboard/${fuseConfig.orgId}/apps/features/${featureId}/secrets`;
+        const url = `https://${org.effectiveDomain}/dashboard/${fuseConfig.orgId}/apps/features/${appId}/secrets`;
         console.log(`\nSet secret values at:\n  ${url}`);
       } catch (error) {
         console.error(
