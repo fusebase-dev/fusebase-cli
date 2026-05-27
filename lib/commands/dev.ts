@@ -369,7 +369,7 @@ devCommand
 
     // Allocate a backend port if the feature has a backend
     const backendPort = selectedFeature.backend?.dev?.command
-      ? await findAvailablePort(3001)
+      ? await findAvailablePort(4000)
       : undefined;
 
     // Start the backend dev process if configured

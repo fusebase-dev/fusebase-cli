@@ -60,7 +60,7 @@ Sidecars are pre-built Docker images that run alongside the app backend in the s
 
 ```bash
 # Add a sidecar to an app backend
-fusebase sidecar add --feature <featureId> --name chromium --image browserless/chrome:latest --port 9222
+fusebase sidecar add --app <appId> --name chromium --image browserless/chrome:latest --port 9222
 ```
 
 The sidecar is accessible from the backend at `http://localhost:<port>`. Max 3 sidecars per app.
@@ -82,7 +82,7 @@ const data = await response.json();
 Each sidecar can have its own env vars (not shared with the backend):
 
 ```bash
-fusebase sidecar add --feature <featureId> --name redis --image redis:7 --port 6379 --env REDIS_MAXMEMORY=256mb
+fusebase sidecar add --app <appId> --name redis --image redis:7 --port 6379 --env REDIS_MAXMEMORY=256mb
 ```
 
 ### Debugging Sidecars
@@ -233,7 +233,7 @@ app.get("/health", (c) => c.json({ ok: true }));
 // import { itemsRoutes } from './routes/items'
 // app.route('/items', itemsRoutes)
 
-const port = Number(process.env.BACKEND_PORT) || 3001;
+const port = Number(process.env.BACKEND_PORT) || 3000;
 
 serve({ fetch: app.fetch, port }, () => {
   console.log(`Server running on port ${port}`);
@@ -266,10 +266,71 @@ app.get(
   })),
 );
 
-const port = Number(process.env.BACKEND_PORT) || 3001;
+const port = Number(process.env.BACKEND_PORT) || 3000;
 const server = serve({ fetch: app.fetch, port });
 injectWebSocket(server);
 ```
+
+## App API Contract: `openapi.json` Is Required
+
+When backend scaffold is present, the app root contains `openapi.json`. This file is **not decorative** and it is **not generated from Hono routes automatically**.
+
+`openapi.json` is the app's published API contract. Fusebase reads it during `fusebase deploy` and uses it for:
+
+- App API registry publication
+- Discovery in dashboard/App APIs SDK
+- Gate/MCP `list/search/describe/call` flows
+
+This means backend implementation and API contract are **two separate artifacts**:
+
+- **Implementation**: Hono routes in `backend/src/routes/*.ts`
+- **Contract**: `apps/<app>/openapi.json`
+
+If you add or change a backend route and do not update `openapi.json`, the route may still work over HTTP, but the platform will not know about it for registry/discovery/call purposes.
+
+### Rule: route change == `openapi.json` review
+
+Any change to the backend route surface must be treated as incomplete until you have checked whether `openapi.json` needs to change.
+
+Examples:
+
+- New `app.get("/tasks")` route → add/update the corresponding path + operation in `openapi.json`
+- New request/response shape → update `components.schemas`
+- Route removed or renamed → remove/update the operation in `openapi.json`
+
+Do not treat spec updates as optional follow-up documentation. They are part of the same backend change.
+
+### Required metadata
+
+Fusebase-specific metadata is expressed via OpenAPI `x-*` extensions.
+
+Allowed values:
+
+- `x-fusebase-visibility`: `org` or `private`
+- `x-fusebase-execution-mode`: `sync` or `async`
+
+Practical guidance:
+
+- Use `x-fusebase-visibility: org` for business operations that other apps/agents in the org may discover and call
+- Use `x-fusebase-visibility: private` for internal-only routes such as `health`, debug/admin endpoints, and routes that should not appear in org-wide discovery
+- Use `x-fusebase-execution-mode: sync` for normal request/response APIs
+- Use `x-fusebase-execution-mode: async` for long-running or async-style operations
+
+### Validation and deploy checks
+
+Before deploy, run:
+
+```bash
+fusebase api validate
+```
+
+During deploy, read the registry line carefully:
+
+```text
+Published OpenAPI registry: N operation(s) from openapi.json
+```
+
+If you added new backend operations and `N` did not increase as expected, assume `openapi.json` is stale until proven otherwise.
 
 ## Routing: `/api` is Reserved for the Backend
 
@@ -280,7 +341,7 @@ When an app has a backend, the `/api` path prefix is **reserved for the backend*
 
 ## Webhooks and External WebSocket Callbacks (Inbound)
 
-Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsapptoken` cookie or `x-app-feature-token` header.
+Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsfeaturetoken` cookie or `x-app-feature-token` header.
 
 The platform proxy skips app-token auth for any path under `/api/webhooks/`, including both HTTP routes and WebSocket upgrade routes.
 
@@ -299,9 +360,9 @@ For external WebSocket integrations, use a path under `/api/webhooks/...` as wel
 
 ### Service-account token for webhooks
 
-Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_APP_TOKEN` — a platform-issued service-account token.
+Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token.
 
-**Security rule**: use `FBS_APP_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid app token — do not fall back to the service-account token.
+**Security rule**: use `FBS_FEATURE_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid app token — do not fall back to the service-account token.
 
 ## Dev Proxy
 
@@ -371,7 +432,7 @@ This works in both environments:
 
 ## Calling the Backend from the SPA
 
-Use standard `fetch` with relative URLs. Same-origin requests automatically include the `fbsapptoken` cookie, so the backend can authenticate on behalf of the user without depending on a custom header surviving the deployed platform proxy:
+Use standard `fetch` with relative URLs. Same-origin requests automatically include the `fbsfeaturetoken` cookie, so the backend can authenticate on behalf of the user without depending on a custom header surviving the deployed platform proxy:
 
 ```typescript
 // In SPA code
@@ -385,12 +446,22 @@ If you still send `x-app-feature-token` from the SPA, treat it as a best-effort 
 import { getCookie } from "hono/cookie";
 
 const appToken =
-  c.req.header("x-app-feature-token") || getCookie(c, "fbsapptoken");
+  c.req.header("x-app-feature-token") || getCookie(c, "fbsfeaturetoken");
 
 if (!appToken) {
   return c.json({ error: "Missing app token" }, 401);
 }
 ```
+
+### Magic-link session exchange (Memberspace / `/link`)
+
+The bundled SPA `/link` route only activates the link and sets platform cookies; **that is not enough** for knowing which user opened the link. Implement in your app backend:
+
+1. `POST /api/account/from-magic-link` — body `{ featureToken, sessionToken, redirectPath? }` from `activateAppMagicLink` **before** redirect.
+2. Call Gate `GET /:orgId/me/access` with `x-app-feature-token` + **`EverHelper-Session-ID: <sessionToken>`** (not platform cookies alone).
+3. Issue an app-owned httpOnly session cookie (HMAC, bound to `userId`); `GET /api/account/me` reads only that cookie.
+
+See `fusebase-gate/references/app-magic-links.md` (§ App Session Exchange) and `fusebase-auth.md` (§ Magic-Link → App Session Exchange). Env: `FUSEBASE_ORG_ID`, `APP_SESSION_SECRET`.
 
 ### Gate security: fail closed for user-facing routes
 
@@ -510,7 +581,7 @@ config.refreshToken = tokens.refresh_token; // lost on restart
 ## Dev Workflow
 
 1. `cd apps/my-app/backend && npm install` — install backend deps
-2. `fusebase secret create --feature <id> --secret "KEY:description"` — register secrets (if needed), set values via the printed URL
+2. `fusebase secret create --app <id> --secret "KEY:description"` — register secrets (if needed), set values via the printed URL
 3. `fusebase dev start` — starts both SPA and backend; secrets are injected automatically as env vars
 
 **No `.env` files or `dotenv` needed** — `fusebase dev start` injects secrets into the backend process.
@@ -525,6 +596,13 @@ Before adding a backend:
 - [ ] Verified `fusebase dev start` proxies `/api` to backend (automatic when `backend` block exists in `fusebase.json`)
 - [ ] Updated `fusebase.json` with `backend` block
 - [ ] SPA does not define routes under `/api`
+- [ ] Reviewed app-root `openapi.json` as the canonical app API contract
+- [ ] Kept `openapi.json` in sync with every new/changed backend route
+- [ ] Used only valid Fusebase OpenAPI extensions:
+  - `x-fusebase-visibility`: `org | private`
+  - `x-fusebase-execution-mode`: `sync | async`
+- [ ] Ran `fusebase api validate`
+- [ ] Checked deploy output for `Published OpenAPI registry: N operation(s) from openapi.json`
 - [ ] No `.env` files or `dotenv` — secrets injected by `fusebase dev start`
 - [ ] Verified backend tier + all sidecar tiers sum to ≤ 2 CPU / 4 Gi
 
@@ -542,7 +620,7 @@ Cron jobs run on a schedule using the **same Docker image** as the app backend. 
 
 ```bash
 fusebase job create \
-  --feature <featureId> \
+  --app <appId> \
   --name <job-name> \
   --cron "0 * * * *" \
   --command "npm run cron:my-job"
@@ -597,7 +675,7 @@ Key points:
 ### Removing a Job
 
 ```bash
-fusebase job delete --feature <featureId> --name <job-name>
+fusebase job delete --app <appId> --name <job-name>
 ```
 
 This removes the job from `backend.jobs` in `fusebase.json`. On the next `fusebase deploy` the job will be automatically deleted from cloud infrastructure.
@@ -611,7 +689,7 @@ Add a sidecar to a job:
 
 ```bash
 fusebase sidecar add \
-  --feature <featureId> \
+  --app <appId> \
   --job <jobName> \
   --name <name> \
   --image <dockerImage> \
@@ -624,7 +702,7 @@ Example — a screenshot cron with its own headless browser:
 
 ```bash
 fusebase sidecar add \
-  --feature my-scraper \
+  --app my-scraper \
   --job screenshots \
   --name chromium \
   --image browserless/chrome:latest \

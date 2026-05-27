@@ -26,7 +26,7 @@ Sidecars are pre-built Docker images deployed alongside an app backend in the sa
 
 ```bash
 fusebase sidecar add \
-  --feature <featureId> \
+  --app <appId> \
   --name <name> \
   --image <dockerImage> \
   [--port <port>] \
@@ -39,7 +39,7 @@ Example:
 
 ```bash
 fusebase sidecar add \
-  --feature my-scraper \
+  --app my-scraper \
   --name chromium \
   --image browserless/chrome:latest \
   --port 9222 \
@@ -51,14 +51,16 @@ fusebase sidecar add \
 ### Remove a Sidecar
 
 ```bash
-fusebase sidecar remove --feature <featureId> --name <name>
+fusebase sidecar remove --app <appId> --name <name>
 ```
 
 ### List Sidecars
 
 ```bash
-fusebase sidecar list --feature <featureId>
+fusebase sidecar list --app <appId>
 ```
+
+`--feature` (`-f`) is accepted as a deprecated alias for `--app` (`-a`).
 
 ## Whitelisting Secrets
 
@@ -68,13 +70,13 @@ Use the repeatable `--secret` option on `fusebase sidecar add` to opt in:
 
 ```bash
 # Inject the secret as an env var with the same name (DB_PASSWORD)
-fusebase sidecar add --feature my-scraper --name redis \
+fusebase sidecar add --app my-scraper --name redis \
   --image redis:7-alpine \
   --secret DB_PASSWORD
 
 # Inject the secret under a different env var name inside the sidecar
 # (sidecar sees REDIS_AUTH_TOKEN; the underlying secret remains DB_PASSWORD)
-fusebase sidecar add --feature my-scraper --name redis \
+fusebase sidecar add --app my-scraper --name redis \
   --image redis:7-alpine \
   --secret DB_PASSWORD:REDIS_AUTH_TOKEN
 ```
@@ -84,7 +86,7 @@ fusebase sidecar add --feature my-scraper --name redis \
 Secrets must be **registered** with the app beforehand (or alongside) via:
 
 ```bash
-fusebase secret create --feature <featureId> --secret "DB_PASSWORD:Redis auth"
+fusebase secret create --app <appId> --secret "DB_PASSWORD:Redis auth"
 ```
 
 Set the actual values in the FuseBase web UI (the URL is printed by `secret create`). Only registered keys may be referenced from `--secret`. See the **app-secrets** skill for the full secret lifecycle.
@@ -160,7 +162,7 @@ Each sidecar should expose a different port. The `port` field is informational f
 **Port 3000 is reserved for the backend app** — do not configure sidecars to listen on port 3000. If a sidecar image defaults to port 3000 (e.g. `browserless/chrome`), override it via environment variables. For example, browserless uses `PORT` env var:
 
 ```bash
-fusebase sidecar add --feature my-scraper --name chromium \
+fusebase sidecar add --app my-scraper --name chromium \
   --image browserless/chrome:latest --port 9222 \
   --env PORT=9222
 ```
@@ -191,7 +193,7 @@ Cron jobs are **excluded** from this budget — each cron job runs as its own co
 Sidecar env vars are isolated — they are NOT shared with the backend or other sidecars. Use them for sidecar-specific configuration:
 
 ```bash
-fusebase sidecar add --feature my-app --name redis --image redis:7 \
+fusebase sidecar add --app my-app --name redis --image redis:7 \
   --env REDIS_MAXMEMORY=256mb --env REDIS_MAXMEMORY_POLICY=allkeys-lru
 ```
 
@@ -217,7 +219,7 @@ fusebase remote-logs runtime <appId>
 Output includes logs from all containers, prefixed by name:
 
 ```
-[api]: Server started on port 3001
+[api]: Server started on port 3000
 [chromium]: Browser ready on port 9222
 ```
 
@@ -266,7 +268,7 @@ To give a job its own auxiliary container (for example a headless browser used o
 
 ```bash
 fusebase sidecar add \
-  --feature <featureId> \
+  --app <appId> \
   --job <jobName> \
   --name <name> \
   --image <dockerImage> \
@@ -279,7 +281,7 @@ Example — give a `screenshots` cron its own headless browser:
 
 ```bash
 fusebase sidecar add \
-  --feature my-scraper \
+  --app my-scraper \
   --job screenshots \
   --name chromium \
   --image browserless/chrome:latest \
@@ -291,8 +293,8 @@ fusebase sidecar add \
 `--job` works the same way for `remove` and `list`:
 
 ```bash
-fusebase sidecar remove --feature my-scraper --job screenshots --name chromium
-fusebase sidecar list --feature my-scraper --job screenshots
+fusebase sidecar remove --app my-scraper --job screenshots --name chromium
+fusebase sidecar list --app my-scraper --job screenshots
 ```
 
 When `--job` is omitted, all three subcommands target backend sidecars exactly as before.

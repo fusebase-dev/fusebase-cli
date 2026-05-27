@@ -17,10 +17,11 @@ This file is the **definitive guide** for AI agents and LLMs working with Fuseba
 - ✅ **verify API calls with test scripts** — when unsure about endpoint behavior or response shapes, use the **api-exploration** skill to create temporary tokens and run test scripts (`_test-api.ts` / `_test-sdk.ts`). These are **not** MCP workarounds; they test the real API directly. Clean up test files after verification.
 <% } %>
 
-**Inside the app (runtime code — UI and optional app `backend/`): use SDK ONLY.**
+**Inside the app (runtime code — UI and optional app `backend/`): use the SDK for every operation it covers.**
 
 - ✅ UI and app backend read/write via SDK methods with the app token — for `DashboardDataApi`, use **`path: { dashboardId, viewId }`** ([details](#dashboard-data-sdk-path-parameters-spa-and-backend))
 - ✅ SDK initialized with app token
+- ✅ a few operations have **no SDK method** — runtime code calls those documented endpoints directly with `fetch` (follow the relevant skill or the scaffold)
 - ❌ runtime code must not call MCP
 
 ## Type safety invariant (non-negotiable)
@@ -126,21 +127,21 @@ SDK token usage in app runtime:
 **Browser/UI runtime**:
 
 <% if (it.flags?.includes("portal-specific-apps")) { %>
-- Uses app token from global runtime variable `window.FBS_APP_TOKEN`; if it's missing, fall back to cookie `fbsapptoken`
+- Uses app token from global runtime variable `window.FBS_FEATURE_TOKEN`; if it's missing, fall back to cookie `fbsfeaturetoken`
 <% } else { %>
-- Uses app token from cookie `fbsapptoken`; if the cookie is absent, fall back to `window.FBS_APP_TOKEN`
+- Uses app token from cookie `fbsfeaturetoken`; if the cookie is absent, fall back to `window.FBS_FEATURE_TOKEN`
 <% } %>
 - `.env` is NOT accessible in browser
 - LLM must never assume `.env` tokens in UI code
 - Direct SDK / Fusebase proxy calls pass the token via `x-app-feature-token`
-- Calls to the app's own backend (`/api/*`) must assume deployed platform proxies may strip `x-app-feature-token`; backend handlers must read header or fallback to cookie `fbsapptoken`
+- Calls to the app's own backend (`/api/*`) must assume deployed platform proxies may strip `x-app-feature-token`; backend handlers must read header or fallback to cookie `fbsfeaturetoken`
 - For user-facing Gate flows, auth must stay in user context (app token). Do not silently fall back to service-account tokens.
 
 **Rules**:
 
 - LLM must NOT use SDK token during development
 - Browser runtime authenticates direct SDK / Fusebase proxy calls using `x-app-feature-token`
-- App backend auth must be implemented as `header || cookie('fbsapptoken')`
+- App backend auth must be implemented as `header || cookie('fbsfeaturetoken')`
 - User-facing Gate endpoints must fail closed on missing/invalid app token (`401/403`) instead of using a service-token fallback path
 
 ## LLM Checklist
@@ -181,9 +182,9 @@ SDK token usage in app runtime:
 ### SDK = Runtime Execution (browser and optional app backend)
 
 <% if (it.flags?.includes("portal-specific-apps")) { %>
-**Token**: App token from global runtime variable `window.FBS_APP_TOKEN` (fallback: cookie `fbsapptoken`); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
+**Token**: App token from global runtime variable `window.FBS_FEATURE_TOKEN` (fallback: cookie `fbsfeaturetoken`); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 <% } else { %>
-**Token**: App token from cookie `fbsapptoken` (fallback: `window.FBS_APP_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
+**Token**: App token from cookie `fbsfeaturetoken` (fallback: `window.FBS_FEATURE_TOKEN` if cookie is absent); direct SDK / Fusebase API calls pass it via `x-app-feature-token`, but app backend handlers must support `header || cookie`
 <% } %>
 
 **SDK Structure**:
@@ -293,9 +294,9 @@ export function createDatabasesApi(appToken: string): DatabasesApi {
 }
 
 <% if (it.flags?.includes("portal-specific-apps")) { %>
-// Usage: read app token from `window.FBS_APP_TOKEN` (fallback: `fbsapptoken` cookie), then e.g.:
+// Usage: read app token from `window.FBS_FEATURE_TOKEN` (fallback: `fbsfeaturetoken` cookie), then e.g.:
 <% } else { %>
-// Usage: read app token from `fbsapptoken` cookie (fallback `window.FBS_APP_TOKEN`), then e.g.:
+// Usage: read app token from `fbsfeaturetoken` cookie (fallback `window.FBS_FEATURE_TOKEN`), then e.g.:
 <% } %>
 // const databasesApi = createDatabasesApi(appToken)
 // const response = await databasesApi.listDatabases({})
@@ -304,7 +305,7 @@ export function createDatabasesApi(appToken: string): DatabasesApi {
 **Custom app backend usage** (`/api/*`):
 
 ```typescript
-// Same-origin requests automatically include the fbsapptoken cookie.
+// Same-origin requests automatically include the fbsfeaturetoken cookie.
 // In deployed mode, do not rely on x-app-feature-token surviving the platform proxy.
 const res = await fetch("/api/items");
 ```
@@ -315,7 +316,7 @@ Backend handlers must read the app token from header first and cookie second:
 import { getCookie } from "hono/cookie";
 
 const appToken =
-  c.req.header("x-app-feature-token") || getCookie(c, "fbsapptoken");
+  c.req.header("x-app-feature-token") || getCookie(c, "fbsfeaturetoken");
 
 if (!appToken) {
   return c.json({ error: "Missing app token" }, 401);
@@ -363,13 +364,15 @@ The app must be registered before it can run. Never leave these for the user to 
 
 ## Explicitly Forbidden
 
-### ❌ Manual HTTP Requests
+### ❌ Guessed or hand-built HTTP Requests
 
-**DO NOT** make manual HTTP requests to Fusebase APIs:
+**DO NOT** invent HTTP calls to Fusebase APIs:
 
 - Don't guess endpoints
-- Don't construct URLs manually
-- Use MCP tools during development, SDK methods in runtime
+- Don't hand-build URLs for operations the SDK already covers
+- Use MCP tools during development; in runtime, use the SDK for everything it covers
+
+**Allowed exception:** a few operations have no SDK method — runtime code may call the **documented** endpoint directly with `fetch`, as shown in the relevant skill or the scaffold. Calling a documented endpoint is fine; inventing one is not.
 
 ### ❌ Calling MCP from Runtime
 
@@ -420,7 +423,7 @@ Covers:
 
 The skill explains how to interact with the **broader Fusebase ecosystem** beyond dashboard data: for example org-scoped user operations, platform services, email and campaign-related flows, automation, and integrations **as exposed through Gate** (see `references/*.md` for each topic). **Verify the fusebase-gate MCP server** is available before gate `tool_call` work (see skill).
 
-For one-click client onboarding into AI Apps, load **`references/app-magic-links.md`**: it covers `createAppMagicLink` (owner invite), `requestAppMagicLink` (visitor self-service, generic-200 contract), and `activateAppMagicLink` (the `/link` route token-exchange endpoint), including the 24h TTL and the `reason=expired|revoked` branching the SPA scaffold relies on. For custom app domains, set `VITE_FUSEBASE_GATE_URL=https://<your-gate-host>/v4/api/proxy/gate-service/v1` at build time so the SPA's `/link` route can reach Gate (the auto-derived base URL only covers Fusebase-managed `*.thefusebase.app` / `*.dev-thefusebase-app.com` hosts).
+For one-click client onboarding into AI Apps, load **`references/app-magic-links.md`**, **`references/fusebase-auth.md`**, and **`app-backend/SKILL.md`** (§ Magic-link session exchange): together they cover `createAppMagicLink` (owner invite), `requestAppMagicLink` (visitor self-service, generic-200 contract), and `activateAppMagicLink` (the `/link` route token-exchange endpoint), including the 24h TTL and the `reason=expired|revoked` branching the SPA scaffold relies on. For custom app domains, set `VITE_FUSEBASE_GATE_URL=https://<your-gate-host>/v4/api/proxy/gate-service/v1` at build time so the SPA's `/link` route can reach Gate (the auto-derived base URL only covers Fusebase-managed `*.thefusebase.app` / `*.dev-thefusebase-app.com` hosts).
 
 **Magic-link session exchange (Test vs Production).** The only **mandatory** post-activation step for every magic-link app is the backend exchange: SPA `POST`s `{ featureToken, sessionToken }` to `/api/account/from-magic-link` (or another app-owned route), backend builds a Gate client with `x-app-feature-token` + `EverHelper-Session-ID: <sessionToken>` and calls `getMyOrgAccess` to resolve `userId`. **HMAC-signed app-owned session cookies are only required in Production** (Memberspace, role-gated UI). **Smoke tests must not run `fusebase secret create` for `APP_SESSION_SECRET`** — and `fusebase secret create` must **never** be used for already-public values like `FUSEBASE_ORG_ID` (read from `fusebase.json`), `productId`, the app subdomain, or `FBS_*` config. See **`app-backend/SKILL.md` → "Magic-link session exchange"** for the Test/Production split, the no-secrets list, and the agent checklist.
 <% if (it.flags?.includes("isolated-stores")) { %>
@@ -532,7 +535,7 @@ When debugging local runtime issues through the CLI, load skill **dev-debug-logs
 
 See `fusebase-cli` skill for complete CLI documentation.
 
-The `fusebase` CLI is installed globally. **Always run it as `fusebase <command>` — never use `npx fusebase`.**
+The `fusebase` CLI is installed globally. **Always run it as `fusebase <command>` — never use `npx fusebase`** (other `npx` commands, e.g. `npx shadcn`, are allowed).
 
 Key commands:
 

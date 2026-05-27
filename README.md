@@ -404,7 +404,7 @@ fusebase scaffold --template backend --dir apps/my-app
 
 the CLI creates `openapi.json` automatically if it does not already exist.
 
-The `spa` feature template ships a built-in **`/link`** route that handles app magic links: it reads `?id=…&redirect=…` from the URL, calls the Gate activation endpoint (`POST /apps/magic-links/{id}/activate`), persists the returned tokens as cookies (`fbsfeaturetoken` for the Gate feature token, `fbsdashboardtoken` for the dashboard-service feature token, `eversessionid` for the session), and redirects to the deep page. Expired, revoked, and not-found cases each render a tailored UI inline, so closed-access apps work for one-click client onboarding without extra wiring. The Gate base URL is auto-derived from `window.location.hostname` for Fusebase-managed app domains; for custom domains set `VITE_FUSEBASE_GATE_URL=https://<your-gate-host>/v4/api/proxy/gate-service/v1` at build time (Vite inlines `import.meta.env.VITE_*` into the bundle). See [`project-template/.claude/skills/fusebase-gate/references/app-magic-links.md`](project-template/.claude/skills/fusebase-gate/references/app-magic-links.md) for the full Gate contract (invite vs self-service vs activate).
+The `spa` feature template ships a built-in **`/link`** route: it calls Gate `POST /apps/magic-links/{id}/activate` and redirects. For **Memberspace** or any flow that must know **which user** opened the link, follow the skills (not the cookies-only shortcut): after activation, your app backend must exchange `{ featureToken, sessionToken }` via `POST /api/account/from-magic-link` with `EverHelper-Session-ID` before redirect — see [`app-magic-links.md`](project-template/.claude/skills/fusebase-gate/references/app-magic-links.md) § App Session Exchange and [`app-backend/SKILL.md`](project-template/.claude/skills/app-backend/SKILL.md).
 
 **Updates `fusebase.json`:**
 
@@ -562,25 +562,25 @@ Manage sidecar containers for an app backend or for a specific cron job. Sidecar
 
 ```bash
 # Add a sidecar to the backend (default — same as today)
-fusebase sidecar add --feature <featureId> --name <name> --image <image> \
+fusebase sidecar add --app <appId> --name <name> --image <image> \
   [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
   [--secret KEY|KEY:ALIAS ...]
 
 # Add a sidecar to a specific cron job (requires the job-sidecars flag)
-fusebase sidecar add --feature <featureId> --job <jobName> --name <name> --image <image> \
+fusebase sidecar add --app <appId> --job <jobName> --name <name> --image <image> \
   [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
   [--secret KEY|KEY:ALIAS ...]
 
 # Remove a sidecar
-fusebase sidecar remove --feature <featureId> --name <name> [--job <jobName>]
+fusebase sidecar remove --app <appId> --name <name> [--job <jobName>]
 
 # List configured sidecars
-fusebase sidecar list --feature <featureId> [--job <jobName>]
+fusebase sidecar list --app <appId> [--job <jobName>]
 ```
 
 **Options:**
 
-- `--feature <featureId>` (required) — app ID
+- `--app <appId>` (required) — app ID. `--feature` (`-f`) is accepted as a deprecated alias.
 - `--name <name>` (required for add/remove) — sidecar name. Lowercase letters, digits, and hyphens; max 63 chars; must start with a lowercase letter.
 - `--image <image>` (required for add) — Docker image reference (e.g. `browserless/chrome:latest`)
 - `--port <port>` — port the sidecar listens on (informational; `localhost:<port>` from the main container)

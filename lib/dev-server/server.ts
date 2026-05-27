@@ -115,9 +115,9 @@ function createWaitingForFeatureResponse(): Response {
   </style>
 </head>
 <body>
-  <h1>⏳ Waiting for feature dev server...</h1>
-  <p>The feature's dev server URL has not been detected yet.</p>
-  <p>Make sure your feature has a <code>dev.command</code> in fusebase.json.</p>
+  <h1>⏳ Waiting for app dev server...</h1>
+  <p>The app's dev server URL has not been detected yet.</p>
+  <p>Make sure your app has a <code>dev.command</code> in fusebase.json.</p>
   <script>setTimeout(() => location.reload(), 2000);</script>
 </body>
 </html>`,
@@ -145,8 +145,8 @@ function createProxyErrorResponse(
 </head>
 <body>
   <h1>❌ Connection Error</h1>
-  <p>Could not connect to feature dev server at <code>${featureUrl}</code></p>
-  <p>Make sure your feature's dev server is running.</p>
+  <p>Could not connect to app dev server at <code>${featureUrl}</code></p>
+  <p>Make sure your app's dev server is running.</p>
   <script>setTimeout(() => location.reload(), 2000);</script>
 </body>
 </html>`,

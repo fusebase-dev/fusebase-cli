@@ -479,7 +479,7 @@ describe("fusebase sidecar --job", () => {
         ws,
       );
       expect(listRes.exitCode).toBe(0);
-      expect(listRes.stdout).toContain('Sidecars for feature "app-1"');
+      expect(listRes.stdout).toContain('Sidecars for app "app-1"');
       expect(listRes.stdout).toContain("backend-redis");
       expect(listRes.stdout).not.toContain("chromium");
     });
@@ -556,6 +556,122 @@ describe("fusebase sidecar --job", () => {
       expect(cfg.apps[0]!.backend!.sidecars).toEqual([
         { name: "redis", image: "redis:7" },
       ]);
+    });
+  });
+
+  describe("--app / --feature flag rename", () => {
+    beforeEach(() => {
+      ws = setupWorkspace({ withFlag: false });
+    });
+
+    it("sidecar add --app works as the primary flag without deprecation warning", async () => {
+      const res = await runCli(
+        [
+          "sidecar",
+          "add",
+          "--app",
+          "app-1",
+          "--name",
+          "redis",
+          "--image",
+          "redis:7",
+        ],
+        ws,
+      );
+      expect(res.exitCode).toBe(0);
+      expect(res.stdout).toContain('Added sidecar "redis" to app "app-1"');
+      expect(res.stderr).not.toContain("[deprecated]");
+      const cfg = readFuseJson(ws);
+      expect(cfg.apps[0]!.backend!.sidecars).toEqual([
+        { name: "redis", image: "redis:7" },
+      ]);
+    });
+
+    it("sidecar add --feature still works but emits a deprecation warning", async () => {
+      const res = await runCli(
+        [
+          "sidecar",
+          "add",
+          "--feature",
+          "app-1",
+          "--name",
+          "redis",
+          "--image",
+          "redis:7",
+        ],
+        ws,
+      );
+      expect(res.exitCode).toBe(0);
+      expect(res.stderr).toContain("[deprecated]");
+      expect(res.stderr).toContain("--feature is deprecated");
+    });
+
+    it("sidecar add with neither --app nor --feature exits with an error", async () => {
+      const res = await runCli(
+        [
+          "sidecar",
+          "add",
+          "--name",
+          "redis",
+          "--image",
+          "redis:7",
+        ],
+        ws,
+      );
+      expect(res.exitCode).not.toBe(0);
+      expect(res.stderr).toContain("--app is required");
+    });
+
+    it("job create --app works as the primary flag", async () => {
+      const res = await runCli(
+        [
+          "job",
+          "create",
+          "--app",
+          "app-1",
+          "--name",
+          "send-reports",
+          "--cron",
+          "0 * * * *",
+          "--command",
+          "npm run cron:send-reports",
+        ],
+        ws,
+      );
+      expect(res.exitCode).toBe(0);
+      expect(res.stdout).toContain(
+        'Added cron job "send-reports" to app "app-1"',
+      );
+      expect(res.stderr).not.toContain("[deprecated]");
+    });
+
+    it("job create --feature still works but emits a deprecation warning", async () => {
+      const res = await runCli(
+        [
+          "job",
+          "create",
+          "--feature",
+          "app-1",
+          "--name",
+          "send-reports",
+          "--cron",
+          "0 * * * *",
+          "--command",
+          "npm run cron:send-reports",
+        ],
+        ws,
+      );
+      expect(res.exitCode).toBe(0);
+      expect(res.stderr).toContain("[deprecated]");
+    });
+
+    it("sidecar list reports the unknown app under the new wording", async () => {
+      const res = await runCli(
+        ["sidecar", "list", "--app", "missing"],
+        ws,
+      );
+      expect(res.exitCode).not.toBe(0);
+      expect(res.stderr).toContain('App "missing" not found');
     });
   });
 });
