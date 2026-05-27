@@ -1,7 +1,7 @@
 ---
-version: "1.1.0"
+version: "1.2.0"
 mcp_prompt: authz
-last_synced: "2026-03-24"
+last_synced: "2026-05-22"
 title: "Authorization and Scopes"
 category: meta
 ---
@@ -36,6 +36,12 @@ In addition to argument scopes, access may be restricted by the token's resource
 - If a tool call targets a resource outside the token's allowed resource scope, do NOT retry the same call.
 - Explain the authorization limitation clearly to the user.
 
+## Session forwarding (AI Apps / magic links)
+
+Gate proxy and app backends can attach a Fusebase user session to a request using header **`EverHelper-Session-ID`** (also accepted as `everhelper-session-id` on some proxies). Use it with `x-app-feature-token` when calling user-context operations (for example `getMyOrgAccess`) after `activateAppMagicLink`. The feature token authenticates the app; the session header identifies the user.
+
+Load the `appMagicLinks` and `fusebaseAuth` prompts for the full post-activation exchange pattern (`POST /api/account/from-magic-link`, app-owned session cookie).
+
 ## Best Practices
 
 - Rely on the tool list provided by the server; unavailable tools usually mean insufficient permission.
@@ -46,7 +52,7 @@ In addition to argument scopes, access may be restricted by the token's resource
 
 ## Version
 
-- **Version**: 1.1.0
+- **Version**: 1.2.0
 - **Category**: meta
-- **Last synced**: 2026-03-24
+- **Last synced**: 2026-05-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

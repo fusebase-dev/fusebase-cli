@@ -48,7 +48,7 @@ Rule 2: only use direct tool calls if your client explicitly knows the tool is r
 
 Rule 3: if a call fails due to schema mismatch, refresh schema and retry once.
 
-Rule 4: never construct API URLs manually from app or concept names. Always use tools.list, tools.describe, and tool.call, or the SDK, to get the correct path and parameters.
+Rule 4: never construct API URLs manually from feature or concept names. Always use tools.list, tools.describe, and tool.call, or the SDK, to get the correct path and parameters.
 
 Rule 5: if there is no exact operation for the requested action, explain the available workaround and ask for confirmation before executing a multi step substitute flow.
 
