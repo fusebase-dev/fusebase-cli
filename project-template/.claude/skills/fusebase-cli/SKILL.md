@@ -425,6 +425,44 @@ Deploys all apps to Fusebase:
 
 The project template includes ESLint (`npm run lint`) and root `npm run typecheck` (TypeScript across apps — catches errors ESLint does not). Run both before saying "Done" so deploy succeeds; see AGENTS.md "Final Gate". Claude Code runs lint and typecheck on Stop via `.claude/settings.json` hooks.
 
+### Isolated SQL Bundle / RLS Manifest
+
+```bash
+fusebase isolated-store sql bundle --app <appId> [--alias <alias>] [--stage dev|prod] [--json|--status|--dry-run|--apply --yes]
+```
+
+Use this for app-owned isolated SQL schema work. It reads `apps[].isolatedStores.sql[]` from `fusebase.json`, loads `postgres/migrations/manifest.json`, and computes Gate-canonical checksums from SQL file bytes.
+
+RLS manifest forwarding is experimental. To attach `rlsManifest` from either `rlsManifestFile`, inline config, manifest `rlsManifest`, or `postgres/migrations/rls-manifest.json`, enable:
+
+```bash
+fusebase config set-flag postgres-rls
+```
+
+Examples:
+
+```bash
+fusebase isolated-store sql bundle --app client-portal --json
+fusebase isolated-store sql bundle --app client-portal --stage dev --status
+fusebase isolated-store sql bundle --app client-portal --stage dev --dry-run
+fusebase isolated-store sql bundle --app client-portal --stage dev --apply --yes
+```
+
+Gate calls use `GATE_MCP_TOKEN` from `.env`. Do `--status` and `--dry-run` before any real `--apply`.
+
+### Gate MCP Token Scope
+
+`fusebase env create` writes `GATE_MCP_TOKEN` to `.env`. For current apps-cli projects, the Gate MCP token is created with the project `productId` as its `client` scope, not necessarily with a child `apps[].id`.
+
+When debugging isolated-store access:
+
+- call Gate `me` / `whoami` first and use the actual resolved `client` scope;
+- compare that value with the store `sourceScopes`;
+- if runtime SQL or migration status/apply fails with `403 Token cannot access isolated store`, check for a missing `sourceScopes` entry before changing migrations;
+- if authorized, fix by adding the exact resolved client scope with `attachIsolatedStoreSourceScope`.
+
+Do not attach a guessed child app id when `whoami` shows a different product/client scope. Do not recreate the store or rebaseline migrations just to fix a source-scope mismatch.
+
 ### Manage Sidecar Containers
 
 Sidecar containers are pre-built Docker images deployed alongside an app's backend container, sharing the localhost network namespace. Max 3 sidecars per app.

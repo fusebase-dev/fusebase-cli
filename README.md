@@ -617,6 +617,61 @@ fusebase env create
 
 ---
 
+### `fusebase isolated-store sql bundle`
+
+Builds the Gate SQL migration request body from app-owned files and, when requested, calls Gate status/dry-run/apply using `GATE_MCP_TOKEN` from `.env`.
+
+RLS manifests are experimental and are only attached when the `postgres-rls` flag is enabled. Without the flag, the command still builds/applies the SQL migration bundle but omits `rlsManifest`.
+
+Expected app config in `fusebase.json`:
+
+```json
+{
+  "apps": [
+    {
+      "id": "client-portal",
+      "path": "apps/client-portal",
+      "isolatedStores": {
+        "sql": [
+          {
+            "alias": "client-portal",
+            "storeId": "00000000-0000-0000-0000-000000000000",
+            "migrationsDir": "postgres/migrations",
+            "schemaName": "public",
+            "rlsManifestFile": "postgres/migrations/rls-manifest.json"
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+Commands:
+
+```bash
+# Print summary and checksum warnings
+fusebase isolated-store sql bundle --app client-portal
+
+# Print the exact Gate request body
+fusebase isolated-store sql bundle --app client-portal --json
+
+# Call Gate migration status / dry-run / apply
+fusebase isolated-store sql bundle --app client-portal --stage dev --status
+fusebase isolated-store sql bundle --app client-portal --stage dev --dry-run
+fusebase isolated-store sql bundle --app client-portal --stage dev --apply --yes
+```
+
+The migration manifest remains app-owned and environment-neutral. Stage state still lives in Gate's `fusebase_schema_migrations` journal and stage metadata.
+
+To include `rlsManifest` in Gate status/dry-run/apply calls:
+
+```bash
+fusebase config set-flag postgres-rls
+```
+
+---
+
 ## Configuration Files
 
 ### `~/.fusebase/config.json`
@@ -646,6 +701,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `app-business-docs` | Copies the `app-business-docs` skill into the app: keeps **`docs/en/business-logic.md`** (English) aligned with real behavior — domain rules, main user flows, edge cases; update after business-logic changes or when debugging unclear behavior |
 | `mcp-gate-debug` | Copies the `mcp-gate-debug` skill: after Fusebase Gate MCP tool runs, summarize smooth vs rough paths and suggest improvements to `.claude/skills/fusebase-gate`, prompts, or MCP server behavior — prioritize **isolated stores** (SQL/NoSQL) flows |
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); also turns on required template references and `isolated_store.*` permissions in `fusebase env create` |
+| `postgres-rls` | Enables experimental RLS manifest helpers for isolated SQL stores |
 | `portal-specific-apps` | Includes portal-specific app guidance in prompts: `fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
 | `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`apps[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `app-sidecar` and `app-backend` skill templates. |
 
@@ -655,6 +711,7 @@ Enable a flag globally, then refresh the project template:
 fusebase config set-flag app-business-docs   # Business-logic documentation skill
 fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summary skill
 fusebase config set-flag isolated-stores     # Isolated stores functionality (SQL/NoSQL)
+fusebase config set-flag postgres-rls        # PostgreSQL RLS manifest helpers for isolated SQL stores
 fusebase config set-flag portal-specific-apps # Portal-specific apps prompts/guidance
 fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```

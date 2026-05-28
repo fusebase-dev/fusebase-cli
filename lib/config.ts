@@ -65,12 +65,55 @@ export interface BackendConfig {
   sidecars?: SidecarConfig[];
 }
 
+export type IsolatedSqlRlsTableClassification =
+  | "tenant"
+  | "user"
+  | "owner_collaborator"
+  | "scoped"
+  | "none"
+  | "technical";
+
+export interface IsolatedSqlRlsScopeManifest {
+  name: string;
+  column: string;
+  setting?: string | null;
+}
+
+export interface IsolatedSqlRlsTableManifest {
+  classification: IsolatedSqlRlsTableClassification;
+  schemaName?: string | null;
+  orgColumn?: string | null;
+  userColumn?: string | null;
+  ownerColumn?: string | null;
+  collaboratorTable?: string | null;
+  scopes?: IsolatedSqlRlsScopeManifest[] | null;
+  reason?: string | null;
+}
+
+export interface IsolatedSqlRlsManifest {
+  tables: Record<string, IsolatedSqlRlsTableManifest>;
+}
+
+export interface IsolatedSqlStoreConfig {
+  alias: string;
+  storeId?: string;
+  migrationsDir?: string;
+  schemaName?: string;
+  rlsManifestFile?: string;
+  rlsManifest?: IsolatedSqlRlsManifest;
+}
+
+export interface IsolatedStoresConfig {
+  sql?: IsolatedSqlStoreConfig[];
+}
+
 export interface FeatureConfig {
   id: string;
   path?: string;
   dev?: DevConfig;
   build?: BuildConfig;
   backend?: BackendConfig;
+  isolatedStores?: IsolatedStoresConfig;
   /** Gate SDK analyze snapshot scoped to this feature path. */
   fusebaseGateMeta?: GateSdkOperationsSnapshot;
 }
@@ -145,6 +188,7 @@ export const KNOWN_FLAGS = [
   "app-business-docs",
   "mcp-gate-debug",
   "isolated-stores",
+  "postgres-rls",
   "legacy-dashboards-db",
   "portal-specific-apps",
   "api-exploration",
@@ -162,6 +206,7 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
   "app-business-docs": "Include business-logic documentation skill in project template.",
   "mcp-gate-debug": "Include Gate MCP debug summary skill (focus on isolated stores).",
   "isolated-stores": "Enable isolated stores functionality (SQL/NoSQL).",
+  "postgres-rls": "Enable experimental RLS manifest helpers for isolated SQL stores.",
   "legacy-dashboards-db":
     "Expose dashboard DB/dashboard creation guidance and enable dashboard-service database/dashboard management permissions in MCP tokens.",
   "portal-specific-apps":

@@ -1,7 +1,7 @@
 ---
 version: "1.3.0"
 mcp_prompt: appMagicLinks
-last_synced: "2026-05-27"
+last_synced: "2026-05-28"
 title: "Fusebase Gate App Magic Link Operations"
 category: specialized
 ---
@@ -26,6 +26,7 @@ category: specialized
 - [Expired-Link Handling](#expired-link-handling)
 - [Access Model](#access-model)
 - [`accessPrincipals` Vs Org Membership](#accessprincipals-vs-org-membership)
+- [Platform Edge: Visitor Token And `/api/*`](#platform-edge-visitor-token-and-api)
 - [App Session Exchange After Activation](#app-session-exchange-after-activation)
   - [Test vs Production session policy](#test-vs-production-session-policy)
   - [Don't register non-secrets](#dont-register-non-secrets)
@@ -130,8 +131,17 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 | App `accessPrincipals` (`fusebase app create/update --access`) | Who may use this host-bearing App | **Yes** — self-service checks principals first when the list is non-empty |
 | `createAppMagicLink` + `addToAccessPrincipals: true` | Adds `{ type: user, id }` on every App of the Product | Invite mail always; also satisfies self-service for that user id |
 
-- Principals are comma-separated CLI entries: `visitor`, `orgRole:member`, `orgRole:client`, `user:<id>`, `orgGroup:<id>`. `visitor` enables anonymous/public app access; it does **not** grant self-service magic links to logged-in org members.
-- Load the `fusebaseAuth` prompt for registration/login patterns and the mandatory app-backend session exchange after activation.
+- Principals are comma-separated CLI entries: `visitor`, `orgRole:member`, `orgRole:client`, `user:<id>`, `orgGroup:<id>`. `visitor` allows **guests to open the App host** and receive a visitor `fbsfeaturetoken` via platform `/_auth/` — it is **not** unauthenticated `/api/*`. It does **not** grant self-service magic links to logged-in org members.
+- Load the `fusebaseAuth` prompt for registration/login patterns, visitor/API edge behavior, and the mandatory app-backend session exchange after activation.
+
+## Platform Edge: Visitor Token And `/api/*`
+
+Magic-link Apps are often created with `--access=visitor`. The platform still requires `fbsfeaturetoken` before proxying `/api/*` to the App backend.
+
+- Before activation (or before the browser completes `/_auth/`), `GET /api/…` without cookies redirects to auth — **not** a broken backend.
+- After `activateAppMagicLink`, the SPA should persist platform cookies; same-origin `/api/account/from-magic-link` then reaches the backend. Timeouts on that route after deploy usually mean **backend listen port / health** (infra), not missing visitor access.
+- Do not smoke-test deployed magic-link flows with naked `curl` on `/api/health`; use the browser flow or curl with cookies saved after `/_auth/`.
+- Do not call Gate `getMyOrgAccess` from the SPA for the exchange — CORS blocks `EverHelper-Session-ID`; use the backend exchange pattern below.
 
 ## App Session Exchange After Activation
 
@@ -178,5 +188,5 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 
 - **Version**: 1.3.0
 - **Category**: specialized
-- **Last synced**: 2026-05-27
+- **Last synced**: 2026-05-28
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

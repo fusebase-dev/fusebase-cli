@@ -216,6 +216,7 @@ const FLAG_GATED_SKILLS: Record<string, string> = {
 const FLAG_GATED_PATH_PREFIXES: Record<string, string> = {
   ".claude/skills/managed-integrations/references/personal-auth-flow.md":
     "managed-integrations-personal-auth",
+  "examples/isolated-sql-rls": "postgres-rls",
 };
 
 function normalizeTemplateEntryPath(name: string): string {

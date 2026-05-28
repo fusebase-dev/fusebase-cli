@@ -43,6 +43,8 @@ Current rollout position (2026-04-12):
 | Change schema (DDL)       | **Only** `getIsolatedStoreSqlMigrationStatus` + `applyIsolatedStoreSqlMigrations` (ordered bundle) |
 | Insert/update/delete rows | Structured row APIs (`insertIsolatedStoreSqlRow`, …) or read-only `queryIsolatedStoreSql`          |
 | Seed / backfill data      | Structured row APIs or `importIsolatedStoreSqlRows` (CSV/TSV → `COPY`)                             |
+| Inspect RLS posture       | `getIsolatedStoreSqlRlsStatus` (read-only table/policy/index introspection)                        |
+| Validate RLS intent       | Optional `rlsManifest` on migration status/apply/adopt; currently warn-only                        |
 | Chat / MCP smoke test     | One small migration **or** status + dryRun; big bundles → **SDK/CI**                               |
 | Understand drift / 409    | Response `structuredIssues` / error `data.issues`; MCP prompt **`isolatedSqlMigrationDiscipline`** |
 
@@ -64,6 +66,9 @@ For `sql/postgres`, the current managed-store path already supports:
 - structured row CRUD
 - batch insert and CSV/TSV import via `COPY`
 - stage stats, table introspection, counts, and query/select paths
+- read-only RLS status introspection for Studio/support visibility
+- transaction-local RLS runtime context on SQL runtime calls
+- warn-only RLS manifest validation on migration status/apply/adopt
 - checkpoints and full stage restore
 - provider-switchable snapshot storage (`local_file` or `azure_blob`)
 - Studio migration/status rendering via bundle metadata persisted by Gate
@@ -73,6 +78,7 @@ What it does not yet fully productize:
 - app release pipeline delivery of migration bundles
 - first-class snapshot preview API
 - completed SQL RLS enforcement layer
+- blocking RLS validation and runtime/migrator role split
 - production-grade retention policy and pruning workflow for stored snapshots
 
 For the next production-pilot cut, the main remaining tasks are:
@@ -148,6 +154,8 @@ Operator migration calls do not require a session-backed user anymore: token-aut
 After a successful SQL migration apply or baseline adoption, Gate stores the latest bundle and schema name in the stage `provisioningMetadata`. Studio can use that metadata to show migration status without access to the app repo.
 
 For the midsize-target PostgreSQL Row-Level Security path and the recommended Gate integration model, see [isolated-sql-rls-plan.md](./isolated-sql-rls-plan.md).
+
+RLS validation is currently warn-only. `getIsolatedStoreSqlMigrationStatus`, `applyIsolatedStoreSqlMigrations`, and `adoptIsolatedStoreSqlMigrationBaseline` may include `rlsManifest`; Gate returns `status.rlsValidation` with table/column/index/policy warnings but does not reject apply on those warnings yet. apps-cli sends `rlsManifest` only when its `postgres-rls` flag is enabled. The manifest supports `tenant`, `user`, `owner_collaborator`, `scoped`, `none`, and `technical` table classifications.
 
 ---
 

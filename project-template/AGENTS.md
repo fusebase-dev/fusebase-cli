@@ -544,6 +544,7 @@ Key commands:
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected app directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `fusebase app create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]` `[--coding-agent=<agent> --model=<model>]` - Register app (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the app needs dashboard access — do not defer to a separate `app update` step. **Always include `--coding-agent` and `--model`** to report anonymous usage stats.
 - `fusebase deploy` - Deploy apps (runs lint then build per app)
+- `fusebase isolated-store sql bundle --app <appId> [--alias <alias>] [--stage dev|prod] [--status|--dry-run|--apply --yes|--json]` - Build the SQL migration bundle from `postgres/migrations/` plus `apps[].isolatedStores.sql[]`; use before/apply through Gate instead of hand-building JSON. Optional RLS manifest forwarding requires `fusebase config set-flag postgres-rls`.
 - `fusebase update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed SDK deps/install), outside app directory runs CLI update only; use `--skip-product` for CLI-only mode even inside app
 - `fusebase env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `fusebase config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
 - `fusebase secret create --feature <featureId> --secret "KEY:description"` - Create app secrets (empty values), prints URL to set values
@@ -577,6 +578,34 @@ Recommended publish sequence:
 1. update runtime permissions with `fusebase app update`
 2. if Gate SDK is used, include `--sync-gate-permissions`
 3. run `fusebase deploy`
+
+### Isolated SQL bundle + RLS manifest
+
+For SQL stores, keep app-owned schema files under `postgres/migrations/` and configure the app in `fusebase.json`:
+
+```json
+{
+  "apps": [
+    {
+      "id": "client-portal",
+      "path": "apps/client-portal",
+      "isolatedStores": {
+        "sql": [
+          {
+            "alias": "client-portal",
+            "storeId": "00000000-0000-0000-0000-000000000000",
+            "migrationsDir": "postgres/migrations",
+            "schemaName": "public",
+            "rlsManifestFile": "postgres/migrations/rls-manifest.json"
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+Use `fusebase isolated-store sql bundle --app <appId> --json` to inspect the exact Gate body. Use `--status` and `--dry-run` before `--apply --yes`. The command reads `GATE_MCP_TOKEN` from `.env` for Gate calls. `rlsManifest` is attached only when the `postgres-rls` flag is enabled; otherwise SQL migrations still work and RLS validation is skipped.
 
 ## Common Failure Modes
 
@@ -638,6 +667,7 @@ You can only claim completion if:
 - ✅ **`Permissions: none` is a blocker for runtime-integrated apps**: If CLI output shows `Permissions: none`, do not present the app as fully published unless it intentionally requires no runtime permissions.
 - ✅ **Gate analysis sanity check**: Run `fusebase analyze gate --operations --json --feature <featureId>` and verify `usedOps` is non-empty for Gate-integrated runtime code. Empty `usedOps` with active Gate SDK usage is a release blocker.
 <% if (it.flags?.includes("isolated-stores")) { %>
+- ✅ **Isolated-store source scope check**: If isolated SQL runtime/status/apply returns `403 Token cannot access isolated store`, call Gate `me` / `whoami`, use the actual `client` scope, and verify the store has matching `sourceScopes`. Current Gate MCP tokens may use project `productId` as client scope rather than child `apps[].id`; fix with `attachIsolatedStoreSourceScope` when authorized, not by rebaselining migrations.
 - ✅ **Isolated SQL schema final gate**: If isolated SQL schema changed, `postgres/migrations/` must contain matching new/updated migration file(s) and manifest updates. Otherwise completion is blocked.
 - ✅ **Isolated SQL schema artifact is mandatory**: Include migration file path, `version`, `name`, `checksum`, `storeId`, and `stage` in the final handoff.
 <% } %>

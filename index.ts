@@ -20,6 +20,7 @@ import { gitCommand } from "./lib/commands/git";
 import { jobCommand } from "./lib/commands/job";
 import { sidecarCommand } from "./lib/commands/sidecar";
 import { apiCommand } from "./lib/commands/api";
+import { isolatedStoreCommand } from "./lib/commands/isolated-store";
 import { checkForUpdates } from "./lib/commands/steps/update-check";
 import { VERSION } from "./lib/version";
 import { registerErrorReporter } from "./lib/error-reporter";
@@ -72,6 +73,7 @@ program.addCommand(scaffoldCommand);
 program.addCommand(jobCommand);
 program.addCommand(sidecarCommand);
 program.addCommand(apiCommand);
+program.addCommand(isolatedStoreCommand);
 program.addCommand(analyzeCommand, { hidden: true });
 
 instrumentAllCommands(program);

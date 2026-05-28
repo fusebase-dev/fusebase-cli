@@ -1,7 +1,7 @@
 ---
 version: "1.2.0"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-05-27"
+last_synced: "2026-05-28"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -10,6 +10,23 @@ category: specialized
 > **MARKER**: `mcp-fusebase-auth-loaded` — When this marker is present in context, MCP prompts for this topic may skip conceptual sections and use API reference only.
 
 > **VERSION CHECK**: If operations fail unexpectedly, load MCP prompt `fusebaseAuth` for latest content.
+
+---
+## Table of contents
+
+- [Fusebase Auth For AI Apps](#fusebase-auth-for-ai-apps)
+- [Relevant Operations](#relevant-operations)
+- [Architecture Rules](#architecture-rules)
+- [Org Onboarding](#org-onboarding)
+- [App `accessPrincipals` Vs Org Membership](#app-accessprincipals-vs-org-membership)
+- [Visitor Access Vs Open API (Platform Edge)](#visitor-access-vs-open-api-platform-edge)
+- [Magic-Link → App Session Exchange](#magic-link--app-session-exchange)
+  - [Test vs Production](#test-vs-production)
+  - [Non-secrets — never `fusebase secret create`](#non-secrets--never-fusebase-secret-create)
+- [Challenge, 2FA, And MFA](#challenge-2fa-and-mfa)
+- [Password Restore](#password-restore)
+- [Google Auth](#google-auth)
+- [Common Pitfalls](#common-pitfalls)
 
 ---
 ## Fusebase Auth For AI Apps
@@ -50,6 +67,16 @@ Org membership (`registerFusebaseOrgMember`, `addOrgUser`, org invites) and **Ap
 - `createAppMagicLink` with `addToAccessPrincipals: true` (default) adds a **user** principal and is the usual path for first-time client invites; that is separate from org registration.
 - When an App ships a **Memberspace** or role-gated area plus self-service magic links, set principals at create time, e.g. `fusebase app create … --access=visitor,orgRole:client,orgRole:member,orgRole:manager,orgRole:owner` (adjust roles to the product). `--access=visitor` alone does **not** imply org members can request links.
 - An App with **empty** `accessPrincipals` falls back to "any org member" for self-service; a non-empty list (including only `visitor`) is evaluated strictly — do not assume org membership alone is enough.
+
+## Visitor Access Vs Open API (Platform Edge)
+
+`fusebase app create/update --access=visitor` means **unauthenticated users may open the App host** and receive a **visitor-scoped** `fbsfeaturetoken` — it does **not** mean the App's `/api/*` routes are callable without any platform token.
+
+- The deployed **app-wrapper** proxy gates `/api/*` (and most non-static HTML) on a valid `fbsfeaturetoken` cookie (or equivalent). Without it, the browser is redirected through `/_auth/` (visitor JWE issuance) before API traffic reaches the App backend.
+- Typical first visit: `GET /` or `/link` → `302 /_auth/?url=…` → `Set-Cookie: fbsfeaturetoken=<visitor JWE>` → redirect back → SPA loads. Browsers follow this automatically; **bare `curl` / fetch without a cookie jar** on `/api/health` will show `302` — that is expected, not an App bug.
+- `--access=visitor` is about **who may obtain** a visitor token after the platform auth dance, not about exposing anonymous REST on the App subdomain.
+- Do not treat `401`/`302` on `/api/*` before activation as "session expired" for visitor Apps. After `activateAppMagicLink`, platform cookies exist and `/api/*` is forwarded; identity for Memberspace still requires the app-backend exchange (below).
+- Smoke tests: use a real browser, Playwright, or `curl` with `-c/-b` after one full `/_auth/` pass — not "`/api/health` without cookies must return 200".
 
 ## Magic-Link → App Session Exchange
 
@@ -115,5 +142,5 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 - **Version**: 1.2.0
 - **Category**: specialized
-- **Last synced**: 2026-05-27
+- **Last synced**: 2026-05-28
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
