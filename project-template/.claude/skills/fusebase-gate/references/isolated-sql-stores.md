@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-05-09"
+last_synced: "2026-05-28"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -223,6 +223,35 @@ Do this **per stage** you care about (usually **dev** first, then **prod**).
   - **`isolated_sql_journal_head_mismatch`** — optimistic-lock fields disagree with journal tail.
 - **`dryRun: true`** now uses the same pre-apply bundle validation pipeline as a real apply. If the full bundle would fail on canonical checksum or schema-only rules, dryRun fails too.
 
+### Auth/source-scope troubleshooting
+
+If status says **`canApply: true`** and **`isDrifted: false`**, but runtime reads or apply fail with auth errors, do not start by editing checksums, re-baselining, or recreating the store.
+
+Check the token/store binding first:
+
+1. Call `me` / `whoami` and record the exact token **`client` scope**. Use the actual resolved scope, not a guessed `apps[].id`; in apps-cli projects the Gate MCP token client scope is commonly the project `productId`.
+2. Read the store and inspect **`sourceScopes`**.
+3. If the store is missing `{ "sourceType": "app", "sourceId": "<current client scope>" }`, this is a **source scope mismatch**.
+4. Use **`attachIsolatedStoreSourceScope`** to add the missing app source scope when you have `isolated_store.control.write`.
+5. Verify:
+   - `listIsolatedStores({ orgId, clientId: <current client scope> })` returns the store;
+   - `getIsolatedStore` shows both old and new `sourceScopes`;
+   - a safe data-plane read, for example `selectIsolatedStoreSqlRows` with `limit: 1`, returns 200;
+   - `getIsolatedStoreSqlMigrationStatus` still returns `canApply: true`.
+
+What the errors mean:
+
+- **`403 Token cannot access isolated store`** before a SQL/status result usually means the token `client` scope does not match any store `sourceScopes` entry.
+- **`400 Authenticated actor was not resolved`** on apply means the request reached the apply route but Gate could not derive an audit actor from that auth context.
+- If **dryRun apply** reaches bundle validation, for example `bundle.migrations[0].sql must not be empty`, auth and source-scope checks have already passed; send a full SQL bundle for apply/dryRun.
+
+Guardrails:
+
+- `attachIsolatedStoreSourceScope` is non-destructive. It adds a source-scope row and does not touch stage databases, `fusebase_schema_migrations`, aliases, or existing binding config.
+- Do not attach a guessed source id. Attach the exact `client` scope from the token that must use the store.
+- A token scoped to `client:A` cannot attach `sourceId:B`; use a matching client-scoped token or a user/operator context with `isolated_store.control.write`.
+- Do not run real apply as part of this diagnosis unless the user explicitly asked for it.
+
 ### Transactions
 
 Apply uses a **single DB transaction**; failure → **ROLLBACK** (no partial journal rows from that attempt). A **prod checkpoint** may still exist if Gate created it before a failed apply — it is not proof migrations committed.
@@ -308,4 +337,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-05-09
+- **Last synced**: 2026-05-28
