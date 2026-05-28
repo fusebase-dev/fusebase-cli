@@ -1,7 +1,7 @@
 ---
-version: "1.1.0"
+version: "1.2.0"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-05-22"
+last_synced: "2026-05-27"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -55,10 +55,34 @@ Org membership (`registerFusebaseOrgMember`, `addOrgUser`, org invites) and **Ap
 
 For Apps that use `requestAppMagicLink` / `activateAppMagicLink` (load the `appMagicLinks` prompt for wire details), auth success is **not** complete when the SPA sets platform cookies alone.
 
+**Mandatory for every magic-link app, Test and Production:**
+
 - After `activateAppMagicLink`, pass **both** `featureToken` and `sessionToken` to a trusted app backend **before** `window.location.replace` to a protected route. Platform cookie `fbsfeaturetoken` can be overwritten on the next HTML request by the app proxy to match whichever Fusebase user is logged into the **browser**, not the magic-link recipient.
 - User identity on Gate calls such as `getMyOrgAccess` requires forwarding `sessionToken` as header `EverHelper-Session-ID` together with `x-app-feature-token` (or your app's equivalent). **`featureToken` alone does not resolve the authenticated user** on those endpoints.
-- Recommended pattern: `POST /api/account/from-magic-link` with `{ featureToken, sessionToken }` in the **body** → backend builds a Gate client with both credentials → `getMyOrgAccess` → issue an **app-owned** session cookie (HMAC-signed, bound to `userId`) → redirect. Do not infer the recipient from `eversessionid` or `fbsfeaturetoken` alone after redirect.
+- Minimum exchange contract: `POST /api/account/from-magic-link` (or another app-owned route) with `{ featureToken, sessionToken }` in the **body** → backend builds a Gate client with both credentials → `getMyOrgAccess` to resolve the recipient → redirect to `redirectPath`. This is the **only** mandatory part of the exchange.
 - Do not call `getMyOrgAccess` with only the app feature token for visitors or fresh magic-link users — that can return the **token owner's** identity (e.g. the app owner in dev, or a stale browser session in prod). Fail closed: show the sign-in / request-link UI instead.
+
+### Test vs Production
+
+Split the recipe so smoke tests don't grow the production attack surface and don't introduce secrets the app does not actually need:
+
+**Test mode (smoke test, no Memberspace, no role-gated UI):**
+
+- The mandatory exchange above is enough — `getMyOrgAccess` + redirect.
+- Do **not** issue an app-owned HMAC-signed session cookie. Do **not** register `APP_SESSION_SECRET` or any other HMAC secret via `fusebase secret create`. The SPA can keep `fbsfeaturetoken` / `eversessionid` set by activation for the smoke flow and re-call the exchange on every protected page-load.
+- Treat the `userId` returned by `getMyOrgAccess` as the source of truth for the current request only; do not persist it server-side.
+
+**Production mode (Memberspace, role-gated areas, any flow where the app must remember which user opened the link across navigations):**
+
+- After the mandatory exchange, issue an **app-owned** session cookie (HMAC-signed or equivalent integrity-protected payload, bound to `userId`) and use it as the source of truth for subsequent requests. Verify on every request — do not infer the recipient from `eversessionid` or `fbsfeaturetoken` after the initial redirect.
+- Register the HMAC secret only here, with `fusebase secret create --feature <appId> --secret "APP_SESSION_SECRET:HMAC signing key for app-owned session cookie"`, then read it from `process.env.APP_SESSION_SECRET` in the backend.
+- Set the cookie `httpOnly`, `secure`, `sameSite=Lax`, `path=/`. Rotate by changing the secret + invalidating live cookies; do not rely on Fusebase cookies for revocation.
+
+### Non-secrets — never `fusebase secret create`
+
+- `FUSEBASE_ORG_ID` is **not a secret** — it lives in `fusebase.json` (`orgId`) and is readable in plain text by anyone who can clone the app. Do not run `fusebase secret create … FUSEBASE_ORG_ID:…`. Read the value from `fusebase.json` (or platform-injected env if the deployed runtime exposes it) at app start.
+- The same rule applies to other already-public values such as the app's subdomain, the `productId`, or Fusebase host URLs. `fusebase secret create` is reserved for things that must not be visible to the agent or anyone reading the repo (HMAC keys, third-party API tokens, OAuth client secrets).
+- If the app only needs a Test-mode exchange, the result is that **no** `fusebase secret create` call is required for the magic-link flow itself.
 
 ## Challenge, 2FA, And MFA
 
@@ -89,7 +113,7 @@ For Apps that use `requestAppMagicLink` / `activateAppMagicLink` (load the `appM
 
 ## Version
 
-- **Version**: 1.1.0
+- **Version**: 1.2.0
 - **Category**: specialized
-- **Last synced**: 2026-05-22
+- **Last synced**: 2026-05-27
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
