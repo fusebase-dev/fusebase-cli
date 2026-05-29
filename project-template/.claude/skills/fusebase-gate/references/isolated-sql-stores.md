@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-05-28"
+last_synced: "2026-05-29"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -156,6 +156,27 @@ After a successful SQL migration apply or baseline adoption, Gate stores the lat
 For the midsize-target PostgreSQL Row-Level Security path and the recommended Gate integration model, see [isolated-sql-rls-plan.md](./isolated-sql-rls-plan.md).
 
 RLS validation is currently warn-only. `getIsolatedStoreSqlMigrationStatus`, `applyIsolatedStoreSqlMigrations`, and `adoptIsolatedStoreSqlMigrationBaseline` may include `rlsManifest`; Gate returns `status.rlsValidation` with table/column/index/policy warnings but does not reject apply on those warnings yet. apps-cli sends `rlsManifest` only when its `postgres-rls` flag is enabled. The manifest supports `tenant`, `user`, `owner_collaborator`, `scoped`, `none`, and `technical` table classifications.
+
+RLS verification must check the runtime database role, not only the SQL context. `getIsolatedStoreSqlRlsStatus` returns the active runtime `currentUser`, `bypassRls`, and `superuser` flags. If `bypassRls` is `true`, PostgreSQL policies are visible in introspection but are not enforced for runtime queries; scoped demos must either use explicit `WHERE current_setting(...)` filters as a temporary workaround or wait for the runtime role split.
+
+Recommended RLS verification checklist after schema apply:
+
+1. Run migration status and confirm the journal head matches the manifest/bundle.
+2. Run RLS status and confirm `bypassRls=false` for real RLS tests.
+3. Probe `current_setting('app.project_id', true)` or another custom setting with a sample `rlsContext`.
+4. Read scoped data and confirm the result is a subset, not all rows.
+5. If `bypassRls=true`, label the environment as "policies not enforced" and do not claim that RLS filtering works.
+
+Anti-pattern: assuming `rlsContext` alone filters rows. `rlsContext` only sets transaction-local PostgreSQL settings; filtering happens only if the runtime role is subject to RLS and table policies use those settings.
+
+Optional-scope policy dimensions should allow "no scope selected" only when that is intended:
+
+```sql
+AND (
+  NULLIF(current_setting('app.project_id', true), '') IS NULL
+  OR project_id = NULLIF(current_setting('app.project_id', true), '')
+)
+```
 
 ---
 
@@ -345,4 +366,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-05-28
+- **Last synced**: 2026-05-29

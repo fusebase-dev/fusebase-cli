@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-rls-plan.md"
-last_synced: "2026-05-28"
+last_synced: "2026-05-29"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
 ---
@@ -188,13 +188,13 @@ Optional dimensions must follow the same rule:
 
 The model should be "mandatory tenant context plus optional narrowing dimensions":
 
-| Dimension | Required | Source of truth | Typical table column | Notes |
-|---|---:|---|---|---|
-| `org_id` | yes | Gate org route/authz | `org_id uuid not null` | Always the first isolation boundary. |
-| `user_id` | yes for user-facing paths | Gate auth actor | `user_id uuid not null` or `owner_user_id uuid not null` | Required for private rows and ownership checks. |
-| `portal_id` | optional | Gate portal binding/context | `portal_id uuid` | Only set when Gate can prove the portal is in the current org and token scope. |
-| `workspace_id` | optional | Gate workspace binding/context | `workspace_id uuid` | Useful for multi-workspace apps inside one org. |
-| custom app ID | optional | Gate-validated scope or DB membership table | `project_id uuid`, `account_id uuid`, etc. | Do not let app code set arbitrary trusted values. |
+| Dimension      |                  Required | Source of truth                             | Typical table column                                     | Notes                                                                          |
+| -------------- | ------------------------: | ------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `org_id`       |                       yes | Gate org route/authz                        | `org_id uuid not null`                                   | Always the first isolation boundary.                                           |
+| `user_id`      | yes for user-facing paths | Gate auth actor                             | `user_id uuid not null` or `owner_user_id uuid not null` | Required for private rows and ownership checks.                                |
+| `portal_id`    |                  optional | Gate portal binding/context                 | `portal_id uuid`                                         | Only set when Gate can prove the portal is in the current org and token scope. |
+| `workspace_id` |                  optional | Gate workspace binding/context              | `workspace_id uuid`                                      | Useful for multi-workspace apps inside one org.                                |
+| custom app ID  |                  optional | Gate-validated scope or DB membership table | `project_id uuid`, `account_id uuid`, etc.               | Do not let app code set arbitrary trusted values.                              |
 
 Recommended session settings:
 
@@ -607,7 +607,11 @@ Example manifest shape:
         "classification": "scoped",
         "orgColumn": "org_id",
         "scopes": [
-          { "name": "workspace", "column": "workspace_id", "setting": "app.workspace_id" }
+          {
+            "name": "workspace",
+            "column": "workspace_id",
+            "setting": "app.workspace_id"
+          }
         ]
       },
       "project_comments": {
@@ -843,6 +847,17 @@ Custom app dimensions are useful, but they are easy to weaken if Gate treats req
 
 Current prototype support: Gate accepts scalar `rlsContext` settings and prevents overriding standard keys. This is enough to test app-owned scopes such as `project_id`, but it is not a complete platform authorization model by itself. Do not set arbitrary custom RLS settings directly from frontend request payloads unless the app has already authorized that scope.
 
+Verification rule: `rlsContext` proving visible in `current_setting('app.project_id', true)` is necessary but not sufficient. PostgreSQL still skips policies when the runtime role has `BYPASSRLS` or otherwise owns/bypasses the table. RLS smoke tests must also check Gate RLS status and require `bypassRls=false` before treating scoped reads as policy-enforced.
+
+For optional app scopes, use policy expressions that make the optional behavior explicit:
+
+```sql
+AND (
+  NULLIF(current_setting('app.project_id', true), '') IS NULL
+  OR project_id = NULLIF(current_setting('app.project_id', true), '')
+)
+```
+
 ### 5.4 Raw SQL remains dangerous even with RLS
 
 RLS protects row visibility, but:
@@ -923,8 +938,10 @@ For `v1`, the right scope is:
 
 - done: add Gate contract for `getIsolatedStoreSqlRlsStatus`
 - done: introspect `pg_class`, `pg_policies`, columns, and indexes
+- done: expose runtime role metadata: `currentUser`, `bypassRls`, and `superuser`
 - done: merge live DB state with manifest declarations
 - done: return structured table-level warnings for Studio and support
+- done: expose RLS runtime bypass warnings through apps-cli and Studio
 - next: add broader integration coverage against a real isolated Postgres stage
 
 ### Phase 4 — Role split
@@ -946,6 +963,7 @@ For `v1`, the right scope is:
 ### Phase 6 — App onboarding and templates
 
 - done: add apps-cli command to build/apply migration bundles; optional `rlsManifest` forwarding is gated by the apps-cli `postgres-rls` flag
+- done: add apps-cli `bundle --rls-status` for runtime role and live table/policy checks
 - done: add an app-template example with RLS migrations and manifest
 - next: provide polished migration templates for:
   - org-shared
@@ -997,4 +1015,4 @@ For `gate isolated stores`, use a combined `org_id + user_id` RLS model, with `o
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-05-28
+- **Last synced**: 2026-05-29

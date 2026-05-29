@@ -623,6 +623,8 @@ Builds the Gate SQL migration request body from app-owned files and, when reques
 
 RLS manifests are experimental and are only attached when the `postgres-rls` flag is enabled. Without the flag, the command still builds/applies the SQL migration bundle but omits `rlsManifest`.
 
+Use `--rls-status` to inspect the live PostgreSQL RLS posture for the selected store/stage. The response includes the runtime DB role and `bypassRls`; if `bypassRls=true`, policies may exist but PostgreSQL does not enforce them for runtime queries. `--apply --yes` also checks this after a successful apply and prints a warning when the runtime role bypasses RLS.
+
 Expected app config in `fusebase.json`:
 
 ```json
@@ -658,6 +660,7 @@ fusebase isolated-store sql bundle --app client-portal --json
 
 # Call Gate migration status / dry-run / apply
 fusebase isolated-store sql bundle --app client-portal --stage dev --status
+fusebase isolated-store sql bundle --app client-portal --stage dev --rls-status
 fusebase isolated-store sql bundle --app client-portal --stage dev --dry-run
 fusebase isolated-store sql bundle --app client-portal --stage dev --apply --yes
 ```

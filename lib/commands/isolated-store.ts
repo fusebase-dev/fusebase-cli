@@ -17,12 +17,20 @@ type SqlBundleOptions = {
   schema?: string;
   json?: boolean;
   status?: boolean;
+  rlsStatus?: boolean;
   dryRun?: boolean;
   apply?: boolean;
   yes?: boolean;
 };
 
 const ISOLATED_SQL_RLS_FLAG = "postgres-rls";
+
+type SqlRlsStatusResponse = {
+  currentUser?: string;
+  bypassRls?: boolean;
+  superuser?: boolean;
+  rlsEnabledCount?: number;
+};
 
 function readArtifact(options: SqlBundleOptions): SqlMigrationBundleArtifact {
   const fuseConfig = loadFuseConfig();
@@ -114,6 +122,49 @@ async function callGate<T>(options: {
   });
 }
 
+async function callGateRlsStatus(options: {
+  token: string;
+  orgId: string;
+  storeId: string;
+  stage: "dev" | "prod";
+  schemaName?: string;
+}): Promise<SqlRlsStatusResponse> {
+  return requestGateService<SqlRlsStatusResponse>(options.token, {
+    method: "GET",
+    path: `/${options.orgId}/isolated-stores/${options.storeId}/stages/${options.stage}/sql/rls/status`,
+    query:
+      options.schemaName === undefined
+        ? undefined
+        : { schemaName: options.schemaName },
+  });
+}
+
+function warnIfRuntimeBypassesRls(status: SqlRlsStatusResponse): void {
+  if (status.bypassRls !== true) {
+    return;
+  }
+  const currentUser = status.currentUser?.trim() || "unknown";
+  console.warn(
+    `WARNING: RLS policies exist but are NOT enforced for runtime role ${currentUser} because bypassRls=true. Scoped tests require a runtime role without BYPASSRLS.`,
+  );
+}
+
+async function warnRuntimeRlsStatus(options: {
+  token: string;
+  orgId: string;
+  storeId: string;
+  stage: "dev" | "prod";
+  schemaName?: string;
+}): Promise<void> {
+  try {
+    const rlsStatus = await callGateRlsStatus(options);
+    warnIfRuntimeBypassesRls(rlsStatus);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Warning: Could not check RLS runtime status after apply: ${message}`);
+  }
+}
+
 const sqlBundleCommand = new Command("bundle")
   .description(
     "Build an isolated SQL migration bundle and optional RLS manifest from app files",
@@ -125,6 +176,7 @@ const sqlBundleCommand = new Command("bundle")
   .option("--schema <schemaName>", "Override schemaName sent to Gate")
   .option("--json", "Print the Gate request body as JSON")
   .option("--status", "Call Gate migration status with the built body")
+  .option("--rls-status", "Call Gate RLS status for the selected store/stage")
   .option("--dry-run", "Call Gate apply with dryRun:true")
   .option("--apply", "Apply pending migrations through Gate")
   .option("--yes", "Confirm --apply")
@@ -147,6 +199,7 @@ const sqlBundleCommand = new Command("bundle")
 
     const shouldCallGate =
       options.status === true ||
+      options.rlsStatus === true ||
       options.dryRun === true ||
       options.apply === true;
     if (!shouldCallGate) {
@@ -175,6 +228,18 @@ const sqlBundleCommand = new Command("bundle")
       console.log(JSON.stringify(status, null, 2));
     }
 
+    if (options.rlsStatus === true) {
+      const rlsStatus = await callGateRlsStatus({
+        token,
+        orgId: fuseConfig.orgId,
+        storeId,
+        stage,
+        schemaName: options.schema ?? artifact.schemaName ?? undefined,
+      });
+      warnIfRuntimeBypassesRls(rlsStatus);
+      console.log(JSON.stringify(rlsStatus, null, 2));
+    }
+
     if (options.dryRun === true) {
       const dryRun = await callGate({
         token,
@@ -200,6 +265,13 @@ const sqlBundleCommand = new Command("bundle")
         body: requestBody,
       });
       console.log(JSON.stringify(apply, null, 2));
+      await warnRuntimeRlsStatus({
+        token,
+        orgId: fuseConfig.orgId,
+        storeId,
+        stage,
+        schemaName: options.schema ?? artifact.schemaName ?? undefined,
+      });
     }
   });
 

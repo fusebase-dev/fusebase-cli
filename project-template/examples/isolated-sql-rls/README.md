@@ -31,7 +31,10 @@ Commands:
 ```bash
 fusebase isolated-store sql bundle --app client-portal --json
 fusebase isolated-store sql bundle --app client-portal --stage dev --status
+fusebase isolated-store sql bundle --app client-portal --stage dev --rls-status
 fusebase isolated-store sql bundle --app client-portal --stage dev --dry-run
 ```
 
 The example intentionally leaves `audit_events` without `FORCE ROW LEVEL SECURITY` so Gate/Studio can show an RLS warning.
+
+For real RLS testing, `--rls-status` must report `bypassRls=false`. If it reports `bypassRls=true`, PostgreSQL policies are introspectable but not enforced for runtime queries; use explicit `WHERE current_setting(...)` filters only as a temporary demo workaround.

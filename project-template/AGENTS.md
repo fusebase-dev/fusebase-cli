@@ -544,7 +544,7 @@ Key commands:
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected app directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `fusebase app create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]` `[--coding-agent=<agent> --model=<model>]` - Register app (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the app needs dashboard access — do not defer to a separate `app update` step. **Always include `--coding-agent` and `--model`** to report anonymous usage stats.
 - `fusebase deploy` - Deploy apps (runs lint then build per app)
-- `fusebase isolated-store sql bundle --app <appId> [--alias <alias>] [--stage dev|prod] [--status|--dry-run|--apply --yes|--json]` - Build the SQL migration bundle from `postgres/migrations/` plus `apps[].isolatedStores.sql[]`; use before/apply through Gate instead of hand-building JSON. Optional RLS manifest forwarding requires `fusebase config set-flag postgres-rls`.
+- `fusebase isolated-store sql bundle --app <appId> [--alias <alias>] [--stage dev|prod] [--status|--rls-status|--dry-run|--apply --yes|--json]` - Build the SQL migration bundle from `postgres/migrations/` plus `apps[].isolatedStores.sql[]`; use before/apply through Gate instead of hand-building JSON. Optional RLS manifest forwarding requires `fusebase config set-flag postgres-rls`.
 - `fusebase update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed SDK deps/install), outside app directory runs CLI update only; use `--skip-product` for CLI-only mode even inside app
 - `fusebase env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `fusebase config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
 - `fusebase secret create --feature <featureId> --secret "KEY:description"` - Create app secrets (empty values), prints URL to set values
@@ -605,7 +605,17 @@ For SQL stores, keep app-owned schema files under `postgres/migrations/` and con
 }
 ```
 
-Use `fusebase isolated-store sql bundle --app <appId> --json` to inspect the exact Gate body. Use `--status` and `--dry-run` before `--apply --yes`. The command reads `GATE_MCP_TOKEN` from `.env` for Gate calls. `rlsManifest` is attached only when the `postgres-rls` flag is enabled; otherwise SQL migrations still work and RLS validation is skipped.
+Use `fusebase isolated-store sql bundle --app <appId> --json` to inspect the exact Gate body. Use `--status`, `--rls-status`, and `--dry-run` before `--apply --yes`. The command reads `GATE_MCP_TOKEN` from `.env` for Gate calls. `rlsManifest` is attached only when the `postgres-rls` flag is enabled; otherwise SQL migrations still work and RLS validation is skipped.
+
+RLS verification checklist after schema apply:
+
+1. `bundle --status` must show the journal head that matches the migration manifest.
+2. `bundle --rls-status` must show `bypassRls=false` for real PostgreSQL-enforced RLS tests.
+3. Probe `current_setting('app.project_id', true)` or the relevant custom setting with sample `rlsContext`.
+4. Scoped reads must return a subset, not all rows.
+5. If `bypassRls=true`, use an explicit `WHERE current_setting(...)` filter as a temporary demo workaround and label the UI/environment as "policies not enforced".
+
+Anti-pattern: do not assume `rlsContext` alone filters rows. It only sets transaction-local PostgreSQL settings; filtering requires a runtime role without `BYPASSRLS` plus table policies that use those settings.
 
 ## Common Failure Modes
 
