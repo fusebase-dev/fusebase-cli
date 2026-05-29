@@ -264,6 +264,8 @@ Optional third role:
   - explicit operator or support-only access
   - preferably still subject to RLS unless there is a separate audited break-glass path
 
+Break-glass bypass should be a separate Gate capability, not a property of normal runtime access. The reserved permission is `isolated_store.rls.bypass`; it is intended only for future explicit admin/support execution paths that log actor, org, store, stage, SQL hash, and reason. It must not be granted to app/client runtime tokens and must not be used by `queryIsolatedStoreSql`, structured row APIs, or normal migrations.
+
 What must not happen:
 
 - runtime role owning app tables
@@ -821,6 +823,13 @@ Recommended change:
 
 - database owner / table owner path should move to migrator role
 - runtime role should be non-owner and RLS-bound
+
+Gate supports the split through optional isolated Postgres env vars:
+
+- `ISOLATED_PG_MIGRATOR_USER`
+- `ISOLATED_PG_MIGRATOR_PASSWORD`
+
+When these are configured for server-backed isolated Postgres stores, Gate resolves schema operations (`applyIsolatedStoreSqlMigrations`, baseline adoption, checksum repair) with the migrator credentials while runtime data/query paths keep using `ISOLATED_PG_RUNTIME_USER` / `ISOLATED_PG_RUNTIME_PASSWORD`. Auto-provisioned databases are created with the migrator as owner, Gate attempts to set the runtime role to `NOBYPASSRLS`, and migration apply grants runtime DML/function/sequence privileges on the target schema.
 
 ### 5.3 `resourceScope` is not a substitute for RLS
 

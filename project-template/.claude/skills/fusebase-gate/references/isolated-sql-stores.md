@@ -142,12 +142,13 @@ Current recommendation:
 
 ## 2. Permissions (typical)
 
-| Capability              | Permission                                                                       |
-| ----------------------- | -------------------------------------------------------------------------------- |
-| Row CRUD, import, query | `isolated_store.read` + `isolated_store.data.write` (as designed for your token) |
-| **Apply migrations**    | `isolated_store.schema.write` (operators / CI — not normal end-users)            |
-| Raw DML escape hatch    | `executeIsolatedStoreSql` — **no DDL**                                           |
-| List/create stores      | Control-plane permissions on isolated-store ops                                  |
+| Capability              | Permission                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| Row CRUD, import, query | `isolated_store.read` + `isolated_store.data.write` (as designed for your token)       |
+| **Apply migrations**    | `isolated_store.schema.write` (operators / CI — not normal end-users)                  |
+| Raw DML escape hatch    | `executeIsolatedStoreSql` — **no DDL**                                                 |
+| RLS break-glass bypass  | `isolated_store.rls.bypass` — reserved for future explicit audited support/admin paths |
+| List/create stores      | Control-plane permissions on isolated-store ops                                        |
 
 Schema **never** goes through `executeIsolatedStoreSql`.
 Operator migration calls do not require a session-backed user anymore: token-auth requests with the right permission can apply migrations through HTTP/SDK, and Gate records a stable token actor label in the audit fields when no concrete `userId` is present.
@@ -158,6 +159,8 @@ For the midsize-target PostgreSQL Row-Level Security path and the recommended Ga
 RLS validation is currently warn-only. `getIsolatedStoreSqlMigrationStatus`, `applyIsolatedStoreSqlMigrations`, and `adoptIsolatedStoreSqlMigrationBaseline` may include `rlsManifest`; Gate returns `status.rlsValidation` with table/column/index/policy warnings but does not reject apply on those warnings yet. apps-cli sends `rlsManifest` only when its `postgres-rls` flag is enabled. The manifest supports `tenant`, `user`, `owner_collaborator`, `scoped`, `none`, and `technical` table classifications.
 
 RLS verification must check the runtime database role, not only the SQL context. `getIsolatedStoreSqlRlsStatus` returns the active runtime `currentUser`, `bypassRls`, and `superuser` flags. If `bypassRls` is `true`, PostgreSQL policies are visible in introspection but are not enforced for runtime queries; scoped demos must either use explicit `WHERE current_setting(...)` filters as a temporary workaround or wait for the runtime role split.
+
+For server-backed isolated Postgres stores, Gate can run schema operations with a separate migrator role when `ISOLATED_PG_MIGRATOR_USER` and `ISOLATED_PG_MIGRATOR_PASSWORD` are configured. Runtime query/data APIs still use the runtime role; migration apply/baseline/checksum repair use the migrator role. New auto-provisioned databases use `provisioningMetadata.roleModel = "split"` when this is active.
 
 Recommended RLS verification checklist after schema apply:
 
