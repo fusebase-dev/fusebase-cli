@@ -194,7 +194,6 @@ export const KNOWN_FLAGS = [
   "api-exploration",
   "job-sidecars",
   MANAGED_INTEGRATIONS_FLAG,
-  "app-api-registry",
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
@@ -219,8 +218,6 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
   // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
     // "Enable personal authorization for managed integrations.",
-  "app-api-registry":
-    "Enable publishing app OpenAPI manifests to the control-plane registry during deploy.",
 };
 
 export function getFlags(): string[] {

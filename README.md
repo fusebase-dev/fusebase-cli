@@ -240,7 +240,7 @@ Deploy apps to Fusebase. For each app this command will:
    - **Frontend unchanged, backend changed** → create a new version, reuse the previous frontend bundle via `copyFrontendParams` (no upload), then re-deploy the backend.
    - **Frontend changed** → create a new version, upload files, persist the new `frontendHash`. Backend is handled per its own hash (skipped/copied or re-deployed).
 5. With `--force`, hash matches are ignored and a full upload + redeploy runs for every app.
-6. If the app contains `openapi.json` and the `app-api-registry` flag is enabled, validate it and publish the app API manifest to the app registry.
+6. If the app contains `openapi.json`, validate it and publish the app API manifest to the app registry.
 
 **Arguments:** None
 
