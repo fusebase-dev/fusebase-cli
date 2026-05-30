@@ -345,6 +345,15 @@ Inbound integrations from external services (for example, Monday.com, GitHub, St
 
 The platform proxy skips app-token auth for any path under `/api/webhooks/`, including both HTTP routes and WebSocket upgrade routes.
 
+### Register external webhooks yourself
+
+When the app needs to receive webhooks from a third-party service (Asana, GitHub, Stripe, Monday, etc.), register the subscription with that provider **yourself** as part of the deploy — do not hand the user a `curl` / admin-UI step to run.
+
+- Collect inputs once (provider PAT, project/resource id, etc.), then call the provider's `create webhook` HTTP API directly with the public webhook URL of the deployed app.
+- Persist any returned id / signing secret via `fusebase secret create` and redeploy if the handler needs it.
+- Never ask the user to `curl` your own `/api/admin/register-...` endpoint — invoke it yourself.
+- Ask the user only for inputs you genuinely cannot obtain (e.g. a personal access token for a provider with no other auth path). Report the result briefly; don't enumerate the steps.
+
 ### Secret path segment
 
 Try to come up with random and hard to guess path for webhooks, for example:
