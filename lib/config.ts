@@ -116,6 +116,8 @@ export interface FeatureConfig {
   isolatedStores?: IsolatedStoresConfig;
   /** Gate SDK analyze snapshot scoped to this feature path. */
   fusebaseGateMeta?: GateSdkOperationsSnapshot;
+  /** Cross-app API dependency analyze snapshot scoped to this feature path. */
+  fusebaseAppApiDependenciesMeta?: AppApiDependenciesSnapshot;
 }
 
 /** Written by `fusebase analyze gate` — last Gate SDK operation scan. */
@@ -136,6 +138,32 @@ export interface GateSdkOperationsSnapshot {
    * Gate permission strings required for the current `usedOps` (from `POST /v1/gate/resolve-operation-permissions`), sorted.
    */
   permissions?: string[];
+}
+
+export type AppApiDependencySource = "static" | "manual";
+
+export interface AppApiDependencySnapshot {
+  targetOrgId: string;
+  targetAppId: string;
+  operationId: string;
+  source: AppApiDependencySource;
+}
+
+export interface AppApiUnresolvedDependencySnapshot {
+  reason: string;
+  file: string;
+  line: number;
+  column: number;
+}
+
+/** Written by `fusebase analyze app-apis` — cross-app API dependency snapshot. */
+export interface AppApiDependenciesSnapshot {
+  sdkVersion: string | null;
+  analyzedAt: string;
+  dependenciesChangedAt: string;
+  unresolvedChangedAt: string;
+  dependencies: AppApiDependencySnapshot[];
+  unresolved: AppApiUnresolvedDependencySnapshot[];
 }
 
 // Read fusebase.json env config (takes precedence over process.env)
@@ -193,6 +221,7 @@ export const KNOWN_FLAGS = [
   "portal-specific-apps",
   "api-exploration",
   "job-sidecars",
+  "cross-app-api-calls-analysis",
   MANAGED_INTEGRATIONS_FLAG,
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
@@ -214,6 +243,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include api-exploration skill for verifying API endpoints with temporary tokens and test scripts.",
   "job-sidecars":
     "Enable per-job sidecar containers for cron jobs (`fusebase sidecar add --job <name>`).",
+  "cross-app-api-calls-analysis":
+    "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
   [MANAGED_INTEGRATIONS_FLAG]:
     "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
   // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
@@ -535,6 +566,171 @@ function gatePermissionSetsEqual(
   );
 }
 
+function sortAppApiDependencies(
+  dependencies: AppApiDependencySnapshot[],
+): AppApiDependencySnapshot[] {
+  return [...dependencies].sort(
+    (a, b) =>
+      a.targetOrgId.localeCompare(b.targetOrgId) ||
+      a.targetAppId.localeCompare(b.targetAppId) ||
+      a.operationId.localeCompare(b.operationId) ||
+      a.source.localeCompare(b.source),
+  );
+}
+
+function sortAppApiUnresolved(
+  unresolved: AppApiUnresolvedDependencySnapshot[],
+): AppApiUnresolvedDependencySnapshot[] {
+  return [...unresolved].sort(
+    (a, b) =>
+      a.file.localeCompare(b.file) ||
+      a.line - b.line ||
+      a.column - b.column ||
+      a.reason.localeCompare(b.reason),
+  );
+}
+
+function dedupeAppApiDependencies(
+  dependencies: AppApiDependencySnapshot[],
+): AppApiDependencySnapshot[] {
+  const seen = new Set<string>();
+  const out: AppApiDependencySnapshot[] = [];
+
+  for (const dependency of sortAppApiDependencies(dependencies)) {
+    const key = [
+      dependency.targetOrgId,
+      dependency.targetAppId,
+      dependency.operationId,
+      dependency.source,
+    ].join("\u0001");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(dependency);
+  }
+
+  return out;
+}
+
+function dedupeAppApiUnresolved(
+  unresolved: AppApiUnresolvedDependencySnapshot[],
+): AppApiUnresolvedDependencySnapshot[] {
+  const seen = new Set<string>();
+  const out: AppApiUnresolvedDependencySnapshot[] = [];
+
+  for (const item of sortAppApiUnresolved(unresolved)) {
+    const key = [item.file, item.line, item.column, item.reason].join("\u0001");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+
+  return out;
+}
+
+function appApiDependenciesEqual(
+  a: AppApiDependencySnapshot[] | undefined,
+  b: AppApiDependencySnapshot[],
+): boolean {
+  return (
+    JSON.stringify(dedupeAppApiDependencies(a ?? [])) ===
+    JSON.stringify(dedupeAppApiDependencies(b))
+  );
+}
+
+function appApiUnresolvedEqual(
+  a: AppApiUnresolvedDependencySnapshot[] | undefined,
+  b: AppApiUnresolvedDependencySnapshot[],
+): boolean {
+  return (
+    JSON.stringify(dedupeAppApiUnresolved(a ?? [])) ===
+    JSON.stringify(dedupeAppApiUnresolved(b))
+  );
+}
+
+function readAppApiDependenciesSnapshotFromRaw(
+  raw: unknown,
+): AppApiDependenciesSnapshot | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+
+  const o = raw as Record<string, unknown>;
+  if (!Array.isArray(o.dependencies) || !Array.isArray(o.unresolved)) {
+    return undefined;
+  }
+
+  const sdkVersion =
+    o.sdkVersion === null || typeof o.sdkVersion === "string"
+      ? (o.sdkVersion as string | null)
+      : null;
+  const analyzedAt = typeof o.analyzedAt === "string" ? o.analyzedAt : "";
+  const dependenciesChangedAt =
+    typeof o.dependenciesChangedAt === "string"
+      ? o.dependenciesChangedAt
+      : analyzedAt;
+  const unresolvedChangedAt =
+    typeof o.unresolvedChangedAt === "string"
+      ? o.unresolvedChangedAt
+      : analyzedAt;
+
+  const dependencies: AppApiDependencySnapshot[] = [];
+  for (const dependency of o.dependencies) {
+    if (!dependency || typeof dependency !== "object") continue;
+    const item = dependency as Record<string, unknown>;
+    if (
+      typeof item.targetOrgId !== "string" ||
+      typeof item.targetAppId !== "string" ||
+      typeof item.operationId !== "string" ||
+      (item.source !== "static" && item.source !== "manual")
+    ) {
+      continue;
+    }
+    dependencies.push({
+      targetOrgId: item.targetOrgId,
+      targetAppId: item.targetAppId,
+      operationId: item.operationId,
+      source: item.source,
+    });
+  }
+
+  const unresolved: AppApiUnresolvedDependencySnapshot[] = [];
+  for (const unresolvedItem of o.unresolved) {
+    if (!unresolvedItem || typeof unresolvedItem !== "object") continue;
+    const item = unresolvedItem as Record<string, unknown>;
+    if (
+      typeof item.reason !== "string" ||
+      typeof item.file !== "string" ||
+      typeof item.line !== "number" ||
+      !Number.isFinite(item.line) ||
+      typeof item.column !== "number" ||
+      !Number.isFinite(item.column)
+    ) {
+      continue;
+    }
+    unresolved.push({
+      reason: item.reason,
+      file: item.file,
+      line: item.line,
+      column: item.column,
+    });
+  }
+
+  return normalizeAppApiDependenciesSnapshot({
+    sdkVersion,
+    analyzedAt,
+    dependenciesChangedAt,
+    unresolvedChangedAt,
+    dependencies,
+    unresolved,
+  });
+}
+
+function readFeatureAppApiDependenciesMetaFromFeatureRaw(
+  raw: unknown,
+): AppApiDependenciesSnapshot | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  return readAppApiDependenciesSnapshotFromRaw(o.fusebaseAppApiDependenciesMeta);
+}
+
 /** Read one Gate snapshot object from parsed JSON; supports legacy `changedAt`, `used`, `requiredPermissions`. */
 function readGateSdkSnapshotFromRaw(
   raw: unknown,
@@ -630,6 +826,18 @@ function readPreviousGateSnapshotForFeature(
   return undefined;
 }
 
+function readPreviousAppApiDependenciesSnapshotForFeature(
+  raw: Record<string, unknown>,
+  featureId: string,
+): AppApiDependenciesSnapshot | undefined {
+  const apps = Array.isArray(raw.apps) ? raw.apps : [];
+  const featureIndex = getFeatureIndexById(raw, featureId);
+  if (featureIndex === -1) return undefined;
+
+  const featureRaw = apps[featureIndex];
+  return readFeatureAppApiDependenciesMetaFromFeatureRaw(featureRaw);
+}
+
 function writeGateSnapshotToFeatureRaw(
   raw: Record<string, unknown>,
   featureId: string,
@@ -656,6 +864,31 @@ function writeGateSnapshotToFeatureRaw(
   raw.apps = apps;
   delete raw.fusebaseGateMeta;
   delete raw.gateSdkOperations;
+}
+
+function writeAppApiDependenciesSnapshotToFeatureRaw(
+  raw: Record<string, unknown>,
+  featureId: string,
+  snapshot: AppApiDependenciesSnapshot,
+): void {
+  const apps = Array.isArray(raw.apps) ? [...raw.apps] : [];
+  const featureIndex = getFeatureIndexById(raw, featureId);
+  if (featureIndex === -1) {
+    throw new Error(`App "${featureId}" not found in fusebase.json`);
+  }
+
+  const featureRaw = apps[featureIndex];
+  if (!featureRaw || typeof featureRaw !== "object") {
+    throw new Error(`App "${featureId}" is invalid in fusebase.json`);
+  }
+
+  const nextFeature = {
+    ...(featureRaw as Record<string, unknown>),
+    fusebaseAppApiDependenciesMeta: snapshot,
+  };
+
+  apps[featureIndex] = nextFeature;
+  raw.apps = apps;
 }
 
 /**
@@ -691,10 +924,34 @@ function normalizeGateSdkOperationsSnapshot(
   };
 }
 
+/**
+ * Stable key order in fusebase.json:
+ * sdkVersion, analyzedAt, dependenciesChangedAt, unresolvedChangedAt, dependencies, unresolved.
+ */
+function normalizeAppApiDependenciesSnapshot(
+  s: AppApiDependenciesSnapshot,
+): AppApiDependenciesSnapshot {
+  return {
+    sdkVersion: s.sdkVersion,
+    analyzedAt: s.analyzedAt,
+    dependenciesChangedAt: s.dependenciesChangedAt,
+    unresolvedChangedAt: s.unresolvedChangedAt,
+    dependencies: dedupeAppApiDependencies(s.dependencies),
+    unresolved: dedupeAppApiUnresolved(s.unresolved),
+  };
+}
+
 export interface GateSdkOperationsWriteInput {
   analyzedAt: string;
   usedOps: string[];
   sdkVersion: string | null;
+}
+
+export interface AppApiDependenciesWriteInput {
+  analyzedAt: string;
+  sdkVersion: string | null;
+  dependencies: AppApiDependencySnapshot[];
+  unresolved: AppApiUnresolvedDependencySnapshot[];
 }
 
 /**
@@ -759,6 +1016,95 @@ export function writeGateSdkOperationsToFusebaseJson(
   snapshot = normalizeGateSdkOperationsSnapshot(snapshot);
 
   writeGateSnapshotToFeatureRaw(raw, featureId, snapshot);
+  writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
+  invalidateFuseConfigCache();
+  return snapshot;
+}
+
+/**
+ * Merge per-feature `fusebaseAppApiDependenciesMeta` into `fusebase.json` in `projectRoot`.
+ * Preserves previous `source: "manual"` dependencies and replaces only `source: "static"`.
+ * Bumps changed timestamps only when sorted/deduped sets differ from the previous snapshot.
+ * @throws If fusebase.json is missing or invalid JSON.
+ */
+export function writeAppApiDependenciesToFusebaseJson(
+  projectRoot: string,
+  featureId: string,
+  input: AppApiDependenciesWriteInput,
+): AppApiDependenciesSnapshot {
+  if (!hasFlag("cross-app-api-calls-analysis")) {
+    throw new Error(
+      "cross-app API dependencies analysis is disabled. Enable it with: fusebase config set-flag cross-app-api-calls-analysis",
+    );
+  }
+
+  const fuseJsonPath = join(projectRoot, "fusebase.json");
+  if (!existsSync(fuseJsonPath)) {
+    throw new Error("fusebase.json not found. Run fusebase init first.");
+  }
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+  } catch {
+    throw new Error("Could not parse fusebase.json");
+  }
+  normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
+
+  const prev = readPreviousAppApiDependenciesSnapshotForFeature(raw, featureId);
+  const previousManualDependencies = (prev?.dependencies ?? []).filter(
+    (dependency) => dependency.source === "manual",
+  );
+
+  const nextStaticDependencies = input.dependencies
+    .filter((dependency) => dependency.source === "static")
+    .map((dependency) => ({
+      targetOrgId: dependency.targetOrgId,
+      targetAppId: dependency.targetAppId,
+      operationId: dependency.operationId,
+      source: "static" as const,
+    }));
+
+  const mergedDependencies = dedupeAppApiDependencies([
+    ...previousManualDependencies,
+    ...nextStaticDependencies,
+  ]);
+  const mergedUnresolved = dedupeAppApiUnresolved(input.unresolved);
+
+  let dependenciesChangedAt: string;
+  if (!prev) {
+    dependenciesChangedAt = input.analyzedAt;
+  } else if (appApiDependenciesEqual(prev.dependencies, mergedDependencies)) {
+    dependenciesChangedAt =
+      prev.dependenciesChangedAt ?? prev.analyzedAt ?? input.analyzedAt;
+  } else {
+    dependenciesChangedAt = input.analyzedAt;
+  }
+
+  let unresolvedChangedAt: string;
+  if (!prev) {
+    unresolvedChangedAt = input.analyzedAt;
+  } else if (appApiUnresolvedEqual(prev.unresolved, mergedUnresolved)) {
+    unresolvedChangedAt =
+      prev.unresolvedChangedAt ?? prev.analyzedAt ?? input.analyzedAt;
+  } else {
+    unresolvedChangedAt = input.analyzedAt;
+  }
+
+  const snapshot = normalizeAppApiDependenciesSnapshot({
+    sdkVersion: input.sdkVersion,
+    analyzedAt: input.analyzedAt,
+    dependenciesChangedAt,
+    unresolvedChangedAt,
+    dependencies: mergedDependencies,
+    unresolved: mergedUnresolved,
+  });
+
+  writeAppApiDependenciesSnapshotToFeatureRaw(raw, featureId, snapshot);
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
   invalidateFuseConfigCache();
   return snapshot;

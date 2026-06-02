@@ -572,12 +572,20 @@ If the app uses Fusebase Gate SDK:
 - do not treat `Permissions: none` as success unless the app intentionally requires no runtime permissions
 - run `fusebase analyze gate --operations --json --feature <featureId>` before publish and confirm `usedOps` is not empty when Gate SDK is used in runtime code
 - if `usedOps` is empty but runtime imports `@fusebase/fusebase-gate-sdk`, treat publish as blocked and fix analysis/runtime call patterns before shipping
+<% if (it.flags?.includes("cross-app-api-calls-analysis")) { %>
+- if runtime code uses `AppApisApi.callAppApi(...)`, run `fusebase analyze app-apis --feature <featureId> --sync` to sync cross-app API dependency metadata (`--force` for reconciliation)
+<% } %>
 
 Recommended publish sequence:
 
 1. update runtime permissions with `fusebase app update`
 2. if Gate SDK is used, include `--sync-gate-permissions`
+<% if (it.flags?.includes("cross-app-api-calls-analysis")) { %>
+3. if cross-app app APIs are used, run `fusebase analyze app-apis --feature <featureId> --sync`
+4. run `fusebase deploy`
+<% } else { %>
 3. run `fusebase deploy`
+<% } %>
 
 ### Isolated SQL bundle + RLS manifest
 

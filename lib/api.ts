@@ -610,6 +610,21 @@ export interface UpdateAppRequest {
   manifest?: Record<string, unknown>;
 }
 
+export type AppApiDependencySyncSource = "static" | "manual";
+
+export interface AppApiDependencySyncItem {
+  targetOrgId: string;
+  targetAppId: string;
+  operationId: string;
+  source: AppApiDependencySyncSource;
+}
+
+export interface SyncAppApiDependenciesResponse {
+  dependencies?: unknown[];
+  warnings?: unknown[];
+  [key: string]: unknown;
+}
+
 export async function updateApp(
   apiKey: string,
   orgId: string,
@@ -652,6 +667,53 @@ export async function updateApp(
   const res = await response.json();
 
   return res as App;
+}
+
+export async function syncAppApiDependencies(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+  appId: string,
+  dependencies: AppApiDependencySyncItem[],
+): Promise<SyncAppApiDependenciesResponse> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/app-api-dependencies`;
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ dependencies }),
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      name?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps/${appId}/app-api-dependencies`,
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
+      timestamp: new Date().toISOString(),
+    });
+
+    throw new Error(
+      `Failed to sync app API dependencies: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as unknown;
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+
+  return payload as SyncAppApiDependenciesResponse;
 }
 
 export async function initUpload(
