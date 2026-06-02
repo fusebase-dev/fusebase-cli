@@ -19,6 +19,7 @@ See:
 - [Conceptual Model](docs/CONCEPTS.md)
 - [App Permissions](docs/PERMISSIONS.md) — canonical model for `dashboardView`, `database`, `gate`, and `app update`
 - [Fusebase Gate meta (`fusebaseGateMeta`)](docs/FUSEBASE_GATE_META.md) — Gate SDK analyze flow and `fusebase.json` snapshot
+- [App API dependencies meta (`fusebaseAppApiDependenciesMeta`)](docs/APP_API_DEPENDENCIES.md) — cross-app `callAppApi` static analysis snapshot in `fusebase.json` with optional explicit remote sync (`fusebase analyze app-apis --sync`; requires flag `cross-app-api-calls-analysis`)
 - [E2E tests](test/e2e/README.md) — CLI end-to-end smoke + dev-start parallel tests, env vars, and CI variables
 
 ## CLI Usage
@@ -707,6 +708,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `postgres-rls` | Enables experimental RLS manifest helpers for isolated SQL stores |
 | `portal-specific-apps` | Includes portal-specific app guidance in prompts: `fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
 | `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`apps[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `app-sidecar` and `app-backend` skill templates. |
+| `cross-app-api-calls-analysis` | Enables hidden `fusebase analyze app-apis` command and cross-app API dependency guidance in generated prompts/skills. |
 
 Enable a flag globally, then refresh the project template:
 
@@ -716,6 +718,7 @@ fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summ
 fusebase config set-flag isolated-stores     # Isolated stores functionality (SQL/NoSQL)
 fusebase config set-flag postgres-rls        # PostgreSQL RLS manifest helpers for isolated SQL stores
 fusebase config set-flag portal-specific-apps # Portal-specific apps prompts/guidance
+fusebase config set-flag cross-app-api-calls-analysis # Cross-app AppApisApi dependency analysis command/guidance
 fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```
 

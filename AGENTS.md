@@ -115,6 +115,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); includes supporting `fusebase-gate` references and `isolated_store.*` permissions in `fusebase env create` |
 | `portal-specific-apps` | Includes portal-specific app prompts and references (`fusebase-portal-specific-apps`, `{{CurrentPortal}}` filters, and auth-context guidance for portal runtime) |
 | `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing app code. Complements MCP discovery. |
+| `cross-app-api-calls-analysis` | Enables hidden `fusebase analyze app-apis` command and cross-app API dependency guidance in generated prompts/skills. |
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 
@@ -213,6 +214,7 @@ When modifying CLI commands (adding/removing options, changing behavior, or addi
 - `project-template/AGENTS.md` - It may be updated as well, as it contains description of some commands
 - `docs/PERMISSIONS.md` - Canonical app permissions model (`dashboardView`, `database`, `gate`, analyze + sync flow)
 - `docs/FUSEBASE_GATE_META.md` - When changing `fusebase analyze gate` or `fusebaseGateMeta` in `fusebase.json`
+- `docs/APP_API_DEPENDENCIES.md` - When changing `fusebase analyze app-apis` or `fusebaseAppApiDependenciesMeta` in `fusebase.json`
 
 This ensures users have accurate documentation for the CLI apps.
 
@@ -223,6 +225,10 @@ You can access the public API using the API key. The API spec is here https://pu
 ## Fusebase Gate analyze snapshot
 
 The hidden command `fusebase analyze gate` writes **`fusebaseGateMeta`** into `fusebase.json` (used Gate SDK operations + resolved permissions). See **`docs/FUSEBASE_GATE_META.md`** for the full mechanism.
+
+## App API dependency analyze snapshot (PoC)
+
+The hidden command `fusebase analyze app-apis` (requires flag `cross-app-api-calls-analysis`) statically scans runtime TypeScript for `AppApisApi.callAppApi(...)` usage and writes **`fusebaseAppApiDependenciesMeta`** into `fusebase.json` for each analyzed app. It preserves manual dependency entries (`source: "manual"`), replaces static entries (`source: "static"`), and keeps changed-at timestamps for dependencies/unresolved sets. Optional `--sync` pushes the current dependency set to `PUT /v1/orgs/{orgId}/products/{productId}/apps/{appId}/app-api-dependencies` for apps where dependencies changed on this run; use `--force` with `--sync` for reconciliation when dependencies are unchanged locally.
 
 ## App permissions
 

@@ -586,6 +586,17 @@ After changing app code, run `fusebase app update <appId>` if any of these need 
 - `--access` — access principals (visitor / org roles) changed
 - `--sync-gate-permissions` — always include for apps using `@fusebase/fusebase-gate-sdk` at runtime
 
+<% if (it.flags?.includes("cross-app-api-calls-analysis")) { %>
+If runtime code calls other apps via Gate `AppApisApi.callAppApi(...)`, refresh local cross-app dependency metadata and optionally sync it:
+
+```bash
+fusebase analyze app-apis --feature <appId>
+fusebase analyze app-apis --feature <appId> --sync
+# repair/reconciliation mode
+fusebase analyze app-apis --feature <appId> --sync --force
+```
+<% } %>
+
 ```bash
 # Update permissions and sync Gate permissions
 fusebase app update <appId> --permissions="dashboardView.dash1:view1.read,write" --sync-gate-permissions
