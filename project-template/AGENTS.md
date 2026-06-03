@@ -61,6 +61,33 @@ Rules:
 - **`fusebase-dashboards`** (folder `.claude/skills/fusebase-dashboards/`) — dashboards, databases, views, dashboard data, and the dashboard-service SDK path during development. See [Required Skills](#required-skills).
 - **`fusebase-gate`** (folder `.claude/skills/fusebase-gate/`) — **Fusebase Gate** and the wider platform surface: how to use the Gate MCP and SDK for org-scoped flows, user lists and membership, tokens and authz, health/bootstrap, and other platform capabilities (e.g. email campaigns, automation, integrations) **as exposed through Gate**. Load it **before** Gate MCP work or when integrating apps with orgs, users, and platform services beyond raw dashboard data.
 
+## Cross-App API Rule
+
+If the task references **another Fusebase app in the same organization** and asks to use **its API**, treat that app as a **peer app**, not as a third-party opaque service.
+
+**Default workflow:**
+
+1. Discover the published app API through Gate:
+   - `searchAppApiOperations`
+   - `listAppApiOperations`
+   - `getAppApiOperation`
+2. Build the integration around the published contract.
+3. Use `callAppApi` or direct runtime probing only after discovery if behavior still needs to be verified.
+
+**Security-sensitive operations:**
+
+- Prefer contract-level policy over ad hoc shared secrets when the platform supports it.
+- Use `x-fusebase-allowed-callers` to restrict which caller app/client may invoke the operation.
+- Use `x-fusebase-required-permissions` only with the `app_api.<namespace>.<capability>.<action>` format, for example `app_api.client_portal.provision.write`.
+- Treat `allowedCallers` as caller identity and `requiredPermissions` as caller capability; do not mix these concerns.
+
+**Anti-patterns:**
+
+- Do **not** start with local source-code search if the target app is separately deployed.
+- Do **not** ask for raw OpenAPI export, manual endpoint lists, or app settings screenshots as the first step.
+- Do **not** treat dashboard tables, storage schemas, or MCP database access as the primary integration surface when a published app API exists.
+- Do **not** claim end-to-end verification unless the real consumer path was tested against the target app API.
+
 ## Two Concepts (SDK, MCP)
 
 | Concept | Where used                                                                                 | Purpose                                                                                                                                       |

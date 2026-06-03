@@ -303,6 +303,9 @@ Behavior:
   - operation presence
   - unique `operationId`
   - basic `x-fusebase-*` fields
+  - app API access policy:
+    - `x-fusebase-allowed-callers`: array of `client:<clientId>` or `app:<appId>` caller ids
+    - `x-fusebase-required-permissions`: array of `app_api.<namespace>.<capability>.<action>` permissions
 
 **Examples:**
 
@@ -310,6 +313,21 @@ Behavior:
 fusebase api validate
 fusebase api validate --file openapi.json
 ```
+
+**App API access policy example:**
+
+```json
+{
+  "x-fusebase-visibility": "org",
+  "x-fusebase-allowed-callers": ["client:signup-client-id"],
+  "x-fusebase-required-permissions": [
+    "app_api.client_portal.provision.write"
+  ]
+}
+```
+
+`x-fusebase-required-permissions` is intentionally namespaced with `app_api.` so app-to-app
+capabilities do not collide with system Gate permissions such as `isolated_store.read`.
 
 **Output:**
 

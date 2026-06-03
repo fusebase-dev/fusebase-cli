@@ -1,7 +1,7 @@
 ---
 version: "1.6.2"
 mcp_prompt: sdk
-last_synced: "2026-05-22"
+last_synced: "2026-06-03"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -26,6 +26,18 @@ npm: `@fusebase/fusebase-gate-sdk`. For development, install from public npm:
 1. Use sdk_search to find relevant methods by intent or keywords.
 2. Use sdk_describe to inspect the exact client, method, and input or output schemas.
 3. Use the generated SDK client for application code.
+
+## Peer App API Workflow
+
+If the task is to integrate with another Fusebase app in the same org, do not treat it like an unknown third-party API.
+Start with published app API discovery through Gate:
+- searchAppApiOperations
+- listAppApiOperations
+- getAppApiOperation
+Only then move to callAppApi or direct runtime probing if behavior still needs verification.
+Do not start by asking for raw OpenAPI export, manual endpoint lists, local source code, or dashboard/storage schema spelunking when a published app API exists.
+For security-sensitive app API operations, use contract-level policy: `x-fusebase-allowed-callers` for caller identity and `x-fusebase-required-permissions` for caller capability.
+`x-fusebase-required-permissions` must use the app API namespace `app_api.<namespace>.<capability>.<action>` (for example `app_api.client_portal.provision.write`), not built-in Gate permissions such as `isolated_store.read`.
 
 ## Main SDK Clients
 
@@ -84,5 +96,5 @@ Always handle SDK operation failures explicitly.
 
 - **Version**: 1.6.2
 - **Category**: meta
-- **Last synced**: 2026-05-22
+- **Last synced**: 2026-06-03
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

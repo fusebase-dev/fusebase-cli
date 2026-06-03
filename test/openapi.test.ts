@@ -60,6 +60,66 @@ describe("OpenAPI Phase 1 validator", () => {
     );
   });
 
+  it("validates app API caller policy extensions", () => {
+    const result = validateOpenApiDocument({
+      openapi: "3.1.0",
+      info: {
+        title: "Policy API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/tickets": {
+          post: {
+            operationId: "createTicket",
+            "x-fusebase-visibility": "org",
+            "x-fusebase-allowed-callers": ["client:signup_app"],
+            "x-fusebase-required-permissions": [
+              "app_api.client_portal.tickets.write",
+            ],
+            responses: {
+              "200": {
+                description: "ok",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.issues).toEqual([]);
+  });
+
+  it("rejects invalid app API caller policy extensions", () => {
+    const result = validateOpenApiDocument({
+      openapi: "3.1.0",
+      info: {
+        title: "Policy API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/tickets": {
+          post: {
+            operationId: "createTicket",
+            "x-fusebase-allowed-callers": ["signup_app"],
+            "x-fusebase-required-permissions": ["tickets.write"],
+            responses: {
+              "200": {
+                description: "ok",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.issues.map((issue) => issue.message)).toContain(
+      "x-fusebase-allowed-callers must be an array of caller ids like 'app:<appId>' or 'client:<clientId>'.",
+    );
+    expect(result.issues.map((issue) => issue.message)).toContain(
+      "x-fusebase-required-permissions must be app API permissions like 'app_api.<namespace>.<capability>.<action>'.",
+    );
+  });
+
   it("builds a published app API manifest from a valid spec", () => {
     const document = JSON.parse(createDefaultOpenApiSpec()) as Record<
       string,
@@ -85,9 +145,50 @@ describe("OpenAPI Phase 1 validator", () => {
         summary: "Health check",
         description: "Returns the backend health status.",
         tags: undefined,
-        visibility: "private",
+        visibility: "org",
         executionMode: "sync",
       },
     ]);
+  });
+
+  it("publishes app API caller policy extensions", () => {
+    const document = {
+      openapi: "3.1.0",
+      info: {
+        title: "Policy API",
+        version: "1.0.0",
+      },
+      paths: {
+        "/tickets": {
+          post: {
+            operationId: "createTicket",
+            "x-fusebase-visibility": "org",
+            "x-fusebase-execution-mode": "sync",
+            "x-fusebase-allowed-callers": ["client:signup_app"],
+            "x-fusebase-required-permissions": [
+              "app_api.client_portal.tickets.write",
+            ],
+            responses: {
+              "200": {
+                description: "ok",
+              },
+            },
+          },
+        },
+      },
+    };
+    const validation = validateOpenApiDocument(document, "/tmp/openapi.json");
+    const manifest = buildPublishedAppApiManifest({
+      filePath: "/tmp/openapi.json",
+      document,
+      validation,
+      publishedAt: "2026-04-29T12:00:00.000Z",
+    });
+
+    expect(manifest.operations[0]).toMatchObject({
+      operationId: "createTicket",
+      allowedCallers: ["client:signup_app"],
+      requiredPermissions: ["app_api.client_portal.tickets.write"],
+    });
   });
 });

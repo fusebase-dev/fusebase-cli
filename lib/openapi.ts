@@ -20,6 +20,9 @@ const HTTP_METHODS = new Set([
 
 const FUSEBASE_VISIBILITIES = new Set(["org", "private"]);
 const FUSEBASE_EXECUTION_MODES = new Set(["sync", "async"]);
+const CALLER_PATTERN = /^(app|client):[A-Za-z0-9_-]+$/;
+const APP_API_PERMISSION_PATTERN =
+  /^app_api\.[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*){2,}$/;
 
 export interface OpenApiValidationIssue {
   path: string;
@@ -56,6 +59,8 @@ export interface PublishedAppApiManifest {
     tags?: string[];
     visibility?: string;
     executionMode?: string;
+    allowedCallers?: string[];
+    requiredPermissions?: string[];
   }>;
   document: Record<string, unknown>;
 }
@@ -66,6 +71,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.filter(isNonEmptyString).map((item) => item.trim());
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -291,6 +304,40 @@ export function validateOpenApiDocument(
           );
         }
 
+        const allowedCallers = operation["x-fusebase-allowed-callers"];
+        if (allowedCallers !== undefined) {
+          if (
+            !Array.isArray(allowedCallers) ||
+            allowedCallers.some(
+              (item) =>
+                !isNonEmptyString(item) || !CALLER_PATTERN.test(item.trim()),
+            )
+          ) {
+            pushIssue(
+              `${operationPrefix}.x-fusebase-allowed-callers`,
+              "x-fusebase-allowed-callers must be an array of caller ids like 'app:<appId>' or 'client:<clientId>'.",
+            );
+          }
+        }
+
+        const requiredPermissions =
+          operation["x-fusebase-required-permissions"];
+        if (requiredPermissions !== undefined) {
+          if (
+            !Array.isArray(requiredPermissions) ||
+            requiredPermissions.some(
+              (item) =>
+                !isNonEmptyString(item) ||
+                !APP_API_PERMISSION_PATTERN.test(item.trim()),
+            )
+          ) {
+            pushIssue(
+              `${operationPrefix}.x-fusebase-required-permissions`,
+              "x-fusebase-required-permissions must be app API permissions like 'app_api.<namespace>.<capability>.<action>'.",
+            );
+          }
+        }
+
         const auth = operation["x-fusebase-auth"];
         if (auth !== undefined) {
           if (!isRecord(auth)) {
@@ -365,7 +412,13 @@ export function buildPublishedAppApiManifest(params: {
       if (!HTTP_METHODS.has(method) || !isRecord(operation)) continue;
       const operationId = operation.operationId;
       if (!isNonEmptyString(operationId)) continue;
-      operations.push({
+      const allowedCallers = readStringArray(
+        operation["x-fusebase-allowed-callers"],
+      );
+      const requiredPermissions = readStringArray(
+        operation["x-fusebase-required-permissions"],
+      );
+      const publishedOperation: PublishedAppApiManifest["operations"][number] = {
         operationId,
         method,
         path: pathKey,
@@ -384,7 +437,14 @@ export function buildPublishedAppApiManifest(params: {
         executionMode: isNonEmptyString(operation["x-fusebase-execution-mode"])
           ? operation["x-fusebase-execution-mode"].trim()
           : undefined,
-      });
+      };
+      if (allowedCallers) {
+        publishedOperation.allowedCallers = allowedCallers;
+      }
+      if (requiredPermissions) {
+        publishedOperation.requiredPermissions = requiredPermissions;
+      }
+      operations.push(publishedOperation);
     }
   }
 
