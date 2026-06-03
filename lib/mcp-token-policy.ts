@@ -3,7 +3,7 @@ import type { CreateTokenRequest } from "./api";
 import { hasFlag } from "./config";
 
 /** Bump when fingerprint inputs change so old .env values force refresh once. */
-export const MCP_POLICY_SCHEMA_VERSION = 4 as const;
+export const MCP_POLICY_SCHEMA_VERSION = 5 as const;
 
 /** Written to `.env` after token refresh — sole source of truth for policy drift checks (`fusebase product update`, `fusebase env create`). */
 export const DASHBOARDS_MCP_POLICY_FP_KEY = "DASHBOARDS_MCP_POLICY_FP";
@@ -71,6 +71,13 @@ const GATE_PERMISSIONS_ISOLATED = [
   "isolated_store.schema.write",
 ] as const;
 
+const GATE_PERMISSIONS_PORTALS = [
+  "portals.read",
+  "portals.write",
+  "portals.delete",
+  "portals.create"
+]
+
 function dashboardsDbManagementEnabled(): boolean {
   return hasFlag("legacy-dashboards-db");
 }
@@ -137,6 +144,7 @@ export function gateMcpPolicyDescriptor(): Record<string, unknown> {
     ...GATE_PERMISSIONS_BASE,
     ...FILE_PERMISSIONS,
     ...GATE_PERMISSIONS_ISOLATED,
+    ...GATE_PERMISSIONS_PORTALS,
   ].sort((a, b) => a.localeCompare(b));
   return {
     schema: MCP_POLICY_SCHEMA_VERSION,
@@ -242,6 +250,7 @@ export function buildGateMcpTokenRequest(orgId: string, appId: string): CreateTo
     ...GATE_PERMISSIONS_BASE,
     ...FILE_PERMISSIONS,
     ...GATE_PERMISSIONS_ISOLATED,
+    ...GATE_PERMISSIONS_PORTALS,
   ];
   return {
     scopes: [
