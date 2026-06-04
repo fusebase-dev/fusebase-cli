@@ -1,7 +1,7 @@
 ---
-version: "1.8.9"
+version: "1.8.10"
 mcp_prompt: isolatedSql
-last_synced: "2026-05-09"
+last_synced: "2026-06-04"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -10,6 +10,26 @@ category: specialized
 > **MARKER**: `mcp-isolated-sql-loaded` — When this marker is present in context, MCP prompts for this topic may skip conceptual sections and use API reference only.
 
 > **VERSION CHECK**: If operations fail unexpectedly, load MCP prompt `isolatedSql` for latest content.
+
+---
+## Table of contents
+
+- [FuseBase PostgreSQL Database (`sql` / `postgres`)](#fusebase-postgresql-database-sql--postgres)
+  - [Canonical docs](#canonical-docs)
+  - [Before migration work](#before-migration-work)
+  - [Standard sequence (schema + store)](#standard-sequence-schema--store)
+  - [Data path (no DDL)](#data-path-no-ddl)
+  - [Structured SQL limits](#structured-sql-limits)
+  - [MCP bundle size](#mcp-bundle-size)
+  - [Tokens](#tokens)
+  - [PostgreSQL RLS native mode](#postgresql-rls-native-mode)
+  - [After a failed apply](#after-a-failed-apply)
+  - [Managed PostgreSQL (Azure, etc.)](#managed-postgresql-azure-etc)
+  - [`executeIsolatedStoreSql` pitfalls](#executeisolatedstoresql-pitfalls)
+  - [Version 1 discipline](#version-1-discipline)
+  - [Discovery](#discovery)
+  - [Manifest / checksums](#manifest--checksums)
+  - [UI links (store and table)](#ui-links-store-and-table)
 
 ---
 ## FuseBase PostgreSQL Database (`sql` / `postgres`)
@@ -59,6 +79,20 @@ Apply sends **full SQL text** for every migration; JSON grows quickly. Many IDE 
 
 Runtime app tokens: usually **`isolated_store.data.write`**, not **`isolated_store.schema.write`** or **`isolated_store.execute`**.
 
+### PostgreSQL RLS native mode
+
+RLS context alone does not filter rows. For native PostgreSQL enforcement, **`getIsolatedStoreSqlRlsStatus`** must report **`bypassRls=false`** and **`superuser=false`** for the runtime DB role. If **`bypassRls=true`**, policies may exist but Postgres will not enforce them for runtime reads/writes.
+
+Production-grade server-backed stores use split roles: **admin** provisions DBs/roles, **migrator** owns schema/tables and applies migrations, **runtime** handles app queries with **`NOBYPASSRLS`** and no DDL ownership. Configure **`ISOLATED_PG_MIGRATOR_USER`** / **`ISOLATED_PG_MIGRATOR_PASSWORD`** and a distinct **`ISOLATED_PG_RUNTIME_USER`** / **`ISOLATED_PG_RUNTIME_PASSWORD`**.
+
+For existing legacy stage databases, an operator can bootstrap the runtime role from the Gate repo:
+
+```bash
+npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
+```
+
+Use **`--transfer-ownership`** only when moving existing object ownership to the migrator role is required. After bootstrap and Gate env update, re-check **`getIsolatedStoreSqlRlsStatus`** before claiming native RLS.
+
 ### After a failed apply
 
 Transaction **ROLLBACK** — no journal rows from that attempt. Fix SQL/checksums, retry. A **prod checkpoint** may still exist if created before the failure; it does not prove migrations applied.
@@ -105,7 +139,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 ## Version
 
-- **Version**: 1.8.9
+- **Version**: 1.8.10
 - **Category**: specialized
-- **Last synced**: 2026-05-09
+- **Last synced**: 2026-06-04
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

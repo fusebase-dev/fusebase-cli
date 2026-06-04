@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-05-29"
+last_synced: "2026-06-04"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -161,6 +161,14 @@ RLS validation is currently warn-only. `getIsolatedStoreSqlMigrationStatus`, `ap
 RLS verification must check the runtime database role, not only the SQL context. `getIsolatedStoreSqlRlsStatus` returns the active runtime `currentUser`, `bypassRls`, and `superuser` flags. If `bypassRls` is `true`, PostgreSQL policies are visible in introspection but are not enforced for runtime queries; scoped demos must either use explicit `WHERE current_setting(...)` filters as a temporary workaround or wait for the runtime role split.
 
 For server-backed isolated Postgres stores, Gate can run schema operations with a separate migrator role when `ISOLATED_PG_MIGRATOR_USER` and `ISOLATED_PG_MIGRATOR_PASSWORD` are configured. Runtime query/data APIs still use the runtime role; migration apply/baseline/checksum repair use the migrator role. New auto-provisioned databases use `provisioningMetadata.roleModel = "split"` when this is active.
+
+Existing legacy databases need an operator bootstrap before they can be treated as production-grade RLS environments. Configure a distinct `ISOLATED_PG_RUNTIME_USER` / `ISOLATED_PG_RUNTIME_PASSWORD`, keep schema writes on `ISOLATED_PG_MIGRATOR_USER` / `ISOLATED_PG_MIGRATOR_PASSWORD`, then run:
+
+```bash
+npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
+```
+
+The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime DML/function/sequence privileges, and verifies that connecting as runtime reports `bypassRls=false` and `superuser=false`. Add `--transfer-ownership` only when the operator wants to move existing schema/table ownership to the migrator role; new auto-provisioned databases already use the migrator owner when split env is configured.
 
 Recommended RLS verification checklist after schema apply:
 
@@ -369,4 +377,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-05-29
+- **Last synced**: 2026-06-04

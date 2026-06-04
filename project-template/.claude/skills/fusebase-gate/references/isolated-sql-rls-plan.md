@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-rls-plan.md"
-last_synced: "2026-05-29"
+last_synced: "2026-06-04"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
 ---
@@ -831,6 +831,20 @@ Gate supports the split through optional isolated Postgres env vars:
 
 When these are configured for server-backed isolated Postgres stores, Gate resolves schema operations (`applyIsolatedStoreSqlMigrations`, baseline adoption, checksum repair) with the migrator credentials while runtime data/query paths keep using `ISOLATED_PG_RUNTIME_USER` / `ISOLATED_PG_RUNTIME_PASSWORD`. Auto-provisioned databases are created with the migrator as owner, Gate attempts to set the runtime role to `NOBYPASSRLS`, and migration apply grants runtime DML/function/sequence privileges on the target schema.
 
+For already-provisioned legacy databases, the role split is an explicit operator action because it changes PostgreSQL roles and privileges outside the migration journal. Gate ships a bootstrap command for this path:
+
+```bash
+npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
+```
+
+Required env before running it:
+
+- `ISOLATED_PG_ADMIN_*` points at the server admin/provisioner identity
+- `ISOLATED_PG_MIGRATOR_USER` / `ISOLATED_PG_MIGRATOR_PASSWORD` points at the schema owner / migration identity
+- `ISOLATED_PG_RUNTIME_USER` / `ISOLATED_PG_RUNTIME_PASSWORD` points at a distinct login role for app runtime queries
+
+The command creates or repairs the runtime role with `NOBYPASSRLS`, grants current and default runtime privileges for the target schema, and verifies runtime posture by connecting as the runtime role. It fails if the runtime role equals the admin role unless `--allow-runtime-admin` is passed for a local-only experiment. Use `--transfer-ownership` when an existing DB also needs database/schema/object ownership moved to the migrator role; without that flag the command only repairs runtime role posture and grants.
+
 ### 5.3 `resourceScope` is not a substitute for RLS
 
 `resourceScope` on `isolated_store_stage_instance` protects stage access, not row access.
@@ -1024,4 +1038,4 @@ For `gate isolated stores`, use a combined `org_id + user_id` RLS model, with `o
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-05-29
+- **Last synced**: 2026-06-04
