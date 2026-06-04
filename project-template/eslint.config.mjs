@@ -66,7 +66,9 @@ export default tseslint.config(
       "*.config.mjs",
       "*.config.ts",
       "coverage/**",
-      ".claude/**"
+      ".claude/**",
+      ".codex/**",
+      ".agents/**"
     ],
   }
 );
