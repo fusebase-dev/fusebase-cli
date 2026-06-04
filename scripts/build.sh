@@ -32,9 +32,10 @@ mkdir -p build
 (cd project-template && zip -r ../project-template.zip .)
 (cd feature-templates && zip -r ../feature-templates.zip .)
 (cd ide-configs && zip -r ../ide-configs.zip .)
+(cd managed-template && zip -r ../managed-template.zip .)
 (cd dev-server && bun install && bun run vite build && cd dist && zip -r ../../dev-server-dist.zip .)
 
-ASSETS=(./index.ts ./dev-server-dist.zip ./project-template.zip ./feature-templates.zip ./ide-configs.zip ./managed-template/AGENTS.managed.md)
+ASSETS=(./index.ts ./dev-server-dist.zip ./project-template.zip ./feature-templates.zip ./ide-configs.zip ./managed-template.zip)
 
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}-macos" --target=bun-darwin-arm64
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}-macos-x64" --target=bun-darwin-x64
@@ -47,7 +48,7 @@ bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}.exe" --t
 # step. Wine must be installed in the build environment.
 bun "$PROJECT_ROOT/scripts/embed-windows-icon.ts" "build/fusebase-${VERSION}.exe" "${VERSION}"
 
-rm dev-server-dist.zip project-template.zip feature-templates.zip ide-configs.zip
+rm dev-server-dist.zip project-template.zip feature-templates.zip ide-configs.zip managed-template.zip
 
 # Save dev version for the upload job (empty file for prod builds)
 echo "${DEV_VERSION:-}" > build/.dev-version

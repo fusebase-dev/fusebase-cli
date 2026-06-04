@@ -190,14 +190,21 @@ async function isDirectoryEmpty(path: string): Promise<boolean> {
 
 /** Read AGENTS.managed.md from managed-template/ (embedded in binary or from repo root). Not in project-template so it is not copied to users who init without --managed. */
 async function getManagedAgentsContent(): Promise<string | null> {
-  const embedded = embeddedFiles.find((f) =>
-    (f as { name?: string }).name?.includes("AGENTS.managed"),
+  const zipFile = embeddedFiles.find(
+    (f) =>
+      (f as { name?: string }).name?.includes("managed-template") &&
+      (f as { name?: string }).name?.endsWith(".zip"),
   );
-  if (embedded) {
-    const buf = await (
-      embedded as { arrayBuffer(): Promise<ArrayBuffer> }
+  if (zipFile) {
+    const zipData = await (
+      zipFile as { arrayBuffer(): Promise<ArrayBuffer> }
     ).arrayBuffer();
-    return Buffer.from(buf).toString("utf-8");
+    const zip = new AdmZip(Buffer.from(zipData));
+    const entry = zip.getEntry("AGENTS.managed.md");
+    if (!entry || entry.isDirectory) {
+      throw new Error("Embedded managed-template.zip missing AGENTS.managed.md");
+    }
+    return entry.getData().toString("utf-8");
   }
   const devPath = join(
     __dirname,
@@ -758,6 +765,10 @@ export const initCommand = new Command("init")
                 "utf-8",
               );
               console.log("✓ AGENTS.md updated with managed app instructions");
+            } else {
+              console.error(
+                "Warning: Managed app instructions asset was not found; AGENTS.md was not updated.",
+              );
             }
           } catch (error) {
             console.error(
