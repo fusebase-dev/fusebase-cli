@@ -72,10 +72,11 @@ const GATE_PERMISSIONS_ISOLATED = [
 ] as const;
 
 const GATE_PERMISSIONS_PORTALS: string[] = [
-  // "portals.read",
-  // "portals.write",
-  // "portals.delete",
-  // "portals.create"
+  "portals.read",
+  "portals.write",
+  "portals.delete",
+  "portals.create",
+  "portals.manage"
 ]
 
 function dashboardsDbManagementEnabled(): boolean {
