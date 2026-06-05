@@ -1,7 +1,7 @@
 ---
-version: "1.6.2"
+version: "1.6.3"
 mcp_prompt: sdk
-last_synced: "2026-06-03"
+last_synced: "2026-06-05"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -66,9 +66,10 @@ For workspace discovery, use WorkspacesApi.listWorkspaces.
 For portal discovery, use PortalsApi.listPortals.
 For portal invite flows, inspect addOrgUser because portal magic links are returned there rather than through a separate Portal invite API.
 For isolated SQL schema work, keep migration files in the app repo and use SDK helpers `buildSqlMigrationBundle(...)` and `calculateSqlMigrationChecksum(...)` before calling IsolatedStoresApi.getIsolatedStoreSqlMigrationStatus / applyIsolatedStoreSqlMigrations.
-For isolated store runtime wiring in external apps, do not hardcode `storeId` values and do not store them as long-lived app secrets. Treat this as an anti-pattern.
+For isolated store runtime wiring in external apps, do not hardcode `storeId` values and do not store them as long-lived app secrets or env vars. Treat this as an anti-pattern.
+Do not ask users to register Gate-resolved store identity with `fusebase secret create`: `storeId`, database IDs, physical database names, and provider connection details are platform/resource binding details, not app-owned secrets.
 Preferred isolated store discovery flow in SDK code: call IsolatedStoresApi.listIsolatedStores with `orgId` + `clientId`, filter by stable store alias (or `aliasLike`), then use the resolved `storeId` for stage and SQL operations.
-Store app-level alias/client binding in config; resolve physical/logical store ids at runtime from Gate.
+Store app-level alias/client binding in non-secret config only when needed; resolve physical/logical store ids at runtime from Gate.
 
 ## Usage Rules
 
@@ -94,7 +95,7 @@ Always handle SDK operation failures explicitly.
 
 ## Version
 
-- **Version**: 1.6.2
+- **Version**: 1.6.3
 - **Category**: meta
-- **Last synced**: 2026-06-03
+- **Last synced**: 2026-06-05
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -5,6 +5,7 @@
 ## Do not hardcode real IDs
 
 - **Never hardcode** database, dashboard, or view IDs from the dashboards-service in code.
+- Do not move real IDs into app secrets or env vars. A secret/env var for a platform-resolved resource ID is still a hardcoded ID and will break across managed environments.
 - Real `global_id` values (database, dashboard, view) are **per-org/per-user** because the database is copied for each consumer of the managed app. Hardcoded IDs will break in other environments.
 
 ## Use aliases for entities
@@ -25,4 +26,4 @@
 
 1. Use **aliases** for all database/dashboard/view identifiers in app logic and when creating entities.
 2. Resolve aliases to IDs at runtime via **resolveAliases** (MCP during development, SDK in app code).
-3. Never hardcode database, dashboard, or view UUIDs from the dashboards-service.
+3. Never hardcode database, dashboard, or view UUIDs from the dashboards-service, including via app secrets or env vars.

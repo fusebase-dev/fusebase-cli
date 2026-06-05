@@ -61,6 +61,15 @@ Rules:
 - **`fusebase-dashboards`** (folder `.claude/skills/fusebase-dashboards/`) — dashboards, databases, views, dashboard data, and the dashboard-service SDK path during development. See [Required Skills](#required-skills).
 - **`fusebase-gate`** (folder `.claude/skills/fusebase-gate/`) — **Fusebase Gate** and the wider platform surface: how to use the Gate MCP and SDK for org-scoped flows, user lists and membership, tokens and authz, health/bootstrap, and other platform capabilities (e.g. email campaigns, automation, integrations) **as exposed through Gate**. Load it **before** Gate MCP work or when integrating apps with orgs, users, and platform services beyond raw dashboard data.
 
+## Platform-resolved resources are not secrets
+
+Gate-managed resource identifiers are not app-owned secret configuration.
+
+- Do **not** ask the user to create app secrets or env vars for `storeId`, database IDs, dashboard/view IDs, physical database names, provider connection details, `productId`, app subdomains, or Fusebase host URLs.
+- For Gate isolated stores, runtime code must use the app token/source scope and a stable store alias to resolve the store through Gate, or use the platform-provided binding when available.
+- `storeId` may appear in MCP/operator handoff logs, Studio links, or CLI migration commands, but it must not be persisted as an app secret, checked into runtime config, or hardcoded in app code.
+- `fusebase secret create` is for real credentials such as third-party API tokens, OAuth client secrets, or app-owned HMAC/session signing keys when the relevant production flow explicitly requires one.
+
 ## Cross-App API Rule
 
 If the task references **another Fusebase app in the same organization** and asks to use **its API**, treat that app as a **peer app**, not as a third-party opaque service.
@@ -179,6 +188,7 @@ SDK token usage in app runtime:
 - [ ] **Loaded `fusebase-dashboards` skill** — read skill `fusebase-dashboards` **before any dashboard operations.** Do NOT skip; the skill contains prompts_search groups, validation rules, and intent schemas. **When this skill is in context, you do not need to call prompts_search for domain knowledge — the skill content is sufficient.**
 - [ ] **Loaded `fusebase-gate` skill when relevant** — if the task involves **Fusebase Gate** (organization users, membership, platform tokens, Gate health/bootstrap, or other Gate/platform APIs), read skill `fusebase-gate` **before** discovery or `tool_call` on the gate MCP.
 - [ ] **Describe before use** — before using an MCP tool or adding SDK code for an operation, call `tools_describe` (or `sdk_describe` for SDK) to know input/output format; do not guess schemas.
+- [ ] **No fake secrets for resource IDs** — before proposing `fusebase secret create` or new env vars, verify the value is a real credential. Never put Gate isolated-store IDs, database/dashboard/view IDs, host URLs, `productId`, or app subdomains into app secrets.
 - [ ] **Dashboard SDK data code** — read `fusebase-dashboards/references/data-patterns.md` **and** call `sdk_describe` for the method before parsing responses; do not assume nested fields like `data.rows` without checking.
 - [ ] **Dashboard data SDK `path` params** — for `getDashboardViewData` / `batchPutDashboardData` / similar, use `{ path: { dashboardId, viewId } }` in **both** SPA and **`backend/`**; do not pass flat `{ dashboardId, viewId }` copied from MCP `tool_call` args.
 - [ ] **Type safety** — no `any`/broad casts on SDK JSON; see [Type safety invariant](#type-safety-invariant-non-negotiable).
@@ -250,6 +260,8 @@ Load skills as described in [Required Skills](#required-skills) before discovery
 <% } %>
 
 **Critical**: Never hardcode database/dashboard/view IDs. Always discover them via MCP first. Concrete opIds and flow details are in the **fusebase-dashboards** skill.
+
+For Gate isolated stores, do not replace hardcoding with secrets. Runtime app code should resolve the store through Gate from app scope/permissions and stable alias; secrets/env vars for `storeId` or database identity are still hardcoding, just in a different file.
 
 ### Step 2: Plan (MCP-only)
 

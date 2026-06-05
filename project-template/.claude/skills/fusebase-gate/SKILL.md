@@ -14,6 +14,8 @@ For rules and checklists, see `AGENTS.md`.
 
 For **FuseBase PostgreSQL Database** (`sql` / `postgres` via the Gate `isolated-stores` contract), treat **`references/isolated-sql-stores.md`** as the **production runbook** (playbooks, permissions, status/apply/409). Add **`references/isolated-sql-migration-discipline.md`** whenever you edit or apply migration bundles (anti-drift). **`references/isolated-sql.md`** is the condensed MCP-oriented SQL surface. See TOC below.
 
+**Critical isolated-store runtime rule:** a Gate isolated store is a platform-bound resource, not app environment configuration. Do not ask users to create app secrets or env vars for `storeId`, database IDs, physical database names, or provider connection details. Runtime code must resolve the store through Gate using the app token/source scope and stable alias (or use the store already bound by the platform). `storeId` may appear in MCP/operator handoff logs or CLI migration commands, but it must not be persisted as an app secret or hardcoded runtime config.
+
 ---
 
 ## References

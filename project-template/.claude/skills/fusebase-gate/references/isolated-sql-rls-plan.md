@@ -264,7 +264,7 @@ Optional third role:
   - explicit operator or support-only access
   - preferably still subject to RLS unless there is a separate audited break-glass path
 
-Break-glass bypass should be a separate Gate capability, not a property of normal runtime access. The reserved permission is `isolated_store.rls.bypass`; it is intended only for future explicit admin/support execution paths that log actor, org, store, stage, SQL hash, and reason. It must not be granted to app/client runtime tokens and must not be used by `queryIsolatedStoreSql`, structured row APIs, or normal migrations.
+Break-glass bypass is a separate Gate capability, not a property of normal runtime access. The permission is `isolated_store.rls.bypass`; Gate binds it only to explicit read-only admin/support row endpoints (`countIsolatedStoreSqlRowsRlsBypass`, `selectIsolatedStoreSqlRowsRlsBypass`) that log actor, org, store, stage, and table. It must not be granted to app/client runtime tokens and must not be used by `queryIsolatedStoreSql`, normal structured row APIs, writes, or migrations.
 
 What must not happen:
 

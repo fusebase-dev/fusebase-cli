@@ -1,7 +1,7 @@
 ---
-version: "1.3.0"
+version: "1.3.1"
 mcp_prompt: isolated
-last_synced: "2026-05-28"
+last_synced: "2026-06-05"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -38,8 +38,9 @@ These prompts cover the common control-plane model for FuseBase PostgreSQL Datab
 
 - Always send `orgId`, `storeId`, and `stage` exactly as returned by previous operations.
 - Treat hardcoded `storeId` values in external app code, env files, or app secrets as an anti-pattern.
+- Do not ask users to register `storeId`, database IDs, physical database names, or provider connection details with `fusebase secret create`; an isolated store is a Gate-resolved platform resource, not runtime environment configuration.
 - Resolve the target store at runtime via `listIsolatedStores` with `clientId`, then filter by stable app-level `alias` (or `aliasLike`) and use the returned `storeId`.
-- Persist app-owned alias and client binding (`clientId`) as configuration; do not persist provider/runtime store ids as long-lived app secrets.
+- Persist app-owned alias and client binding (`clientId`) as non-secret configuration only when needed; do not persist provider/runtime store ids as long-lived app secrets.
 - `listIsolatedStores` accepts optional query `clientId` to narrow stores by `app` source scope `sourceId`; token callers must use their own client scope id when setting it.
 - **Empty `listIsolatedStores`** is expected until at least one `createIsolatedStore` for that `orgId`. Flow: create store → `initIsolatedStoreStage` (`dev` / `prod`) → then PostgreSQL SQL ops. If the list stays empty after create, check **wrong `orgId`**, or **`clientId` filter** (omit the query to list all org stores, or pass the exact app client id matching the store’s `source.sourceId`).
 - Token control-plane ownership is checked through the `client` scope of the token.
@@ -109,7 +110,7 @@ Guardrails: do not attach a guessed child app id if `whoami` shows a different `
 
 ## Version
 
-- **Version**: 1.3.0
+- **Version**: 1.3.1
 - **Category**: specialized
-- **Last synced**: 2026-05-28
+- **Last synced**: 2026-06-05
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

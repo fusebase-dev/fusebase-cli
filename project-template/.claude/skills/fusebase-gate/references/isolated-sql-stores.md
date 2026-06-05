@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-06-04"
+last_synced: "2026-06-05"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -53,6 +53,13 @@ Runtime note:
 - a custom app backend is **not required** for normal PostgreSQL runtime access;
 - browser/UI code can call Gate SDK methods directly with the feature token for frontend-safe reads and allowed structured writes;
 - add a backend only when you need privileged operations, secret-bearing integrations, heavy orchestration, or non-user-context work.
+
+Runtime configuration rule:
+
+- the isolated store is a Gate-resolved resource bound to the app by source scope and permissions, not a value the app owner must copy into secrets;
+- do **not** register `storeId`, database IDs, physical DB names, or provider connection details with `fusebase secret create`;
+- runtime code should resolve the target store through Gate using the app token/client scope and stable store `alias` (or consume the platform-provided binding when available), then use the returned `storeId` only in-memory for that request/session;
+- `storeId` is acceptable in MCP/operator logs, Studio links, and CLI migration commands, but that does not make it runtime app configuration.
 
 ---
 
@@ -168,7 +175,16 @@ Existing legacy databases need an operator bootstrap before they can be treated 
 npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
 ```
 
-The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime DML/function/sequence privileges, and verifies that connecting as runtime reports `bypassRls=false` and `superuser=false`. Add `--transfer-ownership` only when the operator wants to move existing schema/table ownership to the migrator role; new auto-provisioned databases already use the migrator owner when split env is configured.
+The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime DML/function/sequence privileges, configures the optional RLS-bypass read role when `ISOLATED_PG_RLS_BYPASS_USER` / `ISOLATED_PG_RLS_BYPASS_PASSWORD` are set, and verifies that connecting as runtime reports `bypassRls=false` and `superuser=false`. Add `--transfer-ownership` only when the operator wants to move existing schema/table ownership to the migrator role; new auto-provisioned databases already use the migrator owner when split env is configured.
+
+Studio/support "show all rows" views must not use the normal runtime role. Configure an explicit RLS-bypass read role:
+
+- `ISOLATED_PG_RLS_BYPASS_USER`
+- `ISOLATED_PG_RLS_BYPASS_PASSWORD`
+
+For new auto-provisioned databases, Gate creates/updates this role as `LOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE`, grants `CONNECT`, and migration apply grants read-only table access/default privileges. For existing databases, rerun `isolated-pg:bootstrap-rls-runtime` after setting the env to create the role and backfill `CONNECT`, schema `USAGE`, table `SELECT`, and default `SELECT` privileges.
+
+Gate exposes separate read-only row endpoints for this mode: `countIsolatedStoreSqlRowsRlsBypass` and `selectIsolatedStoreSqlRowsRlsBypass`. They require `isolated_store.rls.bypass`, do not apply request RLS context, and log the actor/org/store/stage/table. Do not grant this permission to app runtime tokens.
 
 Recommended RLS verification checklist after schema apply:
 
@@ -195,6 +211,8 @@ AND (
 
 Every call needs **`orgId`**, **`storeId`**, **`stage`** (`dev` | `prod`) exactly as Gate returned them.  
 **`dev` and `prod` are different databases** — same logical migration _sequence_ (version numbers + SQL per version), separate journals.
+
+Preserve these identifiers in the current Gate call chain, operator handoff, or migration logs. Do **not** convert them into app secrets or long-lived runtime env vars. If app runtime needs a store later, resolve it again through Gate from the app token/source scope and stable alias.
 
 ---
 
@@ -377,4 +395,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-06-04
+- **Last synced**: 2026-06-05

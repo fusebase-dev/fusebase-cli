@@ -1,7 +1,7 @@
 ---
-version: "1.8.10"
+version: "1.8.11"
 mcp_prompt: isolatedSql
-last_synced: "2026-06-04"
+last_synced: "2026-06-05"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -60,6 +60,7 @@ Default stage is **`prod`** when stage is omitted by higher-level orchestration.
 
 Prefer structured APIs: **`getIsolatedStoreSqlStats`**, **`countIsolatedStoreSqlRows`**, **`selectIsolatedStoreSqlRows`**, **`insertIsolatedStoreSqlRow`**, **`batchInsertIsolatedStoreSqlRows`**, **`importIsolatedStoreSqlRows`**, **`updateIsolatedStoreSqlRows`**, **`deleteIsolatedStoreSqlRows`**. Raw: **`queryIsolatedStoreSql`** (read); **`executeIsolatedStoreSql`** — DML only, **no DDL**; schema only via **`applyIsolatedStoreSqlMigrations`**.
 Runtime app path does **not** require a custom backend by default. Frontend/browser code can call Gate SDK methods such as **`selectIsolatedStoreSqlRows`**, **`countIsolatedStoreSqlRows`**, and other allowed structured operations directly with the feature token. Add a feature backend only when you need privileged logic, external secrets, heavy orchestration, or non-user-context work.
+Runtime app path also does **not** require users to create secrets for Gate-resolved store identity. Do not put `storeId`, database IDs, physical database names, or provider connection details into app secrets/env. Resolve the store through Gate from the app token/source scope and stable alias, or use the platform-provided binding when available.
 
 ### Structured SQL limits
 
@@ -93,6 +94,8 @@ npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schem
 
 Use **`--transfer-ownership`** only when moving existing object ownership to the migrator role is required. After bootstrap and Gate env update, re-check **`getIsolatedStoreSqlRlsStatus`** before claiming native RLS.
 
+Studio/support view-all rows must use the separate read-only RLS-bypass path, not normal runtime reads: **`countIsolatedStoreSqlRowsRlsBypass`** and **`selectIsolatedStoreSqlRowsRlsBypass`**. These require **`isolated_store.rls.bypass`** and **`ISOLATED_PG_RLS_BYPASS_USER`** / **`ISOLATED_PG_RLS_BYPASS_PASSWORD`**. Do not grant this permission to app runtime tokens.
+
 ### After a failed apply
 
 Transaction **ROLLBACK** — no journal rows from that attempt. Fix SQL/checksums, retry. A **prod checkpoint** may still exist if created before the failure; it does not prove migrations applied.
@@ -115,7 +118,7 @@ Do not **`apply`** throwaway SQL as **v1** on a store that must later use a real
 - **`tools_search`**: parameter **`queries`** (string array, typically 1–10), not a single `query` field.
 - Use **`tools_describe`** on **`initIsolatedStoreStage`**, **`getIsolatedStoreSqlMigrationStatus`**, **`applyIsolatedStoreSqlMigrations`** when schemas are unclear.
 - Session: **`whoami`** / **`bootstrap`**; context prompts: groups **`authz`**, **`isolated`**, **`isolatedSql`**, **`sdk`** when mirroring in code.
-- For external apps, treat hardcoded `storeId` values (including app secrets) as an anti-pattern. Discovery flow: `listIsolatedStores` with app `clientId` -> filter by stable alias/aliasLike -> use returned `storeId` for stage/data calls.
+- For external apps, treat hardcoded `storeId` values (including app secrets/env) as an anti-pattern. Discovery flow: `listIsolatedStores` with app `clientId` -> filter by stable alias/aliasLike -> use returned `storeId` for stage/data calls.
 
 ### Manifest / checksums
 
@@ -139,7 +142,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 ## Version
 
-- **Version**: 1.8.10
+- **Version**: 1.8.11
 - **Category**: specialized
-- **Last synced**: 2026-06-04
+- **Last synced**: 2026-06-05
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
