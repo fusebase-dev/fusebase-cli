@@ -175,16 +175,11 @@ Existing legacy databases need an operator bootstrap before they can be treated 
 npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
 ```
 
-The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime DML/function/sequence privileges, configures the optional RLS-bypass read role when `ISOLATED_PG_RLS_BYPASS_USER` / `ISOLATED_PG_RLS_BYPASS_PASSWORD` are set, and verifies that connecting as runtime reports `bypassRls=false` and `superuser=false`. Add `--transfer-ownership` only when the operator wants to move existing schema/table ownership to the migrator role; new auto-provisioned databases already use the migrator owner when split env is configured.
+The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime DML/function/sequence privileges, and verifies that connecting as runtime reports `bypassRls=false` and `superuser=false`. Add `--transfer-ownership` only when the operator wants to move existing schema/table ownership to the migrator role; new auto-provisioned databases already use the migrator owner when split env is configured.
 
-Studio/support "show all rows" views must not use the normal runtime role. Configure an explicit RLS-bypass read role:
+Studio/support "show all rows" views must not use normal request scope. Gate exposes separate read-only row endpoints for this mode: `countIsolatedStoreSqlRowsRlsBypass` and `selectIsolatedStoreSqlRowsRlsBypass`. They require `isolated_store.rls.bypass`, ignore request `rlsContext`, set trusted `app.rls_admin=true` in the same transaction, and log the actor/org/store/stage/table. Do not grant this permission to app runtime tokens.
 
-- `ISOLATED_PG_RLS_BYPASS_USER`
-- `ISOLATED_PG_RLS_BYPASS_PASSWORD`
-
-For new auto-provisioned databases, Gate creates/updates this role as `LOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE`, grants `CONNECT`, and migration apply grants read-only table access/default privileges. For existing databases, rerun `isolated-pg:bootstrap-rls-runtime` after setting the env to create the role and backfill `CONNECT`, schema `USAGE`, table `SELECT`, and default `SELECT` privileges.
-
-Gate exposes separate read-only row endpoints for this mode: `countIsolatedStoreSqlRowsRlsBypass` and `selectIsolatedStoreSqlRowsRlsBypass`. They require `isolated_store.rls.bypass`, do not apply request RLS context, and log the actor/org/store/stage/table. Do not grant this permission to app runtime tokens.
+Tables that should be visible in Studio Admin must include an explicit read-only admin branch in their `SELECT` policies, for example: `current_setting('app.rls_admin', true) = 'true' OR (...)`. This is Azure-compatible because Azure Flexible Server does not let the configured administrator create arbitrary `BYPASSRLS` roles. Optional physical `BYPASSRLS` read roles are legacy/operator-specific and must not be required for the normal Studio Admin path.
 
 Recommended RLS verification checklist after schema apply:
 

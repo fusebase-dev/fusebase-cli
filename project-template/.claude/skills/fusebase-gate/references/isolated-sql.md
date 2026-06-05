@@ -94,7 +94,7 @@ npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schem
 
 Use **`--transfer-ownership`** only when moving existing object ownership to the migrator role is required. After bootstrap and Gate env update, re-check **`getIsolatedStoreSqlRlsStatus`** before claiming native RLS.
 
-Studio/support view-all rows must use the separate read-only RLS-bypass path, not normal runtime reads: **`countIsolatedStoreSqlRowsRlsBypass`** and **`selectIsolatedStoreSqlRowsRlsBypass`**. These require **`isolated_store.rls.bypass`** and **`ISOLATED_PG_RLS_BYPASS_USER`** / **`ISOLATED_PG_RLS_BYPASS_PASSWORD`**. Do not grant this permission to app runtime tokens.
+Studio/support view-all rows must use the separate read-only RLS-bypass path, not normal runtime reads: **`countIsolatedStoreSqlRowsRlsBypass`** and **`selectIsolatedStoreSqlRowsRlsBypass`**. These require **`isolated_store.rls.bypass`**; Gate sets trusted transaction-local **`app.rls_admin=true`**, so tables that should be visible in Admin must include an explicit admin branch in SELECT policies. Do not grant this permission to app runtime tokens.
 
 ### After a failed apply
 

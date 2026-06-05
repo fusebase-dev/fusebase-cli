@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-rls-plan.md"
-last_synced: "2026-06-04"
+last_synced: "2026-06-05"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
 ---
@@ -264,7 +264,7 @@ Optional third role:
   - explicit operator or support-only access
   - preferably still subject to RLS unless there is a separate audited break-glass path
 
-Break-glass bypass is a separate Gate capability, not a property of normal runtime access. The permission is `isolated_store.rls.bypass`; Gate binds it only to explicit read-only admin/support row endpoints (`countIsolatedStoreSqlRowsRlsBypass`, `selectIsolatedStoreSqlRowsRlsBypass`) that log actor, org, store, stage, and table. It must not be granted to app/client runtime tokens and must not be used by `queryIsolatedStoreSql`, normal structured row APIs, writes, or migrations.
+Break-glass/admin view is a separate Gate capability, not a property of normal runtime access. The permission is `isolated_store.rls.bypass`; Gate binds it only to explicit read-only admin/support row endpoints (`countIsolatedStoreSqlRowsRlsBypass`, `selectIsolatedStoreSqlRowsRlsBypass`) that log actor, org, store, stage, and table. These endpoints set trusted transaction-local `app.rls_admin=true`; table `SELECT` policies must include an admin branch when Studio/Admin should see all rows. It must not be granted to app/client runtime tokens and must not be used by `queryIsolatedStoreSql`, normal structured row APIs, writes, or migrations.
 
 What must not happen:
 
@@ -1038,4 +1038,4 @@ For `gate isolated stores`, use a combined `org_id + user_id` RLS model, with `o
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-06-04
+- **Last synced**: 2026-06-05
