@@ -41,6 +41,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 - [Fusebase Gate Membership And Portal Flows](references/membership.md)
 - [Fusebase Gate Notes Operations](references/notes.md)
 - [Fusebase Gate Org Group Operations](references/org-groups.md)
+- [Fusebase Gate Organization URLs](references/orgs.md)
 - [Fusebase Gate Stripe App And Agent Integration](references/stripe-apps.md)
 - [Fusebase Gate Users Operations](references/users.md)
 - [FuseBase PostgreSQL Database](references/isolated.md)

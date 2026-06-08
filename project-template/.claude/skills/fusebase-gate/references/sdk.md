@@ -1,7 +1,7 @@
 ---
-version: "1.6.3"
+version: "1.6.4"
 mcp_prompt: sdk
-last_synced: "2026-06-05"
+last_synced: "2026-06-08"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -45,6 +45,7 @@ For security-sensitive app API operations, use contract-level policy: `x-fusebas
 - AccessApi
 - BillingApi
 - OrgUsersApi
+- OrgsApi
 - PortalsApi
 - SystemApi
 - TokensApi
@@ -63,6 +64,7 @@ Treat BillingApi.updateStripeMode as a compatibility surface for now rather than
 Use stable app-owned `kind` and `kindId` values in BillingApi. Keep `kind` at 32 chars max and `kindId` at 64 chars max so webhook-backed payment state can be checked later for the same entitlement.
 For subscription offboarding, BillingApi.cancelStripeSubscription defaults to cancel-at-period-end when `cancelAtPeriodEnd` is omitted. Send `cancelAtPeriodEnd: false` only for immediate cancellation.
 For workspace discovery, use WorkspacesApi.listWorkspaces.
+For the organization canonical base URL (subdomain or custom CNAME domain), use OrgsApi.getOrgUrl.
 For portal discovery, use PortalsApi.listPortals.
 For portal invite flows, inspect addOrgUser because portal magic links are returned there rather than through a separate Portal invite API.
 For isolated SQL schema work, keep migration files in the app repo and use SDK helpers `buildSqlMigrationBundle(...)` and `calculateSqlMigrationChecksum(...)` before calling IsolatedStoresApi.getIsolatedStoreSqlMigrationStatus / applyIsolatedStoreSqlMigrations.
@@ -95,7 +97,7 @@ Always handle SDK operation failures explicitly.
 
 ## Version
 
-- **Version**: 1.6.3
+- **Version**: 1.6.4
 - **Category**: meta
-- **Last synced**: 2026-06-05
+- **Last synced**: 2026-06-08
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
