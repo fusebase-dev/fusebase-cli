@@ -1,5 +1,5 @@
 ---
-version: "1.8.11"
+version: "1.8.12"
 mcp_prompt: isolatedSql
 last_synced: "2026-06-10"
 title: "FuseBase PostgreSQL Database"
@@ -23,6 +23,7 @@ category: specialized
   - [MCP bundle size](#mcp-bundle-size)
   - [Tokens](#tokens)
   - [PostgreSQL RLS native mode](#postgresql-rls-native-mode)
+  - [RLS app-design pitfalls from QA](#rls-app-design-pitfalls-from-qa)
   - [After a failed apply](#after-a-failed-apply)
   - [Managed PostgreSQL (Azure, etc.)](#managed-postgresql-azure-etc)
   - [`executeIsolatedStoreSql` pitfalls](#executeisolatedstoresql-pitfalls)
@@ -99,6 +100,16 @@ Use **`--transfer-ownership`** only when moving existing object ownership to the
 
 Studio/support view-all rows must use the separate read-only RLS-bypass path, not normal runtime reads: **`countIsolatedStoreSqlRowsRlsBypass`** and **`selectIsolatedStoreSqlRowsRlsBypass`**. These require **`isolated_store.rls.bypass`**; Gate sets trusted transaction-local **`app.rls_admin=true`**, so tables that should be visible in Admin must include an explicit admin branch in SELECT policies. Do not grant this permission to app runtime tokens.
 
+### RLS app-design pitfalls from QA
+
+- Treat **`app.client_id`** as token/client scope, not app identity. In managed product flows sibling apps may share the same product-level client id. Do not use `app.client_id` to distinguish sibling apps unless the platform explicitly confirms that the token scope is app-unique.
+- Reserved settings such as **`org_id`**, **`user_id`**, **`client_id`**, **`auth_type`**, **`portal_id`**, **`workspace_id`**, and **`rls_admin`** cannot be supplied through caller-controlled `rlsContext`. They must come from Gate auth/runtime context.
+- Visitor tokens normally do not receive isolated-store permissions. If a backend service token reads/writes on behalf of a visitor, the portal/workspace RLS dimension must be derived from trusted platform auth context, not from arbitrary request body/query data. Until Gate exposes first-class delegated portal context, use an app-specific setting such as **`app.req_portal_id`** only from backend-verified context.
+- RLS policy subqueries are also evaluated under RLS. If a policy uses `EXISTS (select ... from another_table ...)`, make sure the current context can see the referenced rows or use a deliberately reviewed helper pattern.
+- Admin/moderation flows need a complete policy matrix. If an admin must delete or update a row, that context must first match the table's `USING` policy for the target row; otherwise `DELETE` / `UPDATE` may affect zero rows even though the admin is allowed in application code.
+- Public insert flows need explicit moderation paths. For example, a visitor-created row should usually have portal-scoped read policies plus admin select/delete policies.
+- For QA/MCP verification, do not spoof reserved **`portal_id`** through `rlsContext`. Use a real portal-scoped auth context or a clearly named app-specific test setting such as **`req_portal_id`**.
+
 ### After a failed apply
 
 Transaction **ROLLBACK** — no journal rows from that attempt. Fix SQL/checksums, retry. A **prod checkpoint** may still exist if created before the failure; it does not prove migrations applied.
@@ -145,7 +156,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 ## Version
 
-- **Version**: 1.8.11
+- **Version**: 1.8.12
 - **Category**: specialized
 - **Last synced**: 2026-06-10
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

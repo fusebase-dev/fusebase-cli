@@ -135,7 +135,13 @@ export interface GateSdkOperationsSnapshot {
   /** Operation ids in use (sorted). */
   usedOps: string[];
   /**
+   * Manually reviewed Gate permissions to merge into the resolved permissions.
+   * Use for dynamic SDK calls or intentionally hidden/admin operations that static analysis cannot see.
+   */
+  manualPermissions?: string[];
+  /**
    * Gate permission strings required for the current `usedOps` (from `POST /v1/gate/resolve-operation-permissions`), sorted.
+   * Includes `manualPermissions` when present.
    */
   permissions?: string[];
 }
@@ -756,6 +762,11 @@ function readGateSdkSnapshotFromRaw(
     (o.requiredPermissions as string[] | undefined);
   const permissions =
     permissionsRaw !== undefined ? sortGateUsedOps(permissionsRaw) : undefined;
+  const manualPermissionsRaw = o.manualPermissions as string[] | undefined;
+  const manualPermissions =
+    manualPermissionsRaw !== undefined
+      ? sortGateUsedOps(manualPermissionsRaw)
+      : undefined;
   let permissionsChangedAt: string | undefined;
   if (typeof o.permissionsChangedAt === "string") {
     permissionsChangedAt = o.permissionsChangedAt;
@@ -770,6 +781,7 @@ function readGateSdkSnapshotFromRaw(
     usedOpsChangedAt,
     ...(permissionsChangedAt !== undefined ? { permissionsChangedAt } : {}),
     usedOps: sortGateUsedOps(usedOps),
+    ...(manualPermissions !== undefined ? { manualPermissions } : {}),
     ...(permissions !== undefined ? { permissions } : {}),
   });
 }
@@ -893,7 +905,7 @@ function writeAppApiDependenciesSnapshotToFeatureRaw(
 
 /**
  * Stable key order in fusebase.json:
- * sdkVersion, analyzedAt, usedOpsChangedAt, permissionsChangedAt (if any), usedOps, permissions (if any).
+ * sdkVersion, analyzedAt, usedOpsChangedAt, permissionsChangedAt (if any), usedOps, manualPermissions (if any), permissions (if any).
  */
 function normalizeGateSdkOperationsSnapshot(
   s: GateSdkOperationsSnapshot,
@@ -904,8 +916,13 @@ function normalizeGateSdkOperationsSnapshot(
     usedOpsChangedAt,
     permissionsChangedAt,
     usedOps,
+    manualPermissions,
     permissions,
   } = s;
+  const sortedManualPermissions =
+    manualPermissions !== undefined
+      ? sortGateUsedOps(manualPermissions)
+      : undefined;
   if (permissions !== undefined) {
     return {
       sdkVersion,
@@ -913,7 +930,10 @@ function normalizeGateSdkOperationsSnapshot(
       usedOpsChangedAt,
       permissionsChangedAt: permissionsChangedAt ?? analyzedAt,
       usedOps,
-      permissions,
+      ...(sortedManualPermissions !== undefined
+        ? { manualPermissions: sortedManualPermissions }
+        : {}),
+      permissions: sortGateUsedOps(permissions),
     };
   }
   return {
@@ -921,7 +941,24 @@ function normalizeGateSdkOperationsSnapshot(
     analyzedAt,
     usedOpsChangedAt,
     usedOps,
+    ...(sortedManualPermissions !== undefined
+      ? { manualPermissions: sortedManualPermissions }
+      : {}),
   };
+}
+
+function mergeGatePermissionStrings(
+  resolvedPermissions: string[] | undefined,
+  manualPermissions: string[] | undefined,
+): string[] | undefined {
+  if (resolvedPermissions === undefined && manualPermissions === undefined) {
+    return undefined;
+  }
+
+  return sortGateUsedOps([
+    ...(resolvedPermissions ?? []),
+    ...(manualPermissions ?? []),
+  ]);
 }
 
 /**
@@ -1000,6 +1037,7 @@ export function writeGateSdkOperationsToFusebaseJson(
     usedOpsChangedAt,
     usedOps: usedSorted,
   };
+  const manualPermissions = prev?.manualPermissions;
 
   if (
     prev &&
@@ -1008,8 +1046,24 @@ export function writeGateSdkOperationsToFusebaseJson(
   ) {
     snapshot = {
       ...snapshot,
-      permissions: sortGateUsedOps(prev.permissions),
+      permissions: mergeGatePermissionStrings(
+        prev.permissions,
+        manualPermissions,
+      ),
       permissionsChangedAt: prev.permissionsChangedAt ?? prev.analyzedAt,
+    };
+  } else if (manualPermissions !== undefined && manualPermissions.length > 0) {
+    snapshot = {
+      ...snapshot,
+      permissions: manualPermissions,
+      permissionsChangedAt: prev?.permissionsChangedAt ?? input.analyzedAt,
+    };
+  }
+
+  if (manualPermissions !== undefined) {
+    snapshot = {
+      ...snapshot,
+      manualPermissions,
     };
   }
 
@@ -1141,7 +1195,10 @@ export function updateGateSdkPermissionsInFusebaseJson(
       `App-scoped fusebaseGateMeta missing or invalid for app "${featureId}" in fusebase.json`,
     );
   }
-  const sorted = sortGateUsedOps(permissions);
+  const sorted = mergeGatePermissionStrings(
+    permissions,
+    g.manualPermissions,
+  )!;
   const permsChanged = !gatePermissionSetsEqual(g.permissions, sorted);
   const nextPermissionsChangedAt = permsChanged
     ? resolvedAt

@@ -37,7 +37,7 @@ Options:
 1. **Allowlist** — Reads operation ids from the installed SDK (`node_modules/@fusebase/fusebase-gate-sdk/dist/apis/*.js`, `opId: "..."`).
 2. **TypeScript usage** — Builds a program from your `tsconfig`, walks source files (excluding `node_modules` and `.d.ts`), and records **method names** called on values typed as **`OrgUsersApi` | `TokensApi` | `HealthApi` | `SystemApi`**.
 3. **Snapshot** — Writes sorted **`usedOps`**, **`sdkVersion`**, and timestamps into the current app’s **`fusebaseGateMeta`**.
-4. **Resolve permissions** (conditional) — If this run **changed** the `usedOps` set compared to the previous snapshot, calls **`resolveGateOperationPermissions`** with the current `usedOps` and merges the returned **`permissions`** array into the snapshot.
+4. **Resolve permissions** (conditional) — If this run **changed** the `usedOps` set compared to the previous snapshot, calls **`resolveGateOperationPermissions`** with the current `usedOps` and merges the returned **`permissions`** array into the snapshot. Any reviewed **`manualPermissions`** are also merged into `permissions`.
 
 Implementation lives in:
 
@@ -59,6 +59,7 @@ Current canonical location:
       "path": "apps/my-app",
       "fusebaseGateMeta": {
         "usedOps": ["listTokens"],
+        "manualPermissions": [],
         "permissions": ["token.read"]
       }
     }
@@ -77,7 +78,31 @@ Stable field order when the CLI writes JSON:
 | `usedOpsChangedAt` | ISO string | Last time the **sorted** `usedOps` array differed from the previous snapshot. |
 | `permissionsChangedAt` | ISO string (optional) | Last time the **sorted** `permissions` array **changed** after a resolve. Omitted until permissions exist. |
 | `usedOps` | `string[]` | Sorted Gate operation ids in use (e.g. `listOrgUsers`, `createToken`). |
-| `permissions` | `string[]` (optional) | Sorted permission strings from the resolve API for the **current** `usedOps`. Omitted until a successful resolve. |
+| `manualPermissions` | `string[]` (optional) | Reviewed Gate permission strings to merge into `permissions` when static analysis cannot see a dynamic/admin operation. |
+| `permissions` | `string[]` (optional) | Sorted permission strings from the resolve API for the **current** `usedOps`, plus `manualPermissions` when present. Omitted until a successful resolve unless manual permissions exist. |
+
+### Manual permissions
+
+Use **`manualPermissions`** sparingly for cases the analyzer cannot prove from TypeScript, such as dynamic SDK wrappers or reviewed admin-only paths. Example:
+
+```json
+{
+  "apps": [
+    {
+      "id": "app-id",
+      "path": "apps/my-app",
+      "fusebaseGateMeta": {
+        "manualPermissions": ["isolated_store.rls.bypass"],
+        "usedOps": ["selectIsolatedStoreSqlRows"]
+      }
+    }
+  ]
+}
+```
+
+On the next `fusebase analyze gate` / `fusebase app update --sync-gate-permissions`, the CLI preserves `manualPermissions` and merges them into `permissions`. Do not use this field to paper over unknown runtime behavior; add it only after code review confirms the operation is intentional and the platform role can receive the permission.
+
+The analyzer also emits a warning when it detects a known sensitive operation but the resolver did not return the expected permission, for example `selectIsolatedStoreSqlRowsRlsBypass` without `isolated_store.rls.bypass`. That usually means Gate/SDK version skew or a dynamic call shape that should be reviewed before adding `manualPermissions`.
 
 ### Why two “changed” timestamps?
 
@@ -93,9 +118,9 @@ Resolve runs when **both** are true:
 - `usedOpsChangedAt === analyzedAt` (this run detected a change in `usedOps`), and  
 - `usedOps.length > 0`.
 
-If `usedOps` is unchanged, the CLI **copies** `permissions` and `permissionsChangedAt` from the previous snapshot (no redundant API call).
+If `usedOps` is unchanged, the CLI **copies** `permissions`, `manualPermissions`, and `permissionsChangedAt` from the previous snapshot (no redundant API call).
 
-When **`usedOps` changes**, the previous **`permissions`** are cleared until a new resolve succeeds (stale permissions must not stay attached to a new operation set).
+When **`usedOps` changes**, the previous resolved **`permissions`** are cleared until a new resolve succeeds (stale resolved permissions must not stay attached to a new operation set). `manualPermissions` are preserved and remain in `permissions`.
 
 Inside **`updateGateSdkPermissionsInFusebaseJson`**, if the API returns a permission set **identical** to the one already stored (same sorted strings), **`permissionsChangedAt` is not bumped**.
 

@@ -6,6 +6,7 @@ import {
   type FeatureConfig,
   type GateSdkOperationsSnapshot,
 } from "./config.ts";
+import { findGatePermissionDiagnostics } from "./gate-sdk-permission-diagnostics.ts";
 import {
   analyzeGateSdkOperations,
   type GateOperationsResult,
@@ -101,6 +102,12 @@ export async function analyzeFeatureGatePermissions(args: {
     result.usedOps.length === 0
       ? []
       : (fusebaseSnapshot.permissions ?? []);
+  for (const diagnostic of findGatePermissionDiagnostics({
+    usedOps: result.usedOps,
+    permissions: gatePermissions,
+  })) {
+    onWarning?.(diagnostic);
+  }
 
   return {
     featureId: feature.id,
