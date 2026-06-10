@@ -31,6 +31,7 @@ import { logger } from "../logger";
 import {
   getConfig,
   loadFuseConfig,
+  validateMinReplicas,
   type BackendConfig,
   type FeatureConfig,
   type SidecarConfig,
@@ -587,6 +588,11 @@ export const deployCommand = new Command("deploy")
         } catch {
           throw new Error(`path does not exist: ${featureConfig.path}`);
         }
+
+        // Fail fast on an invalid backend.minReplicas before any install, build,
+        // or network call. The nimbus-ai deploy endpoint is the authoritative
+        // guard; this only gives a friendlier local error.
+        validateMinReplicas(featureConfig.backend?.minReplicas, featureId);
 
         // Install dependencies so lint and build have devDependencies (e.g. eslint)
         await checkAndInstallDependencies(featureBasePath);

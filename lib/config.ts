@@ -63,6 +63,43 @@ export interface BackendConfig {
   start?: BackendStartConfig;
   jobs?: BackendJobConfig[];
   sidecars?: SidecarConfig[];
+  /**
+   * Minimum number of warm backend replicas (capped at `MAX_MIN_REPLICAS`).
+   * Omit or `0` keeps the default scale-to-zero (cheapest, but cold starts can
+   * time out inbound webhook deliveries). Set `1` for apps that receive
+   * webhooks or any always-on inbound integration; `>1` only for sustained
+   * high traffic — each warm replica runs 24/7 and costs money.
+   */
+  minReplicas?: number;
+}
+
+/**
+ * Maximum value a user may set for `backend.minReplicas`. Mirrors
+ * `MAX_USER_MIN_REPLICAS` in nimbus-ai (`src/util/backendScale.ts`): the server
+ * is the authoritative cost guard, this client-side copy only gives a fast,
+ * friendly error before deploy. Keep both in sync.
+ */
+export const MAX_MIN_REPLICAS = 3;
+
+/**
+ * Validate a `backend.minReplicas` value from `fusebase.json`. Treats
+ * `undefined`/`null` as "field absent" (no change). Otherwise requires an
+ * integer in `[0, MAX_MIN_REPLICAS]` (`0` restores scale-to-zero) and throws a
+ * clear error before any network call. `appId` is named in the message when known.
+ */
+export function validateMinReplicas(value: unknown, appId?: string): void {
+  if (value === undefined || value === null) return;
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 0 ||
+    value > MAX_MIN_REPLICAS
+  ) {
+    const where = appId ? ` for app "${appId}"` : "";
+    throw new Error(
+      `backend.minReplicas${where} must be an integer between 0 and ${MAX_MIN_REPLICAS}`,
+    );
+  }
 }
 
 export type IsolatedSqlRlsTableClassification =
