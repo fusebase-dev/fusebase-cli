@@ -158,6 +158,7 @@ Current recommendation:
 | **Apply migrations**    | `isolated_store.schema.write` (operators / CI — not normal end-users)                  |
 | Raw DML escape hatch    | `executeIsolatedStoreSql` — **no DDL**                                                 |
 | RLS break-glass bypass  | `isolated_store.rls.bypass` — reserved for future explicit audited support/admin paths |
+| RLS context delegation  | `isolated_store.rls.delegate` — backend/operator-only trusted portal/workspace context |
 | List/create stores      | Control-plane permissions on isolated-store ops                                        |
 
 Schema **never** goes through `executeIsolatedStoreSql`.
@@ -183,6 +184,8 @@ The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime
 Studio/support "show all rows" views must not use normal request scope. Gate exposes separate read-only row endpoints for this mode: `countIsolatedStoreSqlRowsRlsBypass` and `selectIsolatedStoreSqlRowsRlsBypass`. They require `isolated_store.rls.bypass`, ignore request `rlsContext`, set trusted `app.rls_admin=true` in the same transaction, and log the actor/org/store/stage/table. Do not grant this permission to app runtime tokens.
 
 Tables that should be visible in Studio Admin must include an explicit read-only admin branch in their `SELECT` policies, for example: `current_setting('app.rls_admin', true) = 'true' OR (...)`. This is Azure-compatible because Azure Flexible Server does not let the configured administrator create arbitrary `BYPASSRLS` roles. Optional physical `BYPASSRLS` read roles are legacy/operator-specific and must not be required for the normal Studio Admin path.
+
+Backend-mediated visitor flows should not tunnel reserved context through `rlsContext`. For service-token calls that act on a verified visitor portal/workspace context, use `trustedRuntimeContext.portalId` and/or `trustedRuntimeContext.workspaceId` on runtime SQL request bodies. Gate requires `isolated_store.rls.delegate` for this field and maps it to trusted transaction-local `app.portal_id` / `app.workspace_id`. Do not grant this permission to browser/client runtime tokens, and do not fill `trustedRuntimeContext` directly from user-controlled request payloads.
 
 Recommended RLS verification checklist after schema apply:
 
