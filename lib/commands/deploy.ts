@@ -953,6 +953,7 @@ export const deployCommand = new Command("deploy")
               version.id,
               jobs,
               sidecars,
+              featureConfig.backend?.minReplicas,
             );
             console.log(`   Deploy ID: ${deploy.id}`);
             console.log(`   Waiting for backend deploy to complete...\n`);

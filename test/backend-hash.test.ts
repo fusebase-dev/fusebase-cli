@@ -125,6 +125,33 @@ describe("calculateBackendConfigHash", () => {
     edited.start = { command: "node other.js" };
     expect(calculateBackendConfigHash(edited, [])).not.toBe(original);
   });
+
+  it("differs when backend.minReplicas is added (forces redeploy)", () => {
+    const original = calculateBackendConfigHash(baseBackend, []);
+    const edited = clone(baseBackend);
+    edited.minReplicas = 1;
+    expect(calculateBackendConfigHash(edited, [])).not.toBe(original);
+  });
+
+  it("differs when backend.minReplicas value changes", () => {
+    const one = clone(baseBackend);
+    one.minReplicas = 1;
+    const two = clone(baseBackend);
+    two.minReplicas = 2;
+    expect(calculateBackendConfigHash(two, [])).not.toBe(
+      calculateBackendConfigHash(one, []),
+    );
+  });
+
+  it("is stable when backend.minReplicas is unchanged (no spurious redeploy)", () => {
+    const a = clone(baseBackend);
+    a.minReplicas = 1;
+    const b = clone(baseBackend);
+    b.minReplicas = 1;
+    expect(calculateBackendConfigHash(a, [])).toBe(
+      calculateBackendConfigHash(b, []),
+    );
+  });
 });
 
 describe("splitBackendHash", () => {
