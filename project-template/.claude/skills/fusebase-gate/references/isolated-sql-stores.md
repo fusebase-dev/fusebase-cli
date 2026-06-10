@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-06-05"
+last_synced: "2026-06-10"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -51,8 +51,11 @@ Current rollout position (2026-04-12):
 Runtime note:
 
 - a custom app backend is **not required** for normal PostgreSQL runtime access;
-- browser/UI code can call Gate SDK methods directly with the feature token for frontend-safe reads and allowed structured writes;
+- browser/UI code can call Gate SDK methods directly with the app token for frontend-safe reads and allowed structured writes;
 - add a backend only when you need privileged operations, secret-bearing integrations, heavy orchestration, or non-user-context work.
+- public/visitor apps do **not** conflict with RLS. `--access=visitor` means guests may open the app host and receive a visitor-scoped app token; it does not mean unauthenticated database access. RLS still enforces whatever trusted context exists (`org_id`, portal/workspace embed context, optional user identity). User-scoped tables should return no rows for anonymous visitors unless the app explicitly activates a user/session path.
+- Do not fix public-app isolated-store access by silently switching to a service-account token. If the app cannot read the store, debug app-token issuance/forwarding, Gate `gst` permissions, and store `sourceScopes`. A service-token backend is only for explicit trusted server-side work, and must not stand in for user-facing RLS context.
+- Wire-protocol token names still use legacy `feature` spelling for compatibility: `window.FBS_FEATURE_TOKEN`, cookie `fbsfeaturetoken`, and header `x-app-feature-token`. Use "app token" in prose, but do not rename the current runtime contract.
 
 Runtime configuration rule:
 
@@ -390,4 +393,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-06-05
+- **Last synced**: 2026-06-10

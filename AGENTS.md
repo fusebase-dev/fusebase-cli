@@ -146,6 +146,8 @@ Apps running in the iframe need an app token to communicate with Fusebase APIs. 
 
 Important: deployed app backends must not rely on `x-app-feature-token` alone. Platform proxies may strip that header on `/api/*`, so backend handlers should read `x-app-feature-token` or fallback to cookie `fbsfeaturetoken`. (Wire-protocol identifiers retain the legacy `feature` naming; rename is a separate cleanup ticket.)
 
+For user-facing Gate/RLS flows, public/visitor apps still use the platform-issued app token. Do not fix missing isolated-store access by falling back to a service-account token. Debug token issuance, the Gate `gst` subtoken/permissions, and isolated-store `sourceScopes`; use service-token backends only for explicit trusted server-side operations.
+
 ### Reliable Token Delivery
 
 The iframe may not always emit the `load` event reliably. Three strategies are used:

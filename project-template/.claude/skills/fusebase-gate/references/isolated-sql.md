@@ -1,7 +1,7 @@
 ---
 version: "1.8.11"
 mcp_prompt: isolatedSql
-last_synced: "2026-06-05"
+last_synced: "2026-06-10"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -59,8 +59,10 @@ Default stage is **`prod`** when stage is omitted by higher-level orchestration.
 ### Data path (no DDL)
 
 Prefer structured APIs: **`getIsolatedStoreSqlStats`**, **`countIsolatedStoreSqlRows`**, **`selectIsolatedStoreSqlRows`**, **`insertIsolatedStoreSqlRow`**, **`batchInsertIsolatedStoreSqlRows`**, **`importIsolatedStoreSqlRows`**, **`updateIsolatedStoreSqlRows`**, **`deleteIsolatedStoreSqlRows`**. Raw: **`queryIsolatedStoreSql`** (read); **`executeIsolatedStoreSql`** — DML only, **no DDL**; schema only via **`applyIsolatedStoreSqlMigrations`**.
-Runtime app path does **not** require a custom backend by default. Frontend/browser code can call Gate SDK methods such as **`selectIsolatedStoreSqlRows`**, **`countIsolatedStoreSqlRows`**, and other allowed structured operations directly with the feature token. Add a feature backend only when you need privileged logic, external secrets, heavy orchestration, or non-user-context work.
+Runtime app path does **not** require a custom backend by default. Frontend/browser code can call Gate SDK methods such as **`selectIsolatedStoreSqlRows`**, **`countIsolatedStoreSqlRows`**, and other allowed structured operations directly with the app token. Add a feature backend only when you need privileged logic, external secrets, heavy orchestration, or non-user-context work.
 Runtime app path also does **not** require users to create secrets for Gate-resolved store identity. Do not put `storeId`, database IDs, physical database names, or provider connection details into app secrets/env. Resolve the store through Gate from the app token/source scope and stable alias, or use the platform-provided binding when available.
+Public/visitor apps do **not** conflict with RLS. `--access=visitor` means guests may open the app host and receive a visitor-scoped app token; it does not mean unauthenticated database access. RLS still enforces trusted context such as `org_id`, portal/workspace embed context, and optional user identity. User-scoped tables should return no rows for anonymous visitors unless the app explicitly activates a user/session path.
+Do **not** fix public-app isolated-store access by silently switching to a service-account token. If the app cannot read the store, debug app-token issuance/forwarding, Gate `gst` permissions, and store `sourceScopes`. A service-token backend is only for explicit trusted server-side work, and must not stand in for user-facing RLS context.
 
 ### Structured SQL limits
 
@@ -79,6 +81,7 @@ Apply sends **full SQL text** for every migration; JSON grows quickly. Many IDE 
 ### Tokens
 
 Runtime app tokens: usually **`isolated_store.data.write`**, not **`isolated_store.schema.write`** or **`isolated_store.execute`**.
+Wire-protocol token names still use legacy `feature` spelling for compatibility: **`window.FBS_FEATURE_TOKEN`**, cookie **`fbsfeaturetoken`**, and header **`x-app-feature-token`**. Use "app token" in prose, but do not rename the current runtime contract.
 
 ### PostgreSQL RLS native mode
 
@@ -144,5 +147,5 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 - **Version**: 1.8.11
 - **Category**: specialized
-- **Last synced**: 2026-06-05
+- **Last synced**: 2026-06-10
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

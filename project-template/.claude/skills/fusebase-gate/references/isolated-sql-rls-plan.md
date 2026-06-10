@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-rls-plan.md"
-last_synced: "2026-06-05"
+last_synced: "2026-06-10"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
 ---
@@ -239,6 +239,7 @@ Rule for `v1`:
 
 - if a path needs user-level isolation, it must reach Gate in user context
 - service tokens should not be a silent fallback for user-facing app reads
+- public/visitor apps are compatible with RLS when they use the platform-issued app token; anonymous visitors simply lack `app.user_id`, so user-scoped policies return no rows while portal/org-scoped policies can still work from trusted platform context
 
 ### 2.4 Roles and trust boundaries
 
@@ -1038,4 +1039,4 @@ For `gate isolated stores`, use a combined `org_id + user_id` RLS model, with `o
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-06-05
+- **Last synced**: 2026-06-10

@@ -172,6 +172,7 @@ SDK token usage in app runtime:
 - Direct SDK / Fusebase proxy calls pass the token via `x-app-feature-token`
 - Calls to the app's own backend (`/api/*`) must assume deployed platform proxies may strip `x-app-feature-token`; backend handlers must read header or fallback to cookie `fbsfeaturetoken`
 - For user-facing Gate flows, auth must stay in user context (app token). Do not silently fall back to service-account tokens.
+- Public/visitor apps do not conflict with RLS. They still receive a platform-issued app token; anonymous visitors simply lack `app.user_id`, so user-scoped tables return no rows while portal/org-scoped policies can work from trusted platform context. If isolated-store access fails, debug app-token issuance, Gate `gst` permissions, and store `sourceScopes` instead of switching to a service-token backend.
 
 **Rules**:
 
