@@ -345,6 +345,26 @@ Inbound integrations from external services (for example, Monday.com, GitHub, St
 
 The platform proxy skips app-token auth for any path under `/api/webhooks/`, including both HTTP routes and WebSocket upgrade routes.
 
+### ⚠️ Keep a replica warm for webhook apps (`backend.minReplicas: 1`)
+
+By default the backend **scales to zero when idle**, so an inbound webhook hits a cold
+container that takes longer to start than the provider's delivery timeout — the delivery
+is dropped and silently lost. (Concrete example: **Asana** gives up after **10 seconds**
+with `ETIMEOUT: ... unable to connect to your webhook within the timeout of 10000 ms`, and
+its retries hit the same cold container.)
+
+**Rule:** if the app **receives webhooks** (or has any always-on inbound integration —
+external WebSocket callbacks, polling-replacement push, etc.), set
+`backend.minReplicas: 1` in `fusebase.json` so one replica stays warm and answers
+instantly. See [fusebase.json Backend Config](#fusebasejson-backend-config) for the field.
+
+- Recommended value: **`1`**. That is enough to eliminate cold-start delivery timeouts.
+- **Cost tradeoff:** each warm replica runs **24/7**, so it costs money even when idle.
+  Use `1` unless the app has sustained high traffic; only raise it for genuinely
+  high-throughput apps.
+- **Cap: `3`** (enforced server-side). Higher values are rejected at deploy.
+- Apps **without** webhooks should omit the field (or set `0`) and keep scale-to-zero.
+
 ### Register external webhooks yourself
 
 When the app needs to receive webhooks from a third-party service (Asana, GitHub, Stripe, Monday, etc.), register the subscription with that provider **yourself** as part of the deploy — do not hand the user a `curl` / admin-UI step to run.
@@ -394,7 +414,8 @@ When an app has a backend, add the `backend` block to its entry in `fusebase.jso
       "backend": {
         "dev": { "command": "npm run dev" },
         "build": { "command": "npm run build" },
-        "start": { "command": "npm run start" }
+        "start": { "command": "npm run start" },
+        "minReplicas": 1
       }
     }
   ]
@@ -402,6 +423,20 @@ When an app has a backend, add the `backend` block to its entry in `fusebase.jso
 ```
 
 Backend commands (`dev`, `build`, `start`) run from the `backend/` subdirectory of the app path.
+
+### `backend.minReplicas` (keep the backend warm)
+
+Optional integer. Minimum number of backend replicas to keep running.
+
+- Omitted / `0` (default): the backend **scales to zero when idle** — cheapest, but the
+  first request after an idle period pays a cold start.
+- `1`: keeps **one replica warm 24/7** so inbound requests are answered instantly.
+  **Required for apps that receive webhooks** — see
+  [Keep a replica warm for webhook apps](#️-keep-a-replica-warm-for-webhook-apps-backendminreplicas-1).
+- Range: **`0`–`3`** (cap `3`). The value is validated locally by the CLI and
+  authoritatively by the server on `fusebase deploy`; out-of-range, negative, or
+  non-integer values are rejected with a clear error. Each warm replica runs 24/7 and
+  costs money even when idle, so prefer `1` unless the app has sustained high traffic.
 
 ## Deriving the Public Base URL from the Request
 

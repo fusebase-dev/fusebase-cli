@@ -518,7 +518,7 @@ When `git-debug-commits` is enabled, these rules are mandatory:
 
 ### ✅ app-backend
 
-**Load when an app needs a backend API** (REST endpoints, WebSockets, custom logic). Covers when to add a backend, `backend/` folder structure, Hono setup, `/api` route reservation, and `fusebase.json` backend config. **The backend is optional** — only add when the app genuinely needs backend logic beyond dashboard SDK calls. **No code is shared between SPA and backend** — each side defines its own types independently. **Backends are not shared among apps** — only the app that owns the `backend/` folder can access it.
+**Load when an app needs a backend API** (REST endpoints, WebSockets, custom logic). Covers when to add a backend, `backend/` folder structure, Hono setup, `/api` route reservation, and `fusebase.json` backend config (including `backend.minReplicas` — **set it to `1` for webhook/always-on apps** so the backend stays warm and does not drop deliveries on cold start). **The backend is optional** — only add when the app genuinely needs backend logic beyond dashboard SDK calls. **No code is shared between SPA and backend** — each side defines its own types independently. **Backends are not shared among apps** — only the app that owns the `backend/` folder can access it.
 
 ### ✅ app-secrets
 
