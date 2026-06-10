@@ -93,8 +93,10 @@ function printSummary(
   } else if (includeRlsManifest) {
     console.log("RLS manifest: yes");
   } else {
-    console.log(
-      `RLS manifest: present but not sent (enable with: fusebase config set-flag ${ISOLATED_SQL_RLS_FLAG})`,
+    const message = `RLS manifest: present but not sent (enable with: fusebase config set-flag ${ISOLATED_SQL_RLS_FLAG})`;
+    console.log(message);
+    console.warn(
+      `WARNING: ${message}. Gate will not validate the declared RLS baseline for status/apply.`,
     );
   }
   if (artifact.warnings.length > 0) {
@@ -139,13 +141,17 @@ async function callGateRlsStatus(options: {
   });
 }
 
-function warnIfRuntimeBypassesRls(status: SqlRlsStatusResponse): void {
-  if (status.bypassRls !== true) {
+function warnIfRuntimeDoesNotEnforceRls(status: SqlRlsStatusResponse): void {
+  if (status.bypassRls !== true && status.superuser !== true) {
     return;
   }
   const currentUser = status.currentUser?.trim() || "unknown";
+  const reasons = [
+    ...(status.bypassRls === true ? ["bypassRls=true"] : []),
+    ...(status.superuser === true ? ["superuser=true"] : []),
+  ].join(", ");
   console.warn(
-    `WARNING: RLS policies exist but are NOT enforced for runtime role ${currentUser} because bypassRls=true. Scoped tests require a runtime role without BYPASSRLS.`,
+    `WARNING: RLS policies exist but are NOT enforced for runtime role ${currentUser} because ${reasons}. Scoped tests require a runtime role without BYPASSRLS and without superuser privileges.`,
   );
 }
 
@@ -158,7 +164,7 @@ async function warnRuntimeRlsStatus(options: {
 }): Promise<void> {
   try {
     const rlsStatus = await callGateRlsStatus(options);
-    warnIfRuntimeBypassesRls(rlsStatus);
+    warnIfRuntimeDoesNotEnforceRls(rlsStatus);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`Warning: Could not check RLS runtime status after apply: ${message}`);
@@ -236,7 +242,7 @@ const sqlBundleCommand = new Command("bundle")
         stage,
         schemaName: options.schema ?? artifact.schemaName ?? undefined,
       });
-      warnIfRuntimeBypassesRls(rlsStatus);
+      warnIfRuntimeDoesNotEnforceRls(rlsStatus);
       console.log(JSON.stringify(rlsStatus, null, 2));
     }
 

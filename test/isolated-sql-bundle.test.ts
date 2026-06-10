@@ -225,6 +225,21 @@ describe("isolated SQL bundle CLI flag", () => {
     expect(body.rlsManifest).toBeUndefined();
   });
 
+  it("warns when an RLS manifest is present but postgres-rls flag is disabled", async () => {
+    const ws = writeCliWorkspace();
+    const result = await runCli(
+      ["isolated-store", "sql", "bundle", "--app", "app-1"],
+      ws.projectDir,
+      ws.homeDir,
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("RLS manifest: present but not sent");
+    expect(result.stderr).toContain(
+      "Gate will not validate the declared RLS baseline",
+    );
+  });
+
   it("attaches RLS manifest only when postgres-rls flag is enabled", async () => {
     const ws = writeCliWorkspace(["postgres-rls"]);
     const result = await runCli(
