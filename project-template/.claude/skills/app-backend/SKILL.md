@@ -347,23 +347,14 @@ The platform proxy skips app-token auth for any path under `/api/webhooks/`, inc
 
 ### ⚠️ Keep a replica warm for webhook apps (`backend.minReplicas: 1`)
 
-By default the backend **scales to zero when idle**, so an inbound webhook hits a cold
-container that takes longer to start than the provider's delivery timeout — the delivery
-is dropped and silently lost. (Concrete example: **Asana** gives up after **10 seconds**
-with `ETIMEOUT: ... unable to connect to your webhook within the timeout of 10000 ms`, and
-its retries hit the same cold container.)
+The backend **scales to zero when idle**, so a webhook can hit a cold container that
+starts slower than the provider's timeout and is silently dropped (e.g. **Asana** gives up
+after **10s**, and its retries hit the same cold container).
 
-**Rule:** if the app **receives webhooks** (or has any always-on inbound integration —
-external WebSocket callbacks, polling-replacement push, etc.), set
-`backend.minReplicas: 1` in `fusebase.json` so one replica stays warm and answers
-instantly. See [fusebase.json Backend Config](#fusebasejson-backend-config) for the field.
-
-- Recommended value: **`1`**. That is enough to eliminate cold-start delivery timeouts.
-- **Cost tradeoff:** each warm replica runs **24/7**, so it costs money even when idle.
-  Use `1` unless the app has sustained high traffic; only raise it for genuinely
-  high-throughput apps.
-- **Cap: `3`** (enforced server-side). Higher values are rejected at deploy.
-- Apps **without** webhooks should omit the field (or set `0`) and keep scale-to-zero.
+**Rule:** if the app receives webhooks (or any always-on inbound integration), set
+`backend.minReplicas: 1` in `fusebase.json` to keep one replica warm — see
+[fusebase.json Backend Config](#fusebasejson-backend-config). Cap `3`; each warm replica
+runs 24/7, so prefer `1`. Apps without webhooks omit it (or `0`) to keep scale-to-zero.
 
 ### Register external webhooks yourself
 
