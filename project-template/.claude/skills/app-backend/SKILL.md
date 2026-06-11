@@ -345,11 +345,10 @@ Inbound integrations from external services (for example, Monday.com, GitHub, St
 
 The platform proxy skips app-token auth for any path under `/api/webhooks/`, including both HTTP routes and WebSocket upgrade routes.
 
-### ⚠️ Keep a replica warm for webhook apps (`backend.minReplicas: 1`)
+### Keep a replica warm for webhook apps (`backend.minReplicas: 1`)
 
 The backend **scales to zero when idle**, so a webhook can hit a cold container that
-starts slower than the provider's timeout and is silently dropped (e.g. **Asana** gives up
-after **10s**, and its retries hit the same cold container).
+starts slower than the provider's timeout and is silently dropped.
 
 **Rule:** if the app receives webhooks (or any always-on inbound integration), set
 `backend.minReplicas: 1` in `fusebase.json` to keep one replica warm — see
@@ -417,17 +416,7 @@ Backend commands (`dev`, `build`, `start`) run from the `backend/` subdirectory 
 
 ### `backend.minReplicas` (keep the backend warm)
 
-Optional integer. Minimum number of backend replicas to keep running.
-
-- Omitted / `0` (default): the backend **scales to zero when idle** — cheapest, but the
-  first request after an idle period pays a cold start.
-- `1`: keeps **one replica warm 24/7** so inbound requests are answered instantly.
-  **Required for apps that receive webhooks** — see
-  [Keep a replica warm for webhook apps](#️-keep-a-replica-warm-for-webhook-apps-backendminreplicas-1).
-- Range: **`0`–`3`** (cap `3`). The value is validated locally by the CLI and
-  authoritatively by the server on `fusebase deploy`; out-of-range, negative, or
-  non-integer values are rejected with a clear error. Each warm replica runs 24/7 and
-  costs money even when idle, so prefer `1` unless the app has sustained high traffic.
+Optional integer. Minimum number of backend replicas to keep running. 0 by default. 0 means scale to zero (cold starts).
 
 ## Deriving the Public Base URL from the Request
 
