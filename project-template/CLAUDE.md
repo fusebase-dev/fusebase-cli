@@ -6,8 +6,6 @@
 
 **Type safety:** No `any` / `as Record<string, unknown>` / `as any` on SDK JSON; use `@fusebase/*` types, `sdk_describe`, narrowing — @AGENTS.md **Type safety invariant**.
 
-**Webhook apps must keep a replica warm:** If the app registers inbound webhooks (or any always-on inbound integration), set `backend.minReplicas: 1` in `fusebase.json`. The default scale-to-zero drops webhook deliveries on cold start (e.g. Asana times out after 10s). Cap is `3`; prefer `1` — see `.claude/skills/app-backend/SKILL.md`.
-
 **Dashboard SDK data (runtime code):** Before writing or reviewing code that calls dashboard data SDK methods (`getDashboardViewData`, `batchPutDashboardData`, and similar), you **must** (1) read `.claude/skills/fusebase-dashboards/references/data-patterns.md` for the actual response/request shapes, and (2) use `sdk_describe` on that method (e.g. `schemaMode: "output"`) before writing parsing logic. **Do not** guess shapes (for example assuming `response.data.rows` when the API returns a flat `data` array plus `meta`).
 
 **Dashboard data SDK request args:** Methods such as `getDashboardViewData` and `batchPutDashboardData` take **route parameters under `path`**, e.g. `{ path: { dashboardId, viewId }, ... }` (plus `body` / query per `sdk_describe`). **Do not** pass `{ dashboardId, viewId }` at the top level — that matches MCP `tool_call` **args**, not the TypeScript SDK. Apply the **same** SDK shape in **SPA and app `backend/`** code.
