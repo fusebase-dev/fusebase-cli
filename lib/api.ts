@@ -1031,6 +1031,7 @@ export async function createDeploy(
   versionId: string,
   jobs?: DeployJobDefinition[],
   sidecars?: DeploySidecarDefinition[],
+  minReplicas?: number,
 ): Promise<Deploy> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/versions/${versionId}/deploy`;
@@ -1038,6 +1039,12 @@ export async function createDeploy(
   const body: Record<string, unknown> = { jobs: jobs ?? [] };
   if (sidecars && sidecars.length > 0) {
     body.sidecars = sidecars;
+  }
+  // Forward minReplicas only when set in fusebase.json. `undefined` = "no
+  // change" (server keeps the current value); explicit `0`/`null` = "restore
+  // scale-to-zero". The server (nimbus-ai) is the authoritative cost guard.
+  if (minReplicas !== undefined) {
+    body.minReplicas = minReplicas;
   }
 
   const response = await fetch(url, {
