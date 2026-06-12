@@ -63,7 +63,12 @@ build:
     - bun install --frozen-lockfile
     - bun run build
     - bun "$RELEASE_SCRIPTS/installers/build-installer-win.ts"
-    - bun "$RELEASE_SCRIPTS/signing/sign-exe.ts" build/installers/win/fusebase-installer-*.exe
+    - |
+      if [[ "$SKIP_WINDOWS_SIGNING" == "1" ]]; then
+        echo "Skipping Windows installer signing because SKIP_WINDOWS_SIGNING=1"
+      else
+        bun "$RELEASE_SCRIPTS/signing/sign-exe.ts" build/installers/win/fusebase-installer-*.exe
+      fi
   artifacts:
     name: "fusebase-cli-$CI_COMMIT_REF_SLUG"
     paths:
