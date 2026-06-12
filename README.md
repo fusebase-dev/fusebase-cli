@@ -729,6 +729,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `portal-specific-apps` | Includes portal-specific app guidance in prompts: `fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
 | `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`apps[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `app-sidecar` and `app-backend` skill templates. |
 | `cross-app-api-calls-analysis` | Enables hidden `fusebase analyze app-apis` command and cross-app API dependency guidance in generated prompts/skills. |
+| `customize-backend-replicas` | Sends `backend.minReplicas` from `fusebase.json` to the deploy endpoint so the backend keeps N warm replicas (cap 3). Without this flag the field is ignored at deploy. |
 
 Enable a flag globally, then refresh the project template:
 
