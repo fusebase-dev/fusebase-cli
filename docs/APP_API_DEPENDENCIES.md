@@ -123,3 +123,16 @@ When a call is dynamic by design, declare dependency manually by adding an entry
 - `apps[].fusebaseAppApiDependenciesMeta.dependencies[]` with `source: "manual"`
 
 Manual entries are preserved on future analyzer runs.
+
+CLI helper flow:
+
+```bash
+fusebase analyze app-apis --feature <consumerAppId>
+fusebase app-api-contracts unresolved --app <consumerAppId>
+fusebase app-api-contracts add-manual-dependency --app <consumerAppId> --provider <providerAppId> --operation <operationId>
+```
+
+Notes:
+
+- `add-manual-dependency` defaults `targetOrgId` to project `fusebase.json` `orgId`
+- once the manual dependency exists, `fusebase app-api-contracts scaffold ...` can generate the matching draft consumer contract

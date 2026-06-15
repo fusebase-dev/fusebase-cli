@@ -5,6 +5,7 @@
     "": {
       "name": "fusebase-apps-cli",
       "dependencies": {
+        "@fusebase/fusebase-gate-sdk": "^2.2.21-sdk.12",
         "@iarna/toml": "^2.2.5",
         "@inquirer/prompts": "^8.2.0",
         "@types/cli-progress": "^3.11.6",
@@ -34,6 +35,8 @@
     },
   },
   "packages": {
+    "@fusebase/fusebase-gate-sdk": ["@fusebase/fusebase-gate-sdk@2.2.21-sdk.18", "", {}, "sha512-w8WK4ybVPU+5VzipfmENKI+cEDk+qhBoTNAV8GbZH2c1LTG1M7r8LXIXJhmEoMZ+/wik2lBgoBLpKMv/yaYLiw=="],
+
     "@iarna/toml": ["@iarna/toml@2.2.5", "", {}, "sha512-trnsAYxU3xnS1gPHPyU961coFyLkh4gAD/0zQ5mymY4yOZ+CYvsPqUbOFSw0aDM4y0tV7tiFxL/1XfXPNC6IPg=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.3", "", {}, "sha512-g44zhR3NIKVs0zUesa4iMzExmZpLUdTLRMCStqX3GE5NT6VkPcxQGJ+uC8tDgBUC/vB1rUhUd55cOf++4NZcmw=="],

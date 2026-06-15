@@ -210,6 +210,7 @@ const FLAG_GATED_SKILLS: Record<string, string> = {
   "mcp-gate-debug": "mcp-gate-debug",
   "fusebase-portal-specific-apps": "portal-specific-apps",
   "managed-integrations": "managed-integrations",
+  "app-api-contract-testing": "cross-app-api-calls-analysis",
 };
 
 /** Template paths that require a specific flag to be included. */

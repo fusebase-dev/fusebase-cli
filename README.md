@@ -20,6 +20,7 @@ See:
 - [App Permissions](docs/PERMISSIONS.md) — canonical model for `dashboardView`, `database`, `gate`, and `app update`
 - [Fusebase Gate meta (`fusebaseGateMeta`)](docs/FUSEBASE_GATE_META.md) — Gate SDK analyze flow and `fusebase.json` snapshot
 - [App API dependencies meta (`fusebaseAppApiDependenciesMeta`)](docs/APP_API_DEPENDENCIES.md) — cross-app `callAppApi` static analysis snapshot in `fusebase.json` with optional explicit remote sync (`fusebase analyze app-apis --sync`; requires flag `cross-app-api-calls-analysis`)
+- [App API consumer contracts](docs/APP_API_CONTRACTS.md) — local PoC format and hidden CLI validation, unresolved/manual resolution flow, scaffolding, publish-to-central storage, central consumer/provider verification, and machine-readable `--json` output for cross-app API contracts
 - [E2E tests](test/e2e/README.md) — CLI end-to-end smoke + dev-start parallel tests, env vars, and CI variables
 
 ## CLI Usage
