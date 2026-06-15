@@ -172,7 +172,8 @@ SDK token usage in app runtime:
 - Direct SDK / Fusebase proxy calls pass the token via `x-app-feature-token`
 - Calls to the app's own backend (`/api/*`) must assume deployed platform proxies may strip `x-app-feature-token`; backend handlers must read header or fallback to cookie `fbsfeaturetoken`
 - For user-facing Gate flows, auth must stay in user context (app token). Do not silently fall back to service-account tokens.
-- Public/visitor apps do not conflict with RLS. They still receive a platform-issued app token; anonymous visitors simply lack `app.user_id`, so user-scoped tables return no rows while portal/org-scoped policies can work from trusted platform context. If isolated-store access fails, debug app-token issuance, Gate `gst` permissions, and store `sourceScopes` instead of switching to a service-token backend.
+- Public/visitor apps can open with a visitor app token, but visitor tokens normally do **not** receive isolated-store permissions. For public portal reads/writes, use an app backend with a service token plus trusted portal/workspace context. Prefer `trustedRuntimeContext.portalId` / `trustedRuntimeContext.workspaceId` when the token has `isolated_store.rls.delegate`; if unavailable in the target environment, a custom `rlsContext` key such as `req_portal_id` is only a reviewed temporary fallback derived from trusted auth context.
+- In local `fusebase dev start`, `FBS_FEATURE_TOKEN` may be absent in backend env. Backend-only service-token code may use `process.env.FBS_FEATURE_TOKEN ?? process.env.GATE_MCP_TOKEN` for dev, but browser/UI code must never read `.env` or use MCP/service tokens.
 
 **Rules**:
 
@@ -608,7 +609,7 @@ For apps that use Dashboard SDK or Gate SDK at runtime, a successful deploy is *
 
 If the app uses Fusebase Gate SDK:
 
-- run `fusebase app update <appId> --sync-gate-permissions` before or alongside publish
+- run `fusebase app update <appId> --sync-gate-permissions` after changing Gate SDK operations and before `fusebase deploy` or before calling the deployment published
 - do not treat `Permissions: none` as success unless the app intentionally requires no runtime permissions
 - run `fusebase analyze gate --operations --json --feature <featureId>` before publish and confirm `usedOps` is not empty when Gate SDK is used in runtime code
 - if `usedOps` is empty but runtime imports `@fusebase/fusebase-gate-sdk`, treat publish as blocked and fix analysis/runtime call patterns before shipping

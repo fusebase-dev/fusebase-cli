@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-06-10"
+last_synced: "2026-06-15"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -53,8 +53,8 @@ Runtime note:
 - a custom app backend is **not required** for normal PostgreSQL runtime access;
 - browser/UI code can call Gate SDK methods directly with the app token for frontend-safe reads and allowed structured writes;
 - add a backend only when you need privileged operations, secret-bearing integrations, heavy orchestration, or non-user-context work.
-- public/visitor apps do **not** conflict with RLS. `--access=visitor` means guests may open the app host and receive a visitor-scoped app token; it does not mean unauthenticated database access. RLS still enforces whatever trusted context exists (`org_id`, portal/workspace embed context, optional user identity). User-scoped tables should return no rows for anonymous visitors unless the app explicitly activates a user/session path.
-- Do not fix public-app isolated-store access by silently switching to a service-account token. If the app cannot read the store, debug app-token issuance/forwarding, Gate `gst` permissions, and store `sourceScopes`. A service-token backend is only for explicit trusted server-side work, and must not stand in for user-facing RLS context.
+- public/visitor apps can open with `--access=visitor`, but visitor tokens normally do **not** receive isolated-store permissions. For public portal reads/writes, use an app backend with a service token plus trusted portal/workspace context; do not expect direct visitor-token Gate SDK calls to the store to work.
+- A service-token backend must derive the portal/workspace scope from trusted platform auth context, not from arbitrary request body/query data. Prefer `trustedRuntimeContext.portalId` / `trustedRuntimeContext.workspaceId` when the token has `isolated_store.rls.delegate`; if that permission is not available in the target environment, an app-specific `rlsContext` key such as `req_portal_id` is only a reviewed temporary fallback.
 - Wire-protocol token names still use legacy `feature` spelling for compatibility: `window.FBS_FEATURE_TOKEN`, cookie `fbsfeaturetoken`, and header `x-app-feature-token`. Use "app token" in prose, but do not rename the current runtime contract.
 
 Runtime configuration rule:
@@ -186,6 +186,10 @@ Studio/support "show all rows" views must not use normal request scope. Gate exp
 Tables that should be visible in Studio Admin must include an explicit read-only admin branch in their `SELECT` policies, for example: `current_setting('app.rls_admin', true) = 'true' OR (...)`. This is Azure-compatible because Azure Flexible Server does not let the configured administrator create arbitrary `BYPASSRLS` roles. Optional physical `BYPASSRLS` read roles are legacy/operator-specific and must not be required for the normal Studio Admin path.
 
 Backend-mediated visitor flows should not tunnel reserved context through `rlsContext`. For service-token calls that act on a verified visitor portal/workspace context, use `trustedRuntimeContext.portalId` and/or `trustedRuntimeContext.workspaceId` on runtime SQL request bodies. Gate requires `isolated_store.rls.delegate` for this field and maps it to trusted transaction-local `app.portal_id` / `app.workspace_id`. Do not grant this permission to browser/client runtime tokens, and do not fill `trustedRuntimeContext` directly from user-controlled request payloads.
+
+Standard `app.*` RLS settings are text platform ids, not UUIDs. Values such as `app.org_id`, `app.user_id`, `app.client_id`, `app.portal_id`, and `app.workspace_id` may be strings like `u37o` or `4164`; scope columns that compare to these settings should normally be `text`. Use UUID only for app-owned ids that are actually UUID-shaped.
+
+Under PostgreSQL RLS, `INSERT ... RETURNING` and structured `insert` with `returning` require the inserted row to pass the table's `SELECT` policy. If a row becomes visible only after a second portal/link-table insert, generate the id in app code and insert without `returning`.
 
 Recommended RLS verification checklist after schema apply:
 
@@ -396,4 +400,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-06-10
+- **Last synced**: 2026-06-15

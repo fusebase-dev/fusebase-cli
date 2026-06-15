@@ -1,7 +1,7 @@
 ---
-version: "1.8.13"
+version: "1.8.14"
 mcp_prompt: isolatedSql
-last_synced: "2026-06-10"
+last_synced: "2026-06-15"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -62,8 +62,8 @@ Default stage is **`prod`** when stage is omitted by higher-level orchestration.
 Prefer structured APIs: **`getIsolatedStoreSqlStats`**, **`countIsolatedStoreSqlRows`**, **`selectIsolatedStoreSqlRows`**, **`insertIsolatedStoreSqlRow`**, **`batchInsertIsolatedStoreSqlRows`**, **`importIsolatedStoreSqlRows`**, **`updateIsolatedStoreSqlRows`**, **`deleteIsolatedStoreSqlRows`**. Raw: **`queryIsolatedStoreSql`** (read); **`executeIsolatedStoreSql`** — DML only, **no DDL**; schema only via **`applyIsolatedStoreSqlMigrations`**.
 Runtime app path does **not** require a custom backend by default. Frontend/browser code can call Gate SDK methods such as **`selectIsolatedStoreSqlRows`**, **`countIsolatedStoreSqlRows`**, and other allowed structured operations directly with the app token. Add a feature backend only when you need privileged logic, external secrets, heavy orchestration, or non-user-context work.
 Runtime app path also does **not** require users to create secrets for Gate-resolved store identity. Do not put `storeId`, database IDs, physical database names, or provider connection details into app secrets/env. Resolve the store through Gate from the app token/source scope and stable alias, or use the platform-provided binding when available.
-Public/visitor apps do **not** conflict with RLS. `--access=visitor` means guests may open the app host and receive a visitor-scoped app token; it does not mean unauthenticated database access. RLS still enforces trusted context such as `org_id`, portal/workspace embed context, and optional user identity. User-scoped tables should return no rows for anonymous visitors unless the app explicitly activates a user/session path.
-Do **not** fix public-app isolated-store access by silently switching to a service-account token. If the app cannot read the store, debug app-token issuance/forwarding, Gate `gst` permissions, and store `sourceScopes`. A service-token backend is only for explicit trusted server-side work, and must not stand in for user-facing RLS context.
+Public/visitor apps can open with `--access=visitor`, but visitor tokens normally do **not** receive isolated-store permissions. For public portal reads/writes, use an app backend with a service token plus trusted portal/workspace context; do not expect direct visitor-token Gate SDK calls to the store to work.
+A service-token backend must derive the portal/workspace scope from trusted platform auth context, not from arbitrary request body/query data. Prefer `trustedRuntimeContext.portalId` / `trustedRuntimeContext.workspaceId` when the token has `isolated_store.rls.delegate`; if that permission is not available in the target environment, an app-specific `rlsContext` key such as `req_portal_id` is only a reviewed temporary fallback.
 
 ### Structured SQL limits
 
@@ -71,6 +71,7 @@ Do **not** fix public-app isolated-store access by silently switching to a servi
 - **`batchInsertIsolatedStoreSqlRows`**: at most **`floor(65535 / columnCount)`** rows per call (Postgres bind limit); e.g. **~2621** rows at **25** columns.
 - **`update`** / **`delete`** need filters unless **`allowAll=true`**.
 - For JSONB columns in structured row APIs (`insert…`, `batchInsert…`, `update…`), pass values as JSON strings (e.g. `JSON.stringify(objOrArray)`) rather than raw JS objects/arrays to avoid Postgres `invalid input syntax for type json`.
+- Under PostgreSQL RLS, `INSERT ... RETURNING` and structured `insert` with `returning` require the inserted row to pass the table's `SELECT` policy. If a row becomes visible only after a second portal/link-table insert, generate the id in app code and insert without `returning`.
 - Migration bundles are **schema-only**. Gate rejects top-level `INSERT` / `UPDATE` / `DELETE` / `TRUNCATE` / `MERGE` / `COPY` inside migration SQL.
 - Large **data** seeds: **`importIsolatedStoreSqlRows`** (`csv`/`tsv`, **`COPY FROM STDIN`**); default payload cap **64MiB** UTF-8 per call (`ISOLATED_SQL_IMPORT_MAX_PAYLOAD_BYTES`, hard cap **256MiB**); split larger files.
 - Small demo seeds or backfills: structured row APIs (`insert…`, `batchInsert…`) after schema apply, not inside migration SQL.
@@ -103,6 +104,7 @@ Studio/support view-all rows must use the separate read-only RLS-bypass path, no
 ### RLS app-design pitfalls from QA
 
 - Treat **`app.client_id`** as token/client scope, not app identity. In managed product flows sibling apps may share the same product-level client id. Do not use `app.client_id` to distinguish sibling apps unless the platform explicitly confirms that the token scope is app-unique.
+- Treat standard **`app.*`** RLS settings as **text platform ids**, not UUIDs. Values such as `app.org_id`, `app.user_id`, `app.client_id`, `app.portal_id`, and `app.workspace_id` may be strings like `u37o` or `4164`; scope columns that compare to them should normally be `text` unless a specific custom id is truly UUID-shaped.
 - Reserved settings such as **`org_id`**, **`user_id`**, **`client_id`**, **`auth_type`**, **`portal_id`**, **`workspace_id`**, and **`rls_admin`** cannot be supplied through caller-controlled `rlsContext`. They must come from Gate auth/runtime context.
 - Visitor tokens normally do not receive isolated-store permissions. If a backend service token reads/writes on behalf of a visitor, the portal/workspace RLS dimension must be derived from trusted platform auth context, not from arbitrary request body/query data. Use **`trustedRuntimeContext.portalId`** / **`trustedRuntimeContext.workspaceId`** for backend-delegated portal/workspace context; it requires **`isolated_store.rls.delegate`** and normal client/runtime tokens must not receive that permission. Treat app-specific settings such as **`app.req_portal_id`** as legacy/temporary workarounds only.
 - RLS policy subqueries are also evaluated under RLS. If a policy uses `EXISTS (select ... from another_table ...)`, make sure the current context can see the referenced rows or use a deliberately reviewed helper pattern.
@@ -156,7 +158,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 ## Version
 
-- **Version**: 1.8.13
+- **Version**: 1.8.14
 - **Category**: specialized
-- **Last synced**: 2026-06-10
+- **Last synced**: 2026-06-15
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-rls-plan.md"
-last_synced: "2026-06-10"
+last_synced: "2026-06-15"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
 ---
@@ -188,13 +188,13 @@ Optional dimensions must follow the same rule:
 
 The model should be "mandatory tenant context plus optional narrowing dimensions":
 
-| Dimension      |                  Required | Source of truth                             | Typical table column                                     | Notes                                                                          |
-| -------------- | ------------------------: | ------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `org_id`       |                       yes | Gate org route/authz                        | `org_id uuid not null`                                   | Always the first isolation boundary.                                           |
-| `user_id`      | yes for user-facing paths | Gate auth actor                             | `user_id uuid not null` or `owner_user_id uuid not null` | Required for private rows and ownership checks.                                |
-| `portal_id`    |                  optional | Gate portal binding/context                 | `portal_id uuid`                                         | Only set when Gate can prove the portal is in the current org and token scope. |
-| `workspace_id` |                  optional | Gate workspace binding/context              | `workspace_id uuid`                                      | Useful for multi-workspace apps inside one org.                                |
-| custom app ID  |                  optional | Gate-validated scope or DB membership table | `project_id uuid`, `account_id uuid`, etc.               | Do not let app code set arbitrary trusted values.                              |
+| Dimension      |                  Required | Source of truth                             | Typical table column                               | Notes                                                                          |
+| -------------- | ------------------------: | ------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `org_id`       |                       yes | Gate org route/authz                        | `org_id text not null`                             | Always the first isolation boundary. Gate ids are platform strings, not UUIDs. |
+| `user_id`      | yes for user-facing paths | Gate auth actor                             | `user_id text not null` or `owner_user_id text`    | Required for private rows and ownership checks.                                |
+| `portal_id`    |                  optional | Gate portal binding/context                 | `portal_id text`                                   | Only set when Gate can prove the portal is in the current org and token scope. |
+| `workspace_id` |                  optional | Gate workspace binding/context              | `workspace_id text`                                | Useful for multi-workspace apps inside one org.                                |
+| custom app ID  |                  optional | Gate-validated scope or DB membership table | `project_id text`, `account_id uuid`, etc.         | Use UUID only for app-owned ids that are actually UUID-shaped.                 |
 
 Recommended session settings:
 
@@ -365,12 +365,12 @@ Use for shared reference/business objects inside a tenant.
 Columns:
 
 - `id`
-- `org_id uuid not null`
+- `org_id text not null`
 - business columns
 
 Policy:
 
-- all reads/writes require `org_id = current_setting('app.org_id', true)::uuid`
+- all reads/writes require `org_id = nullif(current_setting('app.org_id', true), '')`
 
 #### Pattern B — user-private table
 
@@ -379,8 +379,8 @@ Use for private drafts, personal preferences, private carts, personal notes.
 Columns:
 
 - `id`
-- `org_id uuid not null`
-- `user_id uuid not null`
+- `org_id text not null`
+- `user_id text not null`
 - business columns
 
 Policy:
@@ -395,8 +395,8 @@ Use for business objects that can be shared.
 Columns:
 
 - `id`
-- `org_id uuid not null`
-- `owner_user_id uuid not null`
+- `org_id text not null`
+- `owner_user_id text not null`
 
 Separate collaborator table:
 
@@ -419,9 +419,9 @@ Use when rows are tenant-owned but also belong to a portal, workspace, project, 
 Columns:
 
 - `id`
-- `org_id uuid not null`
-- optional platform scope column, for example `portal_id uuid` or `workspace_id uuid`
-- optional custom scope column, for example `project_id uuid not null`
+- `org_id text not null`
+- optional platform scope column, for example `portal_id text` or `workspace_id text`
+- optional custom scope column, for example `project_id text not null`
 - business columns
 
 Policy:
@@ -451,9 +451,9 @@ This is also the practical difference between our recommended Gate path and a pl
 
 For app-owned tables in `v1`, require:
 
-- `org_id uuid not null`
-- `user_id uuid not null` for user-private tables
-- `portal_id uuid` / `workspace_id uuid` / custom scope columns when the manifest declares them
+- `org_id text not null`
+- `user_id text not null` for user-private tables
+- `portal_id text` / `workspace_id text` / custom scope columns when the manifest declares them
 - index on `org_id`
 - composite index on `(org_id, user_id)` when user-scoped
 - composite index on `(org_id, portal_id)`, `(org_id, workspace_id)`, or `(org_id, custom_scope_id)` when scope-scoped
@@ -667,32 +667,32 @@ For `v1`, direct policy editing in Studio should be out of scope. Direct UI edit
 Use `current_setting(..., true)` so missing settings return `NULL` instead of throwing.
 
 ```sql
-create or replace function app_current_org_id() returns uuid
+create or replace function app_current_org_id() returns text
 language sql
 stable
 as $$
-  select nullif(current_setting('app.org_id', true), '')::uuid
+  select nullif(current_setting('app.org_id', true), '')
 $$;
 
-create or replace function app_current_user_id() returns uuid
+create or replace function app_current_user_id() returns text
 language sql
 stable
 as $$
-  select nullif(current_setting('app.user_id', true), '')::uuid
+  select nullif(current_setting('app.user_id', true), '')
 $$;
 
-create or replace function app_current_portal_id() returns uuid
+create or replace function app_current_portal_id() returns text
 language sql
 stable
 as $$
-  select nullif(current_setting('app.portal_id', true), '')::uuid
+  select nullif(current_setting('app.portal_id', true), '')
 $$;
 
-create or replace function app_current_workspace_id() returns uuid
+create or replace function app_current_workspace_id() returns text
 language sql
 stable
 as $$
-  select nullif(current_setting('app.workspace_id', true), '')::uuid
+  select nullif(current_setting('app.workspace_id', true), '')
 $$;
 ```
 
@@ -701,8 +701,8 @@ $$;
 ```sql
 create table carts (
   id uuid primary key,
-  org_id uuid not null,
-  user_id uuid not null,
+  org_id text not null,
+  user_id text not null,
   status text not null,
   created_at timestamptz not null default now()
 );
@@ -737,7 +737,7 @@ with check (
 ```sql
 create table products (
   id uuid primary key,
-  org_id uuid not null,
+  org_id text not null,
   sku text not null,
   title text not null
 );
@@ -774,9 +774,9 @@ This must happen inside the same transaction and connection as the actual query.
 ```sql
 create table workspace_tasks (
   id uuid primary key,
-  org_id uuid not null,
-  workspace_id uuid not null,
-  owner_user_id uuid not null,
+  org_id text not null,
+  workspace_id text not null,
+  owner_user_id text not null,
   title text not null,
   created_at timestamptz not null default now()
 );
@@ -1039,4 +1039,4 @@ For `gate isolated stores`, use a combined `org_id + user_id` RLS model, with `o
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-06-10
+- **Last synced**: 2026-06-15
