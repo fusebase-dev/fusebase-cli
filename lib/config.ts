@@ -1205,6 +1205,77 @@ export function writeAppApiDependenciesToFusebaseJson(
   return snapshot;
 }
 
+export function upsertManualAppApiDependencyInFusebaseJson(
+  projectRoot: string,
+  featureId: string,
+  dependency: Omit<AppApiDependencySnapshot, "source">,
+): { snapshot: AppApiDependenciesSnapshot; added: boolean } {
+  if (!hasFlag("cross-app-api-calls-analysis")) {
+    throw new Error(
+      "cross-app API dependencies analysis is disabled. Enable it with: fusebase config set-flag cross-app-api-calls-analysis",
+    );
+  }
+
+  const fuseJsonPath = join(projectRoot, "fusebase.json");
+  if (!existsSync(fuseJsonPath)) {
+    throw new Error("fusebase.json not found. Run fusebase init first.");
+  }
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+  } catch {
+    throw new Error("Could not parse fusebase.json");
+  }
+  normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
+
+  const prev = readPreviousAppApiDependenciesSnapshotForFeature(raw, featureId);
+  const now = new Date().toISOString();
+  const alreadyPresent = (prev?.dependencies ?? []).some(
+    (item) =>
+      item.targetOrgId === dependency.targetOrgId &&
+      item.targetAppId === dependency.targetAppId &&
+      item.operationId === dependency.operationId,
+  );
+
+  const nextDependencies = alreadyPresent
+    ? dedupeAppApiDependencies(prev?.dependencies ?? [])
+    : dedupeAppApiDependencies([
+        ...(prev?.dependencies ?? []),
+        {
+          targetOrgId: dependency.targetOrgId,
+          targetAppId: dependency.targetAppId,
+          operationId: dependency.operationId,
+          source: "manual",
+        },
+      ]);
+
+  const snapshot = normalizeAppApiDependenciesSnapshot({
+    sdkVersion: prev?.sdkVersion ?? null,
+    analyzedAt: prev?.analyzedAt ?? now,
+    dependenciesChangedAt: alreadyPresent
+      ? (prev?.dependenciesChangedAt ?? prev?.analyzedAt ?? now)
+      : now,
+    unresolvedChangedAt:
+      prev?.unresolvedChangedAt ?? prev?.analyzedAt ?? now,
+    dependencies: nextDependencies,
+    unresolved: prev?.unresolved ?? [],
+  });
+
+  writeAppApiDependenciesSnapshotToFeatureRaw(raw, featureId, snapshot);
+  writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
+  invalidateFuseConfigCache();
+
+  return {
+    snapshot,
+    added: !alreadyPresent,
+  };
+}
+
 /**
  * Set `features[].fusebaseGateMeta.permissions` in fusebase.json (keeps other snapshot fields).
  * Bumps `permissionsChangedAt` only when the sorted permission set differs from the previous snapshot.

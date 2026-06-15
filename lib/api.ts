@@ -716,6 +716,186 @@ export async function syncAppApiDependencies(
   return payload as SyncAppApiDependenciesResponse;
 }
 
+export interface AppApiConsumerContractSyncItem {
+  kind?: string;
+  schemaVersion: string;
+  providerAppId: string;
+  operationId: string;
+  cases: unknown[];
+}
+
+export interface SyncAppApiConsumerContractsResponse {
+  orgId?: string;
+  appId?: string;
+  stored?: number;
+  [key: string]: unknown;
+}
+
+export async function syncAppApiConsumerContracts(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+  appId: string,
+  contracts: AppApiConsumerContractSyncItem[],
+): Promise<SyncAppApiConsumerContractsResponse> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/app-api-consumer-contracts`;
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ contracts }),
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      name?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps/${appId}/app-api-consumer-contracts`,
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
+      timestamp: new Date().toISOString(),
+    });
+
+    throw new Error(
+      `Failed to sync app API consumer contracts: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as unknown;
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+
+  return payload as SyncAppApiConsumerContractsResponse;
+}
+
+export interface VerifyCentralAppApiContractsRequest {
+  provider?: string;
+  operation?: string;
+}
+
+export interface VerifyCentralAppApiContractCaseResult {
+  consumerAppId?: string;
+  providerAppId: string;
+  operationId: string;
+  caseName: string;
+  status: "PASS" | "FAIL";
+  warnings: string[];
+  message?: string;
+  request?: {
+    url?: string;
+    envelope?: Record<string, unknown>;
+  };
+  response?: {
+    status?: number;
+    body?: unknown;
+  };
+}
+
+export interface VerifyCentralAppApiContractsResponse {
+  ok: boolean;
+  summary: {
+    contractCount: number;
+    caseCount: number;
+    passCount: number;
+    failCount: number;
+    warnCount: number;
+  };
+  cases: VerifyCentralAppApiContractCaseResult[];
+}
+
+export async function verifyCentralAppApiConsumerContracts(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+  appId: string,
+  request?: VerifyCentralAppApiContractsRequest,
+): Promise<VerifyCentralAppApiContractsResponse> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/app-api-contracts/verify-consumer`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request ?? {}),
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      name?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps/${appId}/app-api-contracts/verify-consumer`,
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
+      timestamp: new Date().toISOString(),
+    });
+
+    throw new Error(
+      `Failed to verify central consumer contracts: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+
+  return (await response.json()) as VerifyCentralAppApiContractsResponse;
+}
+
+export async function verifyCentralAppApiProviderContracts(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+  appId: string,
+): Promise<VerifyCentralAppApiContractsResponse> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/app-api-contracts/verify-provider`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      name?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps/${appId}/app-api-contracts/verify-provider`,
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
+      timestamp: new Date().toISOString(),
+    });
+
+    throw new Error(
+      `Failed to verify central provider contracts: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+
+  return (await response.json()) as VerifyCentralAppApiContractsResponse;
+}
+
 export async function initUpload(
   apiKey: string,
   orgId: string,

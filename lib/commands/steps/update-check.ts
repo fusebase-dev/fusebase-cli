@@ -60,18 +60,20 @@ export function checkForUpdates(): void {
       : cache.manifest.version;
 
     if (compareVersions(latestVersion, VERSION) > 0) {
+      // Route to stderr: this notice must not pollute command stdout (e.g. the
+      // `--json` machine-readable output that CI parses as a single document).
       const border = chalk.yellow("★ ══════════════════════════════════════════════ ★");
-      console.log(border);
-      console.log(chalk.yellow("★") + "  " + chalk.bold.white(`New version of fusebase-cli available: ${latestVersion}!`));
-      console.log(chalk.yellow("★") + "  " + chalk.cyan("Run: ") + chalk.bold.cyan("`fusebase update --skip-product`") + chalk.cyan(" to update CLI"));
+      console.error(border);
+      console.error(chalk.yellow("★") + "  " + chalk.bold.white(`New version of fusebase-cli available: ${latestVersion}!`));
+      console.error(chalk.yellow("★") + "  " + chalk.cyan("Run: ") + chalk.bold.cyan("`fusebase update --skip-product`") + chalk.cyan(" to update CLI"));
       if (cache.manifest.comment?.trim()) {
         const commentLines = formatComment(cache.manifest.comment).split("\n");
         for (const line of commentLines) {
-          console.log(chalk.yellow("★") + "  " + chalk.gray(line));
+          console.error(chalk.yellow("★") + "  " + chalk.gray(line));
         }
       }
-      console.log(border);
-      console.log();
+      console.error(border);
+      console.error();
     }
   }
 

@@ -595,6 +595,30 @@ fusebase analyze app-apis --feature <appId> --sync
 # repair/reconciliation mode
 fusebase analyze app-apis --feature <appId> --sync --force
 ```
+
+To author a consumer-contract draft for those resolved dependencies, then verify it centrally:
+
+```bash
+fusebase app-api-contracts unresolved --app <appId>
+fusebase app-api-contracts add-manual-dependency --app <appId> --provider <providerAppId> --operation <operationId>
+fusebase app-api-contracts scaffold --app <appId>
+fusebase app-api-contracts validate --app <appId>
+fusebase app-api-contracts publish --app <appId>
+fusebase app-api-contracts verify-consumer --app <appId>
+fusebase app-api-contracts verify-provider --app <providerAppId>
+```
+
+Use the unresolved/manual flow when `AppApisApi.callAppApi(...)` is dynamic by design and static analysis cannot resolve the target operation.
+
+Contracts are **authored and validated locally but verified centrally** — there is no local runtime verification command. Recommended flow: `scaffold` + `validate` (offline) while authoring, `publish` the validated contracts, then `verify-consumer` to confirm the published remote set. Run `verify-provider` for an org-wide provider regression check against the target deployed environment; it verifies the currently deployed provider runtime, not unpublished local changes.
+
+`validate` is offline: it checks contract structure and dependency linkage only; it does not call the provider.
+
+`publish` re-validates the consumer app's contracts (same checks as `validate`) and, only when they all pass, uploads the full set to central storage via the public API; the server replaces the stored set, so re-publishing is idempotent.
+
+`verify-consumer --app <consumerAppId>` (optional `--provider`/`--operation`) and `verify-provider --app <providerAppId>` operate on the **published central** contract set, not local files. They call the public API (`POST .../app-api-contracts/verify-consumer` and `.../verify-provider`), which runs the verification engine centrally through Gate. `verify-consumer` covers one consumer's published contracts; `verify-provider` is the org-wide inbound check across every published consumer targeting that provider in the target deployed environment. Because they read the published set and call the deployed provider runtime, run `publish` after editing local contracts before re-verifying, and run `verify-provider` only after the provider version you want to check is deployed to that environment.
+
+`validate`, `verify-consumer`, and `verify-provider` accept `--json` for machine-readable output in CI: human/colored output is suppressed, a single JSON document is printed to stdout, and a top-level `ok` flag mirrors the process exit code. `publish` is an action (not a check) and has no `--json` report; branch on its exit code.
 <% } %>
 
 ```bash

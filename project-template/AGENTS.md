@@ -614,6 +614,10 @@ If the app uses Fusebase Gate SDK:
 - if `usedOps` is empty but runtime imports `@fusebase/fusebase-gate-sdk`, treat publish as blocked and fix analysis/runtime call patterns before shipping
 <% if (it.flags?.includes("cross-app-api-calls-analysis")) { %>
 - if runtime code uses `AppApisApi.callAppApi(...)`, run `fusebase analyze app-apis --feature <featureId> --sync` to sync cross-app API dependency metadata (`--force` for reconciliation)
+- once resolved dependencies are known, scaffold a local draft consumer contract with `fusebase app-api-contracts scaffold --app <featureId>` and validate it with `fusebase app-api-contracts validate --app <featureId>`
+- to publish the validated contracts to central storage, run `fusebase app-api-contracts publish --app <featureId>`; it re-validates first and uploads nothing if any contract is invalid
+- after publishing, verify the published remote set with `fusebase app-api-contracts verify-consumer --app <featureId>`. For an org-wide provider regression check, run `fusebase app-api-contracts verify-provider --app <providerAppId>` against the target deployed environment; it operates on central storage (not local files) through the public API and verifies the currently deployed provider runtime, not unpublished local changes. Contracts are authored/validated locally but verified centrally — there is no local runtime verification command
+- if `fusebase analyze app-apis` reports unresolved calls, inspect them with `fusebase app-api-contracts unresolved --app <featureId>`, add an explicit manual dependency, then rescan/scaffold that operation
 <% } %>
 
 Recommended publish sequence:
@@ -622,7 +626,13 @@ Recommended publish sequence:
 2. if Gate SDK is used, include `--sync-gate-permissions`
 <% if (it.flags?.includes("cross-app-api-calls-analysis")) { %>
 3. if cross-app app APIs are used, run `fusebase analyze app-apis --feature <featureId> --sync`
-4. run `fusebase deploy`
+4. scaffold or refresh local consumer contracts with `fusebase app-api-contracts scaffold --app <featureId>` when the app relies on provider behavior
+5. if any dependency is dynamic by design, record it with `fusebase app-api-contracts add-manual-dependency --app <featureId> --provider <providerAppId> --operation <operationId>` before regenerating the contract draft
+6. validate the contracts offline with `fusebase app-api-contracts validate --app <featureId>` (structure + dependency linkage; no provider call)
+7. publish the validated contracts to central storage with `fusebase app-api-contracts publish --app <featureId>`
+8. verify the published remote set with `fusebase app-api-contracts verify-consumer --app <featureId>` (runs centrally; there is no local runtime verification command)
+9. run `fusebase deploy`
+10. if this change affects a provider app other apps call, run `fusebase app-api-contracts verify-provider --app <providerAppId>` against the target deployed environment to check the newly deployed provider runtime org-wide
 <% } else { %>
 3. run `fusebase deploy`
 <% } %>

@@ -106,7 +106,7 @@ function printFeatureScopedAppApiResult(
       "Warning: unresolved callAppApi calls were detected and were not converted to dependencies.",
     );
     console.log(
-      "Add explicit entries with source \"manual\" in apps[].fusebaseAppApiDependenciesMeta.dependencies when dynamic calls are intentional.",
+      `Review them with: fusebase app-api-contracts unresolved --app ${featureId}`,
     );
   }
 
