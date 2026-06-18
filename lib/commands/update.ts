@@ -1,14 +1,21 @@
 import { Command } from "commander";
 import { runProductUpdate, type ProductUpdateOptions } from "./product";
-import { runCliSelfUpdate } from "./cli";
+import { runCliSelfUpdate, refreshWindowsLauncher } from "./cli";
 import { existsSync } from "fs";
 import { join } from "path";
 
-type SmartUpdateOptions = ProductUpdateOptions & { skipProduct?: boolean };
+type SmartUpdateOptions = ProductUpdateOptions & {
+  skipProduct?: boolean;
+  launcher?: boolean;
+};
+
+export const LAUNCHER_UPDATE_NOOP_MESSAGE =
+  "`update --launcher` is Windows-only; nothing to do.";
 
 export const updateCommand = new Command("update")
   .description("Smart update: CLI everywhere, product stages in product directories")
   .option("--skip-product", "Skip product update flow even when fusebase.json exists")
+  .option("--launcher", "Windows: refresh the launcher (fusebase.exe) via the elevated installer")
   .option("--skip-cli-update", "Skip automatic CLI self-update step")
   .option("--skip-skills", "Skip AGENTS.md and .claude assets refresh")
   .option("--skip-mcp", "Skip MCP token and IDE config refresh")
@@ -19,6 +26,20 @@ export const updateCommand = new Command("update")
   .option("--commit", "Run pre-update Git checkpoint in non-interactive mode (no prompt)")
   .option("--dry-run", "Print planned work without writing files or running installs", false)
   .action(async (opts: SmartUpdateOptions) => {
+    if (opts.launcher) {
+      if (process.platform !== "win32") {
+        console.log(LAUNCHER_UPDATE_NOOP_MESSAGE);
+        return;
+      }
+      try {
+        await refreshWindowsLauncher();
+      } catch (err) {
+        console.error("Error:", err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
+      return;
+    }
+
     const isProductDirectory = existsSync(join(process.cwd(), "fusebase.json"));
     const shouldRunProductFlow = isProductDirectory && opts.skipProduct !== true;
 

@@ -304,7 +304,12 @@ Single update command for both CLI and app:
 - outside app directory: runs only CLI self-update;
 - use `--skip-product` to force CLI-only mode even inside an app directory.
 
-On Windows, CLI self-update launches the installer and exits so `fusebase.exe` can be replaced. After the installer finishes, run `fusebase update` again to continue app stages.
+On Windows the CLI self-update is a **cache swap** (updates the cached CLI under `%LOCALAPPDATA%\FuseBase\CLI\` with no admin elevation and no installer download), so the remaining app stages continue in the same run — just like macOS/Linux.
+
+**Windows launcher commands:**
+
+- `fusebase update --launcher` — refreshes the stable launcher `fusebase.exe` via the elevated installer (the only path that prompts for admin). Windows-only; a no-op on macOS/Linux. Run it when the CLI tells you the launcher is too old, or when prompted by the non-blocking "A launcher update is available" nudge.
+- `fusebase --previous-version <cmd>` — runs the retained previous cached CLI version for that one invocation (escape hatch when a new version misbehaves or a launcher gate is blocking). The next normal run goes back to the active version.
 
 ### Create or update .env (MCP token)
 
