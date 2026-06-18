@@ -251,7 +251,6 @@ export function getUpdateChannel(): "prod" | "dev" {
 /** Known experimental flags. */
 export const MANAGED_INTEGRATIONS_FLAG = "managed-integrations";
 export const PERSONAL_MANAGED_INTEGRATIONS_FLAG = "managed-integrations-personal-auth";
-export const CUSTOMIZE_BACKEND_REPLICAS_FLAG = "customize-backend-replicas";
 
 export const KNOWN_FLAGS = [
   "mcp-beta",
@@ -267,7 +266,6 @@ export const KNOWN_FLAGS = [
   "job-sidecars",
   "cross-app-api-calls-analysis",
   MANAGED_INTEGRATIONS_FLAG,
-  CUSTOMIZE_BACKEND_REPLICAS_FLAG,
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
@@ -292,8 +290,6 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
   [MANAGED_INTEGRATIONS_FLAG]:
     "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
-  [CUSTOMIZE_BACKEND_REPLICAS_FLAG]:
-    "Send `backend.minReplicas` from fusebase.json to the deploy endpoint (keep backend warm replicas). Without this flag the field is ignored.",
   // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
     // "Enable personal authorization for managed integrations.",
 };

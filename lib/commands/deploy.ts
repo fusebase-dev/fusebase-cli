@@ -30,10 +30,8 @@ import { getFusebaseAppHost } from "../config";
 import { logger } from "../logger";
 import {
   getConfig,
-  hasFlag,
   loadFuseConfig,
   validateMinReplicas,
-  CUSTOMIZE_BACKEND_REPLICAS_FLAG,
   type BackendConfig,
   type FeatureConfig,
   type SidecarConfig,
@@ -591,16 +589,11 @@ export const deployCommand = new Command("deploy")
           throw new Error(`path does not exist: ${featureConfig.path}`);
         }
 
-        // `backend.minReplicas` is only sent to the deploy endpoint when the
-        // `customize-backend-replicas` flag is enabled; otherwise the field is
-        // ignored entirely (not validated, not sent). When enabled, fail fast on
-        // an invalid value before any install, build, or network call — the
+        // `backend.minReplicas` is sent to the deploy endpoint. Fail fast on an
+        // invalid value before any install, build, or network call — the
         // nimbus-ai deploy endpoint is the authoritative guard, this only gives a
         // friendlier local error.
-        const customizeBackendReplicas = hasFlag(CUSTOMIZE_BACKEND_REPLICAS_FLAG);
-        if (customizeBackendReplicas) {
-          validateMinReplicas(featureConfig.backend?.minReplicas, featureId);
-        }
+        validateMinReplicas(featureConfig.backend?.minReplicas, featureId);
 
         // Install dependencies so lint and build have devDependencies (e.g. eslint)
         await checkAndInstallDependencies(featureBasePath);
@@ -961,9 +954,7 @@ export const deployCommand = new Command("deploy")
               version.id,
               jobs,
               sidecars,
-              customizeBackendReplicas
-                ? featureConfig.backend?.minReplicas
-                : undefined,
+              featureConfig.backend?.minReplicas,
             );
             console.log(`   Deploy ID: ${deploy.id}`);
             console.log(`   Waiting for backend deploy to complete...\n`);
