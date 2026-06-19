@@ -25,6 +25,27 @@ type SqlBundleOptions = {
 
 const ISOLATED_SQL_RLS_FLAG = "postgres-rls";
 
+function writeStdoutLine(text: string): void {
+  process.stdout.write(`${text}\n`);
+}
+
+function resolveAppConfig(appId: string) {
+  const fuseConfig = loadFuseConfig();
+  if (fuseConfig === null) {
+    throw new Error("Project is not initialized. Run 'fusebase init' first.");
+  }
+  const appConfig = (fuseConfig.apps ?? []).find((app) => app.id === appId);
+  if (appConfig === undefined) {
+    const knownIds = (fuseConfig.apps ?? []).map((app) => app.id).join(", ");
+    throw new Error(
+      knownIds.length > 0
+        ? `App "${appId}" not found in fusebase.json. Known app ids: ${knownIds}`
+        : `App "${appId}" not found in fusebase.json (apps[] is empty)`,
+    );
+  }
+  return { fuseConfig, appConfig };
+}
+
 type SqlRlsStatusResponse = {
   currentUser?: string;
   bypassRls?: boolean;
@@ -33,16 +54,7 @@ type SqlRlsStatusResponse = {
 };
 
 function readArtifact(options: SqlBundleOptions): SqlMigrationBundleArtifact {
-  const fuseConfig = loadFuseConfig();
-  if (fuseConfig === null) {
-    throw new Error("Project is not initialized. Run 'fusebase init' first.");
-  }
-  const appConfig = (fuseConfig.apps ?? []).find((app) => {
-    return app.id === options.app;
-  });
-  if (appConfig === undefined) {
-    throw new Error(`App "${options.app}" not found in fusebase.json`);
-  }
+  const { appConfig } = resolveAppConfig(options.app);
   if (appConfig.path === undefined || appConfig.path.trim().length === 0) {
     throw new Error(`App "${options.app}" has no path in fusebase.json`);
   }
@@ -76,33 +88,33 @@ function printSummary(
   includeRlsManifest: boolean,
 ): void {
   const latest = artifact.bundle.migrations.at(-1);
-  console.log(`App: ${artifact.appId}`);
-  console.log(`Store alias: ${artifact.store.alias}`);
+  writeStdoutLine(`App: ${artifact.appId}`);
+  writeStdoutLine(`Store alias: ${artifact.store.alias}`);
   if (artifact.store.storeId !== undefined) {
-    console.log(`Store ID: ${artifact.store.storeId}`);
+    writeStdoutLine(`Store ID: ${artifact.store.storeId}`);
   }
-  console.log(`Migrations: ${artifact.bundle.migrations.length}`);
-  console.log(`Bundle version: ${String(artifact.bundle.bundleVersion ?? "")}`);
+  writeStdoutLine(`Migrations: ${artifact.bundle.migrations.length}`);
+  writeStdoutLine(`Bundle version: ${String(artifact.bundle.bundleVersion ?? "")}`);
   if (latest !== undefined) {
-    console.log(
+    writeStdoutLine(
       `Head: v${latest.version} ${latest.name} ${latest.checksum.slice(0, 12)}...`,
     );
   }
   if (artifact.rlsManifest === null) {
-    console.log("RLS manifest: none");
+    writeStdoutLine("RLS manifest: none");
   } else if (includeRlsManifest) {
-    console.log("RLS manifest: yes");
+    writeStdoutLine("RLS manifest: yes");
   } else {
     const message = `RLS manifest: present but not sent (enable with: fusebase config set-flag ${ISOLATED_SQL_RLS_FLAG})`;
-    console.log(message);
+    writeStdoutLine(message);
     console.warn(
       `WARNING: ${message}. Gate will not validate the declared RLS baseline for status/apply.`,
     );
   }
   if (artifact.warnings.length > 0) {
-    console.log("Warnings:");
+    writeStdoutLine("Warnings:");
     for (const warning of artifact.warnings) {
-      console.log(`  - ${warning}`);
+      writeStdoutLine(`  - ${warning}`);
     }
   }
 }
@@ -197,7 +209,7 @@ const sqlBundleCommand = new Command("bundle")
     );
 
     if (options.json === true) {
-      console.log(JSON.stringify(requestBody, null, 2));
+      writeStdoutLine(JSON.stringify(requestBody, null, 2));
       return;
     }
 
@@ -212,10 +224,7 @@ const sqlBundleCommand = new Command("bundle")
       return;
     }
 
-    const fuseConfig = loadFuseConfig();
-    if (fuseConfig === null) {
-      throw new Error("Project is not initialized. Run 'fusebase init' first.");
-    }
+    const { fuseConfig } = resolveAppConfig(options.app);
     const storeId = options.storeId ?? artifact.store.storeId;
     if (storeId === undefined || storeId.trim().length === 0) {
       throw new Error("Missing store id. Set isolatedStores.sql[].storeId or pass --store-id.");
@@ -231,7 +240,7 @@ const sqlBundleCommand = new Command("bundle")
         mode: "status",
         body: requestBody,
       });
-      console.log(JSON.stringify(status, null, 2));
+      writeStdoutLine(JSON.stringify(status, null, 2));
     }
 
     if (options.rlsStatus === true) {
@@ -243,7 +252,7 @@ const sqlBundleCommand = new Command("bundle")
         schemaName: options.schema ?? artifact.schemaName ?? undefined,
       });
       warnIfRuntimeDoesNotEnforceRls(rlsStatus);
-      console.log(JSON.stringify(rlsStatus, null, 2));
+      writeStdoutLine(JSON.stringify(rlsStatus, null, 2));
     }
 
     if (options.dryRun === true) {
@@ -255,7 +264,7 @@ const sqlBundleCommand = new Command("bundle")
         mode: "apply",
         body: { ...requestBody, dryRun: true },
       });
-      console.log(JSON.stringify(dryRun, null, 2));
+      writeStdoutLine(JSON.stringify(dryRun, null, 2));
     }
 
     if (options.apply === true) {
@@ -270,7 +279,7 @@ const sqlBundleCommand = new Command("bundle")
         mode: "apply",
         body: requestBody,
       });
-      console.log(JSON.stringify(apply, null, 2));
+      writeStdoutLine(JSON.stringify(apply, null, 2));
       await warnRuntimeRlsStatus({
         token,
         orgId: fuseConfig.orgId,

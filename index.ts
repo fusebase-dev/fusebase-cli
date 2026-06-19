@@ -110,4 +110,4 @@ program.addCommand(analyzeCommand, { hidden: true });
 
 instrumentAllCommands(program);
 
-program.parse();
+await program.parseAsync(process.argv);
