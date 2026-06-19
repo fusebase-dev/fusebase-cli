@@ -9,6 +9,7 @@ import {
   mergeFeaturePermissions,
   parsePermissions,
   parsePrincipals,
+  splitGatePermissionStrings,
 } from "../permissions.ts";
 
 export interface AppUpdateOptions {
@@ -77,6 +78,7 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     }
 
     let gatePermissions: string[] | undefined;
+    let backendOnlyGatePermissions: string[] | undefined;
     if (options.syncGatePermissions) {
       const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
       if (!featureConfig) {
@@ -94,10 +96,16 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         apiKey: config.apiKey,
         throwOnResolveFailure: true,
       });
-      gatePermissions = gateAnalysis.gatePermissions;
+      const split = splitGatePermissionStrings(gateAnalysis.gatePermissions);
+      gatePermissions = split.runtimePermissions;
+      backendOnlyGatePermissions = split.backendOnlyPermissions;
     }
 
-    const updateRequest: { accessPrincipals?: AppAccessPrincipal[]; permissions?: AppPermissions } = {};
+    const updateRequest: {
+      accessPrincipals?: AppAccessPrincipal[];
+      permissions?: AppPermissions;
+      manifest?: Record<string, unknown>;
+    } = {};
 
     if (accessPrincipals !== undefined) {
       updateRequest.accessPrincipals = accessPrincipals;
@@ -109,6 +117,13 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         existingPermissions: app.permissions,
         gatePermissions,
       });
+    }
+
+    if (backendOnlyGatePermissions !== undefined) {
+      updateRequest.manifest = {
+        ...(app.manifest ?? {}),
+        backendOnlyGatePermissions,
+      };
     }
 
     const updatedApp = await updateApp(
@@ -134,6 +149,12 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       for (const item of updateRequest.permissions.items) {
         console.log(`    - ${formatPermissionItem(item)}`);
       }
+    }
+
+    if (backendOnlyGatePermissions !== undefined && backendOnlyGatePermissions.length > 0) {
+      console.log(
+        `  Backend-only Gate permissions (manifest.backendOnlyGatePermissions): ${backendOnlyGatePermissions.join(", ")}`,
+      );
     }
   } catch (error) {
     console.error(`Error: Failed to update app. ${error instanceof Error ? error.message : String(error)}`);

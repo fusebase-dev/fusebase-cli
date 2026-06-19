@@ -2,6 +2,19 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-rls-plan.md"
+last_synced: "2026-06-19"
+title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
+category: specialized
+---
+# Isolated SQL stores PostgreSQL RLS plan (Gate)
+
+> **SOURCE**: This file is copied from `docs/isolated-sql-rls-plan.md` in the fusebase-gate repo. Edit that file, then run `npm run mcp:skills:generate`.
+
+---
+---
+version: "1.0.0"
+mcp_prompt: none
+source: "docs/isolated-sql-rls-plan.md"
 last_synced: "2026-06-15"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
@@ -55,7 +68,8 @@ The current implementation is ready for end-to-end prototype testing.
 Implemented:
 
 - Gate runtime SQL paths set transaction-local RLS settings on the same PostgreSQL transaction that executes the request
-- standard settings are available automatically: `app.org_id`, `app.user_id`, `app.client_id`, `app.auth_type`, `app.portal_id`, `app.workspace_id`
+- standard settings are injected automatically for **user/org-scoped** runtime tokens: `app.org_id`, `app.user_id`, `app.client_id`, `app.auth_type`, and often `app.portal_id` / `app.workspace_id` when Gate can derive them from auth scopes
+- **Portal iframe app tokens** (`fbsfeaturetoken` in a portal brick) typically get `app.org_id` only — **not** `app.portal_id`. Use verified `portalFeatureContextToken` on the backend ([portal-embed-context.md](./portal-embed-context.md))
 - custom scalar settings are available through request `rlsContext`; for example `{"project_id": "..."}` becomes `app.project_id`
 - `rlsContext` keys are constrained to safe identifiers, may be passed as `project_id` or `app.project_id`, and cannot override standard keys
 - `rlsManifest` is accepted on migration status/apply/adopt paths and is validated in warn-only mode
@@ -1040,3 +1054,10 @@ For `gate isolated stores`, use a combined `org_id + user_id` RLS model, with `o
 - **Version**: 1.0.0
 - **Category**: specialized
 - **Last synced**: 2026-06-15
+---
+
+## Version
+
+- **Version**: 1.0.0
+- **Category**: specialized
+- **Last synced**: 2026-06-19

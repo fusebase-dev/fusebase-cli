@@ -1,7 +1,7 @@
 ---
 version: "1.8.14"
 mcp_prompt: isolatedSql
-last_synced: "2026-06-15"
+last_synced: "2026-06-19"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -160,5 +160,5 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 - **Version**: 1.8.14
 - **Category**: specialized
-- **Last synced**: 2026-06-15
+- **Last synced**: 2026-06-19
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

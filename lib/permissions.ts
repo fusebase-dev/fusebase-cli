@@ -165,6 +165,30 @@ export function parsePermissions(permissionsStr: string): AppPermissions {
   return { items };
 }
 
+export const BACKEND_ONLY_GATE_PERMISSIONS = [
+  "isolated_store.rls.delegate",
+  "isolated_store.rls.bypass",
+] as const;
+
+export function splitGatePermissionStrings(permissionStrings: string[]): {
+  runtimePermissions: string[];
+  backendOnlyPermissions: string[];
+} {
+  const backendOnly = new Set<string>(BACKEND_ONLY_GATE_PERMISSIONS);
+  const runtimePermissions: string[] = [];
+  const backendOnlyPermissions: string[] = [];
+
+  for (const permission of normalizeGatePermissionStrings(permissionStrings)) {
+    if (backendOnly.has(permission)) {
+      backendOnlyPermissions.push(permission);
+    } else {
+      runtimePermissions.push(permission);
+    }
+  }
+
+  return { runtimePermissions, backendOnlyPermissions };
+}
+
 function normalizeGatePermissionStrings(permissionStrings: string[]): string[] {
   return Array.from(
     new Set(

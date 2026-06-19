@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-06-15"
+last_synced: "2026-06-19"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -79,7 +79,7 @@ For `sql/postgres`, the current managed-store path already supports:
 - read-only RLS status introspection for Studio/support visibility
 - transaction-local RLS runtime context on SQL runtime calls
 - warn-only RLS manifest validation on migration status/apply/adopt
-- checkpoints and full stage restore
+- checkpoints and full stage restore (prod auto-checkpoint before migrations uses **admin** or **RLS-bypass** credentials for `pg_dump` when split roles + `FORCE RLS` are enabled — not the runtime role)
 - provider-switchable snapshot storage (`local_file` or `azure_blob`)
 - Studio migration/status rendering via bundle metadata persisted by Gate
 
@@ -400,4 +400,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-06-15
+- **Last synced**: 2026-06-19
