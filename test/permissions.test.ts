@@ -3,6 +3,8 @@ import {
   mergeFeaturePermissions,
   parsePermissions,
   parsePrincipals,
+  splitGatePermissionStrings,
+  withTrustedRuntimeContextDelegatePermission,
 } from "../lib/permissions.ts";
 
 // ---------------------------------------------------------------------------
@@ -356,5 +358,43 @@ describe("mergeFeaturePermissions", () => {
         },
       ],
     });
+  });
+});
+
+describe("splitGatePermissionStrings", () => {
+  it("routes delegate and bypass into backend-only permissions", () => {
+    expect(
+      splitGatePermissionStrings([
+        "isolated_store.read",
+        "isolated_store.rls.delegate",
+        "isolated_store.rls.bypass",
+      ]),
+    ).toEqual({
+      runtimePermissions: ["isolated_store.read"],
+      backendOnlyPermissions: [
+        "isolated_store.rls.bypass",
+        "isolated_store.rls.delegate",
+      ],
+    });
+  });
+});
+
+describe("withTrustedRuntimeContextDelegatePermission", () => {
+  it("adds isolated_store.rls.delegate when trustedRuntimeContext is used", () => {
+    expect(
+      withTrustedRuntimeContextDelegatePermission(
+        ["isolated_store.read"],
+        true,
+      ),
+    ).toEqual(["isolated_store.read", "isolated_store.rls.delegate"]);
+  });
+
+  it("leaves permissions unchanged when trustedRuntimeContext is not used", () => {
+    expect(
+      withTrustedRuntimeContextDelegatePermission(
+        ["isolated_store.read"],
+        false,
+      ),
+    ).toEqual(["isolated_store.read"]);
   });
 });

@@ -170,6 +170,23 @@ export const BACKEND_ONLY_GATE_PERMISSIONS = [
   "isolated_store.rls.bypass",
 ] as const;
 
+export const TRUSTED_RUNTIME_CONTEXT_DELEGATE_PERMISSION =
+  "isolated_store.rls.delegate";
+
+export function withTrustedRuntimeContextDelegatePermission(
+  permissionStrings: string[],
+  usesTrustedRuntimeContext: boolean,
+): string[] {
+  if (!usesTrustedRuntimeContext) {
+    return normalizeGatePermissionStrings(permissionStrings);
+  }
+
+  return normalizeGatePermissionStrings([
+    ...permissionStrings,
+    TRUSTED_RUNTIME_CONTEXT_DELEGATE_PERMISSION,
+  ]);
+}
+
 export function splitGatePermissionStrings(permissionStrings: string[]): {
   runtimePermissions: string[];
   backendOnlyPermissions: string[];

@@ -15,6 +15,8 @@ export interface GateOperationsResult {
   sdkOperationIds: string[];
   /** Operation ids referenced from *Api instances in app TS (sorted). */
   usedOps: string[];
+  /** Backend code passes trustedRuntimeContext to isolated-store SQL APIs. */
+  usesTrustedRuntimeContext: boolean;
   sdkVersion: string | null;
   sdkRoot: string;
   tsconfig?: string;
@@ -191,6 +193,69 @@ export function collectUsedOperations(
   return used;
 }
 
+function isTrustedRuntimeContextPropertyName(name: ts.PropertyName): boolean {
+  if (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) {
+    return name.text === "trustedRuntimeContext";
+  }
+  return false;
+}
+
+export function collectTrustedRuntimeContextUsage(
+  program: ts.Program,
+  scopeRoot?: string,
+): boolean {
+  const resolvedScopeRoot = scopeRoot ? resolve(scopeRoot) : undefined;
+
+  const isWithinScope = (fileName: string): boolean => {
+    if (!resolvedScopeRoot) return true;
+    const resolvedFileName = resolve(fileName);
+    return (
+      resolvedFileName === resolvedScopeRoot ||
+      resolvedFileName.startsWith(`${resolvedScopeRoot}${sep}`)
+    );
+  };
+
+  let found = false;
+
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+
+    if (ts.isPropertyAssignment(node) && isTrustedRuntimeContextPropertyName(node.name)) {
+      found = true;
+      return;
+    }
+
+    if (
+      ts.isShorthandPropertyAssignment(node) &&
+      node.name.text === "trustedRuntimeContext"
+    ) {
+      found = true;
+      return;
+    }
+
+    if (
+      (ts.isPropertyAccessExpression(node) || ts.isPropertyAccessChain(node)) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "trustedRuntimeContext"
+    ) {
+      found = true;
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  for (const sf of program.getSourceFiles()) {
+    if (sf.isDeclarationFile) continue;
+    if (sf.fileName.includes("node_modules")) continue;
+    if (!isWithinScope(sf.fileName)) continue;
+    visit(sf);
+    if (found) break;
+  }
+
+  return found;
+}
+
 async function readSdkVersion(sdkRoot: string): Promise<string | null> {
   try {
     const raw = await readFile(join(sdkRoot, "package.json"), "utf-8");
@@ -282,6 +347,7 @@ export async function analyzeGateSdkOperations(
   }
 
   const used = new Set<string>();
+  let usesTrustedRuntimeContext = false;
   for (const loaded of loadedPrograms) {
     const part = collectUsedOperations(
       loaded.program,
@@ -292,11 +358,17 @@ export async function analyzeGateSdkOperations(
     for (const op of part) {
       used.add(op);
     }
+    if (
+      collectTrustedRuntimeContextUsage(loaded.program, options.scopeRoot)
+    ) {
+      usesTrustedRuntimeContext = true;
+    }
   }
 
   return {
     sdkOperationIds: opIds,
     usedOps: [...used].sort(),
+    usesTrustedRuntimeContext,
     sdkVersion,
     sdkRoot,
     tsconfig: loadedPrograms[0]?.configPath,

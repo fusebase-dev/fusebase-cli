@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
 import {
   analyzeGateSdkOperations,
+  collectTrustedRuntimeContextUsage,
   collectUsedOperations,
   extractAllowlistFromSdk,
   loadTsProgram,
@@ -514,6 +515,50 @@ describe("collectUsedOperations scoped by app path", () => {
 
     expect(result.usedOps).toEqual(["getMyOrgAccess", "listOrgUsers"]);
     expect(result.tsconfig).toBe(join(appDir, "tsconfig.json"));
+
+    rmSync(dir, { recursive: true });
+  });
+
+  it("detects trustedRuntimeContext usage in scoped backend sources", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fusebase-trusted-ctx-"));
+    const appDir = join(dir, "apps", "notes");
+    const backendDir = join(appDir, "backend", "src");
+    mkdirSync(backendDir, { recursive: true });
+
+    writeFileSync(
+      join(dir, "tsconfig.json"),
+      JSON.stringify(
+        {
+          compilerOptions: {
+            target: "ES2020",
+            module: "ESNext",
+            moduleResolution: "Bundler",
+            strict: false,
+          },
+          include: ["apps/**/*.ts"],
+        },
+        null,
+        2,
+      ),
+    );
+
+    writeFileSync(
+      join(backendDir, "store.ts"),
+      `
+      export async function loadNotes(api: { queryIsolatedStoreSql: (body: unknown) => Promise<unknown> }, portalId: string) {
+        return api.queryIsolatedStoreSql({
+          trustedRuntimeContext: { portalId },
+          sql: "select 1",
+        });
+      }
+      `,
+    );
+
+    const loaded = loadTsProgram(dir);
+    expect(loaded).not.toBeNull();
+    expect(
+      collectTrustedRuntimeContextUsage(loaded!.program, appDir),
+    ).toBe(true);
 
     rmSync(dir, { recursive: true });
   });

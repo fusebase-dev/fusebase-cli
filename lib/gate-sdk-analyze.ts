@@ -11,6 +11,7 @@ import {
   analyzeGateSdkOperations,
   type GateOperationsResult,
 } from "./gate-sdk-used-operations.ts";
+import { withTrustedRuntimeContextDelegatePermission } from "./permissions.ts";
 
 export interface FeatureGateAnalysisOutput {
   featureId: string;
@@ -98,13 +99,14 @@ export async function analyzeFeatureGatePermissions(args: {
     }
   }
 
-  const gatePermissions =
-    result.usedOps.length === 0
-      ? []
-      : (fusebaseSnapshot.permissions ?? []);
+  const gatePermissions = withTrustedRuntimeContextDelegatePermission(
+    result.usedOps.length === 0 ? [] : (fusebaseSnapshot.permissions ?? []),
+    result.usesTrustedRuntimeContext,
+  );
   for (const diagnostic of findGatePermissionDiagnostics({
     usedOps: result.usedOps,
     permissions: gatePermissions,
+    usesTrustedRuntimeContext: result.usesTrustedRuntimeContext,
   })) {
     onWarning?.(diagnostic);
   }
