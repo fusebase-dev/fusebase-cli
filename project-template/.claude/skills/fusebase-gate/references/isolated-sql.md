@@ -1,7 +1,7 @@
 ---
 version: "1.8.14"
 mcp_prompt: isolatedSql
-last_synced: "2026-06-19"
+last_synced: "2026-06-22"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -64,6 +64,7 @@ Runtime app path does **not** require a custom backend by default. Frontend/brow
 Runtime app path also does **not** require users to create secrets for Gate-resolved store identity. Do not put `storeId`, database IDs, physical database names, or provider connection details into app secrets/env. Resolve the store through Gate from the app token/source scope and stable alias, or use the platform-provided binding when available.
 Public/visitor apps can open with `--access=visitor`, but visitor tokens normally do **not** receive isolated-store permissions. For public portal reads/writes, use an app backend with a service token plus trusted portal/workspace context; do not expect direct visitor-token Gate SDK calls to the store to work.
 A service-token backend must derive the portal/workspace scope from trusted platform auth context, not from arbitrary request body/query data. Prefer `trustedRuntimeContext.portalId` / `trustedRuntimeContext.workspaceId` when the token has `isolated_store.rls.delegate`; if that permission is not available in the target environment, an app-specific `rlsContext` key such as `req_portal_id` is only a reviewed temporary fallback.
+- **Portal iframe app tokens** (`fbsfeaturetoken` in a portal brick) get `app.org_id` from the browser token but **not** `app.portal_id`. Read and verify `portalFeatureContextToken` from the iframe URL on the app backend, then use `trustedRuntimeContext.portalId` on Gate SQL calls — see [portal-embed-context.md](./portal-embed-context.md).
 
 ### Structured SQL limits
 
@@ -105,8 +106,8 @@ Studio/support view-all rows must use the separate read-only RLS-bypass path, no
 
 - Treat **`app.client_id`** as token/client scope, not app identity. In managed product flows sibling apps may share the same product-level client id. Do not use `app.client_id` to distinguish sibling apps unless the platform explicitly confirms that the token scope is app-unique.
 - Treat standard **`app.*`** RLS settings as **text platform ids**, not UUIDs. Values such as `app.org_id`, `app.user_id`, `app.client_id`, `app.portal_id`, and `app.workspace_id` may be strings like `u37o` or `4164`; scope columns that compare to them should normally be `text` unless a specific custom id is truly UUID-shaped.
-- Reserved settings such as **`org_id`**, **`user_id`**, **`client_id`**, **`auth_type`**, **`portal_id`**, **`workspace_id`**, and **`rls_admin`** cannot be supplied through caller-controlled `rlsContext`. They must come from Gate auth/runtime context.
-- Visitor tokens normally do not receive isolated-store permissions. If a backend service token reads/writes on behalf of a visitor, the portal/workspace RLS dimension must be derived from trusted platform auth context, not from arbitrary request body/query data. Use **`trustedRuntimeContext.portalId`** / **`trustedRuntimeContext.workspaceId`** for backend-delegated portal/workspace context; it requires **`isolated_store.rls.delegate`** and normal client/runtime tokens must not receive that permission. Treat app-specific settings such as **`app.req_portal_id`** as legacy/temporary workarounds only.
+- Reserved settings such as **`org_id`**, **`user_id`**, **`client_id`**, **`auth_type`**, **`portal_id`**, **`workspace_id`**, and **`rls_admin`** cannot be supplied through caller-controlled `rlsContext`. They must come from Gate auth/runtime context. For **portal iframe embeds**, browser app tokens do **not** auto-inject `app.portal_id`; verify `portalFeatureContextToken` on the backend ([portal-embed-context.md](./portal-embed-context.md)) before using `trustedRuntimeContext`.
+- Visitor tokens normally do not receive isolated-store permissions. If a backend service token reads/writes on behalf of a visitor, the portal/workspace RLS dimension must be derived from trusted platform auth context, not from arbitrary request body/query data. Use **`trustedRuntimeContext.portalId`** / **`trustedRuntimeContext.workspaceId`** for backend-delegated portal/workspace context; it requires **`isolated_store.rls.delegate`** and normal client/runtime tokens must not receive that permission. Treat app-specific settings such as **`app.req_portal_id`** as legacy/temporary workarounds only. See [portal-embed-context.md](./portal-embed-context.md) for iframe handoff tokens.
 - RLS policy subqueries are also evaluated under RLS. If a policy uses `EXISTS (select ... from another_table ...)`, make sure the current context can see the referenced rows or use a deliberately reviewed helper pattern.
 - Admin/moderation flows need a complete policy matrix. If an admin must delete or update a row, that context must first match the table's `USING` policy for the target row; otherwise `DELETE` / `UPDATE` may affect zero rows even though the admin is allowed in application code.
 - Public insert flows need explicit moderation paths. For example, a visitor-created row should usually have portal-scoped read policies plus admin select/delete policies.
@@ -160,5 +161,5 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 - **Version**: 1.8.14
 - **Category**: specialized
-- **Last synced**: 2026-06-19
+- **Last synced**: 2026-06-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-06-19"
+last_synced: "2026-06-22"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -55,6 +55,7 @@ Runtime note:
 - add a backend only when you need privileged operations, secret-bearing integrations, heavy orchestration, or non-user-context work.
 - public/visitor apps can open with `--access=visitor`, but visitor tokens normally do **not** receive isolated-store permissions. For public portal reads/writes, use an app backend with a service token plus trusted portal/workspace context; do not expect direct visitor-token Gate SDK calls to the store to work.
 - A service-token backend must derive the portal/workspace scope from trusted platform auth context, not from arbitrary request body/query data. Prefer `trustedRuntimeContext.portalId` / `trustedRuntimeContext.workspaceId` when the token has `isolated_store.rls.delegate`; if that permission is not available in the target environment, an app-specific `rlsContext` key such as `req_portal_id` is only a reviewed temporary fallback.
+- **Portal iframe app tokens** (`fbsfeaturetoken` in a portal brick) get `app.org_id` from the browser token but **not** `app.portal_id`. Read and verify `portalFeatureContextToken` from the iframe URL on the app backend, then use `trustedRuntimeContext.portalId` on Gate SQL calls — see [portal-embed-context.md](./portal-embed-context.md).
 - Wire-protocol token names still use legacy `feature` spelling for compatibility: `window.FBS_FEATURE_TOKEN`, cookie `fbsfeaturetoken`, and header `x-app-feature-token`. Use "app token" in prose, but do not rename the current runtime contract.
 
 Runtime configuration rule:
@@ -185,7 +186,7 @@ Studio/support "show all rows" views must not use normal request scope. Gate exp
 
 Tables that should be visible in Studio Admin must include an explicit read-only admin branch in their `SELECT` policies, for example: `current_setting('app.rls_admin', true) = 'true' OR (...)`. This is Azure-compatible because Azure Flexible Server does not let the configured administrator create arbitrary `BYPASSRLS` roles. Optional physical `BYPASSRLS` read roles are legacy/operator-specific and must not be required for the normal Studio Admin path.
 
-Backend-mediated visitor flows should not tunnel reserved context through `rlsContext`. For service-token calls that act on a verified visitor portal/workspace context, use `trustedRuntimeContext.portalId` and/or `trustedRuntimeContext.workspaceId` on runtime SQL request bodies. Gate requires `isolated_store.rls.delegate` for this field and maps it to trusted transaction-local `app.portal_id` / `app.workspace_id`. Do not grant this permission to browser/client runtime tokens, and do not fill `trustedRuntimeContext` directly from user-controlled request payloads.
+Backend-mediated visitor flows should not tunnel reserved context through `rlsContext`. For service-token calls that act on a verified visitor portal/workspace context, use `trustedRuntimeContext.portalId` and/or `trustedRuntimeContext.workspaceId` on runtime SQL request bodies. Gate requires `isolated_store.rls.delegate` for this field and maps it to trusted transaction-local `app.portal_id` / `app.workspace_id`. Do not grant this permission to browser/client runtime tokens, and do not fill `trustedRuntimeContext` directly from user-controlled request payloads. For portal iframe embeds, obtain portal scope from verified `portalFeatureContextToken` — see [portal-embed-context.md](./portal-embed-context.md).
 
 Standard `app.*` RLS settings are text platform ids, not UUIDs. Values such as `app.org_id`, `app.user_id`, `app.client_id`, `app.portal_id`, and `app.workspace_id` may be strings like `u37o` or `4164`; scope columns that compare to these settings should normally be `text`. Use UUID only for app-owned ids that are actually UUID-shaped.
 
@@ -400,4 +401,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-06-19
+- **Last synced**: 2026-06-22

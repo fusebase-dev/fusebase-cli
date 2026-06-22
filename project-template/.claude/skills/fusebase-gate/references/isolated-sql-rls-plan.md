@@ -19,11 +19,13 @@ last_synced: "2026-06-15"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
 ---
+
 # Isolated SQL stores PostgreSQL RLS plan (Gate)
 
 > **SOURCE**: This file is copied from `docs/isolated-sql-rls-plan.md` in the fusebase-gate repo. Edit that file, then run `npm run mcp:skills:generate`.
 
 ---
+
 # Isolated SQL stores — PostgreSQL RLS plan for Gate
 
 Short summary for quick reading: for `gate isolated stores`, the recommended `v1` model is `org_id + user_id` RLS enforced by PostgreSQL itself, with optional trusted dimensions such as `portal_id`, `workspace_id`, or app-specific scope IDs layered on top. Gate now injects per-request session context into the DB connection and exposes warn-only RLS validation plus read-only RLS introspection. The production target is still to run migrations under a separate migrator role and runtime queries under an RLS-bound runtime role. The key rule is that table security is not guessed from SQL automatically: every app-owned table must be explicitly classified as `tenant`, `user`, `owner_collaborator`, `scoped`, `none`, or `technical`, and CI or migration validation must check that the SQL matches that declared security model.
@@ -202,13 +204,13 @@ Optional dimensions must follow the same rule:
 
 The model should be "mandatory tenant context plus optional narrowing dimensions":
 
-| Dimension      |                  Required | Source of truth                             | Typical table column                               | Notes                                                                          |
-| -------------- | ------------------------: | ------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `org_id`       |                       yes | Gate org route/authz                        | `org_id text not null`                             | Always the first isolation boundary. Gate ids are platform strings, not UUIDs. |
-| `user_id`      | yes for user-facing paths | Gate auth actor                             | `user_id text not null` or `owner_user_id text`    | Required for private rows and ownership checks.                                |
-| `portal_id`    |                  optional | Gate portal binding/context                 | `portal_id text`                                   | Only set when Gate can prove the portal is in the current org and token scope. |
-| `workspace_id` |                  optional | Gate workspace binding/context              | `workspace_id text`                                | Useful for multi-workspace apps inside one org.                                |
-| custom app ID  |                  optional | Gate-validated scope or DB membership table | `project_id text`, `account_id uuid`, etc.         | Use UUID only for app-owned ids that are actually UUID-shaped.                 |
+| Dimension      |                  Required | Source of truth                             | Typical table column                            | Notes                                                                          |
+| -------------- | ------------------------: | ------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------ |
+| `org_id`       |                       yes | Gate org route/authz                        | `org_id text not null`                          | Always the first isolation boundary. Gate ids are platform strings, not UUIDs. |
+| `user_id`      | yes for user-facing paths | Gate auth actor                             | `user_id text not null` or `owner_user_id text` | Required for private rows and ownership checks.                                |
+| `portal_id`    |                  optional | Gate portal binding/context                 | `portal_id text`                                | Only set when Gate can prove the portal is in the current org and token scope. |
+| `workspace_id` |                  optional | Gate workspace binding/context              | `workspace_id text`                             | Useful for multi-workspace apps inside one org.                                |
+| custom app ID  |                  optional | Gate-validated scope or DB membership table | `project_id text`, `account_id uuid`, etc.      | Use UUID only for app-owned ids that are actually UUID-shaped.                 |
 
 Recommended session settings:
 
@@ -1046,8 +1048,7 @@ Expected Gate touch points:
 
 ## Recommended `v1` answer in one paragraph
 
-For `gate isolated stores`, use a combined `org_id + user_id` RLS model, with `org_id` required on all app-owned business tables and `user_id` added where data is private to a user. Optional dimensions such as `portal_id`, `workspace_id`, and app-specific IDs fit the same model as explicit scoped columns and trusted session settings, but Gate must validate them before they become RLS context. Gate should inject trusted per-request session context into PostgreSQL using transaction-local settings on the same pooled connection that executes the query. Schema must continue to flow only through journaled migrations, and the isolated Postgres server should move from a single runtime owner role to a split `migrator` / `runtime` model so runtime queries are subject to RLS and cannot bypass it. Studio should show RLS status per table through Gate introspection, while policy changes remain migration/manifest-driven. Migration CI should enforce `ENABLE RLS`, `FORCE RLS`, policies, required columns, and indexes as the minimum midsize security baseline.
----
+## For `gate isolated stores`, use a combined `org_id + user_id` RLS model, with `org_id` required on all app-owned business tables and `user_id` added where data is private to a user. Optional dimensions such as `portal_id`, `workspace_id`, and app-specific IDs fit the same model as explicit scoped columns and trusted session settings, but Gate must validate them before they become RLS context. Gate should inject trusted per-request session context into PostgreSQL using transaction-local settings on the same pooled connection that executes the query. Schema must continue to flow only through journaled migrations, and the isolated Postgres server should move from a single runtime owner role to a split `migrator` / `runtime` model so runtime queries are subject to RLS and cannot bypass it. Studio should show RLS status per table through Gate introspection, while policy changes remain migration/manifest-driven. Migration CI should enforce `ENABLE RLS`, `FORCE RLS`, policies, required columns, and indexes as the minimum midsize security baseline.
 
 ## Version
 
