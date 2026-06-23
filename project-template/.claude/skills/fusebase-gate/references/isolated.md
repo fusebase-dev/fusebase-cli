@@ -1,7 +1,7 @@
 ---
 version: "1.3.1"
 mcp_prompt: isolated
-last_synced: "2026-06-05"
+last_synced: "2026-06-23"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -68,7 +68,8 @@ Guardrails: do not attach a guessed child app id if `whoami` shows a different `
 
 ## Stage Rules
 
-- Default stage is `prod` when stage is omitted by higher-level orchestration.
+- At store bootstrap, call `initIsolatedStoreStage` for **both** `dev` and `prod` (do not defer `prod`).
+- When stage is omitted by higher-level orchestration (deployed runtime / CLI), default target is **`prod`**; local `fusebase dev start` uses **`dev`**.
 - `dev` and `prod` are separate stage instances with separate physical databases.
 - Do not assume data written to `dev` exists in `prod`.
 - **SQL schema:** follow the **`isolatedSql`** prompt and repo **`docs/isolated-sql-stores.md`** (status → optional dryRun → apply). Load **`isolatedSqlMigrationDiscipline`** before editing migration bundles.
@@ -112,5 +113,5 @@ Guardrails: do not attach a guessed child app id if `whoami` shows a different `
 
 - **Version**: 1.3.1
 - **Category**: specialized
-- **Last synced**: 2026-06-05
+- **Last synced**: 2026-06-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

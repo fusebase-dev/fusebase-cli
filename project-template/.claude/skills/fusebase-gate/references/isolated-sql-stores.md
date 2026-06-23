@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-06-22"
+last_synced: "2026-06-23"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -245,8 +245,10 @@ This keeps checksum generation canonical and avoids agent drift from ad-hoc hash
 
 1. **`listIsolatedStores`** (`orgId`, optional `clientId` for app-scoped tokens). Empty list is normal before create.
 2. **`createIsolatedStore`** — `storeType: "sql"`, `engine: "postgres"`, `alias`, `source: { sourceType: "app", sourceId: "<app id>" }`.
-3. **`initIsolatedStoreStage`** — `stage: "dev"` (then `"prod"` when needed). Omit `bindingConfig` if Gate auto-provisions (see repo README / `ISOLATED_PG_*`).
-4. **`applyIsolatedStoreSqlMigrations`** — full ordered bundle for that `storeId` + `stage` (or SDK equivalent).
+3. **`initIsolatedStoreStage`** — for **both** `dev` and `prod` (two calls, same `storeId`). Omit `bindingConfig` if Gate auto-provisions (see repo README / `ISOLATED_PG_*`). Do **not** defer `prod` to “when needed” — published apps target `prod`; `fusebase dev start` targets `dev`.
+4. **`applyIsolatedStoreSqlMigrations`** — full ordered bundle for **each** `storeId` + `stage` (same logical version line; separate physical databases).
+
+**Stage bootstrap vs runtime default:** always provision **both** stages at create time. When higher-level orchestration **omits** a stage (deployed app runtime, many CLI defaults), the target is **`prod`**. Local **`fusebase dev start`** uses **`dev`**.
 
 **Empty `listIsolatedStores` after create:** wrong `orgId`, or `clientId` filter does not match `source.sourceId` — omit `clientId` to list all org stores.
 
@@ -401,4 +403,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-06-22
+- **Last synced**: 2026-06-23

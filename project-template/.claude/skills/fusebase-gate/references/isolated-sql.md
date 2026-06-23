@@ -1,7 +1,7 @@
 ---
 version: "1.8.14"
 mcp_prompt: isolatedSql
-last_synced: "2026-06-22"
+last_synced: "2026-06-23"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -48,14 +48,14 @@ Load MCP prompt **`isolatedSqlMigrationDiscipline`** (`prompts_search`, groups `
 ### Standard sequence (schema + store)
 
 1. **`listIsolatedStores`** → **`createIsolatedStore`** (`engine` `postgres`, `storeType` `sql`, `source` `{ sourceType: app, sourceId: … }`, `alias`).
-2. **`initIsolatedStoreStage`** for `prod` / `dev` (omit `bindingConfig` when Gate auto-provisions).
+2. **`initIsolatedStoreStage`** for **both** `dev` and `prod` at store bootstrap (two calls; omit `bindingConfig` when Gate auto-provisions). Do not skip `prod` at create time.
 3. In the app repo, keep schema files under **`postgres/migrations/`** and assemble the bundle with SDK helper **`buildSqlMigrationBundle(...)`**. Do not hand-build migration JSON or copy ad-hoc checksums into chat unless this is an explicitly temporary smoke test.
 4. **`getIsolatedStoreSqlMigrationStatus`** with the bundle for this stage: read **`canApply`**, **`isDrifted`**, **`pendingCount`**, **`structuredIssues`**. For lightweight status-only probes, migration entries may use **`sql: ""`** when you only need metadata comparison (`version` / `name` / `checksum`). Optionally pass **`expectedLastAppliedVersion`** / **`expectedLastAppliedChecksum`** from a prior status → **409** if the journal tail changed.
 5. Optional: **`applyIsolatedStoreSqlMigrations`** with **`dryRun: true`** — same pre-apply validation as a real apply, **no** SQL / journal writes. Use the same full bundle you would really apply.
 6. **`applyIsolatedStoreSqlMigrations`** — pending tail only when prefix matches. **409** + **`data.errorCode`** / **`data.issues`** on drift or head mismatch. Prod: automatic checkpoint may run before pending migrations.
 7. Verify: **`listIsolatedStoreSqlTables`**, **`getIsolatedStoreSqlStats`**, or **`queryIsolatedStoreSql`** (read-only, **one** statement per call).
 
-Default stage is **`prod`** when stage is omitted by higher-level orchestration. `dev` and `prod` are **different databases** — repeat the sequence per stage with the **same logical version line**.
+**Runtime default:** when orchestration **omits** a stage (deployed app, many CLI defaults), target **`prod`**; **`fusebase dev start`** uses **`dev`**. **Bootstrap:** always init **both** stages. `dev` and `prod` are **different databases** — repeat migrations per stage with the **same logical version line**.
 
 ### Data path (no DDL)
 
@@ -161,5 +161,5 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 - **Version**: 1.8.14
 - **Category**: specialized
-- **Last synced**: 2026-06-22
+- **Last synced**: 2026-06-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
