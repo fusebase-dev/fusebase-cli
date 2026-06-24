@@ -230,6 +230,44 @@ Total: 1 app(s)
 
 ---
 
+### `fusebase app portal-embeds <appId>`
+
+List portal pages where an app is embedded in the current product/org.
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `appId` | Yes | The ID of the app to inspect |
+
+**Prerequisites:**
+
+- App must be initialized (`fusebase init`)
+- API key must be configured (`fusebase auth`)
+- `app-portal-embeds-list` flag must be enabled (`fusebase config set-flag app-portal-embeds-list`)
+
+**Example:**
+
+```bash
+fusebase app portal-embeds feat_abc123
+```
+
+**Output:**
+
+```text
+Portal embeds:
+
+Portal: Customer Portal
+Page: Home
+URL: https://customer.example.com/
+
+Total: 1 portal page(s)
+```
+
+If no embeds are found, prints `No portal embeds found for this app.` and exits successfully.
+
+---
+
 ### `fusebase deploy`
 
 Deploy apps to Fusebase. For each app this command will:
@@ -731,6 +769,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); also turns on required template references and `isolated_store.*` permissions in `fusebase env create` |
 | `postgres-rls` | Enables experimental RLS manifest helpers for isolated SQL stores |
 | `portal-specific-apps` | Includes portal-specific app guidance in prompts: `fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
+| `app-portal-embeds-list` | Enables `fusebase app portal-embeds <appId>` and generated app guidance for listing portal pages where an app is embedded |
 | `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`apps[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `app-sidecar` and `app-backend` skill templates. |
 | `cross-app-api-calls-analysis` | Enables hidden `fusebase analyze app-apis` command and cross-app API dependency guidance in generated prompts/skills. |
 
@@ -742,6 +781,7 @@ fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summ
 fusebase config set-flag isolated-stores     # Isolated stores functionality (SQL/NoSQL)
 fusebase config set-flag postgres-rls        # PostgreSQL RLS manifest helpers for isolated SQL stores
 fusebase config set-flag portal-specific-apps # Portal-specific apps prompts/guidance
+fusebase config set-flag app-portal-embeds-list # App portal embed discovery command/guidance
 fusebase config set-flag cross-app-api-calls-analysis # Cross-app AppApisApi dependency analysis command/guidance
 fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```

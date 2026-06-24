@@ -324,6 +324,54 @@ See [PERMISSIONS.md](PERMISSIONS.md) for the canonical permission workflow.
 
 ---
 
+### `fusebase app portal-embeds <appId>`
+
+**Purpose**: List portal pages where an app is embedded in the current product/org.
+
+**Syntax**:
+
+```bash
+fusebase app portal-embeds <appId>
+```
+
+**Arguments**:
+
+- `<appId>`: App ID to inspect.
+
+**Prerequisites**:
+
+- App must be initialized (`fusebase init`)
+- API key must be configured (`fusebase auth`)
+- `fusebase.json` must contain `orgId` and `productId`
+- `app-portal-embeds-list` flag must be enabled (`fusebase config set-flag app-portal-embeds-list`)
+
+**Behavior**:
+
+1. Validates the app exists.
+2. Calls public-api for `GET /v1/orgs/{orgId}/products/{productId}/apps/{appId}/portal-embeds`.
+3. Prints one row per portal page where the app is embedded.
+4. Prints `No portal embeds found for this app.` when the result is empty.
+
+**Output**:
+
+```text
+Portal embeds:
+
+Portal: Customer Portal
+Page: Home
+URL: https://customer.example.com/
+
+Total: 1 portal page(s)
+```
+
+**Examples**:
+
+```bash
+fusebase app portal-embeds feat_abc123
+```
+
+---
+
 ### `fusebase dev start [app]`
 
 **Purpose**: Start the development server for an app.

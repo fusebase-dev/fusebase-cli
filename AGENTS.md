@@ -70,6 +70,7 @@ bun index.ts [command]
 - `deploy` - Deploy apps to Fusebase (runs lint then build per app). Computes frontend/backend SHA-256 hashes and skips apps whose frontend AND backend are unchanged; reuses the previous frontend bundle via `copyFrontendParams` when only the backend changed. Pass `--force` to override the skip and always re-upload + redeploy.
 - `app list` - List all apps for the current app with their URLs
 - `app create` - Create and configure an app (requires `--name`, `--subdomain`, `--path`, `--dev-command`, `--build-command`, `--output-dir`; optional `--access` for access principals e.g. `visitor`, `orgRole:member`; `--permissions` for manual `dashboardView/database` access)
+- `app portal-embeds <appId>` - List portal pages in the current product/org where the app is embedded
 - `app update <appId>` - Update app settings (`--access`, `--permissions` for manual `dashboardView/database`, `--sync-gate-permissions` for Gate analyze + sync)
 - `dev start` - Start the development server (creates per-session debug logs in the selected app directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
@@ -116,6 +117,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); includes supporting `fusebase-gate` references and `isolated_store.*` permissions in `fusebase env create` |
 | `portal-specific-apps` | Includes portal-specific app prompts and references (`fusebase-portal-specific-apps`, `{{CurrentPortal}}` filters, and auth-context guidance for portal runtime) |
+| `app-portal-embeds-list` | Enables `fusebase app portal-embeds <appId>` and generated app guidance for listing portal pages where an app is embedded |
 | `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing app code. Complements MCP discovery. |
 | `cross-app-api-calls-analysis` | Enables the hidden `fusebase analyze app-apis` and `fusebase app-api-contracts` commands and cross-app API dependency guidance in generated prompts/skills. |
 

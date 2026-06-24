@@ -135,6 +135,24 @@ export interface AppsResponse {
   apps: App[];
 }
 
+export interface ProductAppPortalEmbed {
+  portal: {
+    globalId: string;
+    name: string;
+  };
+  page: {
+    globalId: string;
+    title?: string;
+  };
+  url: string;
+}
+
+export interface ProductAppPortalEmbedsResponse {
+  orgId: string;
+  appId: string;
+  portalEmbeds: ProductAppPortalEmbed[];
+}
+
 /**
  * App version. Renamed from `AppFeatureVersion`. Field `productId` was `appId`,
  * `appId` was `appFeatureId`.
@@ -414,6 +432,48 @@ export async function fetchApps(
   const res = await response.json();
 
   return res as AppsResponse;
+}
+
+export async function fetchProductAppPortalEmbeds(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+  appId: string,
+): Promise<ProductAppPortalEmbedsResponse> {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps/${appId}/portal-embeds`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      name?: string;
+    };
+
+    logger.error({
+      msg: "API request failed",
+      endpoint: `/v1/orgs/${orgId}/products/${productId}/apps/${appId}/portal-embeds`,
+      status: response.status,
+      statusText: response.statusText,
+      errorBody,
+      url,
+      timestamp: new Date().toISOString(),
+    });
+
+    throw new Error(
+      `Failed to fetch app portal embeds: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+    );
+  }
+
+  const res = await response.json();
+
+  return res as ProductAppPortalEmbedsResponse;
 }
 
 export interface AppTokenResponse {
