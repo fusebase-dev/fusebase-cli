@@ -32,7 +32,11 @@ import {
   writeCurrentAtomic,
 } from "../lib/win-cli-cache";
 import {
+  isLauncherAwareCliVersion,
+  isLauncherUpdateCommand,
+  isUpdateCommand,
   selectFallbackVersion,
+  selectLauncherAwareFallback,
   stripLauncherFlags,
   wantsPreviousVersion,
 } from "./launcher-core";
@@ -130,9 +134,45 @@ async function main(): Promise<never> {
     version = resolved.version;
   }
 
+  let legacyUpdateRedirected = false;
+  if (
+    !isLauncherAwareCliVersion(version) &&
+    isUpdateCommand(args) &&
+    !isLauncherUpdateCommand(args)
+  ) {
+    const fallback = selectLauncherAwareFallback(await enumerateVersions(root), version);
+    if (!fallback) {
+      console.error(
+        "The active cached CLI is a legacy Windows CLI and cannot safely run `fusebase update` under the launcher/cache model.",
+      );
+      console.error(
+        "No launcher-aware cached CLI is available to perform the update. Switch to or install a launcher-aware channel, then try again.",
+      );
+      process.exit(1);
+    }
+    await log(root, `legacy update redirect: ${version} -> ${fallback}`);
+    version = fallback;
+    legacyUpdateRedirected = true;
+  }
+
   try {
     process.exit(await runCli(binPathForVersion(root, version), args));
   } catch {
+    if (legacyUpdateRedirected) {
+      const fallback = selectLauncherAwareFallback(await enumerateVersions(root), version);
+      if (!fallback) {
+        console.error(
+          "The launcher-aware CLI selected to recover `fusebase update` failed to start, and no other launcher-aware cached CLI is available.",
+        );
+        process.exit(1);
+      }
+      await log(
+        root,
+        `legacy update redirect fallback: ${version} failed to start, running ${fallback}`,
+      );
+      process.exit(await runCli(binPathForVersion(root, fallback), args));
+    }
+
     // Active binary missing or won't start → fall back to the previous version.
     const fallback = selectFallbackVersion(await enumerateVersions(root), version);
     if (!fallback) {

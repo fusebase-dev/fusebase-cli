@@ -34,6 +34,12 @@ versioning model, and the developer rollout workflow.
   that isn't active), which is why downloads are **staged** (written to a staging
   dir and moved in only on completion) so `versions\` never holds a partial folder.
 - Retention is `{active, previous}` total — not per channel.
+- Temporary rollout guard: if `current.json` points at a known legacy Windows CLI
+  and the user runs ordinary `fusebase update`, the launcher delegates that same
+  command to a cached launcher-aware CLI instead of running the legacy updater.
+  Normal legacy commands still run normally, and `update --launcher` remains the
+  explicit launcher refresh path. If no launcher-aware CLI is cached, the launcher
+  fails clearly instead of entering the legacy installer loop.
 
 Code: launcher entrypoint `launcher/index.ts` (+ pure helpers `launcher/launcher-core.ts`);
 shared cache module `lib/win-cli-cache.ts`; the Windows branch of
@@ -114,6 +120,9 @@ launcher is refreshed).
 - **`fusebase update`** — cache swap: download the CLI bin to staging → move into
   `versions\<new>\` → atomically flip `current.json` → prune to two. Reports
   `FuseBase CLI updated from <old> to <new>.` No elevation, no installer, no exit.
+  During the legacy prod rollout window, if the active cached CLI is known legacy,
+  the launcher first redirects this command to a cached launcher-aware CLI so the
+  cache-swap updater owns the operation.
 - **`fusebase update --launcher`** — the only elevating path. Downloads the NSIS
   installer and runs it elevated (UAC) to replace the launcher in Program Files.
   Windows-only; a no-op on macOS/Linux.
@@ -135,3 +144,11 @@ empty cache → bootstraps. From then on, updates are cache swaps. Self-correcti
 old CLIs resolve to the installer (→ migrate), new cached CLIs resolve to the bin
 (→ cache swap). Re-running the installer on an already-migrated machine is a safe
 repair — it overwrites only the launcher and leaves `%LOCALAPPDATA%` untouched.
+
+During the temporary period where prod can still resolve to legacy `0.25.7`, an
+already-migrated cache may point back to that legacy binary after a prod/dev channel
+switch. The fixed launcher handles only `fusebase update` specially in that state:
+it runs a cached launcher-aware CLI with the original update args, letting the CLI
+repair `current.json` through the normal cache-swap path. If the cache contains only
+legacy CLIs, the launcher prints a clear error and does not run the legacy installer
+updater again.
