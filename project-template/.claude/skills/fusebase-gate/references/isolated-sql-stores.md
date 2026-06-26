@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-06-23"
+last_synced: "2026-06-26"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -80,7 +80,7 @@ For `sql/postgres`, the current managed-store path already supports:
 - read-only RLS status introspection for Studio/support visibility
 - transaction-local RLS runtime context on SQL runtime calls
 - warn-only RLS manifest validation on migration status/apply/adopt
-- checkpoints and full stage restore (prod auto-checkpoint before migrations uses **admin** or **RLS-bypass** credentials for `pg_dump` when split roles + `FORCE RLS` are enabled — not the runtime role)
+- checkpoints and full stage restore (prod auto-checkpoint before migrations uses **admin** or **RLS-bypass** credentials for `pg_dump` when split roles + `FORCE RLS` are enabled — not the runtime role). **Azure server setup** (roles, secrets, Helm, `BYPASSRLS`): [isolated-postgres-azure-operations.md](./isolated-postgres-azure-operations.md)
 - provider-switchable snapshot storage (`local_file` or `azure_blob`)
 - Studio migration/status rendering via bundle metadata persisted by Gate
 
@@ -184,7 +184,7 @@ The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime
 
 Studio/support "show all rows" views must not use normal request scope. Gate exposes separate read-only row endpoints for this mode: `countIsolatedStoreSqlRowsRlsBypass` and `selectIsolatedStoreSqlRowsRlsBypass`. They require `isolated_store.rls.bypass`, ignore request `rlsContext`, set trusted `app.rls_admin=true` in the same transaction, and log the actor/org/store/stage/table. Do not grant this permission to app runtime tokens.
 
-Tables that should be visible in Studio Admin must include an explicit read-only admin branch in their `SELECT` policies, for example: `current_setting('app.rls_admin', true) = 'true' OR (...)`. This is Azure-compatible because Azure Flexible Server does not let the configured administrator create arbitrary `BYPASSRLS` roles. Optional physical `BYPASSRLS` read roles are legacy/operator-specific and must not be required for the normal Studio Admin path.
+Tables that should be visible in Studio Admin must include an explicit read-only admin branch in their `SELECT` policies, for example: `current_setting('app.rls_admin', true) = 'true' OR (...)`. This is Azure-compatible because Azure Flexible Server does not let the configured administrator create arbitrary `BYPASSRLS` roles. Optional physical `BYPASSRLS` read roles are legacy/operator-specific and must not be required for the normal Studio Admin path. **Server-level role + secret setup on Azure:** [isolated-postgres-azure-operations.md](./isolated-postgres-azure-operations.md).
 
 Backend-mediated visitor flows should not tunnel reserved context through `rlsContext`. For service-token calls that act on a verified visitor portal/workspace context, use `trustedRuntimeContext.portalId` and/or `trustedRuntimeContext.workspaceId` on runtime SQL request bodies. Gate requires `isolated_store.rls.delegate` for this field and maps it to trusted transaction-local `app.portal_id` / `app.workspace_id`. Do not grant this permission to browser/client runtime tokens, and do not fill `trustedRuntimeContext` directly from user-controlled request payloads. For portal iframe embeds, obtain portal scope from verified `portalFeatureContextToken` — see [portal-embed-context.md](./portal-embed-context.md).
 
@@ -403,4 +403,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-06-23
+- **Last synced**: 2026-06-26
