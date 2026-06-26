@@ -83,6 +83,7 @@ describe("isolated SQL bundle helpers", () => {
     });
     expect(artifact.bundle.migrations).toHaveLength(1);
     expect(artifact.bundle.migrations[0]!.version).toBe(1);
+    expect(artifact.bundle.bundleVersion).toBe("1");
     expect(artifact.bundle.migrations[0]!.checksum).toBe(checksum);
     expect(artifact.rlsManifest?.tables.tasks?.classification).toBe("tenant");
     expect(artifact.warnings).toEqual([]);

@@ -239,13 +239,18 @@ export function buildSqlMigrationBundleArtifact(options: {
     manifest,
   );
 
+  const rawBundleVersion = manifest.bundleVersion ?? migrations.at(-1)?.version;
+
   return {
     appId: options.appConfig.id,
     store: options.store,
     schemaName: options.store.schemaName ?? null,
     migrationsDir,
     bundle: {
-      bundleVersion: manifest.bundleVersion ?? migrations.at(-1)?.version,
+      bundleVersion:
+        rawBundleVersion === undefined || rawBundleVersion === null
+          ? undefined
+          : String(rawBundleVersion),
       migrations,
     },
     rlsManifest,
