@@ -16,6 +16,7 @@ import {
   getDeploy,
   fetchProduct,
   fetchApps,
+  fetchApp,
   fetchAppSecrets,
   copyBackendParams,
   copyFrontendParams,
@@ -439,12 +440,25 @@ async function runBuildCommand(featureConfig: FeatureConfig): Promise<void> {
   await runCommand(buildCommand, featurePath, "Building");
 }
 
+function readBackendOnlyGatePermissionsFromFeature(
+  featureConfig: FeatureConfig,
+): string[] | undefined {
+  const fromFeature = (featureConfig as FeatureConfig & { backendOnlyGatePermissions?: unknown })
+    .backendOnlyGatePermissions;
+  if (!Array.isArray(fromFeature)) {
+    return undefined;
+  }
+  const permissions = fromFeature.filter((p): p is string => typeof p === "string" && p.length > 0);
+  return permissions.length > 0 ? permissions : undefined;
+}
+
 async function publishOpenApiManifestIfPresent(params: {
   apiKey: string;
   orgId: string;
   appId: string;
   featureId: string;
   featureBasePath: string;
+  featureConfig: FeatureConfig;
 }): Promise<void> {
   const openApiPath = await resolveOpenApiFile(params.featureBasePath);
   if (!openApiPath) {
@@ -468,11 +482,30 @@ async function publishOpenApiManifestIfPresent(params: {
       return;
     }
 
-    const manifest = buildPublishedAppApiManifest({
+    const published = buildPublishedAppApiManifest({
       filePath: openApiPath,
       document,
       validation,
     });
+
+    let backendOnlyGatePermissions = readBackendOnlyGatePermissionsFromFeature(params.featureConfig);
+    if (!backendOnlyGatePermissions) {
+      try {
+        const app = await fetchApp(params.apiKey, params.orgId, params.appId, params.featureId);
+        const fromManifest = app.manifest?.backendOnlyGatePermissions;
+        if (Array.isArray(fromManifest)) {
+          const preserved = fromManifest.filter((p): p is string => typeof p === "string" && p.length > 0);
+          backendOnlyGatePermissions = preserved.length > 0 ? preserved : undefined;
+        }
+      } catch {
+        // Non-fatal: OpenAPI publish still proceeds without backend-only permissions.
+      }
+    }
+
+    const manifest = {
+      ...published,
+      ...(backendOnlyGatePermissions ? { backendOnlyGatePermissions } : {}),
+    };
 
     await updateApp(
       params.apiKey,
@@ -980,6 +1013,7 @@ export const deployCommand = new Command("deploy")
           appId: fuseConfig.productId,
           featureId,
           featureBasePath,
+          featureConfig,
         });
 
         // Build feature URL
