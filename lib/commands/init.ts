@@ -474,6 +474,10 @@ async function promptSelect<T extends { id: string }>(
   return result;
 }
 
+function formatOrgLabel(org: Organization): string {
+  return `${org.title} ${chalk.dim(`(${org.id})`)}`;
+}
+
 export const initCommand = new Command("init")
   .description("Initialize a Fusebase product in the current directory")
   .option("--name <name>", "Product title/name")
@@ -633,15 +637,15 @@ export const initCommand = new Command("init")
           process.exit(1);
         }
         selectedOrg = foundOrg;
-        console.log(`Using organization: ${selectedOrg.title}`);
+        console.log(`Using organization: ${formatOrgLabel(selectedOrg)}`);
       } else if (orgs.length === 1 && orgs[0]) {
         selectedOrg = orgs[0];
-        console.log(`Using organization: ${selectedOrg.title}`);
+        console.log(`Using organization: ${formatOrgLabel(selectedOrg)}`);
       } else {
         selectedOrg = await promptSelect(
           "Select an organization:",
           orgs,
-          (org) => org.title,
+          formatOrgLabel,
         );
       }
 
@@ -793,7 +797,7 @@ export const initCommand = new Command("init")
         "utf-8",
       );
       console.log("✓ Product initialized successfully");
-      console.log(`  Organization: ${selectedOrg.title}`);
+      console.log(`  Organization: ${formatOrgLabel(selectedOrg)}`);
       console.log(`  Product: ${selectedApp.title}`);
 
       // Run npm install if template was used

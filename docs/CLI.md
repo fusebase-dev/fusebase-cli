@@ -146,7 +146,7 @@ fusebase init [--ide <presets>] [--force]
 3. **Organization Selection**:
    - Prompt: `"Select an organization:"`
    - Type: `select` (single choice)
-   - Options: Fetched from API (organization titles)
+   - Options: Fetched from API (`title (orgId)`)
    - Auto-select: If only one organization exists
    - When: Always (unless only one org)
 
