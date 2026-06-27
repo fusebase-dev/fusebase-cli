@@ -1,6 +1,6 @@
 ---
 name: fusebase-dashboards
-description: "How to use MCP for working with FuseBase Project Dashboards during LLM development. Use when: 1. Discovering dashboards, views, and schema via MCP; 2. Reading or updating dashboard data; 3. Working with relations, filters, templates, and child tables; 4. Understanding dashboard/view structure before SDK runtime code."
+description: "How to use MCP for working with FuseBase Project Dashboards during LLM development. Use when: 1. Discovering dashboards, views, and schema via MCP; 2. Reading or updating dashboard data; 3. Working with relations, filters, templates, and child tables; 4. Understanding dashboard/view structure before SDK runtime code; 5. Working with system managed databases — Companies, Deals, Meetings (CRM, pipeline, B2B accounts, seeding demo rows, alias-only discovery)."
 metadata:
   source: entrypoint
 ---
@@ -42,6 +42,43 @@ Each reference is in a separate file under `references/`. Load the file when you
 - [Dashboard View Representations](references/representations.md)
 
 ---
+
+
+## Managed database routing (Companies, Deals, Meetings)
+
+**System managed dashboards** (Companies, Deals, Meetings) are first-class product surfaces — same category as Workspaces, Portals, Clients. They live in **managed databases** with **fixed template aliases** (not org-specific UUIDs from URLs). Technically `rootEntity: custom`; do **not** treat them as arbitrary user-created custom tables.
+
+When the user mentions any of the intents below, load the matching reference **before** domain tool calls (or use `prompts_search` with group `managedDatabases`):
+
+| User intent (examples)                                           | Load reference / MCP prompt                                     |
+| ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| clients (`root_entity: client`) — no dedicated managed-DB prompt | `references/core-concepts.md` + `references/relations-guide.md` |
+
+**Alias-only discovery rule:** Never hardcode database/dashboard/view UUIDs. Resolve by stable aliases within org scope from bootstrap `defaults.toolArgs`:
+
+| Entity    | Companies      | Deals                                                  |
+| --------- | -------------- | ------------------------------------------------------ |
+| Database  | `companies_db` | `deals_db`                                             |
+| Dashboard | `companies`    | `deals_table` (not `deals`)                            |
+| Views     | `companies`    | `deals_pipeline` (default Kanban), `deals_all` (table) |
+
+Meetings DB alias: `meetings`; dashboards: `meetings`, `trackers`.
+
+**Prompt load (Option B):** `prompts_search({ groups: ["managedDatabases", "data", "relations"] })` — add `"childTables"` for Meetings trackers/results.
+
+### CRM demo data recipe (alias-only)
+
+For requests like “seed demo companies and deals”, “fill CRM with sample data”:
+
+1. **`bootstrap`** — read `defaults.toolArgs` (`scope_type`, `scope_id`).
+2. **Domain knowledge** — load Companies + Deals references (or `prompts_search` above).
+3. **`resolveAliases`** — one call with all aliases for `companies_db` / `companies` and `deals_db` / `deals_table` / `deals_pipeline` (see references for exact `items` shape).
+4. **`getDashboardView`** — schema for each dashboard; resolve `item_key` by column **`alias`** (never hardcode keys).
+5. **`batchPutDashboardData`** — create company rows (`company_name`, etc.), then deal rows (`deal_name`, `deal_stage`, `deal_value`, …). Use `generate_id` for new row UUIDs. `deal_stage` = `[label-nanoid]` from schema.
+6. **`findRelationsByDashboardIds`** — `inversive_search: true` on deals dashboard id from step 3.
+7. **`addRelationRows`** — link Companies → Deals (`source_index` = company `root_index_value`, `target_index` = deal `root_index_value`). Do **not** write lookup columns via `batchPutDashboardData`.
+
+If a managed database is missing: use `getOrCreateDatabase` only when exposed in the session; otherwise report that the managed DB was not found.
 
 
 ## When NOT To Use This Skill
@@ -128,29 +165,31 @@ You must have the required domain knowledge (database, dashboard, view, relation
 
 - **Always** use a group filter when loading prompts.
 - **Never** call `prompts_search({})` or omit the `groups` parameter.
-- Call **`prompts_search`** with **`groups`**: e.g. `prompts_search({ groups: ["data", "rows", "schema"] })` for default dashboard work; add `"dashboard"`, `"filters"`, `"templates"`, `"relations"`, `"childTables"` when needed (see table below).
+- Call **`prompts_search`** with **`groups`**: e.g. `prompts_search({ groups: ["data", "rows", "schema"] })` for default dashboard work; add `"managedDatabases"` for Companies/Deals/Meetings/CRM tasks; add `"dashboard"`, `"filters"`, `"templates"`, `"relations"`, `"childTables"` when needed (see table below).
+- **CRM / managed DB example:** `prompts_search({ groups: ["managedDatabases", "data", "relations"] })` before working with Companies, Deals, or seeding pipeline data.
 - If the result is too large, request **one group at a time** (e.g. `["schema"]` then `["dashboard"]`).
 
 **Invariant:** Do not call domain operations until you have this knowledge (from the skill in context or from prompts).
 
 **Prompt groups (summary):**
 
-| Group           | Purpose                                                 |
-| --------------- | ------------------------------------------------------- |
-| tooling         | Discovery and execution (tools.list → describe → call)  |
-| authz           | Permissions, scopes, ID formats                         |
-| bootstrap       | Connection context and defaults                         |
-| database        | Database entities and operations                        |
-| dashboard       | Dashboards, types, root_entity                          |
-| view            | Views (dashboard projections)                           |
-| schema          | Dashboard schema and columns                            |
-| relations       | one_to_many, many_to_many relations                     |
-| filters         | View filters                                            |
-| representations | Cell display                                            |
-| rows            | Rows (custom rows)                                      |
-| data            | Reading/writing cell data                               |
-| templates       | Templates and creating from templates                   |
-| childTables     | Child-table-link columns, get-or-create child dashboard |
+| Group            | Purpose                                                               |
+| ---------------- | --------------------------------------------------------------------- |
+| tooling          | Discovery and execution (tools.list → describe → call)                |
+| authz            | Permissions, scopes, ID formats                                       |
+| bootstrap        | Connection context and defaults                                       |
+| database         | Database entities and operations                                      |
+| dashboard        | Dashboards, types, root_entity                                        |
+| view             | Views (dashboard projections)                                         |
+| schema           | Dashboard schema and columns                                          |
+| relations        | one_to_many, many_to_many relations                                   |
+| filters          | View filters                                                          |
+| representations  | Cell display                                                          |
+| rows             | Rows (custom rows)                                                    |
+| data             | Reading/writing cell data                                             |
+| templates        | Templates and creating from templates                                 |
+| childTables      | Child-table-link columns, get-or-create child dashboard               |
+| managedDatabases | System managed DBs: Companies, Deals, Meetings (alias-only discovery) |
 
 ### II.1a Prompts and skills (version check)
 
@@ -324,3 +363,4 @@ Tooling flow **after** the connection is established:
 - **SDK = runtime only**: used only in feature code; see the Fusebase Dashboards SDK skill.
 - **Connection check**: Always verify fusebase-dashboards MCP is connected; if not, ask the user to check connected MCP servers.
 - **Flow**: Bootstrap/context → have domain knowledge (prompts or skill in context) → tools_search/tools_list → tools_describe → tool_call → handle response.
+- **Managed DB / CRM**: Route by user intent (Companies / Deals / Meetings references) → `prompts_search({ groups: ["managedDatabases", ...] })` → alias-only `resolveAliases` → data ops. See **Managed database routing** above.
