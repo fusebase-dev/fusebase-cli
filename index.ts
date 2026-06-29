@@ -26,11 +26,7 @@ import { checkForUpdates } from "./lib/commands/steps/update-check";
 import { VERSION } from "./lib/version";
 import { registerErrorReporter } from "./lib/error-reporter";
 import { instrumentAllCommands } from "./lib/command-logger";
-import { flushAgentAssetsRefreshAfterMigration, loadFuseConfig, getUpdateChannel } from "./lib/config";
-import { detectLinkedOrLocalCli } from "./lib/commands/cli";
-import { evaluateLauncherGate } from "./lib/launcher-self-check";
-import { REQUIRED_LAUNCHER } from "./lib/required-launcher";
-import { formatVersionInfo } from "./lib/version-output";
+import { flushAgentAssetsRefreshAfterMigration, loadFuseConfig } from "./lib/config";
 
 registerErrorReporter();
 
@@ -41,14 +37,7 @@ program.hook("preAction", async () => {
   await flushAgentAssetsRefreshAfterMigration(process.cwd());
 });
 
-const launcherVersionEnv = process.env.FUSEBASE_LAUNCHER_VERSION;
-const versionOutput = formatVersionInfo({
-  cliVersion: VERSION,
-  launcherVersion: launcherVersionEnv,
-  channel: launcherVersionEnv ? getUpdateChannel() : "prod",
-});
-
-program.name("fusebase").description("Fusebase Products CLI").version(versionOutput);
+program.name("fusebase").description("Fusebase Products CLI").version(VERSION);
 
 program.addCommand(authCommand);
 
@@ -56,29 +45,10 @@ program
   .command("version")
   .description("Print CLI version from package.json")
   .action(() => {
-    console.log(versionOutput);
+    console.log(VERSION);
   });
 
 const argv = process.argv.slice(2);
-
-// Windows launcher hard gate: a CLI flipped to by `fusebase update` self-rejects
-// when the on-PATH launcher is too old for its baked REQUIRED_LAUNCHER, except
-// remediation/info commands. Windows-only; no effect on macOS/Linux.
-if (process.platform === "win32") {
-  const localMode = await detectLinkedOrLocalCli();
-  const gate = evaluateLauncherGate({
-    platform: process.platform,
-    localLinked: localMode.linked,
-    launcherVersionEnv,
-    required: REQUIRED_LAUNCHER,
-    argv,
-  });
-  if (gate.block) {
-    console.error(gate.message);
-    process.exit(1);
-  }
-}
-
 const isUpdateCommand =
   argv[0] === "update" ||
   (argv[0] === "cli" && argv[1] === "update") ||
