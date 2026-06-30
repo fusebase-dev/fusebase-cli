@@ -64,8 +64,13 @@ build:
     - bun run build
     - bun "$RELEASE_SCRIPTS/installers/build-installer-win.ts"
     - |
-      if [[ "$SKIP_WINDOWS_SIGNING" == "1" ]]; then
+      VERSION=$(bun "$RELEASE_SCRIPTS/get-version.ts")
+      PROD_VERSION_TAG="v${VERSION}"
+
+      if [[ "${SKIP_WINDOWS_SIGNING:-}" == "1" ]]; then
         echo "Skipping Windows installer signing because SKIP_WINDOWS_SIGNING=1"
+      elif [[ "${CI_COMMIT_TAG:-}" != "$PROD_VERSION_TAG" ]]; then
+        echo "Skipping Windows installer signing because CI_COMMIT_TAG is not ${PROD_VERSION_TAG}"
       else
         bun "$RELEASE_SCRIPTS/signing/sign-exe.ts" build/installers/win/fusebase-installer-*.exe
       fi
