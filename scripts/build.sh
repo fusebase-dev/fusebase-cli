@@ -42,20 +42,11 @@ bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}-macos-x6
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}" --target=bun-linux-x64
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}.exe" --target=bun-windows-x64
 
-# Stable Windows launcher (fusebase.exe). Generate its auto-derived version
-# first (from the launcher source's last git change): this writes the value as a
-# baked literal into lib/launcher-version.ts (bun --compile does not bake
-# build-time env) and prints it for the artifact name + manifest launcherVersion.
-LAUNCHER_VERSION=$(bun "$PROJECT_ROOT/scripts/generate-launcher-version.ts")
-bun build ./launcher/index.ts --compile --outfile "build/fusebase-launcher-${LAUNCHER_VERSION}.exe" --target=bun-windows-x64
-echo "${LAUNCHER_VERSION}" > build/.launcher-version
-
-# Embed the FuseBase icon and version metadata into the Windows binaries.
+# Embed the FuseBase icon and version metadata into the Windows binary.
 # `bun build --windows-icon` only works on Windows hosts; on Linux CI we use
 # rcedit-x64.exe (via Wine, handled by the rcedit npm package) as a post-build
 # step. Wine must be installed in the build environment.
 bun "$PROJECT_ROOT/scripts/embed-windows-icon.ts" "build/fusebase-${VERSION}.exe" "${VERSION}"
-bun "$PROJECT_ROOT/scripts/embed-windows-icon.ts" "build/fusebase-launcher-${LAUNCHER_VERSION}.exe" "${LAUNCHER_VERSION}"
 
 rm dev-server-dist.zip project-template.zip feature-templates.zip ide-configs.zip managed-template.zip
 
