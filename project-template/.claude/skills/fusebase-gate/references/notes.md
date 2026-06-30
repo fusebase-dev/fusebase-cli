@@ -1,7 +1,7 @@
 ---
-version: "1.2.0"
+version: "1.3.0"
 mcp_prompt: notes
-last_synced: "2026-04-28"
+last_synced: "2026-06-30"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -14,7 +14,7 @@ category: specialized
 ---
 ## Fusebase Gate Notes Operations
 
-These operations manage workspace note folders, workspace notes, note reads, note creation, and stored-file attachment flows exposed by Gate.
+These operations manage workspace note folders, workspace notes, note reads, note creation, append-only note content updates, and stored-file attachment flows exposed by Gate.
 
 ## Relevant Operations
 
@@ -23,6 +23,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - getWorkspaceNote returns one workspace note together with markdown content.
 - createWorkspaceNoteFolder creates a workspace note folder.
 - createWorkspaceNote creates a workspace note and can optionally append initial content after creation.
+- appendWorkspaceNoteContent appends text or html to the end of an existing workspace note without replacing existing content.
 - addWorkspaceNoteAttachment attaches a `storedFileUUID` to a workspace note and appends the matching editor blot.
 
 ## Identity And Scoping Rules
@@ -50,6 +51,15 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - `format` defaults to `text`. Use `html` only when you are intentionally sending html content for the initial paste step.
 - `createWorkspaceNote` returns note summary metadata, not the final note body. Call `getWorkspaceNote` afterward when you need the resulting markdown.
 
+## Append Flow Rules
+
+- `appendWorkspaceNoteContent` requires a known `noteId` and non-empty `content`.
+- It always appends to the end of the existing note. Do not use it for replacement or full-document editing.
+- `format` defaults to `text`. Use `html` when the content is already rendered HTML or when preserving formatting from a Markdown source matters.
+- Gate reads note bodies as markdown via `getWorkspaceNote`, but editor-server append writes currently accept text or html, not a dedicated md body.
+- For Markdown input, prefer converting Markdown to HTML in the app and call `appendWorkspaceNoteContent` with `format: html`. If no renderer is available, send Markdown as `format: text` and expect only plain-text or editor-supported paste behavior.
+- `appendWorkspaceNoteContent` returns the refreshed note metadata and `note.md` after the append.
+
 ## Attachment Flow Rules
 
 - Upload files with the files operations first. Complete the upload and use the returned `storedFileUUID` for attachment creation. In Gate file responses this is file-service `storedFile.uuid` exposed as `storedFileUUID`; `fileId` is only an alias. Use the completion `readUrl` for direct file reads or image `src`.
@@ -60,7 +70,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 ## Access Model
 
 - Note reads require `notes.read` and org access.
-- Note creation and attachment writes require `notes.write` and org access.
+- Note creation, content append, and attachment writes require `notes.write` and org access.
 - If note-service or editor-server writes fail, verify caller permissions and workspace scope before assuming a schema mismatch.
 
 ## Working Rules
@@ -69,11 +79,12 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - Before creating notes in an unspecified/default workspace, call `listWorkspaces` and use the default workspace's real `id` instead of building note URLs with `/workspaces/default`.
 - For root note creation or listing, prefer omitting `parentId` instead of inventing a folder id.
 - If the caller needs note content after create, follow `createWorkspaceNote` with `getWorkspaceNote`.
+- If the caller wants to add content to an existing note, use `appendWorkspaceNoteContent` instead of creating a replacement note.
 ---
 
 ## Version
 
-- **Version**: 1.2.0
+- **Version**: 1.3.0
 - **Category**: specialized
-- **Last synced**: 2026-04-28
+- **Last synced**: 2026-06-30
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

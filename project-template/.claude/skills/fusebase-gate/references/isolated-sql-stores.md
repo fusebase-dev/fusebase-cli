@@ -2,7 +2,7 @@
 version: "1.1.2"
 mcp_prompt: none
 source: "docs/isolated-sql-stores.md"
-last_synced: "2026-06-26"
+last_synced: "2026-06-30"
 title: "Isolated SQL stores and migrations (Gate)"
 category: specialized
 ---
@@ -80,7 +80,7 @@ For `sql/postgres`, the current managed-store path already supports:
 - read-only RLS status introspection for Studio/support visibility
 - transaction-local RLS runtime context on SQL runtime calls
 - warn-only RLS manifest validation on migration status/apply/adopt
-- checkpoints and full stage restore (prod auto-checkpoint before migrations uses **admin** or **RLS-bypass** credentials for `pg_dump` when split roles + `FORCE RLS` are enabled — not the runtime role). **Azure server setup** (roles, secrets, Helm, `BYPASSRLS`): [isolated-postgres-azure-operations.md](./isolated-postgres-azure-operations.md)
+- checkpoints and full stage restore (prod auto-checkpoint before migrations uses **admin** or **RLS-bypass** credentials for `pg_dump` when split roles + `FORCE RLS` are enabled — not the runtime role). **Azure server setup** (roles, secrets, Helm, `BYPASSRLS`): [isolated-postgres-azure-operations.md](https://gitlab.com/fusebase/fusebase-gate/-/blob/master/docs/isolated-postgres-azure-operations.md)
 - provider-switchable snapshot storage (`local_file` or `azure_blob`)
 - Studio migration/status rendering via bundle metadata persisted by Gate
 
@@ -88,9 +88,18 @@ What it does not yet fully productize:
 
 - app release pipeline delivery of migration bundles
 - first-class snapshot preview API
-- completed SQL RLS enforcement layer
-- blocking RLS validation and runtime/migrator role split
+- **full** SQL RLS enforcement on every environment (requires real policies **and** `bypassRls=false` runtime role — see below)
+- blocking RLS manifest validation (still warn-only)
 - production-grade retention policy and pruning workflow for stored snapshots
+
+**Runtime/migrator role split (2026-06-29):**
+
+| Environment | Gate `ISOLATED_PG_RUNTIME_USER`                                            | Legacy stage DBs                              | RLS policies enforced?                                                       |
+| ----------- | -------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------- |
+| **dev**     | `isolated_pg_runtime` (`NOBYPASSRLS`)                                      | Operator bootstrap run on all dev `iso_*` DBs | **Only if** migrations define real policies (not `USING (true)` scaffolding) |
+| **prod**    | `isolated_pg_prod` (admin, legacy) until bootstrap + helm switch completes | Per-DB bootstrap in progress                  | **No** on legacy stores until runtime split lands                            |
+
+Scaffolding migrations (`ENABLE` + `FORCE` RLS + permissive `USING (true)`) are **not** a security boundary. Apps without enforcement policies still rely on **backend filters** and token scope until real policies ship **and** `getIsolatedStoreSqlRlsStatus` reports `bypassRls=false`.
 
 For the next production-pilot cut, the main remaining tasks are:
 
@@ -180,11 +189,25 @@ Existing legacy databases need an operator bootstrap before they can be treated 
 npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
 ```
 
-The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime DML/function/sequence privileges, and verifies that connecting as runtime reports `bypassRls=false` and `superuser=false`. Add `--transfer-ownership` only when the operator wants to move existing schema/table ownership to the migrator role; new auto-provisioned databases already use the migrator owner when split env is configured.
+The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime DML/function/sequence privileges (plus migrator journal + bypass snapshot `SELECT`), and verifies that connecting as runtime reports `bypassRls=false` and `superuser=false`.
+
+**Two ways to run it:**
+
+```bash
+# From fusebase-gate repo (local env file or gate pod ISOLATED_PG_*)
+npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
+
+# Shell script (same default: legacy-safe grants only)
+bash bin/bootstrap-iso-pg-rls-runtime.sh --database <stage_database>
+```
+
+Default mode is **grants only** (no ownership change). Add `--transfer-ownership` only when `ALTER TABLE` / migration apply fails with `must be owner of table …` on legacy admin-owned objects. New auto-provisioned databases already use the migrator owner when split env is configured.
+
+**Legacy store symptoms before bootstrap:** `permission denied for table fusebase_schema_migrations` (migrator), or `getIsolatedStoreSqlRlsStatus` shows `currentUser=isolated_pg_prod` + `bypassRls=true` while helm already points at `isolated_pg_runtime`.
 
 Studio/support "show all rows" views must not use normal request scope. Gate exposes separate read-only row endpoints for this mode: `countIsolatedStoreSqlRowsRlsBypass` and `selectIsolatedStoreSqlRowsRlsBypass`. They require `isolated_store.rls.bypass`, ignore request `rlsContext`, set trusted `app.rls_admin=true` in the same transaction, and log the actor/org/store/stage/table. Do not grant this permission to app runtime tokens.
 
-Tables that should be visible in Studio Admin must include an explicit read-only admin branch in their `SELECT` policies, for example: `current_setting('app.rls_admin', true) = 'true' OR (...)`. This is Azure-compatible because Azure Flexible Server does not let the configured administrator create arbitrary `BYPASSRLS` roles. Optional physical `BYPASSRLS` read roles are legacy/operator-specific and must not be required for the normal Studio Admin path. **Server-level role + secret setup on Azure:** [isolated-postgres-azure-operations.md](./isolated-postgres-azure-operations.md).
+Tables that should be visible in Studio Admin must include an explicit read-only admin branch in their `SELECT` policies, for example: `current_setting('app.rls_admin', true) = 'true' OR (...)`. This is Azure-compatible because Azure Flexible Server does not let the configured administrator create arbitrary `BYPASSRLS` roles. Optional physical `BYPASSRLS` read roles are legacy/operator-specific and must not be required for the normal Studio Admin path. **Server-level role + secret setup on Azure:** [isolated-postgres-azure-operations.md](https://gitlab.com/fusebase/fusebase-gate/-/blob/master/docs/isolated-postgres-azure-operations.md).
 
 Backend-mediated visitor flows should not tunnel reserved context through `rlsContext`. For service-token calls that act on a verified visitor portal/workspace context, use `trustedRuntimeContext.portalId` and/or `trustedRuntimeContext.workspaceId` on runtime SQL request bodies. Gate requires `isolated_store.rls.delegate` for this field and maps it to trusted transaction-local `app.portal_id` / `app.workspace_id`. Do not grant this permission to browser/client runtime tokens, and do not fill `trustedRuntimeContext` directly from user-controlled request payloads. For portal iframe embeds, obtain portal scope from verified `portalFeatureContextToken` — see [portal-embed-context.md](./portal-embed-context.md).
 
@@ -403,4 +426,4 @@ Those constraints should be enforced through repo templates, skills/prompts, cod
 
 - **Version**: 1.1.2
 - **Category**: specialized
-- **Last synced**: 2026-06-26
+- **Last synced**: 2026-06-30

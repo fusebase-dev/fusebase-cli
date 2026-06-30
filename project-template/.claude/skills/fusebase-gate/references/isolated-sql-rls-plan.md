@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-rls-plan.md"
-last_synced: "2026-06-19"
+last_synced: "2026-06-30"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
 ---
@@ -15,7 +15,7 @@ category: specialized
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-rls-plan.md"
-last_synced: "2026-06-15"
+last_synced: "2026-06-30"
 title: "Isolated SQL stores PostgreSQL RLS plan (Gate)"
 category: specialized
 ---
@@ -83,7 +83,7 @@ Not production-grade yet:
 
 - `rlsManifest` validation is warn-only and does not block unsafe migrations
 - custom `rlsContext` proves shape, not authorization; apps must authorize the scope before passing it, or policies must verify membership in the database by `org_id` and `user_id`
-- the isolated Postgres role split is not complete; runtime access can still be too privileged until migrator/runtime roles are separated
+- **runtime/migrator role split is environment-dependent:** **dev** (2026-06-29) uses `isolated_pg_runtime` with `NOBYPASSRLS` after operator bootstrap on legacy DBs; **prod** still on legacy `isolated_pg_prod` until per-DB bootstrap + helm `runtimeUser` switch completes
 - Studio does not provide direct policy editing and does not let operators inject arbitrary custom `rlsContext` while browsing data
 - CI linting for RLS manifests/migrations is not wired as a required release gate
 
@@ -846,13 +846,16 @@ Gate supports the split through optional isolated Postgres env vars:
 - `ISOLATED_PG_MIGRATOR_USER`
 - `ISOLATED_PG_MIGRATOR_PASSWORD`
 
-When these are configured for server-backed isolated Postgres stores, Gate resolves schema operations (`applyIsolatedStoreSqlMigrations`, baseline adoption, checksum repair) with the migrator credentials while runtime data/query paths keep using `ISOLATED_PG_RUNTIME_USER` / `ISOLATED_PG_RUNTIME_PASSWORD`. Auto-provisioned databases are created with the migrator as owner, Gate attempts to set the runtime role to `NOBYPASSRLS`, and migration apply grants runtime DML/function/sequence privileges on the target schema.
+When these are configured for server-backed isolated Postgres stores, Gate resolves schema operations (`applyIsolatedStoreSqlMigrations`, baseline adoption, checksum repair) with the migrator credentials while runtime data/query paths keep using `ISOLATED_PG_RUNTIME_USER` / `ISOLATED_PG_RUNTIME_PASSWORD`. Auto-provisioned databases are created with the migrator as owner; runtime `NOBYPASSRLS` posture is operator/bootstrap responsibility (`isolated-pg:bootstrap-rls-runtime`), not altered during stage DB provision. Migration apply grants runtime DML/function/sequence privileges on the target schema.
 
 For already-provisioned legacy databases, the role split is an explicit operator action because it changes PostgreSQL roles and privileges outside the migration journal. Gate ships a bootstrap command for this path:
 
 ```bash
 npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
+# or: bash bin/bootstrap-iso-pg-rls-runtime.sh --database <stage_database>
 ```
+
+Default: **legacy-safe grants only** (CONNECT + DML grants + default privileges; **no** ownership transfer). Use `--transfer-ownership` when migrator must own existing tables for `ALTER` / apply. Use `--skip-runtime-verify` only while helm still uses admin as runtime (pre-switch smoke).
 
 Required env before running it:
 
@@ -986,11 +989,13 @@ For `v1`, the right scope is:
 
 ### Phase 4 — Role split
 
-- next: add migrator role and runtime role to isolated Postgres config
-- next: create databases owned by migrator role, not runtime role
-- next: grant runtime role only the minimum DML privileges
-- next: make sure runtime role has no `BYPASSRLS` and is not table owner
-- next: add migration-time grants so app tables are usable by runtime without making runtime the owner
+- done: migrator + runtime env vars in Gate / Helm (`ISOLATED_PG_MIGRATOR_*`, `ISOLATED_PG_RUNTIME_*`)
+- done: auto-provisioned split databases owned by migrator when configured
+- done: operator bootstrap command (`isolated-pg:bootstrap-rls-runtime` + `bin/bootstrap-iso-pg-rls-runtime.sh` in image)
+- done: **dev** — helm `runtimeUser: isolated_pg_runtime`; legacy dev stage DBs bootstrapped; runtime verify `bypassRls=false`
+- in progress: **prod** — per-DB bootstrap on legacy stores, then helm `runtimeUser: isolated_pg_runtime` (after Azure admin `BYPASSRLS` restored for checkpoints)
+- next: gate provisioning must not run `NOBYPASSRLS` on admin when `runtimeUsername === adminUsername` until runtime is split
+- next: document app expectation — scaffolding `USING (true)` is not enforcement; real policies required for DB-layer security
 
 ### Phase 5 — Studio read-only UI
 
@@ -1054,11 +1059,11 @@ Expected Gate touch points:
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-06-15
+- **Last synced**: 2026-06-30
 ---
 
 ## Version
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-06-19
+- **Last synced**: 2026-06-30
