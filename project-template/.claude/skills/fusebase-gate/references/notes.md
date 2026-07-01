@@ -1,7 +1,7 @@
 ---
-version: "1.3.0"
+version: "1.4.0"
 mcp_prompt: notes
-last_synced: "2026-06-30"
+last_synced: "2026-07-01"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -48,16 +48,19 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - `createWorkspaceNoteFolder` requires a non-empty `title` and optionally accepts `parentId`.
 - `createWorkspaceNote` requires a non-empty `title` and optionally accepts `parentId`, `content`, and `format`.
 - `format` is only valid when `content` is provided.
-- `format` defaults to `text`. Use `html` only when you are intentionally sending html content for the initial paste step.
+- `format` defaults to `text`, which stores content literally. Markdown syntax (`#`, `**`, `>`) sent as `text` appears as raw characters in the editor.
+- When initial note content comes from Markdown, convert Markdown to HTML app-side and call `createWorkspaceNote` with `format: html`.
+- Use `format: text` only for plain text where literal Markdown characters are intended.
 - `createWorkspaceNote` returns note summary metadata, not the final note body. Call `getWorkspaceNote` afterward when you need the resulting markdown.
 
 ## Append Flow Rules
 
 - `appendWorkspaceNoteContent` requires a known `noteId` and non-empty `content`.
 - It always appends to the end of the existing note. Do not use it for replacement or full-document editing.
-- `format` defaults to `text`. Use `html` when the content is already rendered HTML or when preserving formatting from a Markdown source matters.
+- `format` defaults to `text`, which stores content literally. Markdown syntax (`#`, `**`, `>`) sent as `text` appears as raw characters in the editor.
 - Gate reads note bodies as markdown via `getWorkspaceNote`, but editor-server append writes currently accept text or html, not a dedicated md body.
-- For Markdown input, prefer converting Markdown to HTML in the app and call `appendWorkspaceNoteContent` with `format: html`. If no renderer is available, send Markdown as `format: text` and expect only plain-text or editor-supported paste behavior.
+- For Markdown input, convert Markdown to HTML in the app and call `appendWorkspaceNoteContent` with `format: html`. Do not send user-authored Markdown as `format: text` unless raw Markdown characters are the desired output.
+- Editor fidelity is not 1:1: headings, bold, italic, inline code, ordered/unordered lists, and links survive normal HTML paste; markdown blockquotes (`>`, rendered as `<blockquote>`) can degrade to plain paragraphs because of editor limitations.
 - `appendWorkspaceNoteContent` returns the refreshed note metadata and `note.md` after the append.
 
 ## Attachment Flow Rules
@@ -84,7 +87,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 
 ## Version
 
-- **Version**: 1.3.0
+- **Version**: 1.4.0
 - **Category**: specialized
-- **Last synced**: 2026-06-30
+- **Last synced**: 2026-07-01
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
