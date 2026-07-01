@@ -298,6 +298,40 @@ If no Gate SDK calls remain in the app, the synced `gate` set becomes empty, so 
 
 If `--permissions` is not passed, existing remote `dashboardView/database` permissions are preserved.
 
+### Backend-only Gate permissions
+
+Runtime `gate` permissions are embedded in the browser-visible app token (`gst`).
+Two categories are kept out of the browser and stored in
+`manifest.backendOnlyGatePermissions` instead:
+
+1. **Platform-fixed** (`isolated_store.rls.delegate`, `isolated_store.rls.bypass`) —
+   always split out automatically by `splitGatePermissionStrings`. Not app-configurable
+   (see [NIM-42003]).
+2. **App-declared store permissions** (`isolated_store.*`) — opt-in via
+   `--declare-backend-only-gate-permissions`.
+
+#### `--declare-backend-only-gate-permissions` (opt-in, legacy-safe)
+
+For **gateway apps** (the browser only calls the app's own `backend/`, which then
+calls Gate with a server-minted token — the Ovation pattern), the app's store
+permissions should never reach the browser `gst`. Passing this flag alongside
+`--sync-gate-permissions`:
+
+- moves analyzed `isolated_store.*` permissions out of runtime `gate` (control plane)
+  and into `manifest.backendOnlyGatePermissions`
+- leaves everything else (default sync) identical to the current prod CLI
+
+```bash
+fusebase app update <appId> --sync-gate-permissions --declare-backend-only-gate-permissions
+```
+
+Without the flag, if the app has a `backend/` folder and the synced set still
+contains `isolated_store.*`, the CLI prints a warning suggesting the flag. The flag
+requires `--sync-gate-permissions`.
+
+`deploy` preserves `manifest.backendOnlyGatePermissions` when it republishes the
+OpenAPI manifest, so app-declared store perms are not clobbered by a later deploy.
+
 ### Final request shape
 
 The backend receives one final replacement payload.
@@ -318,6 +352,7 @@ That means:
 | `app update <id> --permissions="..." --sync-gate-permissions` | Replace both sections in one request |
 | `app update <id> --access="..."` | Change access only; permissions untouched |
 | `app update <id> --access="..." --sync-gate-permissions` | Change access and replace `gate` |
+| `app update <id> --sync-gate-permissions --declare-backend-only-gate-permissions` | Replace `gate` minus `isolated_store.*`, which move to `manifest.backendOnlyGatePermissions` |
 
 ## `fusebase app create`
 

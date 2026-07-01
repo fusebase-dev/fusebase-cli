@@ -1,5 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import {
+  declareStorePermissionsBackendOnly,
+  isStoreGatePermission,
   mergeFeaturePermissions,
   parsePermissions,
   parsePrincipals,
@@ -375,6 +377,41 @@ describe("splitGatePermissionStrings", () => {
         "isolated_store.rls.bypass",
         "isolated_store.rls.delegate",
       ],
+    });
+  });
+});
+
+describe("isStoreGatePermission", () => {
+  it("matches isolated_store.* permissions", () => {
+    expect(isStoreGatePermission("isolated_store.read")).toBe(true);
+    expect(isStoreGatePermission("isolated_store.data.write")).toBe(true);
+    expect(isStoreGatePermission("org.groups.write")).toBe(false);
+    expect(isStoreGatePermission("files.write")).toBe(false);
+  });
+});
+
+describe("declareStorePermissionsBackendOnly", () => {
+  it("moves store permissions into backend-only, keeps non-store runtime", () => {
+    expect(
+      declareStorePermissionsBackendOnly([
+        "isolated_store.read",
+        "isolated_store.data.write",
+        "org.groups.write",
+        "files.write",
+      ]),
+    ).toEqual({
+      runtimePermissions: ["files.write", "org.groups.write"],
+      backendOnlyPermissions: [
+        "isolated_store.data.write",
+        "isolated_store.read",
+      ],
+    });
+  });
+
+  it("returns empty backend-only when there are no store permissions", () => {
+    expect(declareStorePermissionsBackendOnly(["org.groups.write"])).toEqual({
+      runtimePermissions: ["org.groups.write"],
+      backendOnlyPermissions: [],
     });
   });
 });

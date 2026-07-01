@@ -1,11 +1,14 @@
 import { Command } from "commander";
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { updateApp, fetchApps } from "../api.ts";
 import type { AppAccessPrincipal, AppPermissions } from "../api.ts";
 import { getConfig, loadFuseConfig } from "../config.ts";
 import { analyzeFeatureGatePermissions } from "../gate-sdk-analyze.ts";
 import {
+  declareStorePermissionsBackendOnly,
   formatPermissionItem,
+  isStoreGatePermission,
   mergeFeaturePermissions,
   parsePermissions,
   parsePrincipals,
@@ -16,6 +19,7 @@ export interface AppUpdateOptions {
   access?: string;
   permissions?: string;
   syncGatePermissions?: boolean;
+  declareBackendOnlyGatePermissions?: boolean;
 }
 
 export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions): Promise<void> {
@@ -45,6 +49,11 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     !options.syncGatePermissions
   ) {
     console.error("Error: No update options provided. Use --access=<principals>, --permissions=..., or --sync-gate-permissions.");
+    process.exit(1);
+  }
+
+  if (options.declareBackendOnlyGatePermissions && !options.syncGatePermissions) {
+    console.error("Error: --declare-backend-only-gate-permissions requires --sync-gate-permissions.");
     process.exit(1);
   }
 
@@ -99,6 +108,26 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       const split = splitGatePermissionStrings(gateAnalysis.gatePermissions);
       gatePermissions = split.runtimePermissions;
       backendOnlyGatePermissions = split.backendOnlyPermissions;
+
+      if (options.declareBackendOnlyGatePermissions) {
+        // Opt-in: move app-owned store perms out of the browser-embedded
+        // runtime set into the backend-only manifest list.
+        const declared = declareStorePermissionsBackendOnly(gatePermissions);
+        gatePermissions = declared.runtimePermissions;
+        backendOnlyGatePermissions = [
+          ...backendOnlyGatePermissions,
+          ...declared.backendOnlyPermissions,
+        ]
+          .filter((p, i, all) => all.indexOf(p) === i)
+          .sort((a, b) => a.localeCompare(b));
+      } else if (
+        existsSync(join(resolve(process.cwd(), featureConfig.path), "backend")) &&
+        gatePermissions.some(isStoreGatePermission)
+      ) {
+        console.warn(
+          "Warning: store permissions will be embedded in browser gst. For gateway apps use --declare-backend-only-gate-permissions.",
+        );
+      }
     }
 
     const updateRequest: {
@@ -168,4 +197,8 @@ export const appUpdateCommand = new Command("update")
   .option("--access <principals>", "Set access principals, comma-separated (e.g., visitor or the org roles like orgRole:member, etc.)")
   .option("--permissions <permissions>", "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read)")
   .option("--sync-gate-permissions", "Analyze this app path and sync generated Gate permissions")
+  .option(
+    "--declare-backend-only-gate-permissions",
+    "Opt-in: declare app store permissions (isolated_store.*) as backend-only in manifest.backendOnlyGatePermissions instead of embedding them in the browser gst (gateway apps). Requires --sync-gate-permissions.",
+  )
   .action(runAppUpdate);
