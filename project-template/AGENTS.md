@@ -468,7 +468,7 @@ For one-click client onboarding into AI Apps, load **`references/app-magic-links
 
 **Magic-link session exchange (Test vs Production).** The only **mandatory** post-activation step for every magic-link app is the backend exchange: SPA `POST`s `{ featureToken, sessionToken }` to `/api/account/from-magic-link` (or another app-owned route), backend builds a Gate client with `x-app-feature-token` + `EverHelper-Session-ID: <sessionToken>` and calls `getMyOrgAccess` to resolve `userId`. **HMAC-signed app-owned session cookies are only required in Production** (Memberspace, role-gated UI). **Smoke tests must not run `fusebase secret create` for `APP_SESSION_SECRET`** — and `fusebase secret create` must **never** be used for already-public values like `FUSEBASE_ORG_ID` (read from `fusebase.json`), `productId`, the app subdomain, or `FBS_*` config. See **`app-backend/SKILL.md` → "Magic-link session exchange"** for the Test/Production split, the no-secrets list, and the agent checklist.
 <% if (it.flags?.includes("isolated-stores")) { %>
-For isolated SQL schema work, loading only `fusebase-gate/SKILL.md` is insufficient. Also load and follow `references/isolated-sql-migration-discipline.md`, `references/isolated-sql.md`, and `references/isolated-sql-stores.md` as hard invariants.
+For isolated SQL schema work, loading only `fusebase-gate/SKILL.md` is insufficient. Also load and follow `references/isolated-sql-migration-discipline.md`, `references/isolated-sql.md`, and `references/isolated-sql-integrator-troubleshooting.md` as hard invariants. Do **not** use operator runbooks (`isolated-sql-stores`, `isolated-sql-rls-plan`) — they are platform-internal.
 <% } %>
 
 ### ✅ file-upload
