@@ -262,7 +262,6 @@ export const KNOWN_FLAGS = [
   "postgres-rls",
   "legacy-dashboards-db",
   "portal-specific-apps",
-  "app-portal-embeds-list",
   "api-exploration",
   "job-sidecars",
   "cross-app-api-calls-analysis",
@@ -283,8 +282,6 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Expose dashboard DB/dashboard creation guidance and enable dashboard-service database/dashboard management permissions in MCP tokens.",
   "portal-specific-apps":
     "Include portal-specific app prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
-  "app-portal-embeds-list":
-    "Enable app portal embed discovery command and generated app guidance.",
   "api-exploration":
     "Include api-exploration skill for verifying API endpoints with temporary tokens and test scripts.",
   "job-sidecars":

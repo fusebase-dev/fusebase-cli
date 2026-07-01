@@ -107,7 +107,6 @@ Options:
 - Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; isolated stores emphasis)
 - Global flag `isolated-stores` enables isolated stores functionality (SQL/NoSQL), including required Fusebase Gate references and `isolated_store.*` permissions in `fusebase env create`
 - Global flag `portal-specific-apps` includes portal-specific prompts/guidance (`fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` filter references, and `/auth/context` portal runtime context notes)
-- Global flag `app-portal-embeds-list` enables `fusebase app portal-embeds <appId>` and generated app guidance for listing portal pages where an app is embedded
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 
@@ -627,7 +626,6 @@ Contracts are **authored and validated locally but verified centrally** — ther
 fusebase app update <appId> --permissions="dashboardView.dash1:view1.read,write" --sync-gate-permissions
 ```
 
-<% if (it.flags?.includes("app-portal-embeds-list")) { %>
 ### List Portal Embeds
 
 ```bash
@@ -635,7 +633,6 @@ fusebase app portal-embeds <appId>
 ```
 
 Lists portal pages in the current org where the app is embedded. Output includes portal name, page title when available, and URL. Empty results print `No portal embeds found for this app.`.
-<% } %>
 
 ## Typical Workflow
 

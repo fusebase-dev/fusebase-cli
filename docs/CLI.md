@@ -343,7 +343,6 @@ fusebase app portal-embeds <appId>
 - App must be initialized (`fusebase init`)
 - API key must be configured (`fusebase auth`)
 - `fusebase.json` must contain `orgId` and `productId`
-- `app-portal-embeds-list` flag must be enabled (`fusebase config set-flag app-portal-embeds-list`)
 
 **Behavior**:
 
