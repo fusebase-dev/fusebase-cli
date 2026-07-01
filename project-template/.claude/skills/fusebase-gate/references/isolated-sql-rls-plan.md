@@ -852,7 +852,7 @@ For already-provisioned legacy databases, the role split is an explicit operator
 
 ```bash
 npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
-# or: bash bin/bootstrap-iso-pg-rls-runtime.sh --database <stage_database>
+# or: bash local/bootstrap/bootstrap-iso-pg-rls-runtime.sh --database <stage_database>
 ```
 
 Default: **legacy-safe grants only** (CONNECT + DML grants + default privileges; **no** ownership transfer). Use `--transfer-ownership` when migrator must own existing tables for `ALTER` / apply. Use `--skip-runtime-verify` only while helm still uses admin as runtime (pre-switch smoke).
@@ -991,7 +991,7 @@ For `v1`, the right scope is:
 
 - done: migrator + runtime env vars in Gate / Helm (`ISOLATED_PG_MIGRATOR_*`, `ISOLATED_PG_RUNTIME_*`)
 - done: auto-provisioned split databases owned by migrator when configured
-- done: operator bootstrap command (`isolated-pg:bootstrap-rls-runtime` + `bin/bootstrap-iso-pg-rls-runtime.sh` in image)
+- done: operator bootstrap command (`isolated-pg:bootstrap-rls-runtime` + `local/bootstrap/bootstrap-iso-pg-rls-runtime.sh`; `bin/` path in image)
 - done: **dev** — helm `runtimeUser: isolated_pg_runtime`; legacy dev stage DBs bootstrapped; runtime verify `bypassRls=false`
 - in progress: **prod** — per-DB bootstrap on legacy stores, then helm `runtimeUser: isolated_pg_runtime` (after Azure admin `BYPASSRLS` restored for checkpoints)
 - next: gate provisioning must not run `NOBYPASSRLS` on admin when `runtimeUsername === adminUsername` until runtime is split

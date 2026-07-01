@@ -198,7 +198,7 @@ The bootstrap ensures the runtime role exists with `NOBYPASSRLS`, grants runtime
 npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
 
 # Shell script (same default: legacy-safe grants only)
-bash bin/bootstrap-iso-pg-rls-runtime.sh --database <stage_database>
+bash local/bootstrap/bootstrap-iso-pg-rls-runtime.sh --database <stage_database>
 ```
 
 Default mode is **grants only** (no ownership change). Add `--transfer-ownership` only when `ALTER TABLE` / migration apply fails with `must be owner of table …` on legacy admin-owned objects. New auto-provisioned databases already use the migrator owner when split env is configured.

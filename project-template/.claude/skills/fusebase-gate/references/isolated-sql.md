@@ -1,7 +1,7 @@
 ---
 version: "1.8.14"
 mcp_prompt: isolatedSql
-last_synced: "2026-06-23"
+last_synced: "2026-06-30"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -96,9 +96,20 @@ For existing legacy stage databases, an operator can bootstrap the runtime role 
 
 ```bash
 npm run isolated-pg:bootstrap-rls-runtime -- --database <stage_database> --schema public
+# or: bash local/bootstrap/bootstrap-iso-pg-rls-runtime.sh --database <stage_database>
 ```
 
-Use **`--transfer-ownership`** only when moving existing object ownership to the migrator role is required. After bootstrap and Gate env update, re-check **`getIsolatedStoreSqlRlsStatus`** before claiming native RLS.
+Default: **grants only**. Use `--transfer-ownership` when `ALTER TABLE` / apply fails with `must be owner`. Re-check **`getIsolatedStoreSqlRlsStatus`** after bootstrap — expect **`bypassRls=false`** on dev once helm uses `isolated_pg_runtime`.
+
+### Postgres with RLS enforcement vs without
+
+| | **Without DB enforcement** | **With DB enforcement** |
+|---|---------------------------|-------------------------|
+| Typical signal | `bypassRls=true` or policies `USING (true)` | `bypassRls=false` + real policies |
+| Row filtering | App/backend SQL filters | PostgreSQL RLS + Gate `app.*` session settings |
+| Portal apps | Backend filters + optional `trustedRuntimeContext` | Same + RLS on scope columns (`portal_id`, etc.) |
+
+Scaffolding RLS migrations are **not** a security boundary. Do not claim per-row DB isolation until runtime split **and** enforcement policies are live on that stage.
 
 Studio/support view-all rows must use the separate read-only RLS-bypass path, not normal runtime reads: **`countIsolatedStoreSqlRowsRlsBypass`** and **`selectIsolatedStoreSqlRowsRlsBypass`**. These require **`isolated_store.rls.bypass`**; Gate sets trusted transaction-local **`app.rls_admin=true`**, so tables that should be visible in Admin must include an explicit admin branch in SELECT policies. Do not grant this permission to app runtime tokens.
 
