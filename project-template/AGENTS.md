@@ -170,8 +170,10 @@ SDK token usage in app runtime:
 - `.env` is NOT accessible in browser
 - LLM must never assume `.env` tokens in UI code
 - Direct SDK / Fusebase proxy calls pass the token via `x-app-feature-token`
-- Calls to the app's own backend (`/api/*`) must assume deployed platform proxies may strip `x-app-feature-token`; backend handlers must read header or fallback to cookie `fbsfeaturetoken`
-- For user-facing Gate flows, auth must stay in user context (app token). Do not silently fall back to service-account tokens.
+- Calls to the app's own backend (`/api/*`) must assume deployed platform proxies may strip `x-app-feature-token`; backend handlers must read header or fallback to cookie `fbsfeaturetoken` when the route needs **visitor app-proxy auth** (most `/api/*` traffic).
+- For user-facing Gate **reads** of the current user (`getMyOrgAccess`, role-gated UI), stay in user context: app token from the request plus `EverHelper-Session-ID` when a session exists. Do not use the backend service token to impersonate the visitor.
+- **Exception — privileged provisioning:** trusted BFF routes such as `POST /api/account/register` that call `registerFusebaseOrgMember` or `addOrgUser` must use `process.env.FBS_FEATURE_TOKEN` for the Gate call (see `fusebase-gate/references/fusebase-auth.md`). The visitor cookie on the incoming request is not sufficient for org membership writes; that is not a "fallback" for user identity — it is a separate server-side provisioning step.
+- **`window.FBS_FEATURE_TOKEN` / cookie `fbsfeaturetoken`** (browser) and **`process.env.FBS_FEATURE_TOKEN`** (backend env) are different artifacts — same name, different scope. Browser token is visitor JWE; backend env is the deploy-time service token with app permissions.
 - Public/visitor apps can open with a visitor app token, but visitor tokens normally do **not** receive isolated-store permissions. For public portal reads/writes, use an app backend with a service token plus trusted portal/workspace context. Prefer `trustedRuntimeContext.portalId` / `trustedRuntimeContext.workspaceId` when the token has `isolated_store.rls.delegate`; if unavailable in the target environment, a custom `rlsContext` key such as `req_portal_id` is only a reviewed temporary fallback derived from trusted auth context.
 - In local `fusebase dev start`, `FBS_FEATURE_TOKEN` may be absent in backend env. Backend-only service-token code may use `process.env.FBS_FEATURE_TOKEN ?? process.env.GATE_MCP_TOKEN` for dev, but browser/UI code must never read `.env` or use MCP/service tokens.
 
@@ -179,8 +181,9 @@ SDK token usage in app runtime:
 
 - LLM must NOT use SDK token during development
 - Browser runtime authenticates direct SDK / Fusebase proxy calls using `x-app-feature-token`
-- App backend auth must be implemented as `header || cookie('fbsfeaturetoken')`
-- User-facing Gate endpoints must fail closed on missing/invalid app token (`401/403`) instead of using a service-token fallback path
+- App backend auth for **app-proxy forwarding** is `header || cookie('fbsfeaturetoken')` on routes that need a visitor token to reach the backend.
+- User-facing Gate **identity** endpoints: fail closed on missing/invalid app token; use session header when required — do not substitute `FBS_FEATURE_TOKEN`.
+- User-facing Gate **org provisioning** (`registerFusebaseOrgMember`, `addOrgUser`): use `FBS_FEATURE_TOKEN` inside the BFF handler only (see `fusebase-gate/references/fusebase-auth.md`).
 
 ## LLM Checklist
 

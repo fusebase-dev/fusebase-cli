@@ -1,7 +1,7 @@
 ---
-version: "1.2.0"
+version: "1.3.0"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-05-28"
+last_synced: "2026-07-01"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -18,6 +18,8 @@ category: specialized
 - [Relevant Operations](#relevant-operations)
 - [Architecture Rules](#architecture-rules)
 - [Org Onboarding](#org-onboarding)
+- [Public Registration With Org Membership](#public-registration-with-org-membership)
+- [Two Names For Feature Token](#two-names-for-feature-token)
 - [App `accessPrincipals` Vs Org Membership](#app-accessprincipals-vs-org-membership)
 - [Visitor Access Vs Open API (Platform Edge)](#visitor-access-vs-open-api-platform-edge)
 - [Magic-Link → App Session Exchange](#magic-link--app-session-exchange)
@@ -57,6 +59,23 @@ These operations help AI Apps add Fusebase account registration, login, logout, 
 - Default org role is `client`. Send `orgRole` only when the app intentionally grants another role and the caller has permission to do so.
 - The operation uses `org.members.write`; expose it only through a trusted app backend or a properly scoped feature token. Do not build an unauthenticated public form that can choose arbitrary org ids or roles.
 - If auth-form returns a challenge during registration, complete the challenge first and retry the registration flow as appropriate. Membership is added only after an authenticated registration response includes a `userId`.
+
+## Public Registration With Org Membership
+
+Acceptance flows that require `registerFusebaseOrgMember` (create account **and** add org membership) use a **two-token BFF pattern**. A `403 Authenticated user-bound context is required (authType=visitor)` is **not** "the platform blocks org join" — it means Gate was called with a **visitor** token instead of the backend service token.
+
+- **Browser → app backend** (`POST /api/account/register` or similar): the request may carry visitor `fbsfeaturetoken` / `x-app-feature-token` so the app-proxy forwards `/api/*`. That token is **not** sufficient for org membership writes.
+- **App backend → Gate** (`registerFusebaseOrgMember`, `addOrgUser`): use `process.env.FBS_FEATURE_TOKEN` — the platform-issued **service token** minted at deploy with `org.members.write` (subject = app owner). In local `fusebase dev`, backend-only provisioning may use `process.env.FBS_FEATURE_TOKEN ?? process.env.GATE_MCP_TOKEN`; browser/UI must never use MCP tokens.
+- Do **not** forward the incoming request's visitor cookie to Gate for `registerFusebaseOrgMember` or `addOrgUser`. Do **not** store an admin session in secrets as a workaround.
+- `orgId` in the Gate path must come from `fusebase.json` (`orgId`), never from user input in the registration body.
+- Grant `org.members.write` on the app feature (`fusebase sync` / redeploy) before testing registration-with-membership.
+- Alternative for instant client onboarding without auth-form confirm-email: `registerFusebaseUser` then `addOrgUser` with `orgRole: "client"` and `autoConfirmClientInvite: true` — still via `FBS_FEATURE_TOKEN` on the backend.
+- After success, set the returned `sessionId` as an app-domain cookie and verify membership with `getMyOrgAccess` (session header + feature token as documented for user-context reads).
+
+## Two Names For Feature Token
+
+- **`window.FBS_FEATURE_TOKEN` / cookie `fbsfeaturetoken`** (browser): visitor-scoped JWE from `/_auth/` for SPA and app-proxy. Cannot perform `org.members.write`.
+- **`process.env.FBS_FEATURE_TOKEN`** (backend pod env): deploy-time Gate **service** token with app permissions. Required for privileged provisioning from trusted BFF routes.
 
 ## App `accessPrincipals` Vs Org Membership
 
@@ -135,12 +154,15 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 - Do not put these app routes under `/api/auth/*` in generated app backends; deployed platform proxies may reserve that prefix. Prefer `/api/account/*` or another app-owned prefix.
 - Do not confuse Fusebase platform cookies with app-domain cookies. The app must own its fallback session cookie on its own domain.
 - Do not call org provisioning from login. If a user already has a stronger role, a login-time provisioning call can accidentally change the intended access model.
+- Do not call `registerFusebaseOrgMember` or `addOrgUser` from the SPA directly to Gate, and do not forward visitor `fbsfeaturetoken` from the signup request into those ops.
+- Do not downgrade a flow that requires org membership to account-only (`registerFusebaseUser`) without explicit product approval — `registerFusebaseUser` never adds org membership.
+- `403` with `authType=visitor` on org-write ops: fix backend token wiring (`FBS_FEATURE_TOKEN` + `org.members.write`), not platform policy.
 - Do not expose `sessionId` to localStorage. Prefer server-set cookies; if a pure SPA has to handle it, keep the lifetime short and document the tradeoff.
 ---
 
 ## Version
 
-- **Version**: 1.2.0
+- **Version**: 1.3.0
 - **Category**: specialized
-- **Last synced**: 2026-05-28
+- **Last synced**: 2026-07-01
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

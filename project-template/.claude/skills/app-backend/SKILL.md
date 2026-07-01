@@ -377,11 +377,24 @@ Public webhook URL: `https://{FEATURE_DOMAIN}/api/webhooks/...`
 
 For external WebSocket integrations, use a path under `/api/webhooks/...` as well (example: `/api/webhooks/twilio-stream-<random-secret>`).
 
-### Service-account token for webhooks
+### Service-account token (`FBS_FEATURE_TOKEN`)
 
-Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token.
+Use `process.env.FBS_FEATURE_TOKEN` when the backend must call Gate **without** the end-user's Fusebase session:
 
-**Security rule**: use `FBS_FEATURE_TOKEN` only in system/background routes (webhooks, scheduled jobs). User-facing routes must fail closed (`401/403`) on a missing/invalid app token — do not fall back to the service-account token.
+1. **Webhooks / cron** — no browser session at all
+2. **Privileged provisioning** — public signup BFF routes that call `registerFusebaseOrgMember` or `addOrgUser` on behalf of a new visitor
+
+`FBS_FEATURE_TOKEN` is the platform-issued service token minted at deploy (with permissions such as `org.members.write`). See **`fusebase-gate/references/fusebase-auth.md`** (§ Public Registration With Org Membership, § Two Names For Feature Token).
+
+**Security rules:**
+
+- Never expose `FBS_FEATURE_TOKEN` to the browser or SPA bundles.
+- Do **not** use it as a fallback when resolving **who the current user is** (`getMyOrgAccess`, role-gated UI) — those need the visitor/user app token plus `EverHelper-Session-ID` when applicable.
+- **Do** use it inside trusted BFF handlers that perform org membership writes after validating signup input server-side.
+- On routes like `POST /api/account/register`, incoming `header || cookie('fbsfeaturetoken')` is only for app-proxy auth; the Gate SDK client inside the handler must use `FBS_FEATURE_TOKEN`, not the forwarded visitor cookie.
+- In local `fusebase dev`, backend-only provisioning may use `process.env.FBS_FEATURE_TOKEN ?? process.env.GATE_MCP_TOKEN`.
+
+**Not a service-token route:** ordinary user-context Gate reads/writes where the acting user is the logged-in visitor — use the request app token and session header, not `FBS_FEATURE_TOKEN`.
 
 ## Dev Proxy
 
