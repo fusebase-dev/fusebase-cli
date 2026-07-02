@@ -1,159 +1,20 @@
 /**
- * Helpers for the `/link` magic-link activation route.
+ * Legacy `/link` magic-link route helper.
  *
- * The page lives at `https://{featureSub}.{appHost}/link?id=<globalId>&redirect=/some/path`.
- * Calls Gate `activateAppMagicLink({ path: { globalId } })`, persists the returned
- * tokens as cookies, then redirects. See `.claude/skills/fusebase-gate/references/app-magic-links.md`.
- *
- * Pure helpers only — no React, no SDK imports — so the unit test runs in plain Bun without JSDOM.
+ * Magic-link activation is handled server-side by the platform at
+ * `/_auth/magiclink/{key}`: fusebase-gate activates the link, sets HttpOnly
+ * session cookies, and redirects. The SPA no longer activates links or writes
+ * session cookies via JS; it only forwards old `/link?id={key}` email URLs to
+ * the platform endpoint. The `redirect` query param is ignored — the platform
+ * reads the stored `redirectPath` from the link itself.
  */
 
 export const MAGIC_LINK_ROUTE = '/link'
-export const FEATURE_TOKEN_COOKIE = 'fbsfeaturetoken'
-export const SESSION_COOKIE = 'eversessionid'
-// Separate from the Gate feature token: dashboard-service SDK calls authenticate
-// with a token scoped to the dashboard product. In the deployed app-wrapper flow
-// both tokens are bundled into a single JWT; the magic-link activation receives
-// them as discrete strings, so the SPA must persist both.
-export const DASHBOARD_TOKEN_COOKIE = 'fbsdashboardtoken'
+export const PLATFORM_MAGIC_LINK_PATH = '/_auth/magiclink/'
 
-export type LinkActivationFailure = 'expired' | 'revoked' | 'not_found' | 'unknown'
-
-/** Reject any value that is not a same-origin relative path. */
-export function sanitizeRedirectPath(input: string | null | undefined): string {
-  if (typeof input !== 'string' || input.length === 0) return '/'
-  if (!input.startsWith('/')) return '/'
-  if (input.startsWith('//')) return '/'
-  if (input.includes('\\')) return '/'
-  return input
-}
-
-/** Parse `?id=...&redirect=...`. Returns null when `id` is missing. */
-export function parseLinkParams(search: string): { id: string; redirect: string } | null {
-  const params = new URLSearchParams(search)
-  const id = params.get('id')
+/** Map a legacy `/link?id={key}` query string to the platform activation path. Null when `id` is missing. */
+export function buildLegacyMagicLinkRedirect(search: string): string | null {
+  const id = new URLSearchParams(search).get('id')
   if (!id) return null
-  return { id, redirect: sanitizeRedirectPath(params.get('redirect')) }
-}
-
-/**
- * Map an SDK `ApiError`-shaped value to a stable failure code.
- * Reads `body.reason` ("expired" / "revoked") then falls back to status code.
- */
-export function parseActivationError(error: unknown): LinkActivationFailure {
-  if (!error || typeof error !== 'object') return 'unknown'
-  const err = error as Record<string, unknown>
-  const candidates: Record<string, unknown>[] = []
-  for (const candidate of [err, err['body'], err['data'], err['error']]) {
-    if (candidate && typeof candidate === 'object') {
-      candidates.push(candidate as Record<string, unknown>)
-    }
-  }
-  for (const c of candidates) {
-    const reason = c['reason']
-    if (reason === 'expired' || reason === 'revoked') return reason
-  }
-  const status =
-    typeof err['status'] === 'number'
-      ? err['status']
-      : typeof err['statusCode'] === 'number'
-        ? err['statusCode']
-        : undefined
-  if (status === 404) return 'not_found'
-  return 'unknown'
-}
-
-/**
- * Resolve the Gate SDK base URL.
- *
- * Priority: explicit override (`VITE_FUSEBASE_GATE_URL`) > app hostname heuristic > prod.
- * Heuristic recognises Fusebase-managed app domains; for custom domains set
- * `VITE_FUSEBASE_GATE_URL=https://<your-gate-host>/v4/api/proxy/gate-service/v1` at
- * build time (Vite inlines `import.meta.env.VITE_*` constants).
- */
-export function deriveGateBaseUrl(opts?: { hostname?: string; override?: string | null }): string {
-  const override = opts?.override
-  if (typeof override === 'string' && override.length > 0) return override
-  const hostname =
-    typeof opts?.hostname === 'string'
-      ? opts.hostname
-      : typeof window !== 'undefined' && window.location
-        ? window.location.hostname
-        : ''
-  if (hostname.endsWith('.dev-thefusebase-app.com')) {
-    return 'https://app-api.dev-thefusebase.com/v4/api/proxy/gate-service/v1'
-  }
-  if (hostname.endsWith('.thefusebase-app.com') || hostname.endsWith('.thefusebase.app')) {
-    return 'https://app-api.thefusebase.com/v4/api/proxy/gate-service/v1'
-  }
-  return 'https://app-api.thefusebase.com/v4/api/proxy/gate-service/v1'
-}
-
-/**
- * Build a `document.cookie` string with sane defaults for the activation flow.
- * `Secure` is omitted for non-HTTPS so it works against `http://localhost` during dev.
- */
-export function buildLinkCookie(
-  name: string,
-  value: string,
-  opts?: { isSecure?: boolean; maxAgeSeconds?: number },
-): string {
-  const parts = [
-    `${name}=${encodeURIComponent(value)}`,
-    'path=/',
-    'SameSite=Lax',
-  ]
-  if (typeof opts?.maxAgeSeconds === 'number' && opts.maxAgeSeconds > 0) {
-    parts.push(`Max-Age=${Math.floor(opts.maxAgeSeconds)}`)
-  }
-  if (opts?.isSecure) parts.push('Secure')
-  return parts.join('; ')
-}
-
-export interface ActivationResponseShape {
-  sessionToken?: string | null
-  featureToken?: string | null
-  dashboardToken?: string | null
-  redirectPath?: string | null
-}
-
-export interface ActivationOutcome {
-  redirectTarget: string
-  cookies: Array<{ name: string; cookie: string }>
-}
-
-/**
- * Pure: pick the redirect target and prepare cookie strings from an activation response.
- *
- * Both the server-returned `redirectPath` and the URL fallback are funnelled through
- * `sanitizeRedirectPath` — protects against `//evil.com` open-redirects regardless of
- * which side produced the value (CR feedback round 1 on NIM-41013).
- */
-export function selectActivationOutcome(
-  response: ActivationResponseShape,
-  fallbackRedirect: string,
-  cookieOpts: { isSecure: boolean; maxAgeSeconds: number },
-): ActivationOutcome {
-  const serverRedirect = sanitizeRedirectPath(response.redirectPath)
-  const redirectTarget = serverRedirect !== '/' ? serverRedirect : sanitizeRedirectPath(fallbackRedirect)
-  const cookies: Array<{ name: string; cookie: string }> = []
-  if (response.featureToken) {
-    cookies.push({
-      name: FEATURE_TOKEN_COOKIE,
-      cookie: buildLinkCookie(FEATURE_TOKEN_COOKIE, response.featureToken, cookieOpts),
-    })
-  }
-  if (response.dashboardToken) {
-    cookies.push({
-      name: DASHBOARD_TOKEN_COOKIE,
-      cookie: buildLinkCookie(DASHBOARD_TOKEN_COOKIE, response.dashboardToken, cookieOpts),
-    })
-  }
-  if (response.sessionToken) {
-    cookies.push({
-      name: SESSION_COOKIE,
-      cookie: buildLinkCookie(SESSION_COOKIE, response.sessionToken, cookieOpts),
-    })
-  }
-  return { redirectTarget, cookies }
+  return `${PLATFORM_MAGIC_LINK_PATH}${encodeURIComponent(id)}`
 }
