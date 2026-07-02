@@ -262,6 +262,12 @@ export async function runProductUpdate(opts: ProductUpdateOptions): Promise<void
             const cliUpdateResult = await runCliSelfUpdate();
             if (cliUpdateResult.status === "updated") {
               summary.cliUpdate = "updated";
+              if (process.platform === "win32") {
+                console.log("");
+                console.log("CLI installer handoff started for Windows.");
+                console.log("Complete the installer, then run `fusebase update` again.");
+                return;
+              }
             } else if (cliUpdateResult.status === "already-up-to-date") {
               summary.cliUpdate = "no changes";
             } else {

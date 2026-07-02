@@ -75,8 +75,7 @@ bun index.ts [command]
 - `dev start` - Start the development server (creates per-session debug logs in the selected app directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
 - `secret create` - Create app secrets with empty values (`--app <id> --secret KEY:description`); prints URL to set values. `--feature` is accepted as a deprecated alias for `--app`.
-- `update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed deps/install), outside app directory runs CLI binary update only; use `--skip-product` for CLI-only mode even inside app. On Windows the CLI self-update is a **cache swap** under `%LOCALAPPDATA%\FuseBase\CLI\` (no installer, no elevation, no exit) and continues remaining stages in the same run. `--launcher` (Windows-only) refreshes the stable launcher `fusebase.exe` via the elevated installer; no-op on macOS/Linux. See `docs/WINDOWS_LAUNCHER.md`.
-- `--previous-version` - Windows launcher escape hatch (handled by the launcher before exec): `fusebase --previous-version <cmd>` runs the retained previous cached CLI version for that one invocation.
+- `update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed deps/install), outside app directory runs CLI binary update only; use `--skip-product` for CLI-only mode even inside app. On Windows, CLI self-update launches the installer and exits; rerun after installation to continue app stages.
 - `config set-flag <flag>` - Enable an experimental flag (e.g. `server`, `mcp-beta`)
 - `config remove-flag <flag>` - Disable an experimental flag
 - `config flags` - Manage experimental flags (interactive selector in TTY; use `--list` for non-interactive output)
@@ -218,7 +217,6 @@ When modifying CLI commands (adding/removing options, changing behavior, or addi
 - `project-template/.claude/skills/fusebase-cli/SKILL.md` - User-facing CLI documentation that gets copied into new projects
 - `project-template/AGENTS.md` - It may be updated as well, as it contains description of some commands
 - `docs/PERMISSIONS.md` - Canonical app permissions model (`dashboardView`, `database`, `gate`, analyze + sync flow)
-- `docs/WINDOWS_LAUNCHER.md` - When changing the Windows launcher, the versioned cache, `fusebase update` Windows behavior, `update --launcher`, `--previous-version`, or the release pipeline that bundles/signs the launcher
 - `docs/APP_API_CONTRACTS.md` - When changing `fusebase app-api-contracts` or the local consumer contract format/discovery convention
 - `docs/FUSEBASE_GATE_META.md` - When changing `fusebase analyze gate` or `fusebaseGateMeta` in `fusebase.json`
 - `docs/APP_API_DEPENDENCIES.md` - When changing `fusebase analyze app-apis` or `fusebaseAppApiDependenciesMeta` in `fusebase.json`

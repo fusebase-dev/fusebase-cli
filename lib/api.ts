@@ -145,7 +145,6 @@ export interface ProductAppPortalEmbed {
     title?: string;
   };
   url: string;
-  kind?: 'app-feature' | 'iframe';
 }
 
 export interface ProductAppPortalEmbedsResponse {
