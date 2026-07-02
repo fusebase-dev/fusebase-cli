@@ -187,6 +187,41 @@ export function withTrustedRuntimeContextDelegatePermission(
   ]);
 }
 
+/**
+ * App-owned store (data-plane) Gate permissions. Unlike the platform-fixed
+ * delegate/bypass in BACKEND_ONLY_GATE_PERMISSIONS, these are declared as
+ * backend-only per-app via the opt-in --declare-backend-only-gate-permissions.
+ */
+export const STORE_GATE_PERMISSION_PREFIX = "isolated_store.";
+
+export function isStoreGatePermission(permission: string): boolean {
+  return permission.startsWith(STORE_GATE_PERMISSION_PREFIX);
+}
+
+/**
+ * Opt-in split (--declare-backend-only-gate-permissions): move app-owned store
+ * permissions out of the browser-embedded runtime set into the backend-only
+ * manifest list. Platform delegate/bypass are handled by
+ * splitGatePermissionStrings and must be removed before calling this.
+ */
+export function declareStorePermissionsBackendOnly(runtimePermissions: string[]): {
+  runtimePermissions: string[];
+  backendOnlyPermissions: string[];
+} {
+  const runtime: string[] = [];
+  const backendOnly: string[] = [];
+
+  for (const permission of normalizeGatePermissionStrings(runtimePermissions)) {
+    if (isStoreGatePermission(permission)) {
+      backendOnly.push(permission);
+    } else {
+      runtime.push(permission);
+    }
+  }
+
+  return { runtimePermissions: runtime, backendOnlyPermissions: backendOnly };
+}
+
 export function splitGatePermissionStrings(permissionStrings: string[]): {
   runtimePermissions: string[];
   backendOnlyPermissions: string[];

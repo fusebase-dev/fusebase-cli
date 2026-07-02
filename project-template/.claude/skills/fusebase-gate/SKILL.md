@@ -119,6 +119,31 @@ When runtime code uses `@fusebase/fusebase-gate-sdk`, `fusebase feature update -
    - if runtime imports Gate SDK and `usedOps` is empty, treat it as a blocker and fix before publish.
 
 
+## Backend-only Gate permissions (keep store perms out of the browser)
+
+Runtime `gate` permissions are embedded in the browser-visible app token (`gst`).
+For a **gateway app** — the browser calls only the app's own `backend/`, which then
+calls Gate with a server-minted token (the Ovation pattern) — the app's store
+permissions (`isolated_store.*`) should never be shipped to the browser.
+
+Two categories live in `manifest.backendOnlyGatePermissions` instead of the browser `gst`:
+
+- **Platform-fixed:** `isolated_store.rls.delegate` / `isolated_store.rls.bypass` are
+  always split out automatically. Not app-configurable.
+- **App-declared:** your `isolated_store.*` store permissions, opt-in via the CLI flag.
+
+```bash
+# Gateway app: move analyzed store perms to backend-only manifest, not the browser gst.
+fusebase app update <appId> --sync-gate-permissions --declare-backend-only-gate-permissions
+```
+
+Without the flag, if the app has a `backend/` and the synced set still contains
+`isolated_store.*`, the CLI warns that those store permissions will be embedded in the
+browser `gst`. Default sync (no flag) is unchanged — legacy apps are not affected.
+`fusebase deploy` preserves `manifest.backendOnlyGatePermissions`, so a later deploy
+does not clobber the declared store perms.
+
+
 ## Token permission mode (default soft)
 
 Token permission validation is soft by default (`strictPermissionValidation = false`).
