@@ -9,4 +9,4 @@
  * pre-launcher install (no `FUSEBASE_LAUNCHER_VERSION` in env) is still treated
  * as "too old" and blocked, because the env var is absent rather than older.
  */
-export const REQUIRED_LAUNCHER = "0.0.0";
+export const REQUIRED_LAUNCHER = "2026.070314.1650";
