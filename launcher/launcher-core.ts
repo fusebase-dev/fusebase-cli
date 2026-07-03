@@ -6,7 +6,7 @@
 import { compareVersions, isDevVersion } from "../lib/remote-version";
 
 export const PREVIOUS_VERSION_FLAG = "--previous-version";
-export const LAST_LEGACY_PROD_WINDOWS_CLI = "0.25.15";
+export const LAST_LEGACY_PROD_WINDOWS_CLI = "0.25.16";
 export const FIRST_LAUNCHER_AWARE_DEV_WINDOWS_CLI = "2026.070209.3952";
 
 /** Whether the user asked to run the retained previous version. */
