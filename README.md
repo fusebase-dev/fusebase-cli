@@ -567,7 +567,7 @@ For custom app backends (`/api/*`), treat `x-app-feature-token` as optional in d
 
 One command to refresh a generated app after a CLI or template upgrade:
 
-1. **CLI binary update** — runs first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage. On Windows, this launches the installer and exits so `fusebase.exe` can be replaced; after the installer finishes, run `fusebase update` again to continue app stages.
+1. **CLI binary update** — runs first (skips automatically in local linked/source mode). Use **`--skip-cli-update`** to disable this stage. On Windows this is a **cache swap** (no admin elevation, no installer download): it updates the cached CLI under `%LOCALAPPDATA%\FuseBase\CLI\` and continues the remaining stages in the same run, just like macOS/Linux. See [`docs/WINDOWS_LAUNCHER.md`](docs/WINDOWS_LAUNCHER.md).
 2. **Agent assets** — refreshes `AGENTS.md`, `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`.
 3. **MCP + IDE** — selectively regenerates Dashboards and/or Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh both regardless.
 4. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **app** `package.json` files are updated only if those deps already exist (nothing new is injected into apps).
@@ -579,9 +579,11 @@ One command to refresh a generated app after a CLI or template upgrade:
 
 Behavior by directory:
 
-- In an app directory (`fusebase.json` exists): runs full flow (CLI + app stages). On Windows, a CLI binary update exits after launching the installer; rerun the command after installation to run app stages.
+- In an app directory (`fusebase.json` exists): runs full flow (CLI + app stages) in a single run on every platform (Windows updates via cache swap, no installer/exit).
 - Outside an app directory: runs only CLI binary update.
 - Use `--skip-product` to force CLI-only mode even inside an app directory.
+
+**Windows launcher (`fusebase update --launcher`, `fusebase --previous-version`):** On Windows `fusebase.exe` is a stable launcher that runs the cached CLI. **`fusebase update --launcher`** refreshes that launcher via the elevated installer (the only path that elevates; Windows-only, no-op elsewhere). **`fusebase --previous-version`** runs the retained previous cached version for one invocation (escape hatch). Full model: [`docs/WINDOWS_LAUNCHER.md`](docs/WINDOWS_LAUNCHER.md).
 
 **Examples:**
 
@@ -599,6 +601,7 @@ fusebase update --skip-commit
 | Flag | Effect |
 |------|--------|
 | `--skip-product` | Skip app stages and run only CLI update |
+| `--launcher` | Windows only: refresh the launcher (`fusebase.exe`) via the elevated installer (no-op elsewhere) |
 | `--skip-cli-update` | Skip automatic CLI self-update stage |
 | `--skip-skills` | Skip agent asset refresh |
 | `--skip-mcp` | Skip MCP token + IDE refresh |

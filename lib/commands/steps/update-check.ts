@@ -36,6 +36,18 @@ function writeCache(manifest: Manifest): void {
   }
 }
 
+/**
+ * Whether to nudge about a newer launcher: only when launched by a launcher
+ * (env present) and the manifest advertises a strictly newer launcher version.
+ */
+export function shouldNudgeLauncherUpdate(
+  manifestLauncherVersion: string | undefined,
+  launcherVersionEnv: string | undefined,
+): boolean {
+  if (!launcherVersionEnv || !manifestLauncherVersion) return false;
+  return compareVersions(manifestLauncherVersion, launcherVersionEnv) > 0;
+}
+
 function formatComment(comment: string): string {
   const lines = comment.trimEnd().split("\n");
   if (lines.length <= COMMENT_MAX_LINES) return lines.join("\n");
@@ -73,6 +85,20 @@ export function checkForUpdates(): void {
         }
       }
       console.error(border);
+      console.error();
+    }
+
+    if (
+      shouldNudgeLauncherUpdate(
+        cache.manifest.launcherVersion,
+        process.env.FUSEBASE_LAUNCHER_VERSION,
+      )
+    ) {
+      console.error(
+        chalk.yellow(
+          "A launcher update is available. Run `fusebase update --launcher` when convenient.",
+        ),
+      );
       console.error();
     }
   }
