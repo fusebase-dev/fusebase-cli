@@ -80,7 +80,10 @@ async function bootstrap(root: string): Promise<string> {
       updatedAt: new Date().toISOString(),
     });
     process.stderr.write(`FuseBase CLI ${version} installed.\n`);
-    await log(root, `bootstrap: installed ${version} (channel ${channel})`);
+    await log(
+      root,
+      `bootstrap: installed ${version} (channel ${channel}, launcher ${LAUNCHER_VERSION})`,
+    );
     return version;
   } catch (err) {
     await log(root, `bootstrap failed: ${String(err)}`);
@@ -127,8 +130,9 @@ async function main(): Promise<never> {
     await log(
       root,
       resolved.kind === "migrated"
-        ? `migrated current.json to schema ${SUPPORTED_SCHEMA} (version ${version})`
-        : `recovered pointer to ${version}`,
+        ? `migrated current.json to schema ${SUPPORTED_SCHEMA} ` +
+          `(version ${version}, launcher ${LAUNCHER_VERSION})`
+        : `recovered pointer to ${version} (launcher ${LAUNCHER_VERSION})`,
     );
   } else {
     version = resolved.version;
