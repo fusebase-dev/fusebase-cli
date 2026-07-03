@@ -1,7 +1,7 @@
 ---
 version: "1.2.0"
 mcp_prompt: users
-last_synced: "2026-07-02"
+last_synced: "2026-07-03"
 title: "Fusebase Gate Users Operations"
 category: specialized
 ---
@@ -20,9 +20,9 @@ These operations manage organization membership flows and safe member removal ex
 
 - listOrgUsers returns organization members for a specific org.
 - addOrgUser can create an org invite, workspace invite, or portal invite depending on payload shape.
-- removeOrgMember removes an organization member by `orgMemberId` (`orgMember.globalId`, not `userId`).
-- removeWorkspaceMember removes a workspace member by `workspaceMemberId` (`workspaceMember.globalId`).
-- removePortalMember is a portal-named alias for removing the underlying workspace member by `workspaceMemberId`.
+- removeOrgMember removes an organization member by numeric `userId`.
+- removeWorkspaceMember removes a workspace member by `workspaceId` plus numeric `userId`.
+- removePortalMember is a portal-named alias for removing the underlying workspace member by `workspaceId` plus numeric `userId`.
 - scheduleClientAccountDeletion schedules delayed account deletion only for target users whose role in the org is `client`.
 
 ## Access Model
@@ -36,8 +36,8 @@ These operations manage organization membership flows and safe member removal ex
 - Always discover exact params and response contracts through tools_describe or sdk_describe before writing integration code.
 - Treat orgId as required path input for all org-user operations.
 - For addOrgUser, send the request body under body with the exact schema expected by the operation.
-- For removeOrgMember, pass the org membership global id, not the numeric user id.
-- For removeWorkspaceMember/removePortalMember, pass the workspace membership global id.
+- For removeOrgMember, pass the numeric user id from listOrgUsers.
+- For removeWorkspaceMember/removePortalMember, pass the target workspace id and numeric user id. Gate resolves internal membership ids.
 - For scheduleClientAccountDeletion, pass body.userId as the numeric target user id; Gate validates the target is a Client-role org member before calling user-service.
 - scheduleClientAccountDeletion is delayed/soft first; do not describe it as immediate hard deletion.
 - A 201 from addOrgUser is not proof that the current session or target user already has org access.
@@ -59,5 +59,5 @@ These operations manage organization membership flows and safe member removal ex
 
 - **Version**: 1.2.0
 - **Category**: specialized
-- **Last synced**: 2026-07-02
+- **Last synced**: 2026-07-03
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

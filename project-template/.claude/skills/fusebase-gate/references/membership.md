@@ -1,7 +1,7 @@
 ---
 version: "1.1.0"
 mcp_prompt: membership
-last_synced: "2026-07-02"
+last_synced: "2026-07-03"
 title: "Fusebase Gate Membership And Portal Flows"
 category: specialized
 ---
@@ -23,9 +23,9 @@ These prompts cover organization member invites/removal, workspace selection, po
 - listWorkspaces: list workspaces visible in an organization and identify the default workspace.
 - listPortals: list portals visible in an organization.
 - addOrgUser: create an org invite, workspace invite, or portal invite depending on payload shape.
-- removeOrgMember: remove an organization member by `orgMemberId` (`orgMember.globalId`, not `userId`).
-- removeWorkspaceMember: remove a workspace member by `workspaceMemberId` (`workspaceMember.globalId`).
-- removePortalMember: remove a portal member through the underlying `workspaceMemberId`.
+- removeOrgMember: remove an organization member by numeric `userId`.
+- removeWorkspaceMember: remove a workspace member by `workspaceId` plus numeric `userId`.
+- removePortalMember: remove a portal member through the underlying `workspaceId` plus numeric `userId`.
 - scheduleClientAccountDeletion: schedule delayed deletion for a target user only when their org role is `client`.
 
 ## Access Status Rules
@@ -73,8 +73,8 @@ These prompts cover organization member invites/removal, workspace selection, po
 ## Removal And Client Account Deletion Rules
 
 - Use listOrgUsers first when you need to verify a target user's org role before account-level deletion.
-- removeOrgMember uses the org membership global id. Do not pass numeric userId.
-- removeWorkspaceMember and removePortalMember use the workspace membership global id.
+- removeOrgMember uses the numeric user id available from listOrgUsers. Gate resolves the internal org membership global id.
+- removeWorkspaceMember and removePortalMember use workspaceId plus numeric userId. Gate resolves the internal workspace membership global id.
 - Removing an org member removes org membership; org-service owns related workspace/group cleanup.
 - scheduleClientAccountDeletion takes numeric `userId` in the body and is allowed only for Client-role users in the requested org.
 - Client account deletion is scheduled/delayed by user-service; do not promise immediate permanent deletion.
@@ -90,5 +90,5 @@ These prompts cover organization member invites/removal, workspace selection, po
 
 - **Version**: 1.1.0
 - **Category**: specialized
-- **Last synced**: 2026-07-02
+- **Last synced**: 2026-07-03
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
