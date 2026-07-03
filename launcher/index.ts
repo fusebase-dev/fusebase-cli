@@ -154,7 +154,10 @@ async function main(): Promise<never> {
       );
       process.exit(1);
     }
-    await log(root, `legacy update redirect: ${version} -> ${fallback}`);
+    await log(
+      root,
+      `legacy update redirect: ${version} -> ${fallback} (launcher ${LAUNCHER_VERSION})`,
+    );
     version = fallback;
     legacyUpdateRedirected = true;
   }
@@ -172,7 +175,8 @@ async function main(): Promise<never> {
       }
       await log(
         root,
-        `legacy update redirect fallback: ${version} failed to start, running ${fallback}`,
+        `legacy update redirect fallback: ${version} failed to start, ` +
+          `running ${fallback} (launcher ${LAUNCHER_VERSION})`,
       );
       process.exit(await runCli(binPathForVersion(root, fallback), args));
     }
@@ -185,7 +189,11 @@ async function main(): Promise<never> {
       );
       process.exit(1);
     }
-    await log(root, `fallback: ${version} failed to start, running ${fallback}`);
+    await log(
+      root,
+      `fallback: ${version} failed to start, running ${fallback} ` +
+        `(launcher ${LAUNCHER_VERSION})`,
+    );
     process.exit(await runCli(binPathForVersion(root, fallback), args));
   }
 }
