@@ -1,7 +1,7 @@
 ---
 version: "1.3.0"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-07-01"
+last_synced: "2026-07-03"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -37,8 +37,8 @@ These operations help AI Apps add Fusebase account registration, login, logout, 
 
 ## Relevant Operations
 
-- `registerFusebaseUser` — visitor-safe email/password registration. Creates a Fusebase account through auth-form and returns a `sessionId` plus `userId` when registration succeeds. It does not add org membership.
-- `registerFusebaseOrgMember` — protected registration plus org provisioning. Creates the Fusebase account, then adds the new user to the path `orgId`. Requires `org.members.write` and org access. Use this only on registration, not on login. **Does not add the user to any App's `accessPrincipals`** — org membership and app access are separate (see below).
+- `registerFusebaseUser` — visitor-safe email/password registration. Creates a Fusebase account through auth-form and returns a `sessionId` plus `userId` when registration succeeds. It does not add org membership. For AI App signup, send `autoConfirmEmail: true` unless product requirements explicitly need platform email confirmation.
+- `registerFusebaseOrgMember` — protected registration plus org provisioning. Creates the Fusebase account, then adds the new user to the path `orgId`. Requires `org.members.write` and org access. Use this only on registration, not on login. **Does not add the user to any App's `accessPrincipals`** — org membership and app access are separate (see below). For AI App signup, send `autoConfirmEmail: true` regardless of the org role being granted.
 - `loginFusebaseUser` — visitor-safe email/password login. Returns `sessionId` plus `userId`, or a challenge. Never provisions org membership.
 - `completeFusebaseAuthChallenge` — completes auth-form challenges such as CAPTCHA, OTP, mail OTP, two-factor, and MFA states returned by register/login.
 - `requestFusebasePasswordRestore` — sends restore email through auth-form. It returns a generic `{ ok: true }` and must not be used for account enumeration.
@@ -50,6 +50,7 @@ These operations help AI Apps add Fusebase account registration, login, logout, 
 - All calls to auth-form must go through a backend or Gate operation. Do not `fetch()` auth-form directly from the SPA because the app host and auth host are different origins and CORS/session cookies will not behave correctly.
 - The returned `sessionId` is credential material. A server/BFF should set it as an app-domain cookie such as `eversessionid` with `httpOnly`, `secure`, `sameSite=Lax`, and `path=/` where possible.
 - After register, login, or challenge success, route the user to the returned `redirectPath`. Always keep redirect paths relative (`/dashboard`, `/tasks/123`) and reject absolute URLs or `//host` forms.
+- When creating accounts from an AI App email/password signup flow, include `autoConfirmEmail: true` on `registerFusebaseUser` or `registerFusebaseOrgMember` so auth-form does not send a separate email-confirmation message.
 - Use `registerFusebaseOrgMember` only for a brand-new registration flow. Do not add org membership during ordinary login because login must not mutate roles or downgrade existing access.
 - For app access decisions after auth or provisioning, check the user's actual org/app access before unlocking protected content. Do not treat a successful write as a substitute for an access check.
 
@@ -69,7 +70,7 @@ Acceptance flows that require `registerFusebaseOrgMember` (create account **and*
 - Do **not** forward the incoming request's visitor cookie to Gate for `registerFusebaseOrgMember` or `addOrgUser`. Do **not** store an admin session in secrets as a workaround.
 - `orgId` in the Gate path must come from `fusebase.json` (`orgId`), never from user input in the registration body.
 - Grant `org.members.write` on the app feature (`fusebase sync` / redeploy) before testing registration-with-membership.
-- Alternative for instant client onboarding without auth-form confirm-email: `registerFusebaseUser` then `addOrgUser` with `orgRole: "client"` and `autoConfirmClientInvite: true` — still via `FBS_FEATURE_TOKEN` on the backend.
+- For instant password-based onboarding, prefer `registerFusebaseOrgMember` with `autoConfirmEmail: true`. `autoConfirmClientInvite` is only for `addOrgUser` org-only client invites and does not affect auth-form account registration.
 - After success, set the returned `sessionId` as an app-domain cookie and verify membership with `getMyOrgAccess` (session header + feature token as documented for user-context reads).
 
 ## Two Names For Feature Token
@@ -164,5 +165,5 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 - **Version**: 1.3.0
 - **Category**: specialized
-- **Last synced**: 2026-07-01
+- **Last synced**: 2026-07-03
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
