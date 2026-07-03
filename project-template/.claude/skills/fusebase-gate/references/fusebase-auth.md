@@ -104,9 +104,9 @@ For Apps that use `requestAppMagicLink` / `activateAppMagicLink` (load the `appM
 
 **Mandatory for every magic-link app, Test and Production:**
 
-- After `activateAppMagicLink`, pass **both** `featureToken` and `sessionToken` to a trusted app backend **before** `window.location.replace` to a protected route. Platform cookie `fbsfeaturetoken` can be overwritten on the next HTML request by the app proxy to match whichever Fusebase user is logged into the **browser**, not the magic-link recipient.
-- User identity on Gate calls such as `getMyOrgAccess` requires forwarding `sessionToken` as header `EverHelper-Session-ID` together with `x-app-feature-token` (or your app's equivalent). **`featureToken` alone does not resolve the authenticated user** on those endpoints.
-- Minimum exchange contract: `POST /api/account/from-magic-link` (or another app-owned route) with `{ featureToken, sessionToken }` in the **body** → backend builds a Gate client with both credentials → `getMyOrgAccess` to resolve the recipient → redirect to `redirectPath`. This is the **only** mandatory part of the exchange.
+- Activation is platform-handled at `/_auth/magiclink/{key}`: HttpOnly `eversessionid` / `fbsfeaturetoken` cookies are set server-side, then the browser is redirected to `redirectPath`. JS never sees the tokens; the backend resolves the recipient from request cookies before rendering protected routes.
+- User identity on Gate calls such as `getMyOrgAccess` requires forwarding the session as header `EverHelper-Session-ID` together with `x-app-feature-token` (or your app's equivalent). **The feature token alone does not resolve the authenticated user** on those endpoints.
+- Minimum exchange contract: SPA makes a same-origin `POST /api/account/from-magic-link` (or another app-owned route) — the HttpOnly cookies ride along → backend builds a Gate client with `x-app-feature-token: <fbsfeaturetoken>` + `EverHelper-Session-ID: <eversessionid>` → `getMyOrgAccess` to resolve the recipient. This is the **only** mandatory part of the exchange.
 - Do not call `getMyOrgAccess` with only the app feature token for visitors or fresh magic-link users — that can return the **token owner's** identity (e.g. the app owner in dev, or a stale browser session in prod). Fail closed: show the sign-in / request-link UI instead.
 
 ### Test vs Production

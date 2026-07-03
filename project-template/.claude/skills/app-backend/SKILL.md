@@ -490,12 +490,12 @@ if (!appToken) {
 }
 ```
 
-### Magic-link session exchange (Memberspace / `/link`)
+### Magic-link session exchange (Memberspace)
 
-The bundled SPA `/link` route only activates the link and sets platform cookies; **that is not enough** for knowing which user opened the link. Implement in your app backend:
+Platform activation at `/_auth/magiclink/{key}` sets HttpOnly cookies and redirects; **that is not enough** for knowing which user opened the link. Implement in your app backend:
 
-1. `POST /api/account/from-magic-link` — body `{ featureToken, sessionToken, redirectPath? }` from `activateAppMagicLink` **before** redirect.
-2. Call Gate `GET /:orgId/me/access` with `x-app-feature-token` + **`EverHelper-Session-ID: <sessionToken>`** (not platform cookies alone).
+1. `POST /api/account/from-magic-link` — same-origin call from the SPA after the activation redirect; the HttpOnly cookies ride along automatically (JS cannot read them).
+2. Call Gate `GET /:orgId/me/access` with `x-app-feature-token: <fbsfeaturetoken cookie>` + **`EverHelper-Session-ID: <eversessionid cookie>`**.
 3. Issue an app-owned httpOnly session cookie (HMAC, bound to `userId`); `GET /api/account/me` reads only that cookie.
 
 See `fusebase-gate/references/app-magic-links.md` (§ App Session Exchange) and `fusebase-auth.md` (§ Magic-Link → App Session Exchange). Env: `FUSEBASE_ORG_ID`, `APP_SESSION_SECRET`.
@@ -514,12 +514,12 @@ If the app uses Fusebase Gate magic links (`requestAppMagicLink` / `activateAppM
 
 **Mandatory exchange (same in Test and Production):**
 
-1. SPA `/link` route calls `activateAppMagicLink` and receives `{ featureToken, sessionToken, redirectPath, … }`.
-2. SPA `POST`s `{ featureToken, sessionToken }` in the **body** of a backend route (default: `/api/account/from-magic-link`). Do **not** rely on `fbsfeaturetoken` surviving the next HTML navigation — the platform proxy can re-issue it for whichever Fusebase user is signed into the browser, not the magic-link recipient.
-3. Backend builds a Gate client with `x-app-feature-token: <featureToken>` **and** `EverHelper-Session-ID: <sessionToken>`, then calls `getMyOrgAccess` to resolve `userId`. The feature token alone does not identify the user on `getMyOrgAccess`.
-4. Backend responds to the SPA with whatever the SPA needs to redirect (typically just `{ userId }`); the SPA navigates to `redirectPath`.
+1. Visitor opens `/_auth/magiclink/{key}`; the platform activates the link, sets HttpOnly `eversessionid` / `fbsfeaturetoken` / `fbsdashboardtoken` cookies, and redirects to `redirectPath`.
+2. The SPA calls a backend route (default: `POST /api/account/from-magic-link`) as a plain same-origin request — the HttpOnly cookies are attached automatically; JS cannot (and must not) read or forward the tokens itself.
+3. Backend reads the cookies and builds a Gate client with `x-app-feature-token: <fbsfeaturetoken>` **and** `EverHelper-Session-ID: <eversessionid>`, then calls `getMyOrgAccess` to resolve `userId`. The feature token alone does not identify the user on `getMyOrgAccess`.
+4. Backend responds with whatever the SPA needs (typically just `{ userId }`).
 
-That is the **only** mandatory part of the exchange. The `EverHelper-Session-ID` header + body payload pattern is the rule that protects against a stale browser session masquerading as the magic-link recipient.
+That is the **only** mandatory part of the exchange. The `EverHelper-Session-ID` header pattern is the rule that protects against a stale browser session masquerading as the magic-link recipient.
 
 #### Test vs Production cookie policy
 
@@ -553,8 +553,8 @@ If `fusebase secret list --feature <appId>` shows any of the above, remove them 
 
 Before claiming the magic-link flow is done, verify:
 
-- [ ] SPA `/link` route activates via `activateAppMagicLink` and posts `{ featureToken, sessionToken }` in the **body** of `/api/account/from-magic-link` (or another app-owned route).
-- [ ] Backend builds the Gate client with **both** `x-app-feature-token` and `EverHelper-Session-ID: <sessionToken>` before calling `getMyOrgAccess`. The feature token alone is not enough.
+- [ ] After the platform `/_auth/magiclink/{key}` redirect, the SPA calls `/api/account/from-magic-link` (or another app-owned route) as a same-origin request; no code reads or forwards tokens via JS.
+- [ ] Backend builds the Gate client with **both** `x-app-feature-token` (from the `fbsfeaturetoken` cookie) and `EverHelper-Session-ID` (from the `eversessionid` cookie) before calling `getMyOrgAccess`. The feature token alone is not enough.
 - [ ] Test mode: no `APP_SESSION_SECRET`, no HMAC-signed app cookie, no `fusebase secret create` call for the magic-link flow.
 - [ ] Production mode (only if Memberspace/role-gated UI is required): exactly one `fusebase secret create … APP_SESSION_SECRET:…`, HMAC-signed app-owned session cookie, verified on every protected request.
 - [ ] `fusebase secret list --feature <appId>` does **not** include `FUSEBASE_ORG_ID`, `productId`, app subdomain, or any other value that already lives in `fusebase.json`.

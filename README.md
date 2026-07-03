@@ -461,7 +461,7 @@ fusebase scaffold --template backend --dir apps/my-app
 
 the CLI creates `openapi.json` automatically if it does not already exist.
 
-The `spa` feature template ships a built-in **`/link`** route: it calls Gate `POST /apps/magic-links/{id}/activate` and redirects. For **Memberspace** or any flow that must know **which user** opened the link, follow the skills (not the cookies-only shortcut): after activation, your app backend must exchange `{ featureToken, sessionToken }` via `POST /api/account/from-magic-link` with `EverHelper-Session-ID` before redirect — see [`app-magic-links.md`](project-template/.claude/skills/fusebase-gate/references/app-magic-links.md) § App Session Exchange and [`app-backend/SKILL.md`](project-template/.claude/skills/app-backend/SKILL.md).
+Magic-link activation is handled server-side by the platform at **`/_auth/magiclink/{key}`** (fusebase-gate activates the link, sets HttpOnly session cookies, and redirects). The `spa` feature template keeps a legacy **`/link`** route that only forwards old `/link?id={key}` email URLs to that endpoint — the SPA never activates links or writes session cookies via JS. See [`app-magic-links.md`](project-template/.claude/skills/fusebase-gate/references/app-magic-links.md).
 
 **Updates `fusebase.json`:**
 
