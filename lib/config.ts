@@ -151,6 +151,11 @@ export interface FeatureConfig {
   build?: BuildConfig;
   backend?: BackendConfig;
   isolatedStores?: IsolatedStoresConfig;
+  /**
+   * Gate privileges kept out of the browser gst (merged into manifest.backendOnlyGatePermissions on sync).
+   * Non-store entries (e.g. org.members.read) stay in app.permissions; nimbus-ai subtracts them at browser mint.
+   */
+  backendOnlyGatePermissions?: string[];
   /** Gate SDK analyze snapshot scoped to this feature path. */
   fusebaseGateMeta?: GateSdkOperationsSnapshot;
   /** Cross-app API dependency analyze snapshot scoped to this feature path. */
@@ -1320,6 +1325,49 @@ export function updateGateSdkPermissionsInFusebaseJson(
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
   invalidateFuseConfigCache();
   return next;
+}
+
+/**
+ * Persist `apps[].backendOnlyGatePermissions` in fusebase.json after a successful sync.
+ */
+export function writeBackendOnlyGatePermissionsToFusebaseJson(
+  projectRoot: string,
+  featureId: string,
+  permissions: string[],
+): void {
+  const fuseJsonPath = join(projectRoot, "fusebase.json");
+  if (!existsSync(fuseJsonPath)) {
+    throw new Error("fusebase.json not found.");
+  }
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<string, unknown>;
+  } catch {
+    throw new Error("Could not parse fusebase.json");
+  }
+  normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
+
+  const apps = Array.isArray(raw.apps) ? [...raw.apps] : [];
+  const featureIndex = getFeatureIndexById(raw, featureId);
+  if (featureIndex === -1) {
+    throw new Error(`App "${featureId}" not found in fusebase.json`);
+  }
+
+  const featureRaw = apps[featureIndex];
+  if (!featureRaw || typeof featureRaw !== "object") {
+    throw new Error(`App "${featureId}" is invalid in fusebase.json`);
+  }
+
+  const sorted = [...permissions].sort((a, b) => a.localeCompare(b));
+  apps[featureIndex] = {
+    ...(featureRaw as Record<string, unknown>),
+    backendOnlyGatePermissions: sorted,
+  };
+  raw.apps = apps;
+
+  writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
+  invalidateFuseConfigCache();
 }
 
 export const getEnv = (): string | undefined => {

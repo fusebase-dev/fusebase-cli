@@ -6,14 +6,18 @@ import type { AppAccessPrincipal, AppPermissions } from "../api.ts";
 import { getConfig, loadFuseConfig } from "../config.ts";
 import { analyzeFeatureGatePermissions } from "../gate-sdk-analyze.ts";
 import {
+  buildSyncedBackendOnlyGatePermissions,
   declareStorePermissionsBackendOnly,
   formatPermissionItem,
   isStoreGatePermission,
   mergeFeaturePermissions,
   parsePermissions,
   parsePrincipals,
+  readBackendOnlyGatePermissionsFromFeature,
+  readBackendOnlyGatePermissionsFromManifest,
   splitGatePermissionStrings,
 } from "../permissions.ts";
+import { writeBackendOnlyGatePermissionsToFusebaseJson } from "../config.ts";
 
 export interface AppUpdateOptions {
   access?: string;
@@ -107,26 +111,32 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       });
       const split = splitGatePermissionStrings(gateAnalysis.gatePermissions);
       gatePermissions = split.runtimePermissions;
-      backendOnlyGatePermissions = split.backendOnlyPermissions;
 
+      let declaredStoreBackendOnly: string[] = [];
       if (options.declareBackendOnlyGatePermissions) {
         // Opt-in: move app-owned store perms out of the browser-embedded
         // runtime set into the backend-only manifest list.
         const declared = declareStorePermissionsBackendOnly(gatePermissions);
         gatePermissions = declared.runtimePermissions;
-        backendOnlyGatePermissions = [
-          ...backendOnlyGatePermissions,
-          ...declared.backendOnlyPermissions,
-        ]
-          .filter((p, i, all) => all.indexOf(p) === i)
-          .sort((a, b) => a.localeCompare(b));
-      } else if (
-        existsSync(join(resolve(process.cwd(), featureConfig.path), "backend")) &&
-        gatePermissions.some(isStoreGatePermission)
-      ) {
-        console.warn(
-          "Warning: store permissions will be embedded in browser gst. For gateway apps use --declare-backend-only-gate-permissions.",
-        );
+        declaredStoreBackendOnly = declared.backendOnlyPermissions;
+      }
+
+      backendOnlyGatePermissions = buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: split.backendOnlyPermissions,
+        declaredStoreBackendOnly,
+        fromFusebaseJson: readBackendOnlyGatePermissionsFromFeature(featureConfig),
+        fromRemoteManifest: readBackendOnlyGatePermissionsFromManifest(app.manifest),
+      });
+
+      if (!options.declareBackendOnlyGatePermissions) {
+        if (
+          existsSync(join(resolve(process.cwd(), featureConfig.path), "backend")) &&
+          gatePermissions.some(isStoreGatePermission)
+        ) {
+          console.warn(
+            "Warning: store permissions will be embedded in browser gst. For gateway apps use --declare-backend-only-gate-permissions.",
+          );
+        }
       }
     }
 
@@ -184,6 +194,18 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       console.log(
         `  Backend-only Gate permissions (manifest.backendOnlyGatePermissions): ${backendOnlyGatePermissions.join(", ")}`,
       );
+      if (options.syncGatePermissions) {
+        try {
+          writeBackendOnlyGatePermissionsToFusebaseJson(
+            resolve(process.cwd()),
+            appIdArg,
+            backendOnlyGatePermissions,
+          );
+          console.log("  fusebase.json: backendOnlyGatePermissions updated");
+        } catch {
+          // Non-fatal: remote manifest is still updated; local fusebase.json may be read-only or missing entry.
+        }
+      }
     }
   } catch (error) {
     console.error(`Error: Failed to update app. ${error instanceof Error ? error.message : String(error)}`);

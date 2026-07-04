@@ -204,6 +204,61 @@ export function isStoreGatePermission(permission: string): boolean {
  * manifest list. Platform delegate/bypass are handled by
  * splitGatePermissionStrings and must be removed before calling this.
  */
+/** Normalize a string list from fusebase.json or remote manifest. */
+export function readBackendOnlyGatePermissionsList(source: unknown): string[] {
+  if (!Array.isArray(source)) {
+    return [];
+  }
+  return normalizeGatePermissionStrings(
+    source.filter((entry): entry is string => typeof entry === "string"),
+  );
+}
+
+export function readBackendOnlyGatePermissionsFromManifest(
+  manifest: unknown,
+): string[] {
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return [];
+  }
+  return readBackendOnlyGatePermissionsList(
+    (manifest as Record<string, unknown>).backendOnlyGatePermissions,
+  );
+}
+
+export function readBackendOnlyGatePermissionsFromFeature(feature: {
+  backendOnlyGatePermissions?: unknown;
+}): string[] {
+  return readBackendOnlyGatePermissionsList(feature.backendOnlyGatePermissions);
+}
+
+/** Union backend-only lists (deduped, sorted) for manifest.backendOnlyGatePermissions. */
+export function mergeBackendOnlyGatePermissionLists(
+  ...lists: string[][]
+): string[] {
+  return normalizeGatePermissionStrings(lists.flat());
+}
+
+/**
+ * Build manifest.backendOnlyGatePermissions for app update sync:
+ * platform-fixed split + optional store declare + fusebase.json + remote manifest extras.
+ */
+export function buildSyncedBackendOnlyGatePermissions(params: {
+  platformBackendOnly: string[];
+  declaredStoreBackendOnly?: string[];
+  fromFusebaseJson: string[];
+  fromRemoteManifest: string[];
+}): string[] {
+  const { platformBackendOnly, declaredStoreBackendOnly = [], fromFusebaseJson, fromRemoteManifest } =
+    params;
+  const extras =
+    fromFusebaseJson.length > 0 ? fromFusebaseJson : fromRemoteManifest;
+  return mergeBackendOnlyGatePermissionLists(
+    platformBackendOnly,
+    declaredStoreBackendOnly,
+    extras,
+  );
+}
+
 export function declareStorePermissionsBackendOnly(runtimePermissions: string[]): {
   runtimePermissions: string[];
   backendOnlyPermissions: string[];

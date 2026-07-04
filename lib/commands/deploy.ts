@@ -42,6 +42,7 @@ import {
   loadAndValidateOpenApiFile,
   resolveOpenApiFile,
 } from "../openapi";
+import { readBackendOnlyGatePermissionsFromFeature } from "../permissions.ts";
 
 const FUSE_JSON = "fusebase.json";
 const UPLOAD_CONCURRENCY = 5;
@@ -440,18 +441,6 @@ async function runBuildCommand(featureConfig: FeatureConfig): Promise<void> {
   await runCommand(buildCommand, featurePath, "Building");
 }
 
-function readBackendOnlyGatePermissionsFromFeature(
-  featureConfig: FeatureConfig,
-): string[] | undefined {
-  const fromFeature = (featureConfig as FeatureConfig & { backendOnlyGatePermissions?: unknown })
-    .backendOnlyGatePermissions;
-  if (!Array.isArray(fromFeature)) {
-    return undefined;
-  }
-  const permissions = fromFeature.filter((p): p is string => typeof p === "string" && p.length > 0);
-  return permissions.length > 0 ? permissions : undefined;
-}
-
 async function publishOpenApiManifestIfPresent(params: {
   apiKey: string;
   orgId: string;
@@ -488,7 +477,10 @@ async function publishOpenApiManifestIfPresent(params: {
       validation,
     });
 
-    let backendOnlyGatePermissions = readBackendOnlyGatePermissionsFromFeature(params.featureConfig);
+    let backendOnlyGatePermissions = (() => {
+      const fromFeature = readBackendOnlyGatePermissionsFromFeature(params.featureConfig);
+      return fromFeature.length > 0 ? fromFeature : undefined;
+    })();
     if (!backendOnlyGatePermissions) {
       try {
         const app = await fetchApp(params.apiKey, params.orgId, params.appId, params.featureId);

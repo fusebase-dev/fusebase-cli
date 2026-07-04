@@ -1,10 +1,12 @@
 import { describe, it, expect } from "bun:test";
 import {
+  buildSyncedBackendOnlyGatePermissions,
   declareStorePermissionsBackendOnly,
   isStoreGatePermission,
   mergeFeaturePermissions,
   parsePermissions,
   parsePrincipals,
+  readBackendOnlyGatePermissionsFromManifest,
   splitGatePermissionStrings,
   withTrustedRuntimeContextDelegatePermission,
 } from "../lib/permissions.ts";
@@ -413,6 +415,60 @@ describe("declareStorePermissionsBackendOnly", () => {
       runtimePermissions: ["org.groups.write"],
       backendOnlyPermissions: [],
     });
+  });
+});
+
+describe("buildSyncedBackendOnlyGatePermissions", () => {
+  it("merges platform-fixed, declared store, and fusebase.json extras", () => {
+    expect(
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: ["isolated_store.rls.delegate"],
+        declaredStoreBackendOnly: ["isolated_store.read"],
+        fromFusebaseJson: ["org.members.read", "portals.read"],
+        fromRemoteManifest: ["org.groups.write"],
+      }),
+    ).toEqual([
+      "isolated_store.read",
+      "isolated_store.rls.delegate",
+      "org.members.read",
+      "portals.read",
+    ]);
+  });
+
+  it("falls back to remote manifest extras when fusebase.json list is empty", () => {
+    expect(
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: [],
+        declaredStoreBackendOnly: ["isolated_store.data.write"],
+        fromFusebaseJson: [],
+        fromRemoteManifest: ["org.groups.write", "files.write"],
+      }),
+    ).toEqual([
+      "files.write",
+      "isolated_store.data.write",
+      "org.groups.write",
+    ]);
+  });
+
+  it("prefers fusebase.json over remote manifest for extras", () => {
+    expect(
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: [],
+        declaredStoreBackendOnly: [],
+        fromFusebaseJson: ["org.members.read"],
+        fromRemoteManifest: ["org.groups.write"],
+      }),
+    ).toEqual(["org.members.read"]);
+  });
+});
+
+describe("readBackendOnlyGatePermissionsFromManifest", () => {
+  it("reads and normalizes manifest.backendOnlyGatePermissions", () => {
+    expect(
+      readBackendOnlyGatePermissionsFromManifest({
+        backendOnlyGatePermissions: ["portals.read", "org.members.read", "portals.read"],
+      }),
+    ).toEqual(["org.members.read", "portals.read"]);
   });
 });
 

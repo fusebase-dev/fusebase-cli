@@ -309,6 +309,9 @@ Two categories are kept out of the browser and stored in
    (see [NIM-42003]).
 2. **App-declared store permissions** (`isolated_store.*`) — opt-in via
    `--declare-backend-only-gate-permissions`.
+3. **App-declared non-store permissions** — list in `fusebase.json` under
+   `apps[].backendOnlyGatePermissions` (e.g. `org.members.read`, `portals.read` for gateway apps).
+   Merged on `--sync-gate-permissions`; runtime stays in `app.permissions`, browser gst subtracts via manifest.
 
 #### `--declare-backend-only-gate-permissions` (opt-in, legacy-safe)
 
@@ -353,6 +356,7 @@ That means:
 | `app update <id> --access="..."` | Change access only; permissions untouched |
 | `app update <id> --access="..." --sync-gate-permissions` | Change access and replace `gate` |
 | `app update <id> --sync-gate-permissions --declare-backend-only-gate-permissions` | Replace `gate` minus `isolated_store.*`, which move to `manifest.backendOnlyGatePermissions` |
+| `apps[].backendOnlyGatePermissions` in `fusebase.json` | On sync, **merge** into `manifest.backendOnlyGatePermissions` (non-store extras such as `org.members.read`, `portals.read`). Written back to `fusebase.json` after sync. If the field is empty, remote manifest extras are preserved (API-patch / Ovation pattern). |
 
 ## `fusebase app create`
 
