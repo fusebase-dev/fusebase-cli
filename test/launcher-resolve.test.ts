@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  FIRST_LAUNCHER_AWARE_DEV_WINDOWS_CLI,
+  LAST_LEGACY_PROD_WINDOWS_CLI,
   PREVIOUS_VERSION_FLAG,
   isLauncherAwareCliVersion,
   isLauncherUpdateCommand,
@@ -58,31 +60,40 @@ describe("isLauncherUpdateCommand", () => {
 
 describe("isLauncherAwareCliVersion", () => {
   it("classifies the legacy prod boundary", () => {
+    // Prod is launcher-aware strictly ABOVE the last legacy prod CLI: the
+    // boundary version itself is still legacy, the next patch is launcher-aware.
     expect(isLauncherAwareCliVersion("0.25.7")).toBe(false);
-    expect(isLauncherAwareCliVersion("0.25.8")).toBe(true);
+    expect(isLauncherAwareCliVersion(LAST_LEGACY_PROD_WINDOWS_CLI)).toBe(false);
+    expect(isLauncherAwareCliVersion("0.25.17")).toBe(true);
   });
 
   it("classifies the first launcher-aware dev build boundary", () => {
+    // Dev is launcher-aware AT or above the first launcher-aware dev build.
     expect(isLauncherAwareCliVersion("2026.062310.0435")).toBe(false);
-    expect(isLauncherAwareCliVersion("2026.062310.0436")).toBe(true);
-    expect(isLauncherAwareCliVersion("2026.062311.0000")).toBe(true);
+    expect(
+      isLauncherAwareCliVersion(FIRST_LAUNCHER_AWARE_DEV_WINDOWS_CLI),
+    ).toBe(true);
+    expect(isLauncherAwareCliVersion("2026.070313.0000")).toBe(true);
   });
 });
 
 describe("selectLauncherAwareFallback", () => {
   it("returns the newest launcher-aware cached version that is not active", () => {
     expect(
-      selectLauncherAwareFallback(["2026.062310.0436", "0.25.7"], "0.25.7"),
-    ).toBe("2026.062310.0436");
+      selectLauncherAwareFallback(
+        [FIRST_LAUNCHER_AWARE_DEV_WINDOWS_CLI, "0.25.7"],
+        "0.25.7",
+      ),
+    ).toBe(FIRST_LAUNCHER_AWARE_DEV_WINDOWS_CLI);
   });
 
   it("skips legacy versions and the active version", () => {
     expect(
       selectLauncherAwareFallback(
-        ["2026.062311.0000", "2026.062310.0436", "0.25.7"],
-        "2026.062311.0000",
+        ["2026.070313.0000", FIRST_LAUNCHER_AWARE_DEV_WINDOWS_CLI, "0.25.7"],
+        "2026.070313.0000",
       ),
-    ).toBe("2026.062310.0436");
+    ).toBe(FIRST_LAUNCHER_AWARE_DEV_WINDOWS_CLI);
   });
 
   it("returns null when no launcher-aware fallback exists", () => {

@@ -14,6 +14,14 @@ repo.
   by a per-run `runId`. Calls `DELETE /v1/orgs/{orgId}/products/{productId}` in
   teardown so the cascade in `nimbus-ai` removes the Container App + Container
   Apps Job.
+- **Reconcile deploy** (`reconcile-deploy.e2e.ts`) — declarative
+  `fusebase.json` (NIM-41746): one product, an SPA feature, three sequential
+  deploys proving reconcile **creates** a missing app (no id, new subdomain),
+  **binds** the same id-less entry on re-deploy (no duplicate feature), and
+  trusts a **legacy** entry that carries the real id. Asserts `fusebase.json`
+  is never mutated with the resolved id. Frontend-only, so it skips container
+  provisioning and runs much faster than the smoke deploy. Teardown deletes the
+  product (cascade removes the features).
 - **Dev start parallel** (`dev-start-parallel.e2e.ts`) — spawns
   `fusebase dev start` for two apps in parallel, polls each app port,
   then terminates both processes (no leaked children).
@@ -27,6 +35,7 @@ repo.
 | ------------------------ | ----------------------- |
 | Harness placeholder      | < 5s                    |
 | Smoke deploy             | 10–20 min (CI cap 30m)  |
+| Reconcile deploy         | 3–8 min (3 SPA deploys) |
 | Dev start parallel       | < 2 min                 |
 
 The full `bun run test:e2e` run is dominated by the smoke deploy.
@@ -45,6 +54,7 @@ test/e2e/
   helpers/             # Reusable building blocks (env, CLI runner, api).
   harness.e2e.ts       # Smoke check — auths and lists apps via public-api.
   smoke-deploy.e2e.ts  # Full CLI lifecycle smoke test (NIM-40901).
+  reconcile-deploy.e2e.ts  # Declarative deploy reconcile (NIM-41746).
   dev-start.e2e.ts     # `fusebase dev start` two apps in parallel (local).
   *.e2e.ts             # Other test files (do NOT match the default *.test.ts
                        #  pattern, so plain `bun test` skips them).

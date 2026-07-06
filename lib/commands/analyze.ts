@@ -5,6 +5,7 @@ import {
   getConfig,
   hasFlag,
   loadFuseConfig,
+  requireAppId,
   writeAppApiDependenciesToFusebaseJson,
   type AppApiDependenciesSnapshot,
   type FeatureConfig,
@@ -344,6 +345,7 @@ analyzeCommand
           );
         }
 
+        const featureId = requireAppId(feature);
         const featurePath = feature.path;
         const result = await analyzeAppApiDependencies({
           projectRoot,
@@ -352,7 +354,7 @@ analyzeCommand
         const analyzedAt = new Date().toISOString();
         const fusebaseSnapshot = writeAppApiDependenciesToFusebaseJson(
           projectRoot,
-          feature.id,
+          featureId,
           {
             analyzedAt,
             sdkVersion: result.sdkVersion,
@@ -378,7 +380,7 @@ analyzeCommand
               apiKey!,
               fuseConfig.orgId,
               fuseConfig.productId,
-              feature.id,
+              featureId,
               fusebaseSnapshot.dependencies,
             );
             syncResult = {
@@ -390,7 +392,7 @@ analyzeCommand
         }
 
         analyses.push({
-          featureId: feature.id,
+          featureId,
           featurePath,
           result,
           fusebaseSnapshot,

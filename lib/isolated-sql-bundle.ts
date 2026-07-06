@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
+import { requireAppId } from "./config";
 import type {
   FeatureConfig,
   IsolatedSqlRlsManifest,
@@ -242,7 +243,7 @@ export function buildSqlMigrationBundleArtifact(options: {
   const rawBundleVersion = manifest.bundleVersion ?? migrations.at(-1)?.version;
 
   return {
-    appId: options.appConfig.id,
+    appId: requireAppId(options.appConfig),
     store: options.store,
     schemaName: options.store.schemaName ?? null,
     migrationsDir,

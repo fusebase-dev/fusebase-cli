@@ -1,6 +1,16 @@
 import { Command } from "commander";
 import { join } from "path";
-import { hasFlag, loadFuseConfig } from "../config";
+import {
+  getConfig,
+  hasFlag,
+  loadFuseConfig,
+  writeResolvedAppIdToFusebaseJson,
+  type FeatureConfig,
+  type FuseConfig,
+} from "../config";
+import { fetchApps } from "../api";
+import { reconcileApps } from "../reconcile";
+import assert from "assert";
 import { requestGateService } from "../gate-api";
 import { readAppGateTokenOrExit } from "../managed-integrations";
 import {
@@ -25,22 +35,37 @@ type SqlBundleOptions = {
 
 const ISOLATED_SQL_RLS_FLAG = "postgres-rls";
 
+// Under the declarative-manifest flag an app entry has no platform `id` yet
+// (it is assigned at deploy-time reconcile), so `--app` is matched by local
+// `path` only. Legacy (flag off) keeps the strict `id`-only match.
+const DECLARATIVE = hasFlag("declarative-manifest");
+
+const APP_OPTION_DESCRIPTION = DECLARATIVE
+  ? "App path from fusebase.json apps[]"
+  : "App id from fusebase.json apps[]";
+
 function writeStdoutLine(text: string): void {
   process.stdout.write(`${text}\n`);
 }
 
-function resolveAppConfig(appId: string) {
+function resolveAppConfig(appRef: string) {
   const fuseConfig = loadFuseConfig();
   if (fuseConfig === null) {
     throw new Error("Project is not initialized. Run 'fusebase init' first.");
   }
-  const appConfig = (fuseConfig.apps ?? []).find((app) => app.id === appId);
+  const appConfig = (fuseConfig.apps ?? []).find((app) =>
+    DECLARATIVE ? app.path === appRef : app.id === appRef,
+  );
   if (appConfig === undefined) {
-    const knownIds = (fuseConfig.apps ?? []).map((app) => app.id).join(", ");
+    const known = (fuseConfig.apps ?? [])
+      .map((app) => (DECLARATIVE ? app.path : app.id))
+      .filter(Boolean)
+      .join(", ");
+    const label = DECLARATIVE ? "paths" : "ids";
     throw new Error(
-      knownIds.length > 0
-        ? `App "${appId}" not found in fusebase.json. Known app ids: ${knownIds}`
-        : `App "${appId}" not found in fusebase.json (apps[] is empty)`,
+      known.length > 0
+        ? `App "${appRef}" not found in fusebase.json. Known app ${label}: ${known}`
+        : `App "${appRef}" not found in fusebase.json (apps[] is empty)`,
     );
   }
   return { fuseConfig, appConfig };
@@ -53,15 +78,99 @@ type SqlRlsStatusResponse = {
   rlsEnabledCount?: number;
 };
 
-function readArtifact(options: SqlBundleOptions): SqlMigrationBundleArtifact {
-  const { appConfig } = resolveAppConfig(options.app);
-  if (appConfig.path === undefined || appConfig.path.trim().length === 0) {
-    throw new Error(`App "${options.app}" has no path in fusebase.json`);
+// True when a declarative entry has not been deployed to the platform yet. In
+// declarative mode the resolved `id` is written back into fusebase.json at
+// deploy time, so an id-less entry reliably means "no platform app (and thus no
+// isolated store) exists yet". Legacy (flag-off) entries always carry an id.
+function appIsUndeployed(appConfig: FeatureConfig): boolean {
+  return (
+    DECLARATIVE &&
+    (appConfig.id === undefined || appConfig.id.trim().length === 0)
+  );
+}
+
+// Predefined migration status for an app that isn't on the platform yet, so a
+// read-only `--status` check reports a stable result instead of failing at the
+// `requireAppId` build guard. `appExists: false` is the discriminator callers
+// (CI) can branch on.
+function buildUndeployedStatus(appConfig: FeatureConfig) {
+  return {
+    appExists: false,
+    app: appConfig.path ?? appConfig.subdomain ?? null,
+    subdomain: appConfig.subdomain ?? null,
+    migrations: { applied: [], pending: [] },
+    message:
+      "App is not deployed on the platform yet, so its isolated store has no " +
+      "migration status. Run `fusebase deploy --nocode` to provision it first.",
+  };
+}
+
+// Applying migrations targets an app's isolated store, so the app must exist on
+// the platform. Under the declarative-manifest flag an entry is authored with
+// only a `path`/`subdomain` and the platform app may not exist yet — so
+// reconcile it now, exactly like `fusebase dev` start (NIM-41996): bind the
+// subdomain to an existing app, else create one, sync its declared state,
+// persist the resolved id, and return the config carrying that id. Only the
+// mutating `--apply` path calls this (creating the app is an unexpected side
+// effect for read-only status/dry-run). A legacy or already-reconciled entry
+// (id present) and flag-off runs are returned untouched with no network call.
+async function ensureAppExists(
+  appConfig: FeatureConfig,
+  fuseConfig: FuseConfig,
+): Promise<FeatureConfig> {
+  if (
+    !DECLARATIVE ||
+    (appConfig.id !== undefined && appConfig.id.trim().length > 0) ||
+    appConfig.subdomain === undefined ||
+    appConfig.subdomain.length === 0
+  ) {
+    return appConfig;
   }
-  const store = resolveSqlStoreConfig(appConfig, options.alias);
+
+  const config = getConfig();
+  if (config.apiKey === undefined || config.apiKey.trim().length === 0) {
+    throw new Error("No API key configured. Run 'fusebase auth' first.");
+  }
+
+  const { apps: platformApps } = await fetchApps(
+    config.apiKey,
+    fuseConfig.orgId,
+    fuseConfig.productId,
+  );
+  const [resolved] = await reconcileApps([appConfig], platformApps);
+  assert(resolved, "Reconcile result should not be undefined");
+  appConfig.id = resolved.appId;
+  writeStdoutLine(
+    `✓ ${resolved.action === "created" ? "Created" : "Bound"} app ${appConfig.subdomain} → ${resolved.appId}`,
+  );
+
+  // Best-effort write-back so the next run takes the id fast path — a failure
+  // here must not stop the command.
+  try {
+    writeResolvedAppIdToFusebaseJson(
+      process.cwd(),
+      appConfig.subdomain,
+      resolved.appId,
+    );
+  } catch {
+    // ignore: the reconcile already resolved the id in-memory for this run.
+  }
+
+  return appConfig;
+}
+
+function readArtifact(
+  appConfig: FeatureConfig,
+  appRef: string,
+  alias: string | undefined,
+): SqlMigrationBundleArtifact {
+  if (appConfig.path === undefined || appConfig.path.trim().length === 0) {
+    throw new Error(`App "${appRef}" has no path in fusebase.json`);
+  }
+  const store = resolveSqlStoreConfig(appConfig, alias);
   if (store === null) {
     throw new Error(
-      `App "${options.app}" has no isolatedStores.sql[] config in fusebase.json`,
+      `App "${appRef}" has no isolatedStores.sql[] config in fusebase.json`,
     );
   }
   return buildSqlMigrationBundleArtifact({
@@ -187,7 +296,7 @@ const sqlBundleCommand = new Command("bundle")
   .description(
     "Build an isolated SQL migration bundle and optional RLS manifest from app files",
   )
-  .requiredOption("--app <appId>", "App id from fusebase.json apps[]")
+  .requiredOption("--app <app>", APP_OPTION_DESCRIPTION)
   .option("--alias <alias>", "SQL isolated store alias from isolatedStores.sql[]")
   .option("--store-id <storeId>", "Gate store id; overrides isolatedStores.sql[].storeId")
   .option("--stage <stage>", "Stage for Gate status/apply: dev or prod", "dev")
@@ -200,7 +309,30 @@ const sqlBundleCommand = new Command("bundle")
   .option("--yes", "Confirm --apply")
   .action(async (options: SqlBundleOptions) => {
     const stage = options.stage === "prod" ? "prod" : "dev";
-    const artifact = readArtifact({ ...options, stage });
+    const { fuseConfig, appConfig } = resolveAppConfig(options.app);
+
+    // A read-only status check on a not-yet-deployed declarative app returns a
+    // predefined "not deployed" status instead of failing the build — its
+    // isolated store doesn't exist until the app is deployed.
+    if (options.status === true && appIsUndeployed(appConfig)) {
+      writeStdoutLine(JSON.stringify(buildUndeployedStatus(appConfig), null, 2));
+      return;
+    }
+
+    // Reconcile only for `--apply`, where creating/ensuring the platform app is
+    // the intended side effect of applying migrations against its isolated
+    // store. Read-only paths (`--status`, `--rls-status`, `--dry-run`, `--json`,
+    // summary) must not create or mutate the app; an id-less declarative entry
+    // just surfaces the standard `requireAppId` "run deploy first" guidance.
+    const resolvedAppConfig =
+      options.apply === true
+        ? await ensureAppExists(appConfig, fuseConfig)
+        : appConfig;
+    const artifact = readArtifact(
+      resolvedAppConfig,
+      options.app,
+      options.alias,
+    );
     const includeRlsManifest = hasFlag(ISOLATED_SQL_RLS_FLAG);
     const requestBody = buildGateRequestBody(
       artifact,
@@ -224,7 +356,6 @@ const sqlBundleCommand = new Command("bundle")
       return;
     }
 
-    const { fuseConfig } = resolveAppConfig(options.app);
     const storeId = options.storeId ?? artifact.store.storeId;
     if (storeId === undefined || storeId.trim().length === 0) {
       throw new Error("Missing store id. Set isolatedStores.sql[].storeId or pass --store-id.");

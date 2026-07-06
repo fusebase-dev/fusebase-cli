@@ -281,6 +281,14 @@ Deploy apps to Fusebase. For each app this command will:
 5. With `--force`, hash matches are ignored and a full upload + redeploy runs for every app.
 6. If the app contains `openapi.json`, validate it and publish the app API manifest to the app registry.
 
+When the experimental `declarative-manifest` flag is enabled (`fusebase config set-flag
+declarative-manifest`), deploy **reconciles** the declarative manifest against the platform
+before the per-app loop: each `apps[]` entry is resolved to a real app id — a legacy `id` is
+trusted as-is, otherwise the entry's `subdomain` is matched against existing apps (bind) or a
+new app is created. After a successful deploy the resolved id is written back into the matching
+`apps[]` entry. See [Declarative `fusebase.json`](#declarative-fusebasejson). With the flag
+**off** (default), every deployable `apps[]` entry must already carry a real `id`.
+
 **Arguments:** None
 
 **Options:**
@@ -288,6 +296,8 @@ Deploy apps to Fusebase. For each app this command will:
 | Option | Description |
 |--------|-------------|
 | `--force` | Force re-upload and re-deploy regardless of frontend/backend hash match |
+| `--nocode` | Only reconcile infrastructure (bind/create apps on the platform, write back resolved ids); skip code build/upload/backend deploy |
+| `--app <app>` | Deploy only the app whose `subdomain`, `id`, `name`, or `path` matches |
 
 **Prerequisites:**
 
@@ -303,6 +313,12 @@ fusebase deploy
 
 # Always uploads and redeploys
 fusebase deploy --force
+
+# Reconcile apps on the platform without deploying code
+fusebase deploy --nocode
+
+# Deploy only one app
+fusebase deploy --app my-app
 ```
 
 **App Configuration in `fusebase.json`:**
@@ -313,7 +329,8 @@ fusebase deploy --force
   "productId": "...",
   "apps": [
     {
-      "id": "app-id",
+      "subdomain": "my-app",
+      "name": "My App",
       "path": "apps/my-app",
       "build": {
         "command": "npm run build",
@@ -323,6 +340,10 @@ fusebase deploy --force
   ]
 }
 ```
+
+App entries are declarative — they carry `subdomain` + `name` and omit the platform `id` (deploy
+resolves it). Legacy entries with a real `id` still deploy unchanged. See
+[Declarative `fusebase.json`](#declarative-fusebasejson).
 
 ---
 
@@ -472,6 +493,8 @@ Magic-link activation is handled server-side by the platform at **`/_auth/magicl
   "apps": [
     {
       "id": "app-id",
+      "subdomain": "my-app",
+      "name": "My App",
       "path": "apps/my-app",
       "dev": {
         "command": "npm run dev"
@@ -485,6 +508,11 @@ Magic-link activation is handled server-side by the platform at **`/_auth/magicl
 }
 ```
 
+`app create` writes the **platform-issued** `id` along with `subdomain` + `name`. That id comes
+from the platform — never hand-author one yourself. To add an app **by hand** instead, write a
+declarative entry with `subdomain`/`name`/`path` and **no `id`**, then run `fusebase deploy` —
+reconcile resolves the id. See [Declarative `fusebase.json`](#declarative-fusebasejson).
+
 ---
 
 ### `fusebase dev start [app]`
@@ -496,6 +524,11 @@ Start the development server for an app. This command:
 3. Starts the API proxy server (port 4174)
 4. Creates a per-session debug log folder under the selected app directory at `logs/dev-<timestamp>/`
 5. Opens the dev UI in your browser
+
+> With the experimental `declarative-manifest` flag enabled, if the selected app has no platform
+> `id` yet, `dev start` first **reconciles** it — binds the `subdomain` to an existing platform
+> app or **creates** one — then runs the dev server against that id and writes it back into
+> `fusebase.json` (NIM-41996).
 
 **Arguments:**
 
@@ -681,6 +714,20 @@ fusebase env create
 
 Builds the Gate SQL migration request body from app-owned files and, when requested, calls Gate status/dry-run/apply using `GATE_MCP_TOKEN` from `.env`.
 
+Under the `declarative-manifest` flag a matched app entry may be id-less (authored with only a `path`/`subdomain`), and its platform app may not exist yet. On **`--apply`** the command reconciles it first — exactly like `fusebase dev` start: it binds the subdomain to an existing platform app or creates one, then persists the resolved `id` back into `fusebase.json` — so migrations apply against a real app. Read-only operations never reconcile, to avoid creating/mutating the app as a side effect. In particular **`--status`** on a not-yet-deployed declarative app (no resolved `id`) returns a predefined status instead of erroring:
+
+```json
+{
+  "appExists": false,
+  "app": "apps/client-portal",
+  "subdomain": "client-portal",
+  "migrations": { "applied": [], "pending": [] },
+  "message": "App is not deployed on the platform yet, so its isolated store has no migration status. Run `fusebase deploy` to provision it first."
+}
+```
+
+Branch on `appExists` to tell "not deployed" apart from a real Gate status. Entries that already carry an `id` (and flag-off runs) are used as-is with no reconcile.
+
 This command is operator/CI tooling. Its `storeId` is allowed in `fusebase.json`, `--store-id`, command output, or handoff logs so migrations can target an exact Gate store/stage. Do not copy that `storeId` into app runtime secrets or env vars. Runtime app code should resolve Gate isolated stores through app scope/permissions and stable aliases, or use platform-provided bindings when available.
 
 RLS manifests are experimental and are only attached when the `postgres-rls` flag is enabled. Without the flag, the command still builds/applies the SQL migration bundle but omits `rlsManifest`.
@@ -851,7 +898,8 @@ Project-specific configuration in your app root:
   "productId": "app-id",
   "apps": [
     {
-      "id": "app-uuid",
+      "subdomain": "my-app",
+      "name": "My App",
       "path": "apps/my-app",
       "dev": {
         "command": "npm run dev"
@@ -864,6 +912,42 @@ Project-specific configuration in your app root:
   ]
 }
 ```
+
+#### Declarative `fusebase.json`
+
+`apps[]` is a **declarative manifest**. An app entry describes the app
+(`subdomain`, `name`, `path`, `dev`, `build`) and **omits the platform app `id`** —
+`fusebase deploy` resolves the id at deploy time. `productId` (the product id) stays
+required.
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `apps[].subdomain` | Yes (declarative) | Match key; the app's `{subdomain}.thefusebase.app` domain |
+| `apps[].name` | Yes (declarative) | App title used when reconcile creates the app |
+| `apps[].id` | No | **Legacy only.** Old apps keep a real `id`; never hand-author one |
+| `apps[].path` | Yes | Local app directory |
+
+**Deploy reconcile** (requires the experimental `declarative-manifest` flag — off by default;
+without it, deploy requires a real `id` on every entry) — before deploying, the CLI resolves
+every entry to a real app id:
+
+1. Entry has a legacy `id` → trust it as-is.
+2. Else `subdomain` matches an existing platform app → **bind** to it.
+3. Else → **create** the app from the declaration (`name` + `subdomain` + `path`).
+
+With the flag on, `fusebase app create` also stays declarative: it **only writes the
+`apps[]` entry** (no `id`, no platform call) — the app is created on the first `fusebase
+deploy`. `--access`/`--permissions` require a deployed app id, so apply them via `fusebase
+app update <appId>` after that deploy. (Flag off: `app create` creates the platform app and
+writes its `id`, as before.)
+
+After a successful deploy, the resolved id is written back into the entry, so the next deploy
+takes the legacy fast path. You still never hand-author one — the platform owns it.
+
+> **Never invent or hand-write an app `id`.** The platform owns app ids. Writing your own
+> `id` and then running `fusebase app create` causes a double-registration conflict (a freshly
+> created platform app whose id ≠ the one in the file). Write a declarative record
+> (`subdomain`/`name`/`path`, no `id`) and run `fusebase deploy` or `fusebase app create`.
 
 ---
 
