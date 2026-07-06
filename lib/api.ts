@@ -620,12 +620,16 @@ export async function createProduct(
   return res as Product;
 }
 
+/**
+ * Creates a new app on backend
+ */
 export async function createApp(
   apiKey: string,
   orgId: string,
   productId: string,
   title: string,
   sub: string,
+  path = "",
 ): Promise<App> {
   const baseUrl = getBaseUrl();
   const url = `${baseUrl}/v1/orgs/${orgId}/products/${productId}/apps`;
@@ -635,7 +639,10 @@ export async function createApp(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ title, path: "", sub }),
+    // `path` is the immutable local app path — the deploy-time reconcile match
+    // key (falls back to `id`). Persisted by the platform, returned on the apps
+    // list so a re-deploy binds instead of creating a duplicate.
+    body: JSON.stringify({ title, path, sub }),
   });
 
   if (!response.ok) {
@@ -2050,6 +2057,25 @@ export async function sendCommandLog(
       errorBody,
     });
   }
+}
+
+/**
+ * Best-effort coding-stats send for a freshly-created app (NIM-41997). No-op
+ * when no tracking was captured. Fire-and-forget: a failure never fails deploy.
+ */
+export function sendCodingStatsForCreatedApp(
+  apiKey: string,
+  orgId: string,
+  productId: string,
+  appId: string,
+  tracking: { codingAgent?: string; model?: string },
+): void {
+  if (!tracking.codingAgent && !tracking.model) return;
+  sendCodingStats(apiKey, orgId, productId, {
+    codingAgent: tracking.codingAgent,
+    model: tracking.model,
+    appId,
+  }).catch(() => {});
 }
 
 export async function sendCodingStats(

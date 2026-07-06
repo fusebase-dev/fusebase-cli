@@ -4,10 +4,36 @@ import { join } from "path";
 import {
   loadFuseConfig,
   invalidateFuseConfigCache,
+  hasFlag,
   type BackendJobConfig,
+  type FeatureConfig,
 } from "../config";
 
 const FUSE_JSON = "fusebase.json";
+
+// Under the declarative-manifest flag an app entry has no platform `id` yet
+// (it is assigned at deploy-time reconcile), so `--app` is matched by local
+// `path` only. Legacy (flag off) keeps the strict `id`-only match.
+const DECLARATIVE = hasFlag("declarative-manifest");
+
+function findFeatureIndex(features: FeatureConfig[], appId: string): number {
+  return features.findIndex((f) =>
+    DECLARATIVE ? f.path === appId : f.id === appId,
+  );
+}
+
+function availableAppsLabel(features: FeatureConfig[]): string {
+  return (
+    features
+      .map((f) => (DECLARATIVE ? f.path : f.id))
+      .filter(Boolean)
+      .join(", ") || "(none)"
+  );
+}
+
+const APP_OPTION_DESCRIPTION = DECLARATIVE
+  ? "App path to add the job to"
+  : "App ID to add the job to";
 
 function resolveAppId(opts: { app?: string; feature?: string }): string {
   const appId = opts.app ?? opts.feature;
@@ -23,7 +49,7 @@ function resolveAppId(opts: { app?: string; feature?: string }): string {
 
 const createCommand = new Command("create")
   .description("Add a cron job to an app's backend in fusebase.json")
-  .option("-a, --app <appId>", "App ID to add the job to")
+  .option("-a, --app <app>", APP_OPTION_DESCRIPTION)
   .addOption(
     new Option("-f, --feature <featureId>", "Deprecated alias for --app")
       .hideHelp(),
@@ -60,10 +86,10 @@ const createCommand = new Command("create")
       }
 
       const features = fuseConfig.apps ?? [];
-      const featureIndex = features.findIndex((f) => f.id === appId);
+      const featureIndex = findFeatureIndex(features, appId);
       if (featureIndex === -1) {
         console.error(
-          `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+          `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${availableAppsLabel(features)}`,
         );
         process.exit(1);
       }
@@ -125,7 +151,10 @@ function detectIndent(src: string): number {
 
 const deleteCommand = new Command("delete")
   .description("Remove a cron job from an app's backend in fusebase.json")
-  .option("-a, --app <appId>", "App ID to remove the job from")
+  .option(
+    "-a, --app <app>",
+    DECLARATIVE ? "App path to remove the job from" : "App ID to remove the job from",
+  )
   .addOption(
     new Option("-f, --feature <featureId>", "Deprecated alias for --app")
       .hideHelp(),
@@ -147,10 +176,10 @@ const deleteCommand = new Command("delete")
     }
 
     const features = fuseConfig.apps ?? [];
-    const featureIndex = features.findIndex((f) => f.id === appId);
+    const featureIndex = findFeatureIndex(features, appId);
     if (featureIndex === -1) {
       console.error(
-        `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+        `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${availableAppsLabel(features)}`,
       );
       process.exit(1);
     }

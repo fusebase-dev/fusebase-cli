@@ -67,7 +67,7 @@ bun index.ts [command]
 - `version` - Print CLI version (from package.json)
 - `init` - Initialize a new app in current directory (optional `--ide <preset>`: claude-code, cursor, vscode, opencode, codex, other; single choice; optional `--git` to initialize local Git and sync with configured GitLab remote; `--skip-git` to force-disable git init/sync for this run; optional `--git-tag-managed` to set `managed` topic in GitLab when app is managed; in interactive mode shows editable suggested repo name before sync; same behavior can be enabled globally with flag `git-init`)
 - `git` - Initialize a local Git repository in the current directory (`fusebase git`) and sync an existing local repo with configured GitLab remote (`fusebase git sync` or `fusebase git --git-sync`); requires global config keys `gitlabHost`, `gitlabToken`, `gitlabGroup`; baseline `.gitignore` rules are ensured automatically
-- `deploy` - Deploy apps to Fusebase (runs lint then build per app). Computes frontend/backend SHA-256 hashes and skips apps whose frontend AND backend are unchanged; reuses the previous frontend bundle via `copyFrontendParams` when only the backend changed. Pass `--force` to override the skip and always re-upload + redeploy.
+- `deploy` - Deploy apps to Fusebase (runs lint then build per app). Computes frontend/backend SHA-256 hashes and skips apps whose frontend AND backend are unchanged; reuses the previous frontend bundle via `copyFrontendParams` when only the backend changed. Pass `--force` to override the skip and always re-upload + redeploy. `--nocode` only reconciles infrastructure (bind/create apps on the platform, write back ids) and skips code deployment. `--app <subdomain|id|name|path>` deploys only the matching app.
 - `app list` - List all apps for the current app with their URLs
 - `app create` - Create and configure an app (requires `--name`, `--subdomain`, `--path`, `--dev-command`, `--build-command`, `--output-dir`; optional `--access` for access principals e.g. `visitor`, `orgRole:member`; `--permissions` for manual `dashboardView/database` access)
 - `app portal-embeds <appId>` - List portal pages in the current product/org where the app is embedded
@@ -119,19 +119,49 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `portal-specific-apps` | Includes portal-specific app prompts and references (`fusebase-portal-specific-apps`, `{{CurrentPortal}}` filters, and auth-context guidance for portal runtime) |
 | `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing app code. Complements MCP discovery. |
 | `cross-app-api-calls-analysis` | Enables the hidden `fusebase analyze app-apis` and `fusebase app-api-contracts` commands and cross-app API dependency guidance in generated prompts/skills. |
+| `declarative-manifest` | Enables declarative `fusebase.json` apps (optional `id`, `subdomain` match) and the deploy-time reconcile (bind/create). Off (default): `fusebase deploy` requires a legacy `id` on every app entry. |
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 
-Project-specific config is stored in `fusebase.json` in the project root:
+Project-specific config is stored in `fusebase.json` in the project root. `apps[]`
+is a **declarative manifest**: an app entry carries `subdomain` + `name` and omits
+the platform `id` (the `productId` always stays). The id is resolved at deploy time.
+
 ```json
 {
  "orgId": "...",
  "productId": "...",
  "apps": [
- { "id": "app-id", "path": "apps/my-app", "dev": { "command": "npm run dev" }, "build": { "command": "npm run build", "outputDir": "dist" }, "devUrl": "http://localhost:3000" }
+ { "subdomain": "my-app", "name": "My App", "path": "apps/my-app", "dev": { "command": "npm run dev" }, "build": { "command": "npm run build", "outputDir": "dist" } }
  ]
 }
 ```
+
+**Declarative manifest & deploy reconcile (NIM-41746) — behind the `declarative-manifest` flag (NIM-41963):**
+
+The behavior below is active only when `fusebase config set-flag declarative-manifest` is
+enabled. With the flag **off** (default) `fusebase deploy` uses the legacy path: every
+deployable `apps[]` entry must carry a real platform `id`, and deploy never binds or creates.
+
+- `apps[].id` is **optional**. Declarative entries omit it and use `subdomain` as the
+  match key; legacy entries that still carry a real `id` keep working unchanged (back-compat).
+- `fusebase app create` (NIM-41989) **only writes the declarative `apps[]` entry** — it does
+  **not** create the app on the platform. The real app is created at deploy. (Off/legacy: `app
+  create` calls the platform and writes the returned `id`.) `--access`/`--permissions` need a
+  deployed app id, so set them with `app update <appId>` after the first deploy.
+  `--coding-agent`/`--model` tracking is stored in the entry and sent to the
+  platform when deploy/dev-start actually creates the app (NIM-41997).
+- `fusebase deploy` runs a **reconcile** step before deploying: per app entry it trusts a
+  legacy `id` if present, else matches `subdomain` against the platform's apps, else **creates**
+  the missing app — no path-uniqueness conflict, no double registration.
+- `fusebase dev start` (NIM-41996) applies the same reconcile to the selected app when it has no
+  `id`: it binds the `subdomain` to an existing platform app, else creates one, then runs the dev
+  server against that id and writes it back into `fusebase.json`.
+- Reconcile resolves ids **in-memory** for the deploy; after a successful deploy the resolved
+  id is **written back** into the matching `apps[]` entry (NIM-41875), so the next deploy takes
+  the legacy fast path and the manifest records the real platform id.
+- **Never hand-author an app `id`** — the platform owns it. Write `subdomain`/`name`/`path`
+  and run `fusebase deploy` (or `fusebase app create`). `productId` stays required.
 
 ### App Token Flow
 

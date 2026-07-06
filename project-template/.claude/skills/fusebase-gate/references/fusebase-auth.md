@@ -122,7 +122,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 **Production mode (Memberspace, role-gated areas, any flow where the app must remember which user opened the link across navigations):**
 
 - After the mandatory exchange, issue an **app-owned** session cookie (HMAC-signed or equivalent integrity-protected payload, bound to `userId`) and use it as the source of truth for subsequent requests. Verify on every request — do not infer the recipient from `eversessionid` or `fbsfeaturetoken` after the initial redirect.
-- Register the HMAC secret only here, with `fusebase secret create --feature <appId> --secret "APP_SESSION_SECRET:HMAC signing key for app-owned session cookie"`, then read it from `process.env.APP_SESSION_SECRET` in the backend.
+- Register the HMAC secret only here, with `fusebase secret create --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> --secret "APP_SESSION_SECRET:HMAC signing key for app-owned session cookie"`, then read it from `process.env.APP_SESSION_SECRET` in the backend.
 - Set the cookie `httpOnly`, `secure`, `sameSite=Lax`, `path=/`. Rotate by changing the secret + invalidating live cookies; do not rely on Fusebase cookies for revocation.
 
 ### Non-secrets — never `fusebase secret create`

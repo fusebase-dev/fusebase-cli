@@ -21,22 +21,32 @@ import {
   copyBackendParams,
   copyFrontendParams,
   updateApp,
+  createApp,
+  sendCodingStatsForCreatedApp,
   type Product,
   type App,
   type Deploy,
   type DeployJobDefinition,
   type DeploySidecarDefinition,
+  type AppAccessPrincipal,
+  type AppPermissions,
+  type UpdateAppRequest,
 } from "../api";
+import { mergeFeaturePermissions } from "../permissions";
 import { getFusebaseAppHost } from "../config";
 import { logger } from "../logger";
 import {
   getConfig,
+  hasFlag,
   loadFuseConfig,
+  requireAppId,
   validateMinReplicas,
+  writeResolvedAppIdToFusebaseJson,
   type BackendConfig,
   type FeatureConfig,
   type SidecarConfig,
 } from "../config";
+import { formatReconcileLine, reconcileApps, type ReconcileAction } from "../reconcile";
 import {
   buildPublishedAppApiManifest,
   loadAndValidateOpenApiFile,
@@ -44,7 +54,6 @@ import {
 } from "../openapi";
 import { readBackendOnlyGatePermissionsFromFeature } from "../permissions.ts";
 
-const FUSE_JSON = "fusebase.json";
 const UPLOAD_CONCURRENCY = 5;
 const DEPLOY_POLL_INTERVAL_MS = 3000;
 
@@ -55,6 +64,15 @@ const DEPLOY_POLL_INTERVAL_MS = 3000;
 // enough collision resistance for idempotency checks (128/124 bits).
 export const BACKEND_HASH_SOURCE_PREFIX_LEN = 32;
 export const BACKEND_HASH_CONFIG_PREFIX_LEN = 31;
+
+/** A reconciled app ready to deploy: its declaration + the resolved platform id. */
+export interface DeployTarget {
+  appConfig: FeatureConfig;
+  appId: string;
+  logLine: string;
+  /** How the id was resolved; `created` targets get coding-stats sent (NIM-41997). */
+  action: ReconcileAction;
+}
 
 // Transform sidecar config for the deploy API.
 // - `env` Record<string,string> becomes an array of {key, value}.
@@ -520,14 +538,65 @@ async function publishOpenApiManifestIfPresent(params: {
   }
 }
 
+// Match deployable apps by any stable user-facing key (subdomain/id/name/path)
+// so `--app` works for both declarative and legacy entries.
+export function selectDeployableApps(
+  features: FeatureConfig[],
+  selector: string,
+): FeatureConfig[] {
+  return features.filter(
+    (f) =>
+      f.subdomain === selector ||
+      f.id === selector ||
+      f.name === selector ||
+      f.path === selector,
+  );
+}
+
+// Current platform state of an app needed to diff against the manifest.
+type AppServerState = Partial<
+  Pick<App, "title" | "accessPrincipals" | "permissions">
+>;
+
+
+
+// Persist a reconcile-resolved id back into an id-less declarative `apps[]`
+// entry (NIM-41875). Best-effort — a write failure must not fail the deploy.
+function persistResolvedId(featureConfig: FeatureConfig, featureId: string): void {
+  if (featureConfig.id || !featureConfig.subdomain) return;
+  try {
+    if (
+      writeResolvedAppIdToFusebaseJson(
+        process.cwd(),
+        featureConfig.subdomain,
+        featureId,
+      )
+    ) {
+      console.log(`   ✓ Saved app id ${featureId} to fusebase.json`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.debug("Failed to write resolved app id: %s", message);
+  }
+}
+
 export const deployCommand = new Command("deploy")
   .description("Deploy apps to Fusebase")
   .option(
     "--force",
     "Force re-upload and re-deploy regardless of frontend/backend hash match",
   )
-  .action(async (opts: { force?: boolean }) => {
+  .option(
+    "--nocode",
+    "Only reconcile infrastructure (bind/create apps), skip app code deployment",
+  )
+  .option(
+    "--app <app>",
+    "Deploy only the app matching this subdomain, id, name, or path",
+  )
+  .action(async (opts: { force?: boolean; nocode?: boolean; app?: string }) => {
     const force = opts.force ?? false;
+    const nocode = opts.nocode ?? false;
     // Check if app is initialized
     const fuseConfig = await loadFuseConfig();
     if (!fuseConfig) {
@@ -548,12 +617,12 @@ export const deployCommand = new Command("deploy")
     }
 
     // Find apps with path configured
-    const featuresConfig = fuseConfig.apps || [];
-    const deployableFeatures = featuresConfig.filter(
+    const appsConfig = fuseConfig.apps || [];
+    let deployableApps = appsConfig.filter(
       (config) => config.path && config.path.trim() !== "",
     );
 
-    if (deployableFeatures.length === 0) {
+    if (deployableApps.length === 0) {
       console.error(
         "Error: No apps with path configured in fusebase.json.",
       );
@@ -563,7 +632,25 @@ export const deployCommand = new Command("deploy")
       process.exit(1);
     }
 
-    console.log(`\nDeploying ${deployableFeatures.length} app(s)...\n`);
+    // `--app` narrows the deploy to a single app; match on any stable
+    // user-facing key (subdomain/id/name/path) so it works for both
+    // declarative and legacy entries.
+    if (opts.app) {
+      const selector = opts.app;
+      const selected = selectDeployableApps(deployableApps, selector);
+      if (selected.length === 0) {
+        console.error(`Error: No app matching "${selector}" in fusebase.json.`);
+        console.error(
+          `Available: ${deployableApps
+            .map((f) => f.subdomain ?? f.id ?? f.path)
+            .join(", ")}`,
+        );
+        process.exit(1);
+      }
+      deployableApps = selected;
+    }
+
+    console.log(`\nDeploying ${deployableApps.length} app(s)...\n`);
 
     // Fetch product and apps to get sub and path for URLs
     let app: Product;
@@ -587,11 +674,83 @@ export const deployCommand = new Command("deploy")
 
     logger.debug("Fetched product: %j", app);
 
+    // Resolve each app declaration to a platform id. The declarative manifest
+    // (optional id, subdomain reconcile, auto-create) is experimental and gated
+    // behind the `declarative-manifest` flag (NIM-41963). Flag off → legacy
+    // path: every deployable entry must carry a real `id`, no bind/create.
+    let deployTargets: DeployTarget[];
+    if (hasFlag("declarative-manifest")) {
+      // Reconcile declarations against the platform: bind id-less entries to an
+      // existing app by subdomain, create the missing ones — before any deploy
+      // call so the loop uses the resolved id, never a hand-authored one.
+      try {
+        console.log("Reconciling apps...");
+        deployTargets = (await reconcileApps(
+          deployableApps,
+          features
+        )).map(result => ({
+          appConfig: result.appConfig,
+          appId: result.appId,
+          logLine: formatReconcileLine(result),
+          action: result.action,
+        }));
+        for (const target of deployTargets) {
+          console.log(`   ${target.logLine}`);
+        }
+        // Send the model/agent tracking captured at `app create` for apps this
+        // reconcile just created — in declarative mode create no longer sends
+        // it (NIM-41997). Best-effort; never blocks deploy.
+        for (const target of deployTargets) {
+          if (target.action === "created") {
+            sendCodingStatsForCreatedApp(
+              config.apiKey!,
+              fuseConfig.orgId,
+              fuseConfig.productId,
+              target.appId,
+              target.appConfig,
+            );
+          }
+        }
+
+        console.log("");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Error: Failed to reconcile apps: ${message}`);
+        process.exit(1);
+      }
+    } else {
+      try {
+        deployTargets = deployableApps.map((appConfig) => ({
+          appConfig,
+          appId: requireAppId(appConfig),
+          logLine: `legacy id ${appConfig.id}`,
+          action: "legacy" as const,
+        }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Error: ${message}`);
+        process.exit(1);
+      }
+    }
+
+    // `--nocode`: infrastructure only. Reconcile already bound/created the
+    // apps on the platform above; persist any resolved ids and stop before the
+    // code deploy loop (no build, no upload, no backend deploy).
+    if (nocode) {
+      for (const { appConfig, appId } of deployTargets) {
+        persistResolvedId(appConfig, appId);
+      }
+      console.log(
+        `\n✓ Reconciled ${deployTargets.length} app(s) (--nocode: code deployment skipped).`,
+      );
+      return;
+    }
+
     // Determine domain based on environment (same as FUSEBASE_APP_HOST)
     const domain = getFusebaseAppHost();
 
     const results: Array<{
-      featureId: string;
+      appId: string;
       versionId: string;
       url: string;
       success: boolean;
@@ -599,26 +758,25 @@ export const deployCommand = new Command("deploy")
       error?: string;
     }> = [];
 
-    for (const featureConfig of deployableFeatures) {
-      const featureId = featureConfig.id;
-      const featureBasePath = join(process.cwd(), featureConfig.path!);
+    for (const { appConfig, appId } of deployTargets) {
+      const featureBasePath = join(process.cwd(), appConfig.path!);
 
-      console.log(`📦 App: ${featureId}`);
-      console.log(`   Source: ${featureConfig.path}`);
+      console.log(`📦 App: ${appId}`);
+      console.log(`   Source: ${appConfig.path}`);
 
       try {
         // Check if base path exists
         try {
           await stat(featureBasePath);
         } catch {
-          throw new Error(`path does not exist: ${featureConfig.path}`);
+          throw new Error(`path does not exist: ${appConfig.path}`);
         }
 
         // `backend.minReplicas` is sent to the deploy endpoint. Fail fast on an
         // invalid value before any install, build, or network call — the
         // nimbus-ai deploy endpoint is the authoritative guard, this only gives a
         // friendlier local error.
-        validateMinReplicas(featureConfig.backend?.minReplicas, featureId);
+        validateMinReplicas(appConfig.backend?.minReplicas, appId);
 
         // Install dependencies so lint and build have devDependencies (e.g. eslint)
         await checkAndInstallDependencies(featureBasePath);
@@ -644,8 +802,8 @@ export const deployCommand = new Command("deploy")
         // dir, the backend folder (hashed separately), and node_modules.
         console.log(`   Calculating frontend hash...`);
         const frontendHashExclude = [
-          ...(featureConfig.build?.outputDir
-            ? [featureConfig.build.outputDir]
+          ...(appConfig.build?.outputDir
+            ? [appConfig.build.outputDir]
             : []),
           ...(hasBackendDir ? ["backend"] : []),
         ];
@@ -666,8 +824,8 @@ export const deployCommand = new Command("deploy")
           const secretsResponse = await fetchAppSecrets(
             config.apiKey,
             fuseConfig.orgId,
-            fuseConfig.appId,
-            featureId,
+            fuseConfig.productId,
+            appId,
           );
           secretKeys = secretsResponse.secrets.map((s) => s.key);
           backendSourceHash = await calculateBackendSourceHash(backendDir);
@@ -677,7 +835,7 @@ export const deployCommand = new Command("deploy")
           // matches `calculateBackendHash` so the encoded hash fits the
           // VARCHAR(64) `backendHash` column.
           const backendConfigHash = calculateBackendConfigHash(
-            featureConfig.backend,
+            appConfig.backend,
             secretKeys,
           );
           backendHash = `${backendSourceHash.slice(
@@ -693,7 +851,7 @@ export const deployCommand = new Command("deploy")
           config.apiKey,
           fuseConfig.orgId,
           fuseConfig.productId,
-          featureId,
+          appId,
         ).catch(() => null);
 
         const frontendMatches =
@@ -710,13 +868,14 @@ export const deployCommand = new Command("deploy")
             `   ✓ No changes for app, skipping deploy\n`,
           );
 
-          const feature = features.find((f) => f.id === featureId);
-          const featureUrl = feature?.sub
-            ? `https://${feature.sub}.${domain}/`
-            : "";
+          const feature = features.find((f) => f.id === appId);
+          // `features` was fetched before reconcile, so a freshly-created app
+          // isn't in it — fall back to the declared subdomain for its URL.
+          const sub = feature?.sub ?? appConfig.subdomain;
+          const featureUrl = sub ? `https://${sub}.${domain}/` : "";
 
           results.push({
-            featureId,
+            appId,
             versionId: activeVersion?.globalId ?? "",
             url: featureUrl,
             success: true,
@@ -731,7 +890,7 @@ export const deployCommand = new Command("deploy")
           config.apiKey,
           fuseConfig.orgId,
           fuseConfig.productId,
-          featureId,
+          appId,
         );
 
         // ── Frontend handling ───────────────────────────────────────────────
@@ -748,21 +907,21 @@ export const deployCommand = new Command("deploy")
           );
         } else {
           // Branches A, D: build + upload frontend
-          if (featureConfig.build?.command) {
-            await runBuildCommand(featureConfig);
+          if (appConfig.build?.command) {
+            await runBuildCommand(appConfig);
           }
 
           // ── Resolve upload directory and listing ──────────────────────────
-          const uploadDir = featureConfig.build?.outputDir
-            ? join(featureBasePath, featureConfig.build.outputDir)
+          const uploadDir = appConfig.build?.outputDir
+            ? join(featureBasePath, appConfig.build.outputDir)
             : featureBasePath;
 
           try {
             await stat(uploadDir);
           } catch {
-            const outputDirPath = featureConfig.build?.outputDir
-              ? `${featureConfig.path}/${featureConfig.build.outputDir}`
-              : featureConfig.path;
+            const outputDirPath = appConfig.build?.outputDir
+              ? `${appConfig.path}/${appConfig.build.outputDir}`
+              : appConfig.path;
             throw new Error(
               `output directory does not exist: ${outputDirPath}`,
             );
@@ -770,18 +929,18 @@ export const deployCommand = new Command("deploy")
 
           // Exclude backend folder from static upload when it lives in uploadDir
           const staticExclude =
-            hasBackendDir && !featureConfig.build?.outputDir ? ["backend"] : [];
+            hasBackendDir && !appConfig.build?.outputDir ? ["backend"] : [];
 
           const files = await getAllFiles(uploadDir, uploadDir, staticExclude);
           if (files.length === 0) {
-            const outputDirPath = featureConfig.build?.outputDir
-              ? `${featureConfig.path}/${featureConfig.build.outputDir}`
-              : featureConfig.path;
+            const outputDirPath = appConfig.build?.outputDir
+              ? `${appConfig.path}/${appConfig.build.outputDir}`
+              : appConfig.path;
             throw new Error(`No files found in: ${outputDirPath}`);
           }
 
-          if (featureConfig.build?.outputDir) {
-            console.log(`   Output: ${featureConfig.build.outputDir}`);
+          if (appConfig.build?.outputDir) {
+            console.log(`   Output: ${appConfig.build.outputDir}`);
           }
           console.log(`   Files: ${files.length}`);
 
@@ -790,7 +949,7 @@ export const deployCommand = new Command("deploy")
             config.apiKey,
             fuseConfig.orgId,
             fuseConfig.productId,
-            featureId,
+            appId,
             version.id,
             files,
             frontendHash,
@@ -902,7 +1061,7 @@ export const deployCommand = new Command("deploy")
               config.apiKey,
               fuseConfig.orgId,
               fuseConfig.productId,
-              featureId,
+              appId,
               version.id,
               backendHash,
             );
@@ -935,7 +1094,7 @@ export const deployCommand = new Command("deploy")
             const { unlink } = await import("fs/promises");
             await unlink(archivePath).catch(() => {});
 
-            const sidecars = toDeploySidecars(featureConfig.backend?.sidecars);
+            const sidecars = toDeploySidecars(appConfig.backend?.sidecars);
 
             if (sidecars && sidecars.length > 0) {
               console.log(
@@ -944,7 +1103,7 @@ export const deployCommand = new Command("deploy")
             }
 
             const jobs: DeployJobDefinition[] | undefined =
-              featureConfig.backend?.jobs?.map((j) => {
+              appConfig.backend?.jobs?.map((j) => {
                 const jobSidecars = toDeploySidecars(j.sidecars);
                 return {
                   name: j.name,
@@ -975,11 +1134,11 @@ export const deployCommand = new Command("deploy")
               config.apiKey,
               fuseConfig.orgId,
               fuseConfig.productId,
-              featureId,
+              appId,
               version.id,
               jobs,
               sidecars,
-              featureConfig.backend?.minReplicas,
+              appConfig.backend?.minReplicas,
             );
             console.log(`   Deploy ID: ${deploy.id}`);
             console.log(`   Waiting for backend deploy to complete...\n`);
@@ -1003,20 +1162,26 @@ export const deployCommand = new Command("deploy")
           apiKey: config.apiKey,
           orgId: fuseConfig.orgId,
           appId: fuseConfig.productId,
-          featureId,
+          featureId: appId,
           featureBasePath,
-          featureConfig,
+          featureConfig: appConfig,
         });
 
         // Build feature URL
-        const feature = features.find((f) => f.id === featureId);
+        const feature = features.find((f) => f.id === appId);
         logger.debug("Feature info: %j", feature || {});
-        const featureUrl = feature?.sub
-          ? `https://${feature.sub}.${domain}/`
-          : "";
+        // Fall back to the declared subdomain for freshly-created apps absent
+        // from the pre-reconcile `features` list.
+        const sub = feature?.sub ?? appConfig.subdomain;
+        const featureUrl = sub ? `https://${sub}.${domain}/` : "";
+
+        // Persist the reconcile-resolved id back into fusebase.json for
+        // declarative (id-less) entries, so the next deploy takes the legacy
+        // fast path and the manifest records the real platform id (NIM-41875).
+        persistResolvedId(appConfig, appId);
 
         results.push({
-          featureId,
+          appId,
           versionId: version.id,
           url: featureUrl,
           success: true,
@@ -1026,7 +1191,7 @@ export const deployCommand = new Command("deploy")
           error instanceof Error ? error.message : String(error);
         console.log(`   ✗ Failed: ${errorMessage}\n`);
         results.push({
-          featureId,
+          appId,
           versionId: "",
           url: "",
           success: false,
@@ -1046,7 +1211,7 @@ export const deployCommand = new Command("deploy")
       console.log("✓ Successful deployments:");
       for (const result of successful) {
         const tag = result.skipped ? " (skipped — no changes)" : "";
-        console.log(`  • ${result.featureId}${tag}`);
+        console.log(`  • ${result.appId}${tag}`);
         if (result.versionId) {
           console.log(`    Version ID: ${result.versionId}`);
         }
@@ -1059,7 +1224,7 @@ export const deployCommand = new Command("deploy")
     if (failed.length > 0) {
       console.log("\n✗ Failed deployments:");
       for (const result of failed) {
-        console.log(`  • ${result.featureId}: ${result.error}`);
+        console.log(`  • ${result.appId}: ${result.error}`);
       }
     }
 

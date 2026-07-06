@@ -535,7 +535,7 @@ Pick the recipe based on what the app actually needs. **Do not auto-upgrade a sm
 **Production mode — Memberspace, role-gated UI, anything that must remember which user opened the link across navigations:**
 
 - After step 3, issue an **app-owned** session cookie (HMAC-signed or equivalent integrity-protected payload, bound to the resolved `userId`). Verify it on every protected request; do not re-infer identity from `fbsfeaturetoken` after the initial redirect.
-- Register the HMAC secret here and only here: `fusebase secret create --feature <appId> --secret "APP_SESSION_SECRET:HMAC signing key for app-owned session cookie"`. Read it from `process.env.APP_SESSION_SECRET` at runtime.
+- Register the HMAC secret here and only here: `fusebase secret create --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> --secret "APP_SESSION_SECRET:HMAC signing key for app-owned session cookie"`. Read it from `process.env.APP_SESSION_SECRET` at runtime.
 - Cookie attributes: `httpOnly`, `secure`, `sameSite=Lax`, `path=/`. Rotate by changing the secret and invalidating active cookies; do not rely on Fusebase platform cookies for revocation.
 - Result: a Production-mode magic-link app needs exactly **one** `fusebase secret create` call (the HMAC secret).
 
@@ -618,7 +618,7 @@ config.refreshToken = tokens.refresh_token; // lost on restart
 ## Dev Workflow
 
 1. `cd apps/my-app/backend && npm install` — install backend deps
-2. `fusebase secret create --app <id> --secret "KEY:description"` — register secrets (if needed), set values via the printed URL
+2. `fusebase secret create --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> --secret "KEY:description"` — register secrets (if needed), set values via the printed URL
 3. `fusebase dev start` — starts both SPA and backend; secrets are injected automatically as env vars
 
 **No `.env` files or `dotenv` needed** — `fusebase dev start` injects secrets into the backend process.
@@ -657,7 +657,7 @@ Cron jobs run on a schedule using the **same Docker image** as the app backend. 
 
 ```bash
 fusebase job create \
-  --app <appId> \
+  --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> \
   --name <job-name> \
   --cron "0 * * * *" \
   --command "npm run cron:my-job"
@@ -712,7 +712,7 @@ Key points:
 ### Removing a Job
 
 ```bash
-fusebase job delete --app <appId> --name <job-name>
+fusebase job delete --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> --name <job-name>
 ```
 
 This removes the job from `backend.jobs` in `fusebase.json`. On the next `fusebase deploy` the job will be automatically deleted from cloud infrastructure.

@@ -21,13 +21,23 @@ import {
 import {
   loadFuseConfig,
   getConfig,
+  hasFlag,
+  requireAppId,
+  writeResolvedAppIdToFusebaseJson,
   type FeatureConfig,
   type FuseConfig,
 } from "../config";
 import { detectDevServerUrl } from "../framework-detect";
-import { fetchAppSecrets } from "../api";
+import {
+  fetchAppSecrets,
+  fetchApps,
+  createApp,
+  sendCodingStatsForCreatedApp,
+} from "../api";
+import { reconcileApps } from "../reconcile";
 import packageJson from "../../package.json";
 import { logger } from "../logger";
+import assert from "assert";
 
 const FUSE_JSON = "fusebase.json";
 
@@ -169,7 +179,7 @@ async function spawnDevFeatureFrontend(
   let outputBuffer = "";
   let urlDetected = false;
 
-  const logs = attachFrontendDevServerOutputLogging(child, feature.id, logPaths.frontendDevServerPath, {
+  const logs = attachFrontendDevServerOutputLogging(child, feature.id ?? feature.subdomain ?? feature.path ?? "app", logPaths.frontendDevServerPath, {
     onData(text) {
       if (!urlDetected) {
         outputBuffer += text;
@@ -234,7 +244,7 @@ async function spawnDevFeatureBackend(
     stdio: ["inherit", "pipe", "pipe"],
     env: { ...process.env, BACKEND_PORT: String(backendPort), ...secretsEnv },
   });
-  const logs = attachBackendOutputLogging(child, feature.id, logPaths.backendOutputPath);
+  const logs = attachBackendOutputLogging(child, feature.id ?? feature.subdomain ?? feature.path ?? "app", logPaths.backendOutputPath);
 
   child.on("error", (error) => {
     logs.append({
@@ -315,6 +325,63 @@ devCommand
       throw new Error("No feature selected.");
     }
 
+    // Under the declarative-manifest flag, an app entry may not have a platform
+    // id yet (declarative). Resolve it now: bind the subdomain to an existing
+    // platform app, else create one — so `dev start` runs against a real app and
+    // the id is persisted for next time (NIM-41996). Legacy entries (with an id)
+    // and flag-off runs are unchanged.
+    if (
+      hasFlag("declarative-manifest") &&
+      !selectedFeature.id &&
+      selectedFeature.subdomain
+    ) {
+      try {
+        const { apps: platformApps } = await fetchApps(
+          config.apiKey,
+          fuseConfig.orgId,
+          fuseConfig.productId,
+        );
+        const [resolved] = await reconcileApps(
+          [selectedFeature],
+          platformApps
+        );
+        assert(resolved, "Reconcile result should not be undefined");
+        selectedFeature.id = resolved.appId;
+        console.log(
+          `✓ ${resolved.action === "created" ? "Created" : "Bound"} app ${selectedFeature.subdomain} → ${resolved.appId}`,
+        );
+        // Send the model/agent tracking captured at `app create` when dev-start
+        // actually creates the app (declarative create doesn't send it) (NIM-41997).
+        if (resolved.action === "created") {
+          sendCodingStatsForCreatedApp(
+            config.apiKey,
+            fuseConfig.orgId,
+            fuseConfig.productId,
+            resolved.appId,
+            selectedFeature,
+          );
+        }
+        // Best-effort write-back — a failure here must not stop the dev server.
+        try {
+          writeResolvedAppIdToFusebaseJson(
+            process.cwd(),
+            selectedFeature.subdomain,
+            resolved.appId,
+          );
+        } catch (error) {
+          logger.debug(
+            "Failed to write resolved app id: %s",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      } catch (error) {
+        console.error(
+          `Error: Failed to create app for '${selectedFeature.subdomain}': ${error instanceof Error ? error.message : error}`,
+        );
+        process.exit(1);
+      }
+    }
+
     const projectDir = process.cwd();
     const featureDir = selectedFeature.path
       ? join(projectDir, selectedFeature.path)
@@ -341,7 +408,7 @@ devCommand
         config.apiKey,
         fuseConfig.orgId,
         fuseConfig.productId,
-        selectedFeature.id,
+        requireAppId(selectedFeature),
       );
       if (secretsResponse.secrets.length > 0) {
         registerSensitiveValues(

@@ -19,6 +19,7 @@ import {
   getConfig,
   hasFlag,
   loadFuseConfig,
+  requireAppId,
   upsertManualAppApiDependencyInFusebaseJson,
   type AppApiDependenciesSnapshot,
   type AppApiDependencySnapshot,
@@ -619,7 +620,7 @@ appApiContractsCommand
         apiKey,
         fuseConfig.orgId,
         fuseConfig.productId,
-        consumerApp.id,
+        requireAppId(consumerApp),
         contracts,
       );
       const stored =
@@ -672,7 +673,7 @@ appApiContractsCommand
           );
         }
         console.log("");
-        printUnresolvedGuidance(consumerApp.id);
+        printUnresolvedGuidance(requireAppId(consumerApp));
       }
 
       const manualDependencies = readMatchingManualDependencies({ snapshot });
@@ -725,7 +726,7 @@ appApiContractsCommand
         const targetOrgId = opts.org ?? fuseConfig.orgId;
         const result = upsertManualAppApiDependencyInFusebaseJson(
           projectRoot,
-          consumerApp.id,
+          requireAppId(consumerApp),
           {
             targetOrgId,
             targetAppId: opts.provider,
@@ -823,7 +824,7 @@ appApiContractsCommand
           if (analysis.unresolved.length > 0) {
             console.log("");
             console.log("Unresolved callAppApi usages still exist.");
-            printUnresolvedGuidance(consumerApp.id);
+            printUnresolvedGuidance(requireAppId(consumerApp));
           }
           return;
         }
@@ -884,7 +885,7 @@ appApiContractsCommand
           console.log(
             `Unresolved callAppApi usages not scaffolded: ${analysis.unresolved.length}`,
           );
-          printUnresolvedGuidance(consumerApp.id);
+          printUnresolvedGuidance(requireAppId(consumerApp));
         }
 
         if (manualDependencyCount > 0) {
@@ -932,7 +933,7 @@ appApiContractsCommand
           config.apiKey,
           fuseConfig.orgId,
           fuseConfig.productId,
-          consumerApp.id,
+          requireAppId(consumerApp),
           { provider: opts.provider, operation: opts.operation },
         );
 

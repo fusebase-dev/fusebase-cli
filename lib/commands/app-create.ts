@@ -8,7 +8,12 @@ import {
   type App,
   type AppPermissions,
 } from "../api.ts";
-import { getConfig, loadFuseConfig, type FeatureConfig } from "../config.ts";
+import {
+  getConfig,
+  loadFuseConfig,
+  hasFlag,
+  type FeatureConfig,
+} from "../config.ts";
 import {
   formatPermissionItem,
   mergeFeaturePermissions,
@@ -78,8 +83,12 @@ export async function runAppCreate(options: AppCreateOptions): Promise<void> {
     process.exit(1);
   }
 
+  // Declarative model (NIM-41989): `app create` only writes the fusebase.json
+  // entry; the real platform app is created later by `fusebase deploy` reconcile.
+  const declarative = hasFlag("declarative-manifest");
+
   const config = getConfig();
-  if (!config.apiKey) {
+  if (!declarative && !config.apiKey) {
     console.error(
       "Error: No API key configured. Run 'fusebase auth' first.",
     );
@@ -127,32 +136,40 @@ export async function runAppCreate(options: AppCreateOptions): Promise<void> {
     }
   }
 
-  let createdApp: App;
-  try {
-    createdApp = await createApp(
-      config.apiKey,
-      fuseConfig.orgId,
-      fuseConfig.productId,
-      options.name.trim(),
-      options.subdomain.trim(),
-    );
-    console.log(`✓ Created app: ${createdApp.title}`);
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error("Error: Failed to create app:", error.message);
-    } else {
-      console.error("Error: Failed to create app.");
+  const appSub = options.subdomain.trim();
+  const appTitle = options.name.trim();
+
+  let createdApp: App | undefined;
+  if (!declarative) {
+    try {
+      createdApp = await createApp(
+        config.apiKey!,
+        fuseConfig.orgId,
+        fuseConfig.productId,
+        appTitle,
+        appSub,
+        appPath,
+      );
+      console.log(`✓ Created app: ${createdApp.title}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error("Error: Failed to create app:", error.message);
+      } else {
+        console.error("Error: Failed to create app.");
+      }
+      process.exit(1);
     }
-    process.exit(1);
+
+    if (options.codingAgent || options.model) {
+      sendCodingStats(config.apiKey!, fuseConfig.orgId, fuseConfig.productId, {
+        codingAgent: options.codingAgent,
+        model: options.model,
+        appId: createdApp.id,
+      }).catch(() => {});
+    }
   }
 
-  if (options.codingAgent || options.model) {
-    sendCodingStats(config.apiKey, fuseConfig.orgId, fuseConfig.productId, {
-      codingAgent: options.codingAgent,
-      model: options.model,
-      appId: createdApp.id,
-    }).catch(() => {});
-  }
+  const appId = createdApp?.id;
 
   let accessPrincipals:
     | import("../api.ts").AppAccessPrincipal[]
@@ -174,7 +191,16 @@ export async function runAppCreate(options: AppCreateOptions): Promise<void> {
   });
   const needsUpdate =
     accessPrincipals !== undefined || mergedPermissions !== undefined;
-  if (needsUpdate) {
+  // Declarative: no platform app id yet, so access/permissions can't be applied
+  // now. Persist them on the fusebase.json entry (below) so deploy-time reconcile
+  // applies them when it binds/creates the platform app.
+  if (declarative && needsUpdate) {
+    console.log(
+      "Note: --access/--permissions are recorded in fusebase.json and applied " +
+        "on the next `fusebase deploy`.",
+    );
+  }
+  if (!declarative && appId && needsUpdate) {
     const updateRequest: {
       accessPrincipals?: import("../api.ts").AppAccessPrincipal[];
       permissions?: AppPermissions;
@@ -190,10 +216,10 @@ export async function runAppCreate(options: AppCreateOptions): Promise<void> {
 
     try {
       await updateApp(
-        config.apiKey,
+        config.apiKey!,
         fuseConfig.orgId,
         fuseConfig.productId,
-        createdApp.id,
+        appId,
         updateRequest,
       );
       if (accessPrincipals !== undefined) {
@@ -216,23 +242,40 @@ export async function runAppCreate(options: AppCreateOptions): Promise<void> {
     }
   }
 
+  // Entry identity is the platform `id` (legacy) or the `subdomain` (declarative).
+  const isSameApp = (f: FeatureConfig) =>
+    appId ? f.id === appId : f.subdomain === appSub;
   const conflictingApp = fuseConfig.apps?.find(
-    (f) => f.path === appPath && f.id !== createdApp.id,
+    (f) => f.path === appPath && !isSameApp(f),
   );
   if (conflictingApp) {
     console.error(
-      `Error: Path "${appPath}" is already used by another app (${conflictingApp.id}).`,
+      `Error: Path "${appPath}" is already used by another app (${conflictingApp.id ?? conflictingApp.subdomain}).`,
     );
     process.exit(1);
   }
 
   fuseConfig.apps = fuseConfig.apps || [];
   const isFirstApp = fuseConfig.apps.length === 0;
-  const existingIndex = fuseConfig.apps.findIndex(
-    (f) => f.id === createdApp.id,
-  );
+  const existingIndex = fuseConfig.apps.findIndex(isSameApp);
+  // Preserve an id already resolved on the matched entry (e.g. deploy write-back),
+  // so re-running declarative `app create` never drops a valid platform id.
+  const resolvedId =
+    appId ??
+    (existingIndex >= 0 ? fuseConfig.apps[existingIndex]?.id : undefined);
   const newAppConfig: FeatureConfig = {
-    id: createdApp.id,
+    ...(resolvedId ? { id: resolvedId } : {}),
+    subdomain: createdApp?.sub ?? appSub,
+    name: createdApp?.title ?? appTitle,
+    // Stored so deploy/dev-start reconcile can send them when it creates the
+    // app — in declarative mode `app create` no longer creates it (NIM-41997).
+    ...(options.codingAgent ? { codingAgent: options.codingAgent } : {}),
+    ...(options.model ? { model: options.model } : {}),
+    // Declared access/permissions live in the manifest and are applied at
+    // deploy-time reconcile; `permissions` holds the manual items only (gate
+    // permissions are merged in from `fusebaseGateMeta` at apply time).
+    ...(accessPrincipals !== undefined ? { access: accessPrincipals } : {}),
+    ...(permissions !== undefined ? { permissions } : {}),
     path: appPath,
     dev: { command: options.devCommand },
     build: {
@@ -261,8 +304,8 @@ export async function runAppCreate(options: AppCreateOptions): Promise<void> {
     fuseConfig.apps.push(newAppConfig);
   }
 
-  if (isFirstApp && createdApp.sub) {
-    (fuseConfig as Record<string, unknown>)["firstAppSub"] = createdApp.sub;
+  if (isFirstApp && appSub) {
+    (fuseConfig as Record<string, unknown>)["firstAppSub"] = appSub;
   }
 
   await writeFile(
@@ -272,8 +315,13 @@ export async function runAppCreate(options: AppCreateOptions): Promise<void> {
   );
 
   console.log("");
+  if (declarative) {
+    console.log(
+      `✓ Added app "${appTitle}" to fusebase.json (created on next \`fusebase deploy\`)`,
+    );
+  }
   console.log("✓ Development mode configured");
-  console.log(`  App: ${createdApp.title}`);
+  console.log(`  App: ${createdApp?.title ?? appTitle}`);
   console.log(`  App path: ${appPath}`);
   console.log(`  Dev command: ${options.devCommand}`);
   console.log(`  Build command: ${options.buildCommand}`);

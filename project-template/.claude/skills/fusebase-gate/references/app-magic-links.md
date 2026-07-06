@@ -165,7 +165,7 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 **Production mode (Memberspace, role-gated UI, or any flow that must remember the recipient across navigations):**
 
 - After step 3, issue an **app-owned** session cookie (HMAC-signed or equivalent integrity-protected payload, bound to the resolved `userId`) and treat it as the source of truth for subsequent requests. Verify on every protected request; do not re-infer identity from `fbsfeaturetoken`.
-- Register the HMAC secret here and only here: `fusebase secret create --feature <appId> --secret "APP_SESSION_SECRET:HMAC signing key for app-owned session cookie"`. Read it from `process.env.APP_SESSION_SECRET` at runtime.
+- Register the HMAC secret here and only here: `fusebase secret create --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> --secret "APP_SESSION_SECRET:HMAC signing key for app-owned session cookie"`. Read it from `process.env.APP_SESSION_SECRET` at runtime.
 - Set cookie attributes `httpOnly`, `secure`, `sameSite=Lax`, `path=/`. Rotate by changing the secret + invalidating active cookies; do not depend on Fusebase platform cookies for revocation.
 
 ### Don't register non-secrets

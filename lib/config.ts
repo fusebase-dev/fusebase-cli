@@ -7,6 +7,7 @@ import {
   renameSync,
 } from "fs";
 import { homedir } from "os";
+import type { AppAccessPrincipal, AppPermissions } from "./api";
 
 export const CONFIG_DIR = join(homedir(), ".fusebase");
 export const CONFIG_FILE = join(CONFIG_DIR, "config.json");
@@ -144,13 +145,61 @@ export interface IsolatedStoresConfig {
   sql?: IsolatedSqlStoreConfig[];
 }
 
+/**
+ * A declared app secret in fusebase.json. Only the key name and an optional
+ * human description are ever stored here — the secret **value** is set out of
+ * band in the FuseBase UI and is never written to, read from, or handled by the
+ * CLI. `fusebase secret create` appends these entries; deploy/dev-start register
+ * any declared-but-missing key on the platform with an empty value (NIM-secrets).
+ */
+export interface AppSecretDeclaration {
+  key: string;
+  description?: string;
+}
+
 export interface FeatureConfig {
-  id: string;
+  /**
+   * Platform-issued app id. Optional in the declarative model (NIM-41746):
+   * legacy entries keep it for back-compat, declarative entries omit it and
+   * are resolved at deploy time by `subdomain`. Never hand-author this id —
+   * it is produced by the platform (`fusebase app create` / deploy reconcile).
+   */
+  id?: string;
+  /** App subdomain (`{subdomain}.thefusebase.app`); the declarative match key. */
+  subdomain?: string;
+  /** App title shown in the platform. */
+  name?: string;
+  /**
+   * Coding-agent/model tracking captured at `app create`. In the declarative
+   * model `app create` no longer creates the platform app, so these are stored
+   * here and sent when deploy/dev-start creates the app (NIM-41997).
+   */
+  codingAgent?: string;
+  model?: string;
+  /**
+   * Declared access principals for the app. In the declarative model these are
+   * captured at `app create` (`--access`) and applied at deploy-time reconcile
+   * via `updateApp`, instead of being sent imperatively at create.
+   */
+  access?: AppAccessPrincipal[];
+  /**
+   * Declared manual app permissions (dashboardView/database/gate). Captured at
+   * `app create` (`--permissions`) and applied at deploy-time reconcile, merged
+   * with the Gate SDK analyze snapshot (`fusebaseGateMeta`).
+   */
+  permissions?: AppPermissions;
   path?: string;
   dev?: DevConfig;
   build?: BuildConfig;
   backend?: BackendConfig;
   isolatedStores?: IsolatedStoresConfig;
+  /**
+   * Declared app secrets (key + optional description, never values). Registered
+   * on the platform at deploy/dev-start reconcile if missing; values are set in
+   * the FuseBase UI. Additive-only — deploy never deletes undeclared platform
+   * secret keys (that would wipe a value set in the UI).
+   */
+  secrets?: AppSecretDeclaration[];
   /**
    * Gate privileges kept out of the browser gst (merged into manifest.backendOnlyGatePermissions on sync).
    * Non-store entries (e.g. org.members.read) stay in app.permissions; nimbus-ai subtracts them at browser mint.
@@ -160,6 +209,36 @@ export interface FeatureConfig {
   fusebaseGateMeta?: GateSdkOperationsSnapshot;
   /** Cross-app API dependency analyze snapshot scoped to this feature path. */
   fusebaseAppApiDependenciesMeta?: AppApiDependenciesSnapshot;
+}
+
+/**
+ * A deployable app declaration must be resolvable to a platform app: either it
+ * carries a legacy `id`, or a declarative `subdomain` that deploy-time reconcile
+ * matches/creates. Throws a guiding error otherwise (NIM-41746).
+ */
+export function assertDeployableFeature(app: FeatureConfig): void {
+  if (app.id || app.subdomain) return;
+  const where = app.path ? ` for app at "${app.path}"` : "";
+  throw new Error(
+    `fusebase.json: app entry${where} must have either an "id" (legacy) or a ` +
+      `"subdomain" (declarative). Add a "subdomain" so deploy can match or ` +
+      `create the platform app — do not hand-author an "id".`,
+  );
+}
+
+/**
+ * Return an app's resolved platform `id`, or throw. `id` is optional on
+ * `FeatureConfig` (NIM-41746), but imperative commands (dev, analyze, gate,
+ * contracts, isolated-store) operate only on apps already created on the
+ * platform, so a missing id there is a real error, not a declarative entry.
+ */
+export function requireAppId(app: FeatureConfig): string {
+  if (app.id) return app.id;
+  const where = app.path ? ` (app at "${app.path}")` : "";
+  throw new Error(
+    `App is missing a platform "id"${where}. Run \`fusebase app create\` or ` +
+      `\`fusebase deploy\` (which reconciles declarative entries) first.`,
+  );
 }
 
 /** Written by `fusebase analyze gate` — last Gate SDK operation scan. */
@@ -270,6 +349,7 @@ export const KNOWN_FLAGS = [
   "api-exploration",
   "job-sidecars",
   "cross-app-api-calls-analysis",
+  "declarative-manifest",
   MANAGED_INTEGRATIONS_FLAG,
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
@@ -293,6 +373,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Enable per-job sidecar containers for cron jobs (`fusebase sidecar add --job <name>`).",
   "cross-app-api-calls-analysis":
     "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
+  "declarative-manifest":
+    "Enable declarative `fusebase.json` apps (optional `id`, `subdomain` match) and deploy-time reconcile (bind/create). Off → deploy requires a legacy `id`.",
   [MANAGED_INTEGRATIONS_FLAG]:
     "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
   // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
@@ -1327,6 +1409,50 @@ export function updateGateSdkPermissionsInFusebaseJson(
   return next;
 }
 
+/**
+ * Persist a deploy-resolved app `id` back into fusebase.json (NIM-41875).
+ * Reconcile resolves a declarative (id-less) entry to a real platform id by
+ * subdomain; after a successful deploy we write that id into the matching
+ * `apps[]` entry so the next deploy takes the legacy (id) fast path. Matches by
+ * `subdomain` (the declarative key, deploy-unique). No-op when the file is
+ * missing/unparsable, the entry already has an `id`, or no entry matches the
+ * subdomain. Best-effort: callers should not fail the deploy on a write error.
+ * Returns true only when an id was written.
+ */
+export function writeResolvedAppIdToFusebaseJson(
+  projectRoot: string,
+  subdomain: string,
+  appId: string,
+): boolean {
+  const fuseJsonPath = join(projectRoot, "fusebase.json");
+  if (!existsSync(fuseJsonPath)) return false;
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+  } catch {
+    return false;
+  }
+  normalizeRawFuseConfigShape(raw);
+  const apps = raw.apps;
+  if (!Array.isArray(apps)) return false;
+  const idx = apps.findIndex(
+    (a) =>
+      a &&
+      typeof a === "object" &&
+      (a as Record<string, unknown>).subdomain === subdomain,
+  );
+  if (idx < 0) return false;
+  const entry = apps[idx] as Record<string, unknown>;
+  if (entry.id) return false;
+  // `id` first to match `app create`'s key order.
+  apps[idx] = { id: appId, ...entry };
+  writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
+  invalidateFuseConfigCache();
+  return true;
+}
 /**
  * Persist `apps[].backendOnlyGatePermissions` in fusebase.json after a successful sync.
  */

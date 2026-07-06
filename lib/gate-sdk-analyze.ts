@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { resolveGateOperationPermissions } from "./api.ts";
 import {
+  requireAppId,
   updateGateSdkPermissionsInFusebaseJson,
   writeGateSdkOperationsToFusebaseJson,
   type FeatureConfig,
@@ -43,6 +44,7 @@ export async function analyzeFeatureGatePermissions(args: {
     throw new Error(`Feature "${feature.id}" is missing "path" in fusebase.json`);
   }
 
+  const featureId = requireAppId(feature);
   const featurePath = feature.path;
   const result = await analyzeGateSdkOperations({
     projectRoot,
@@ -51,7 +53,7 @@ export async function analyzeFeatureGatePermissions(args: {
   const analyzedAt = new Date().toISOString();
   let fusebaseSnapshot = writeGateSdkOperationsToFusebaseJson(
     projectRoot,
-    feature.id,
+    featureId,
     {
       analyzedAt,
       usedOps: result.usedOps,
@@ -78,7 +80,7 @@ export async function analyzeFeatureGatePermissions(args: {
         if (res.success && res.data && Array.isArray(res.data.permissions)) {
           fusebaseSnapshot = updateGateSdkPermissionsInFusebaseJson(
             projectRoot,
-            feature.id,
+            featureId,
             res.data.permissions,
             resolvedAt,
           );
@@ -112,7 +114,7 @@ export async function analyzeFeatureGatePermissions(args: {
   }
 
   return {
-    featureId: feature.id,
+    featureId,
     featurePath,
     result,
     fusebaseSnapshot,
