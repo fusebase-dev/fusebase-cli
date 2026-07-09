@@ -379,6 +379,7 @@ For external WebSocket integrations, use a path under `/api/webhooks/...` as wel
 
 ### Service-account token (`FBS_FEATURE_TOKEN`)
 
+<<<<<<< Updated upstream
 Use `process.env.FBS_FEATURE_TOKEN` when the backend must call Gate **without** the end-user's Fusebase session:
 
 1. **Webhooks / cron** — no browser session at all
@@ -395,6 +396,75 @@ Use `process.env.FBS_FEATURE_TOKEN` when the backend must call Gate **without** 
 - In local `fusebase dev`, backend-only provisioning may use `process.env.FBS_FEATURE_TOKEN ?? process.env.GATE_MCP_TOKEN`.
 
 **Not a service-token route:** ordinary user-context Gate reads/writes where the acting user is the logged-in visitor — use the request app token and session header, not `FBS_FEATURE_TOKEN`.
+=======
+Webhook handlers run without a user session. To call Fusebase services from a webhook handler, use `process.env.FBS_FEATURE_TOKEN` — a platform-issued service-account token injected on deploy (not `GATE_TOKEN` unless you created that secret yourself).
+
+**Security rule**: use `FBS_FEATURE_TOKEN` only in system/background routes (webhooks, scheduled jobs, visitor-facing writes that need `isolated_store.*`). User-facing routes must fail closed (`401/403`) on a missing/invalid app token — do not fall back to the service-account token.
+
+### Deployed backend: `FBS_FEATURE_TOKEN` + isolated stores (system routes)
+
+Public apps often need a **backend system route** (webhook, `POST /api/leads`, etc.) that writes to an isolated SQL store. The platform injects **`FBS_FEATURE_TOKEN`** (and usually **`FBS_ORG_ID`**, **`FBS_APP_ID`**) into the deployed backend env. Local dev typically has no `FBS_FEATURE_TOKEN`; use **`GATE_MCP_TOKEN`** from `.env` there instead.
+
+**Token source (one helper, both environments):**
+
+```typescript
+const token =
+  process.env.GATE_TOKEN?.trim() ||
+  process.env.FBS_FEATURE_TOKEN?.trim() ||
+  process.env.GATE_MCP_TOKEN?.trim();
+if (!token) throw new Error("No Gate token in env");
+```
+
+**Transport — do not send deploy token as `Authorization: Bearer`**
+
+| Environment | Token | Gate client headers |
+|-------------|-------|---------------------|
+| **Deployed** | `FBS_FEATURE_TOKEN` | `x-app-feature-token: <token>` only — Bearer → `401 Invalid or expired token` |
+| **Local dev** | `GATE_MCP_TOKEN` | `Authorization: Bearer <token>` (MCP/service token) |
+
+Probe both when unsure: try `feature` header first, then `bearer`; keep the transport that actually passes a capability check (below).
+
+**Org id — do not derive from `getMe().scopes` on deploy**
+
+On deploy, `getMe()` for `FBS_FEATURE_TOKEN` may return `type: "user"` with **empty `scopes` and `permissions`** even when `listIsolatedStores` / `insertIsolatedStoreSqlRow` work. Do **not** gate store access on `getMe().auth.scopes`.
+
+```typescript
+// Deployed: platform injects FBS_ORG_ID — prefer over getMe
+const orgId =
+  process.env.FBS_ORG_ID?.trim() ||
+  (await getMeWithTransport(token, transport)).auth.scopes.find(
+    (s) => s.scopeType === "org",
+  )?.scopeId;
+if (!orgId) throw new Error("orgId unresolved");
+```
+
+**Capability check — probe the store, not `getMe`**
+
+Before insert/update, confirm the token can reach the target store:
+
+1. `listIsolatedStores({ orgId, clientId: process.env.FBS_APP_ID })` (or product id from `fusebase.json`)
+2. Match store by stable **`alias`**
+3. Only then call structured row APIs
+
+If step 1–2 succeed, proceed even when `getMe` looks empty.
+
+**Diagnostics on deploy**
+
+Deployed `/api/*` is behind the platform auth wall — tokenless `curl` from outside will not reach your handler. To debug live backend env and Gate behavior:
+
+1. Add a temporary **`/api/_diag`** route (redact token values; log presence + `getMe` / `listIsolatedStores` / probe insert outcomes per transport).
+2. Invoke it via platform **`callAppApi`** (mints a real app token and hits the live backend).
+
+Remove `_diag` before shipping.
+
+#### System-route backend checklist (isolated store / webhooks)
+
+- [ ] Deployed Gate calls use **`x-app-feature-token`** for `FBS_FEATURE_TOKEN`, not Bearer.
+- [ ] **`orgId`** on deploy comes from **`FBS_ORG_ID`** (or `fusebase.json` `orgId`), not from `getMe().scopes`.
+- [ ] Store resolution is verified with **`listIsolatedStores` + alias**, not `getMe` permissions/scopes.
+- [ ] Local dev uses **`GATE_MCP_TOKEN`** as Bearer; deploy uses **`FBS_FEATURE_TOKEN`** as feature header.
+- [ ] User-facing routes do **not** silently fall back to `FBS_FEATURE_TOKEN` when the visitor app token is missing.
+>>>>>>> Stashed changes
 
 ## Dev Proxy
 
