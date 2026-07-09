@@ -9,6 +9,7 @@ import {
   buildSyncedBackendOnlyGatePermissions,
   declareStorePermissionsBackendOnly,
   formatPermissionItem,
+  isBackendOnlyGatePermissionsDeclared,
   isStoreGatePermission,
   mergeFeaturePermissions,
   parsePermissions,
@@ -92,6 +93,7 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
 
     let gatePermissions: string[] | undefined;
     let backendOnlyGatePermissions: string[] | undefined;
+    let backendOnlyDeclaredInFusebaseJson = false;
     if (options.syncGatePermissions) {
       const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
       if (!featureConfig) {
@@ -121,10 +123,12 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         declaredStoreBackendOnly = declared.backendOnlyPermissions;
       }
 
+      backendOnlyDeclaredInFusebaseJson = isBackendOnlyGatePermissionsDeclared(featureConfig);
       backendOnlyGatePermissions = buildSyncedBackendOnlyGatePermissions({
         platformBackendOnly: split.backendOnlyPermissions,
         declaredStoreBackendOnly,
         fromFusebaseJson: readBackendOnlyGatePermissionsFromFeature(featureConfig),
+        fusebaseJsonDeclared: backendOnlyDeclaredInFusebaseJson,
         fromRemoteManifest: readBackendOnlyGatePermissionsFromManifest(app.manifest),
       });
 
@@ -190,18 +194,30 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       }
     }
 
-    if (backendOnlyGatePermissions !== undefined && backendOnlyGatePermissions.length > 0) {
-      console.log(
-        `  Backend-only Gate permissions (manifest.backendOnlyGatePermissions): ${backendOnlyGatePermissions.join(", ")}`,
-      );
-      if (options.syncGatePermissions) {
+    if (backendOnlyGatePermissions !== undefined) {
+      if (backendOnlyGatePermissions.length > 0) {
+        console.log(
+          `  Backend-only Gate permissions (manifest.backendOnlyGatePermissions): ${backendOnlyGatePermissions.join(", ")}`,
+        );
+      }
+      // Persist when there's something to write, or when clearing a previously-declared
+      // list (empty result + declared) so the local field is removed and cleared extras
+      // are not resurrected on the next sync. Untouched for legacy apps that never declared it.
+      if (
+        options.syncGatePermissions &&
+        (backendOnlyGatePermissions.length > 0 || backendOnlyDeclaredInFusebaseJson)
+      ) {
         try {
           writeBackendOnlyGatePermissionsToFusebaseJson(
             resolve(process.cwd()),
             appIdArg,
             backendOnlyGatePermissions,
           );
-          console.log("  fusebase.json: backendOnlyGatePermissions updated");
+          console.log(
+            backendOnlyGatePermissions.length > 0
+              ? "  fusebase.json: backendOnlyGatePermissions updated"
+              : "  fusebase.json: backendOnlyGatePermissions cleared",
+          );
         } catch {
           // Non-fatal: remote manifest is still updated; local fusebase.json may be read-only or missing entry.
         }

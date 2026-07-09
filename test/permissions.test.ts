@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   buildSyncedBackendOnlyGatePermissions,
   declareStorePermissionsBackendOnly,
+  isBackendOnlyGatePermissionsDeclared,
   isStoreGatePermission,
   mergeFeaturePermissions,
   parsePermissions,
@@ -459,6 +460,58 @@ describe("buildSyncedBackendOnlyGatePermissions", () => {
         fromRemoteManifest: ["org.groups.write"],
       }),
     ).toEqual(["org.members.read"]);
+  });
+
+  it("clears extras when fusebase.json declares an empty list (no remote resurrection)", () => {
+    expect(
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: [],
+        declaredStoreBackendOnly: [],
+        fromFusebaseJson: [],
+        fusebaseJsonDeclared: true,
+        fromRemoteManifest: ["org.groups.write", "files.write"],
+      }),
+    ).toEqual([]);
+  });
+
+  it("keeps platform-fixed/declared-store even when fusebase.json clears extras", () => {
+    expect(
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: ["isolated_store.rls.delegate"],
+        declaredStoreBackendOnly: ["isolated_store.read"],
+        fromFusebaseJson: [],
+        fusebaseJsonDeclared: true,
+        fromRemoteManifest: ["org.groups.write"],
+      }),
+    ).toEqual(["isolated_store.read", "isolated_store.rls.delegate"]);
+  });
+
+  it("falls back to remote manifest when the field is absent (not declared)", () => {
+    expect(
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: [],
+        declaredStoreBackendOnly: [],
+        fromFusebaseJson: [],
+        fusebaseJsonDeclared: false,
+        fromRemoteManifest: ["org.groups.write"],
+      }),
+    ).toEqual(["org.groups.write"]);
+  });
+});
+
+describe("isBackendOnlyGatePermissionsDeclared", () => {
+  it("is true for a present array (even empty)", () => {
+    expect(isBackendOnlyGatePermissionsDeclared({ backendOnlyGatePermissions: [] })).toBe(true);
+    expect(
+      isBackendOnlyGatePermissionsDeclared({ backendOnlyGatePermissions: ["org.members.read"] }),
+    ).toBe(true);
+  });
+
+  it("is false when the field is absent or not an array", () => {
+    expect(isBackendOnlyGatePermissionsDeclared({})).toBe(false);
+    expect(
+      isBackendOnlyGatePermissionsDeclared({ backendOnlyGatePermissions: "org.members.read" as unknown }),
+    ).toBe(false);
   });
 });
 

@@ -1455,6 +1455,7 @@ export function writeResolvedAppIdToFusebaseJson(
 }
 /**
  * Persist `apps[].backendOnlyGatePermissions` in fusebase.json after a successful sync.
+ * An empty `permissions` list removes the field (explicit cleanup).
  */
 export function writeBackendOnlyGatePermissionsToFusebaseJson(
   projectRoot: string,
@@ -1485,11 +1486,14 @@ export function writeBackendOnlyGatePermissionsToFusebaseJson(
     throw new Error(`App "${featureId}" is invalid in fusebase.json`);
   }
 
-  const sorted = [...permissions].sort((a, b) => a.localeCompare(b));
-  apps[featureIndex] = {
-    ...(featureRaw as Record<string, unknown>),
-    backendOnlyGatePermissions: sorted,
-  };
+  const entry = { ...(featureRaw as Record<string, unknown>) };
+  if (permissions.length > 0) {
+    entry.backendOnlyGatePermissions = [...permissions].sort((a, b) => a.localeCompare(b));
+  } else {
+    // Empty result = explicit clear: remove the field entirely rather than leaving `[]`.
+    delete entry.backendOnlyGatePermissions;
+  }
+  apps[featureIndex] = entry;
   raw.apps = apps;
 
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
