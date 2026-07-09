@@ -109,6 +109,7 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         projectRoot: resolve(process.cwd()),
         feature: featureConfig,
         apiKey: config.apiKey,
+        alwaysResolvePermissions: true,
         throwOnResolveFailure: true,
       });
       const split = splitGatePermissionStrings(gateAnalysis.gatePermissions);
@@ -116,8 +117,6 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
 
       let declaredStoreBackendOnly: string[] = [];
       if (options.declareBackendOnlyGatePermissions) {
-        // Opt-in: move app-owned store perms out of the browser-embedded
-        // runtime set into the backend-only manifest list.
         const declared = declareStorePermissionsBackendOnly(gatePermissions);
         gatePermissions = declared.runtimePermissions;
         declaredStoreBackendOnly = declared.backendOnlyPermissions;
@@ -200,9 +199,6 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
           `  Backend-only Gate permissions (manifest.backendOnlyGatePermissions): ${backendOnlyGatePermissions.join(", ")}`,
         );
       }
-      // Persist when there's something to write, or when clearing a previously-declared
-      // list (empty result + declared) so the local field is removed and cleared extras
-      // are not resurrected on the next sync. Untouched for legacy apps that never declared it.
       if (
         options.syncGatePermissions &&
         (backendOnlyGatePermissions.length > 0 || backendOnlyDeclaredInFusebaseJson)

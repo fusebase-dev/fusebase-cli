@@ -578,6 +578,30 @@ When backend routes call Gate on behalf of the current user, keep auth in app-to
 - On missing/invalid app token or Gate auth rejection, return `401/403` and require re-auth/permission sync.
 - Service-token usage is allowed only for explicitly system/admin routes, not as an automatic fallback path.
 
+### Gate 403 triage: permission drift and `--sync-gate-permissions`
+
+When Gate calls fail with **403** and messages like **`Token missing required permission: …`** or **`token subject not allowed for this operation`**, especially after a **Gate SDK bump** or platform deploy while app source did not change:
+
+1. **Read** `fusebase.json` → `fusebaseGateMeta.usedOps` vs `permissions`. A used op without its derived permission (e.g. `listPortals` but no `portals.read`) means **remote permissions are stale**.
+2. **Analyze** (read-only): `fusebase analyze gate --operations --json --feature <featureId>`.
+3. **Propose or run** (with user approval if mutating remote state):
+
+   ```bash
+   fusebase app update <appId> --sync-gate-permissions
+   ```
+
+   Run this after changing Gate SDK usage or upgrading `@fusebase/fusebase-gate-sdk`, and **before** `fusebase deploy` when publishing permission changes. `deploy` does **not** sync permissions.
+
+4. **Re-test** with a fresh session / new feature token after sync.
+
+**Limits of sync**
+
+- Fixes **missing permissions on the minted `gst`** when ops are `userOrToken(permission)`.
+- Does **not** fix **`getMyOrgAccess`** called from the SPA with only `x-app-feature-token` — that op is **`userOnly`**; use backend + `EverHelper-Session-ID` (see § Magic-link session exchange / Calling Gate with session above).
+- Does **not** replace fixing wrong call patterns (bare gst on user-context ops).
+
+Full permission model: `apps-cli/docs/PERMISSIONS.md`. Incident skill (issues workspace): **gate-feature-token-debug** § Gate 403 authz.
+
 ### Magic-link session exchange (`/api/account/from-magic-link`)
 
 If the app uses Fusebase Gate magic links (`requestAppMagicLink` / `activateAppMagicLink` — see the `fusebase-gate/references/app-magic-links.md` and `fusebase-gate/references/fusebase-auth.md` skill references), the backend exchange after activation is **mandatory for every app**, but the cookie policy splits cleanly into Test and Production.

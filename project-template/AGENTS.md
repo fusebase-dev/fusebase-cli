@@ -620,6 +620,7 @@ For apps that use Dashboard SDK or Gate SDK at runtime, a successful deploy is *
 If the app uses Fusebase Gate SDK:
 
 - run `fusebase app update <appId> --sync-gate-permissions` after changing Gate SDK operations and before `fusebase deploy` or before calling the deployment published
+- when investigating **403** Gate errors (`Token missing required permission`, `token subject not allowed`), compare `fusebaseGateMeta.usedOps` vs `permissions` and run `fusebase analyze gate` before blaming a platform regression — especially after bumping `@fusebase/fusebase-gate-sdk`
 - do not treat `Permissions: none` as success unless the app intentionally requires no runtime permissions
 - run `fusebase analyze gate --operations --json --feature <featureId>` before publish and confirm `usedOps` is not empty when Gate SDK is used in runtime code
 - if `usedOps` is empty but runtime imports `@fusebase/fusebase-gate-sdk`, treat publish as blocked and fix analysis/runtime call patterns before shipping

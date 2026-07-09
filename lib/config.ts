@@ -1108,42 +1108,17 @@ export interface GateSdkOperationsWriteInput {
   sdkVersion: string | null;
 }
 
-export interface AppApiDependenciesWriteInput {
-  analyzedAt: string;
-  sdkVersion: string | null;
-  dependencies: AppApiDependencySnapshot[];
-  unresolved: AppApiUnresolvedDependencySnapshot[];
-}
-
 /**
- * Merge per-feature `fusebaseGateMeta` into `fusebase.json` in `projectRoot`.
- * Sets `usedOpsChangedAt` to `analyzedAt` when the sorted `usedOps` list differs from the previous snapshot; otherwise keeps the previous value.
- * When `usedOps` are unchanged, copies `permissions` and `permissionsChangedAt` from the previous snapshot.
- * @throws If fusebase.json is missing or invalid JSON.
+ * Build a Gate SDK analyze snapshot in memory (same rules as fusebase.json writeback).
  */
-export function writeGateSdkOperationsToFusebaseJson(
-  projectRoot: string,
-  featureId: string,
+export function buildGateSdkOperationsSnapshot(
+  prev: GateSdkOperationsSnapshot | undefined,
   input: GateSdkOperationsWriteInput,
+  options?: { preservePermissionsWhenUsedOpsUnchanged?: boolean },
 ): GateSdkOperationsSnapshot {
-  const fuseJsonPath = join(projectRoot, "fusebase.json");
-  if (!existsSync(fuseJsonPath)) {
-    throw new Error("fusebase.json not found. Run fusebase init first.");
-  }
-  let raw: Record<string, unknown>;
-  try {
-    raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
-      string,
-      unknown
-    >;
-  } catch {
-    throw new Error("Could not parse fusebase.json");
-  }
-  normalizeRawFuseConfigShape(raw);
-  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
-
+  const preservePermissionsWhenUsedOpsUnchanged =
+    options?.preservePermissionsWhenUsedOpsUnchanged !== false;
   const usedSorted = sortGateUsedOps(input.usedOps);
-  const prev = readPreviousGateSnapshotForFeature(raw, featureId);
 
   let usedOpsChangedAt: string;
   if (!prev) {
@@ -1164,6 +1139,7 @@ export function writeGateSdkOperationsToFusebaseJson(
   const manualPermissions = prev?.manualPermissions;
 
   if (
+    preservePermissionsWhenUsedOpsUnchanged &&
     prev &&
     gateUsedOpsEqual(prev.usedOps, usedSorted) &&
     prev.permissions !== undefined
@@ -1191,7 +1167,69 @@ export function writeGateSdkOperationsToFusebaseJson(
     };
   }
 
-  snapshot = normalizeGateSdkOperationsSnapshot(snapshot);
+  return normalizeGateSdkOperationsSnapshot(snapshot);
+}
+
+/**
+ * Merge resolved Gate permissions into an in-memory snapshot (no fusebase.json write).
+ */
+export function applyResolvedPermissionsToGateSnapshot(
+  snapshot: GateSdkOperationsSnapshot,
+  permissions: string[],
+  resolvedAt: string,
+): GateSdkOperationsSnapshot {
+  const sorted = mergeGatePermissionStrings(
+    permissions,
+    snapshot.manualPermissions,
+  )!;
+  const permsChanged = !gatePermissionSetsEqual(snapshot.permissions, sorted);
+  const nextPermissionsChangedAt = permsChanged
+    ? resolvedAt
+    : (snapshot.permissionsChangedAt ?? resolvedAt);
+  return normalizeGateSdkOperationsSnapshot({
+    ...snapshot,
+    permissions: sorted,
+    permissionsChangedAt: nextPermissionsChangedAt,
+  });
+}
+
+export interface AppApiDependenciesWriteInput {
+  analyzedAt: string;
+  sdkVersion: string | null;
+  dependencies: AppApiDependencySnapshot[];
+  unresolved: AppApiUnresolvedDependencySnapshot[];
+}
+
+/**
+ * Merge per-feature `fusebaseGateMeta` into `fusebase.json` in `projectRoot`.
+ * Sets `usedOpsChangedAt` to `analyzedAt` when the sorted `usedOps` list differs from the previous snapshot; otherwise keeps the previous value.
+ * When `usedOps` are unchanged, copies `permissions` and `permissionsChangedAt` from the previous snapshot.
+ * @throws If fusebase.json is missing or invalid JSON.
+ */
+export function writeGateSdkOperationsToFusebaseJson(
+  projectRoot: string,
+  featureId: string,
+  input: GateSdkOperationsWriteInput,
+  options?: { preservePermissionsWhenUsedOpsUnchanged?: boolean },
+): GateSdkOperationsSnapshot {
+  const fuseJsonPath = join(projectRoot, "fusebase.json");
+  if (!existsSync(fuseJsonPath)) {
+    throw new Error("fusebase.json not found. Run fusebase init first.");
+  }
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+  } catch {
+    throw new Error("Could not parse fusebase.json");
+  }
+  normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
+
+  const prev = readPreviousGateSnapshotForFeature(raw, featureId);
+  const snapshot = buildGateSdkOperationsSnapshot(prev, input, options);
 
   writeGateSnapshotToFeatureRaw(raw, featureId, snapshot);
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
@@ -1390,19 +1428,11 @@ export function updateGateSdkPermissionsInFusebaseJson(
       `App-scoped fusebaseGateMeta missing or invalid for app "${featureId}" in fusebase.json`,
     );
   }
-  const sorted = mergeGatePermissionStrings(
+  const next = applyResolvedPermissionsToGateSnapshot(
+    g,
     permissions,
-    g.manualPermissions,
-  )!;
-  const permsChanged = !gatePermissionSetsEqual(g.permissions, sorted);
-  const nextPermissionsChangedAt = permsChanged
-    ? resolvedAt
-    : (g.permissionsChangedAt ?? resolvedAt);
-  const next = normalizeGateSdkOperationsSnapshot({
-    ...g,
-    permissions: sorted,
-    permissionsChangedAt: nextPermissionsChangedAt,
-  });
+    resolvedAt,
+  );
   writeGateSnapshotToFeatureRaw(raw, featureId, next);
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
   invalidateFuseConfigCache();

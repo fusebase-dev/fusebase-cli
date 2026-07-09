@@ -15,6 +15,7 @@ import {
 import { runPreUpdateCommit } from "./steps/pre-update-commit";
 import { printIdeSetupResults, setupIdeConfig, type IdePreset } from "./steps/ide-setup";
 import { syncManagedDependencies } from "./steps/update-managed-deps";
+import { maybePromptGatePermissionsSyncAfterSdkUpdate } from "./steps/post-update-gate-permissions-sync";
 import {
   DASHBOARDS_MCP_POLICY_FP_KEY,
   GATE_MCP_POLICY_FP_KEY,
@@ -99,6 +100,15 @@ function runNpmInstall(cwd: string): Promise<number> {
   });
 }
 
+function renderGatePermissionsSummaryValue(value: string): string {
+  const shouldHighlight =
+    value.startsWith("synced") ||
+    value === "no drift" ||
+    value.includes("local meta drift") ||
+    value.startsWith("drift in");
+  return shouldHighlight ? chalk.green.bold(value) : value;
+}
+
 function printUpdateSummary(summary: {
   cliUpdate: string;
   preUpdateCommit: string;
@@ -108,6 +118,7 @@ function printUpdateSummary(summary: {
   mcpIde: string;
   managedDeps: string;
   installs: string;
+  gatePermissionsSync: string;
 }, installTargets: string[]): void {
   const rows: Array<{ key: string; value: string; renderedValue: string }> = [
     {
@@ -165,6 +176,11 @@ function printUpdateSummary(summary: {
         ? chalk.green.bold(summary.installs)
         : summary.installs,
     },
+    {
+      key: "gate permissions",
+      value: summary.gatePermissionsSync,
+      renderedValue: renderGatePermissionsSummaryValue(summary.gatePermissionsSync),
+    },
     ...(installTargets.length > 0
       ? [
           {
@@ -218,6 +234,8 @@ export interface ProductUpdateOptions {
   commit?: boolean;
   skipCommit?: boolean;
   dryRun?: boolean;
+  skipGatePermissionsSync?: boolean;
+  forceGatePermissionsSync?: boolean;
 }
 
 export async function runProductUpdate(opts: ProductUpdateOptions): Promise<void> {
@@ -242,6 +260,7 @@ export async function runProductUpdate(opts: ProductUpdateOptions): Promise<void
     mcpIde: string;
     managedDeps: string;
     installs: string;
+    gatePermissionsSync: string;
   } = {
     cliUpdate: doCliUpdate ? "pending" : "skipped (--skip-cli-update)",
     preUpdateCommit: doCommit ? "requested" : "skipped",
@@ -251,6 +270,7 @@ export async function runProductUpdate(opts: ProductUpdateOptions): Promise<void
     mcpIde: doMcp ? "pending" : "skipped",
     managedDeps: doDeps ? "pending" : "skipped",
     installs: doInstall ? "pending" : "skipped",
+    gatePermissionsSync: "pending",
   };
 
       if (doCliUpdate) {
@@ -410,13 +430,15 @@ export async function runProductUpdate(opts: ProductUpdateOptions): Promise<void
       }
 
       let installRoots: string[] = [];
+      let gateSdkDependencyUpdated = false;
       if (doDeps) {
-        const { changedPackageRoots } = await syncManagedDependencies({
+        const managedDepsResult = await syncManagedDependencies({
           cwd,
           fuseConfig,
           dryRun,
         });
-        installRoots = [...new Set(changedPackageRoots)];
+        installRoots = [...new Set(managedDepsResult.changedPackageRoots)];
+        gateSdkDependencyUpdated = managedDepsResult.gateSdkDependencyUpdated;
         if (installRoots.length === 0) {
           console.log("(no changes) Managed SDK dependency versions already match template");
           summary.managedDeps = "no changes";
@@ -463,6 +485,57 @@ export async function runProductUpdate(opts: ProductUpdateOptions): Promise<void
         summary.installs = "skipped (no dependency changes)";
       }
 
+      const npmInstallCompleted =
+        doInstall &&
+        installRoots.length > 0 &&
+        !dryRun &&
+        summary.installs.startsWith("completed") &&
+        !summary.installs.includes("errors");
+
+      if (opts.skipGatePermissionsSync === true) {
+        summary.gatePermissionsSync = "skipped (--skip-gate-permissions-sync)";
+      } else if (!gateSdkDependencyUpdated && opts.forceGatePermissionsSync !== true) {
+        summary.gatePermissionsSync = "skipped (Gate SDK unchanged)";
+      } else if (!npmInstallCompleted && opts.forceGatePermissionsSync !== true) {
+        summary.gatePermissionsSync = doInstall
+          ? "skipped (npm install did not complete)"
+          : "skipped (--skip-install; run npm install then sync manually)";
+      } else {
+        const config = getConfig();
+        const gateSyncResult = await maybePromptGatePermissionsSyncAfterSdkUpdate({
+          cwd,
+          fuseConfig,
+          apiKey: config.apiKey,
+          gateSdkDependencyUpdated:
+            gateSdkDependencyUpdated || opts.forceGatePermissionsSync === true,
+          npmInstallCompleted:
+            npmInstallCompleted || opts.forceGatePermissionsSync === true,
+          dryRun,
+          skip: opts.skipGatePermissionsSync === true,
+          isTty,
+        });
+        if (!gateSyncResult.checked) {
+          summary.gatePermissionsSync = "skipped";
+        } else if (gateSyncResult.driftCount === 0) {
+          if (
+            gateSyncResult.checkedAppIds > 0 &&
+            gateSyncResult.missingRemoteAppIds > 0
+          ) {
+            summary.gatePermissionsSync = "local meta ok (no remote apps)";
+          } else if (gateSyncResult.checkedAppIds === 0) {
+            summary.gatePermissionsSync = "not checked";
+          } else {
+            summary.gatePermissionsSync = "no drift";
+          }
+        } else if (gateSyncResult.syncedCount > 0) {
+          summary.gatePermissionsSync = `synced ${gateSyncResult.syncedCount}/${gateSyncResult.driftCount} app(s)`;
+        } else if (gateSyncResult.localMetaOnlyDriftCount > 0) {
+          summary.gatePermissionsSync = `local meta drift (${gateSyncResult.localMetaOnlyDriftCount} app(s))`;
+        } else {
+          summary.gatePermissionsSync = `drift in ${gateSyncResult.driftCount} app(s), not synced`;
+        }
+      }
+
   console.log("");
   printUpdateSummary(summary, installRoots);
   console.log("");
@@ -480,6 +553,14 @@ productCommand
   .option("--force-mcp", "Force MCP token and IDE refresh (ignore version marker)")
   .option("--skip-deps", "Skip managed dependency version sync in package.json files")
   .option("--skip-install", "Do not run npm install after dependency changes")
+  .option(
+    "--skip-gate-permissions-sync",
+    "After a Gate SDK bump, skip interactive drift check and --sync-gate-permissions prompt",
+  )
+  .option(
+    "--force-gate-permissions-sync",
+    "Run Gate permission drift check even when Gate SDK version did not change (e.g. stale fusebaseGateMeta)",
+  )
   .option("--skip-commit", "Skip pre-update Git checkpoint")
   .option("--commit", "Run pre-update Git checkpoint in non-interactive mode (no prompt)")
   .option("--dry-run", "Print planned work without writing files or running installs", false)

@@ -7,6 +7,8 @@ import {
   type ProjectTemplatePackageJson,
 } from "../../project-template-manifest";
 
+const GATE_SDK_PACKAGE = "@fusebase/fusebase-gate-sdk";
+
 async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -19,6 +21,20 @@ async function fileExists(path: string): Promise<boolean> {
 export interface ManagedDepsSyncResult {
   /** Absolute-ish paths relative to cwd that had package.json changed */
   changedPackageRoots: string[];
+  /** True when @fusebase/fusebase-gate-sdk version changed in any updated package.json */
+  gateSdkDependencyUpdated: boolean;
+}
+
+function readDependencyVersion(
+  pkg: Record<string, unknown>,
+  name: string,
+): string | undefined {
+  const deps = pkg.dependencies;
+  if (!deps || typeof deps !== "object" || Array.isArray(deps)) {
+    return undefined;
+  }
+  const value = (deps as Record<string, unknown>)[name];
+  return typeof value === "string" ? value : undefined;
 }
 
 function mergeManagedDepsIntoPackageJson(
@@ -74,6 +90,7 @@ export async function syncManagedDependencies(options: {
   const template = await loadProjectTemplatePackageJson();
   const managedNames = getManagedDependencyNames(template);
   const changedPackageRoots: string[] = [];
+  let gateSdkDependencyUpdated = false;
 
   const targets: { rel: string; mode: "root" | "feature" }[] = [];
   if (await fileExists(join(cwd, "package.json"))) {
@@ -100,8 +117,13 @@ export async function syncManagedDependencies(options: {
       continue;
     }
     const before = JSON.stringify(parsed);
+    const gateSdkBefore = readDependencyVersion(parsed, GATE_SDK_PACKAGE);
     const changed = mergeManagedDepsIntoPackageJson(parsed, template, managedNames, mode);
     if (!changed) continue;
+    const gateSdkAfter = readDependencyVersion(parsed, GATE_SDK_PACKAGE);
+    if (gateSdkBefore !== gateSdkAfter) {
+      gateSdkDependencyUpdated = true;
+    }
     const after = JSON.stringify(parsed);
     if (before === after) continue;
 
@@ -116,7 +138,7 @@ export async function syncManagedDependencies(options: {
     changedPackageRoots.push(mode === "root" ? "." : dirnameRel(rel));
   }
 
-  return { changedPackageRoots };
+  return { changedPackageRoots, gateSdkDependencyUpdated };
 }
 
 function dirnameRel(packageJsonRel: string): string {

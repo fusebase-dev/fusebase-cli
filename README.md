@@ -605,6 +605,7 @@ One command to refresh a generated app after a CLI or template upgrade:
 3. **MCP + IDE** — selectively regenerates Dashboards and/or Gate MCP tokens and refreshes IDE configs when the CLI’s **permission policy** no longer matches **`.env`** markers `DASHBOARDS_MCP_POLICY_FP` and `GATE_MCP_POLICY_FP` (SHA-256 of the canonical permission sets; Gate includes `isolated-stores` extras when that global flag is on). Tokens must also be present in `.env`. Use **`--force-mcp`** to refresh both regardless.
 4. **Managed SDK versions** — bumps only packages listed under `fusebaseCli.managedDependencies` in `project-template/package.json` (defaults to `@fusebase/dashboard-service-sdk` and `@fusebase/fusebase-gate-sdk`). Root `package.json` gets missing entries added; **app** `package.json` files are updated only if those deps already exist (nothing new is injected into apps).
 5. **`npm install`** — runs **only** in directories where a managed dependency version actually changed.
+6. **Gate permission drift (interactive)** — when `@fusebase/fusebase-gate-sdk` version changed and `npm install` completed, dry-runs SDK analysis per deployed app and compares runtime Gate permissions on the platform with what a fresh `--sync-gate-permissions` would publish. If drift is found, prompts (TTY) to run sync for all affected apps. Skipped on `--dry-run`, without auth, when Gate SDK unchanged, or with `--skip-gate-permissions-sync`.
 
 **Pre-update Git checkpoint:** In a TTY, you are prompted for an optional commit before changes (empty commit if the tree is clean). If current branch tracks a remote (upstream configured), the pre-update commit is pushed immediately. Without Git, you are warned about rollback risk and can initialize a repo first. Use **`--skip-commit`** to skip, or **`--commit`** to run the checkpoint in CI/non-interactive mode without prompts.
 
@@ -626,6 +627,7 @@ fusebase update --dry-run
 fusebase update --skip-product
 fusebase update --skip-skills --force-mcp
 fusebase update --skip-install
+fusebase update --skip-gate-permissions-sync
 fusebase update --skip-commit
 ```
 
@@ -641,6 +643,7 @@ fusebase update --skip-commit
 | `--force-mcp` | Always refresh MCP tokens + IDE configs |
 | `--skip-deps` | Skip managed dependency version sync |
 | `--skip-install` | After dep sync, do not run `npm install` |
+| `--skip-gate-permissions-sync` | After a Gate SDK bump, skip interactive drift check and permission sync prompt |
 | `--skip-commit` | Skip pre-update Git checkpoint |
 | `--commit` | Run Git checkpoint without prompts (non-interactive) |
 | `--dry-run` | Print planned work only |

@@ -1,6 +1,8 @@
 import { resolve } from "node:path";
 import { resolveGateOperationPermissions } from "./api.ts";
 import {
+  applyResolvedPermissionsToGateSnapshot,
+  buildGateSdkOperationsSnapshot,
   requireAppId,
   updateGateSdkPermissionsInFusebaseJson,
   writeGateSdkOperationsToFusebaseJson,
@@ -37,8 +39,23 @@ export async function analyzeFeatureGatePermissions(args: {
   apiKey?: string;
   onWarning?: (message: string) => void;
   throwOnResolveFailure?: boolean;
+  /** When false, compute snapshot in memory without writing fusebase.json. Default true. */
+  persistFusebaseJson?: boolean;
+  /**
+   * Drift/sync checks: always resolve permissions from current usedOps instead of
+   * reusing fusebaseGateMeta.permissions when usedOps are unchanged.
+   */
+  alwaysResolvePermissions?: boolean;
 }): Promise<FeatureGateAnalysisOutput> {
-  const { projectRoot, feature, apiKey, onWarning, throwOnResolveFailure } = args;
+  const {
+    projectRoot,
+    feature,
+    apiKey,
+    onWarning,
+    throwOnResolveFailure,
+    persistFusebaseJson = true,
+    alwaysResolvePermissions = false,
+  } = args;
 
   if (!feature.path) {
     throw new Error(`Feature "${feature.id}" is missing "path" in fusebase.json`);
@@ -51,17 +68,32 @@ export async function analyzeFeatureGatePermissions(args: {
     scopeRoot: resolve(projectRoot, featurePath),
   });
   const analyzedAt = new Date().toISOString();
-  let fusebaseSnapshot = writeGateSdkOperationsToFusebaseJson(
-    projectRoot,
-    featureId,
-    {
-      analyzedAt,
-      usedOps: result.usedOps,
-      sdkVersion: result.sdkVersion,
-    },
-  );
+  const writeInput = {
+    analyzedAt,
+    usedOps: result.usedOps,
+    sdkVersion: result.sdkVersion,
+  };
+  const snapshotBuildOptions = alwaysResolvePermissions
+    ? { preservePermissionsWhenUsedOpsUnchanged: false as const }
+    : undefined;
+  let fusebaseSnapshot = persistFusebaseJson
+    ? writeGateSdkOperationsToFusebaseJson(
+        projectRoot,
+        featureId,
+        writeInput,
+        snapshotBuildOptions,
+      )
+    : buildGateSdkOperationsSnapshot(
+        feature.fusebaseGateMeta,
+        writeInput,
+        snapshotBuildOptions,
+      );
 
-  if (shouldResolveGatePermissions(fusebaseSnapshot)) {
+  const needsPermissionResolve = alwaysResolvePermissions
+    ? fusebaseSnapshot.usedOps.length > 0
+    : shouldResolveGatePermissions(fusebaseSnapshot);
+
+  if (needsPermissionResolve) {
     if (!apiKey) {
       const message =
         "No API key; skipped POST /v1/gate/resolve-operation-permissions. Run fusebase auth.";
@@ -78,12 +110,18 @@ export async function analyzeFeatureGatePermissions(args: {
         );
 
         if (res.success && res.data && Array.isArray(res.data.permissions)) {
-          fusebaseSnapshot = updateGateSdkPermissionsInFusebaseJson(
-            projectRoot,
-            featureId,
-            res.data.permissions,
-            resolvedAt,
-          );
+          fusebaseSnapshot = persistFusebaseJson
+            ? updateGateSdkPermissionsInFusebaseJson(
+                projectRoot,
+                featureId,
+                res.data.permissions,
+                resolvedAt,
+              )
+            : applyResolvedPermissionsToGateSnapshot(
+                fusebaseSnapshot,
+                res.data.permissions,
+                resolvedAt,
+              );
         } else {
           const message = `resolve-operation-permissions for feature ${feature.id}: success=false${res.message ? ` — ${res.message}` : ""}`;
           if (throwOnResolveFailure) {
