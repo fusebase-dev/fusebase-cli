@@ -231,6 +231,16 @@ export function readBackendOnlyGatePermissionsFromFeature(feature: {
   return readBackendOnlyGatePermissionsList(feature.backendOnlyGatePermissions);
 }
 
+/**
+ * Whether fusebase.json declares the field at all (present as an array, even if empty).
+ * A declared empty list is an explicit "clear extras" intent, distinct from an absent field.
+ */
+export function isBackendOnlyGatePermissionsDeclared(feature: {
+  backendOnlyGatePermissions?: unknown;
+}): boolean {
+  return Array.isArray(feature.backendOnlyGatePermissions);
+}
+
 /** Union backend-only lists (deduped, sorted) for manifest.backendOnlyGatePermissions. */
 export function mergeBackendOnlyGatePermissionLists(
   ...lists: string[][]
@@ -246,12 +256,23 @@ export function buildSyncedBackendOnlyGatePermissions(params: {
   platformBackendOnly: string[];
   declaredStoreBackendOnly?: string[];
   fromFusebaseJson: string[];
+  /**
+   * True when fusebase.json declares the field (present, even if empty). A declared
+   * list is authoritative: an explicit empty list clears extras instead of resurrecting
+   * remote-manifest ones. When absent, fall back to remote-manifest extras (legacy).
+   * Defaults to `fromFusebaseJson.length > 0` for backward compatibility.
+   */
+  fusebaseJsonDeclared?: boolean;
   fromRemoteManifest: string[];
 }): string[] {
-  const { platformBackendOnly, declaredStoreBackendOnly = [], fromFusebaseJson, fromRemoteManifest } =
-    params;
-  const extras =
-    fromFusebaseJson.length > 0 ? fromFusebaseJson : fromRemoteManifest;
+  const {
+    platformBackendOnly,
+    declaredStoreBackendOnly = [],
+    fromFusebaseJson,
+    fusebaseJsonDeclared = fromFusebaseJson.length > 0,
+    fromRemoteManifest,
+  } = params;
+  const extras = fusebaseJsonDeclared ? fromFusebaseJson : fromRemoteManifest;
   return mergeBackendOnlyGatePermissionLists(
     platformBackendOnly,
     declaredStoreBackendOnly,
