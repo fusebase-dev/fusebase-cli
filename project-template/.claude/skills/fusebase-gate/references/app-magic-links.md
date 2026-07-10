@@ -1,7 +1,7 @@
 ---
-version: "1.4.0"
+version: "1.5.0"
 mcp_prompt: appMagicLinks
-last_synced: "2026-07-04"
+last_synced: "2026-07-10"
 title: "Fusebase Gate App Magic Link Operations"
 category: specialized
 ---
@@ -94,8 +94,8 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 
 - The SPA at `/link` reads `id` and `redirect` from the query string, then activates the link by issuing `POST {gateBaseUrl}/apps/magic-links/{id}/activate`. The bundled SPA template currently calls this endpoint directly via `fetch` so it stays usable before `@fusebase/fusebase-gate-sdk` exposes `AppMagicLinksApi.activateAppMagicLink`. Once that SDK ships, prefer `activateAppMagicLink({ path: { globalId: id } })` over hand-rolled fetches; the wire request is identical (the server already stored `redirectPath` on the link row at create time, so the client never sends it on activation).
 - Successful response: `{ id, sessionToken, featureToken, dashboardToken, redirectPath, expiresAt, appFeatureId }`.
-  - `sessionToken` — Fusebase user session for the **magic-link recipient**; forward to Gate as `EverHelper-Session-ID` on user-context calls. The scaffold may also set `eversessionid`, but apps must not treat platform cookies alone as durable app identity (see App session exchange below).
-  - `featureToken` — Gate token scoped to the resolved **App** (host unit); authenticates the app feature but **does not substitute** for `sessionToken` on `getMyOrgAccess` and similar user-context Gate ops.
+  - `sessionToken` — Fusebase user session for the **magic-link recipient**. On **legacy SPA `/link` activation**, forward as `EverHelper-Session-ID` together with `x-app-feature-token`. On **platform email links** (`/_auth/magiclink/{key}`), org session lives on the org domain — the app host does not receive this as a cookie; use the post-activation exchange below instead.
+  - `featureToken` — Gate token scoped to the resolved **App** (host unit). On platform email links, app-wrapper mints recipient-scoped `fbsfeaturetoken` on the app host (user id embedded in the JWE) — that cookie is the identity source for `getMyOrgAccess` on the app backend.
   - `dashboardToken` — dashboard-service token, scoped to the same App and target user. The bundled SPA persists it as the `fbsdashboardtoken` cookie so dashboard SDK calls (`@fusebase/dashboard-service-sdk`) can authenticate after activation; in the deployed app-wrapper flow it is bundled inside the gate feature token JWT, but the magic-link activation hands both tokens out as discrete strings.
   - `redirectPath` — relative path to navigate to after token persistence (`/` if the invite did not request a deep link).
   - `appFeatureId` — the resolved **App** id (host-bearing unit, formerly `feature`) the tokens are scoped to; it matches an `apps[].id` from `fusebase app list`, not a Product id.
@@ -147,14 +147,18 @@ Magic-link Apps are often created with `--access=visitor`. The platform still re
 
 ## App Session Exchange After Activation
 
-The bundled `/link` scaffold sets platform cookies and redirects. **The mandatory part of the exchange is identical in Test and Production:** after activation the SPA must `POST` both tokens to a trusted app route (default `/api/account/from-magic-link`) so the backend can resolve the recipient via Gate before any protected route renders. Without that hop the next HTML load may re-issue `fbsfeaturetoken` for a **different** Fusebase user already signed in on that browser.
+**Platform email (default):** magic links in mail point at `https://{app-host}/_auth/magiclink/{key}`. After NH1, org `eversessionid` is on the **org domain** and `fbsfeaturetoken` on the **app host** — they are different registrable domains, so a same-origin app-backend call only receives `fbsfeaturetoken`.
 
-1. SPA calls `activateAppMagicLink` and receives `{ featureToken, sessionToken, redirectPath, … }`.
-2. SPA `POST`s `{ featureToken, sessionToken }` in the **body** of an app route (e.g. `/api/account/from-magic-link`) — never rely on `fbsfeaturetoken` surviving the next HTML navigation.
-3. Backend calls Gate with `x-app-feature-token` + `EverHelper-Session-ID: <sessionToken>` (e.g. `getMyOrgAccess`) to resolve `userId`.
-4. Redirect to `redirectPath`.
+**Mandatory exchange (Test and Production):**
 
-Never use `getMyOrgAccess` with only the feature token to gate Memberspace — that returns the token owner, not the visitor.
+1. After the platform redirect lands on `redirectPath`, SPA **immediately** `POST`s to `/api/account/from-magic-link` (same-origin; `fbsfeaturetoken` cookie attached automatically).
+2. Backend calls `getMyOrgAccess` with `x-app-feature-token` from the cookie only.
+3. **Fail-closed:** accept only `source === 'member'` with a real user id. Reject `source: 'none'` (visitor), `source: 'owner'`, and invalid responses.
+4. Redirect to protected content (or issue app-owned session cookie in Production — below).
+
+Without that hop the next HTML load may re-issue `fbsfeaturetoken` for a **different** Fusebase user already signed in on that browser.
+
+**Legacy SPA `/link` + `activateAppMagicLink`:** activation JSON returns `{ featureToken, sessionToken, … }`. POST both in the **body** to `/api/account/from-magic-link`, or forward `sessionToken` as `EverHelper-Session-ID` with `x-app-feature-token`. Dual-token in the request body is still valid for this path.
 
 ### Test vs Production session policy
 
@@ -163,7 +167,7 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 **Test mode (smoke test of the magic-link flow, no Memberspace, no role gating):**
 
 - Step 3 returns `userId` for the current request and the SPA redirects. That is the end of the exchange.
-- Do **not** issue an HMAC-signed app session cookie. Do **not** create `APP_SESSION_SECRET` via `fusebase secret create`. The `fbsfeaturetoken` / `eversessionid` cookies set by activation are sufficient for the smoke flow, and re-running the exchange on the next protected request is acceptable.
+- Do **not** issue an HMAC-signed app session cookie. Do **not** create `APP_SESSION_SECRET` via `fusebase secret create`. The platform `fbsfeaturetoken` cookie is sufficient for the smoke flow; re-running the exchange on the next protected request is acceptable.
 
 **Production mode (Memberspace, role-gated UI, or any flow that must remember the recipient across navigations):**
 
@@ -188,7 +192,7 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 
 ## Version
 
-- **Version**: 1.4.0
+- **Version**: 1.5.0
 - **Category**: specialized
-- **Last synced**: 2026-07-04
+- **Last synced**: 2026-07-10
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

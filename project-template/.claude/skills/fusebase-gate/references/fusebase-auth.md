@@ -1,7 +1,7 @@
 ---
-version: "1.3.0"
+version: "1.4.0"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-07-03"
+last_synced: "2026-07-10"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -100,14 +100,16 @@ Org membership (`registerFusebaseOrgMember`, `addOrgUser`, org invites) and **Ap
 
 ## Magic-Link → App Session Exchange
 
-For Apps that use `requestAppMagicLink` / `activateAppMagicLink` (load the `appMagicLinks` prompt for wire details), auth success is **not** complete when the SPA sets platform cookies alone.
+For Apps that use `requestAppMagicLink` / platform `/_auth/magiclink/{key}` (load the `appMagicLinks` prompt for wire details), auth success is **not** complete when the platform redirect alone finishes.
+
+**Cookie model after NH1 (platform email links):** org `eversessionid` on the **org domain**; recipient-scoped `fbsfeaturetoken` on the **app host**. Same-origin app-backend calls only receive `fbsfeaturetoken` — do not expect `eversessionid` on the app host.
 
 **Mandatory for every magic-link app, Test and Production:**
 
-- After `activateAppMagicLink`, pass **both** `featureToken` and `sessionToken` to a trusted app backend **before** `window.location.replace` to a protected route. Platform cookie `fbsfeaturetoken` can be overwritten on the next HTML request by the app proxy to match whichever Fusebase user is logged into the **browser**, not the magic-link recipient.
-- User identity on Gate calls such as `getMyOrgAccess` requires forwarding `sessionToken` as header `EverHelper-Session-ID` together with `x-app-feature-token` (or your app's equivalent). **`featureToken` alone does not resolve the authenticated user** on those endpoints.
-- Minimum exchange contract: `POST /api/account/from-magic-link` (or another app-owned route) with `{ featureToken, sessionToken }` in the **body** → backend builds a Gate client with both credentials → `getMyOrgAccess` to resolve the recipient → redirect to `redirectPath`. This is the **only** mandatory part of the exchange.
-- Do not call `getMyOrgAccess` with only the app feature token for visitors or fresh magic-link users — that can return the **token owner's** identity (e.g. the app owner in dev, or a stale browser session in prod). Fail closed: show the sign-in / request-link UI instead.
+- After the platform `/_auth/magiclink/{key}` redirect, SPA **immediately** `POST`s to `/api/account/from-magic-link` before navigating to protected routes. Platform `fbsfeaturetoken` can be overwritten on the next HTML request by the app proxy to match whichever Fusebase user is logged into the **browser**, not the magic-link recipient.
+- Backend calls `getMyOrgAccess` with `x-app-feature-token` from the `fbsfeaturetoken` cookie. The app-api proxy resolves the recipient from the JWE minted by app-wrapper.
+- **Fail-closed:** accept only `source === 'member'` with a real user id. Reject `source: 'none'` (visitor), `source: 'owner'`, and invalid responses.
+- **Legacy `/link` + `activateAppMagicLink`:** POST `{ featureToken, sessionToken }` in the body to `/api/account/from-magic-link`, or forward `sessionToken` as `EverHelper-Session-ID` with `x-app-feature-token`.
 
 ### Test vs Production
 
@@ -116,7 +118,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 **Test mode (smoke test, no Memberspace, no role-gated UI):**
 
 - The mandatory exchange above is enough — `getMyOrgAccess` + redirect.
-- Do **not** issue an app-owned HMAC-signed session cookie. Do **not** register `APP_SESSION_SECRET` or any other HMAC secret via `fusebase secret create`. The SPA can keep `fbsfeaturetoken` / `eversessionid` set by activation for the smoke flow and re-call the exchange on every protected page-load.
+- Do **not** issue an app-owned HMAC-signed session cookie. Do **not** register `APP_SESSION_SECRET` or any other HMAC secret via `fusebase secret create`. The platform `fbsfeaturetoken` cookie is sufficient for the smoke flow; re-call the exchange on every protected page-load if needed.
 - Treat the `userId` returned by `getMyOrgAccess` as the source of truth for the current request only; do not persist it server-side.
 
 **Production mode (Memberspace, role-gated areas, any flow where the app must remember which user opened the link across navigations):**
@@ -163,7 +165,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 ## Version
 
-- **Version**: 1.3.0
+- **Version**: 1.4.0
 - **Category**: specialized
-- **Last synced**: 2026-07-03
+- **Last synced**: 2026-07-10
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
