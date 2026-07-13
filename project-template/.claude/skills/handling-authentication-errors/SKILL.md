@@ -1,11 +1,93 @@
 ---
 name: handling-authentication-errors
-description: "Required implementation pattern for handling AppTokenValidationError (401) responses when app tokens expire. Use when: 1. Building any Fusebase Apps app that makes API calls, 2. Implementing authentication error handling, 3. Creating AuthExpiredModal components, 4. Setting up global error handlers in App.tsx. All apps MUST implement this pattern to handle token expiration gracefully."
+description: "Required patterns for auth and session errors in Fusebase Apps: AppTokenValidationError (401) on platform tokens, and backend session probes (/api/account/me) for SaaS apps with httpOnly cookies. Use when implementing auth error handling, AuthExpiredModal, session bootstrap on load, or global API error handlers."
 ---
 
 # Handling Authentication Errors
 
-All apps **MUST** handle `AppTokenValidationError` responses from the API. When the app token expires, the API returns a 401 with this body:
+Apps need **two** related but distinct patterns:
+
+1. **Platform app token** (`fbsfeaturetoken` / `x-app-feature-token`) — `AppTokenValidationError` on Gate/Dashboard proxy calls.
+2. **App-owned session** (httpOnly cookie, e.g. `app_session`) — backend `/api/account/me` (or equivalent) on load.
+
+Do **not** treat every failed fetch as “logged out”. That lies to the user when the backend is restarting (deploy), the proxy returns 502, or the network blips.
+
+---
+
+## Session probe invariant (backend SaaS apps)
+
+Any SPA that boots auth from **`GET /api/account/me`** (or similar) **MUST** follow this table:
+
+| Response on session check | Meaning | UI action |
+| ------------------------- | ------- | --------- |
+| **`401`** | Session rejected by backend | Show login / anon state |
+| **`403`** with known business code (`membership_revoked`, `tenant_suspended`, …) | Authenticated but blocked | Dedicated blocked screen |
+| **Everything else** (502/503/504, 5xx, network error, timeout, aborted) | **No verdict** — server may be down | **Retry** (see below), then “Can't reach server” + Try again. **Do not** clear session cookie or force login |
+
+### Anti-pattern (never ship)
+
+```typescript
+// BAD — treats deploy blip as logout
+catch (e) {
+  if (e.code !== 'tenant_suspended' && e.code !== 'membership_revoked') {
+    setAuth({ status: 'anon' }) // ← 502 during fusebase deploy looks like logout
+  }
+}
+```
+
+### Required pattern
+
+```typescript
+type SessionVerdict = 'authenticated' | 'anon' | 'blocked' | 'unknown'
+
+async function probeSession(): Promise<SessionVerdict> {
+  const res = await fetch('/api/account/me', { credentials: 'include' })
+  if (res.status === 401) return 'anon'
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({}))
+    if (body.code === 'membership_revoked' || body.code === 'tenant_suspended') return 'blocked'
+    return 'unknown' // do not assume logout
+  }
+  if (!res.ok) return 'unknown'
+  return 'authenticated'
+}
+
+async function probeSessionWithDeployTolerance(): Promise<SessionVerdict> {
+  const delays = [0, 400, 1200] // ms — survives fusebase deploy pod restart window
+  let last: SessionVerdict = 'unknown'
+  for (const ms of delays) {
+    if (ms) await new Promise((r) => setTimeout(r, ms))
+    try {
+      const v = await probeSession()
+      if (v !== 'unknown') return v
+      last = v
+    } catch {
+      last = 'unknown'
+    }
+  }
+  return last
+}
+```
+
+On `unknown`: show a **transient error** surface (“Can't reach the server”, Retry). Keep the httpOnly session cookie untouched so the next successful probe restores the user without a false login screen.
+
+**SPA bootstrap checklist (backend apps):**
+
+1. On mount: `probeSessionWithDeployTolerance()` — not a single bare `fetch`.
+2. `unknown` → loading/error UI with Retry; **do not** route to login.
+3. `anon` → login/register routes.
+4. `authenticated` → main app shell.
+5. Platform token expiry (`AuthTokenExpiredError`) is a **separate** handler — do not merge with `/api/account/me` logic.
+
+### Why deploy tolerance matters
+
+**`fusebase deploy` restarts the app backend.** Users who refresh during rollout may hit 502 from app-wrapper/proxy while the pod is not ready. Without retries, every deploy briefly “logs out” everyone refreshing in that window — even though `app_session` is still valid.
+
+---
+
+## Platform app token: `AppTokenValidationError`
+
+All apps **MUST** handle `AppTokenValidationError` responses from the **platform** API (Gate/Dashboard proxy). When the app token expires, the API returns a 401 with this body:
 
 ```json
 {
@@ -135,3 +217,10 @@ export async function fetchCurrentUser(
 - **`/users/me` 401** → return `null` (user is anonymous/guest)
 - **Dashboard/data API 401 with `AppTokenValidationError`** → throw `AuthTokenExpiredError` (session expired)
 <% } %>
+
+## Quick reference
+
+| Layer | Endpoint | 401 means | 5xx / network means |
+| ----- | -------- | --------- | ------------------- |
+| Platform token | Gate/Dashboard via `app-api` proxy | Token expired → refresh page modal | Transient — retry, not logout |
+| App session cookie | `/api/account/me` (your backend) | Not logged in → login screen | Transient — retry + “server unavailable”, **keep cookie** |

@@ -263,6 +263,8 @@ Current behavior:
 - `--feature <featureId>` analyzes one app
 - without `--app`, the CLI analyzes all configured apps with `path`
 - analysis is scoped to `app.path`
+- detects calls on full `*Api` instances **and** narrowed clients such as `Pick<AccessApi, "getMe">` (supported for analysis only — **do not use `Pick<>` in app production code**; use full API factories so grants stay aligned)
+- warns when a resolve/sync would **remove** permissions that were previously in `fusebaseGateMeta.permissions`
 
 This command only updates local `fusebase.json`. It does **not** update remote app permissions by itself.
 

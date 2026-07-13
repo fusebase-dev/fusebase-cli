@@ -79,6 +79,68 @@ Store app-level alias/client binding in non-secret config only when needed; reso
 - Treat sdk_describe as the source of truth for params shape and response shape.
 - Keep MCP and SDK roles separate: MCP is for discovery and execution in chat, SDK is for product code.
 
+## Permission sync typing rules (production code)
+
+`fusebase analyze gate` and `--sync-gate-permissions` build `fusebaseGateMeta.usedOps` from **static TypeScript analysis** of Gate SDK calls. The remote app grant follows that list. **Write SDK usage so analysis and humans see the same operations.**
+
+### Do (straightforward)
+
+```typescript
+import { AccessApi, OrgUsersApi, createClient } from "@fusebase/fusebase-gate-sdk";
+
+function gateClient(token: string) {
+  return createClient({
+    baseUrl: GATE_BASE_URL,
+    defaultHeaders: { "x-app-feature-token": token },
+  });
+}
+
+export function createAccessApi(token: string): AccessApi {
+  return new AccessApi(gateClient(token));
+}
+
+export function createOrgUsersApi(token: string): OrgUsersApi {
+  return new OrgUsersApi(gateClient(token));
+}
+
+// usage
+const access = createAccessApi(appToken);
+await access.getMe();
+await access.getMyOrgAccess({ path: { orgId } });
+```
+
+- Return type of factories: the real SDK class (`AccessApi`, not a custom subset type).
+- Call methods on the instance: `api.methodName(...)`.
+- Co-locate Gate calls in normal app/backend TS that your feature `tsconfig` includes.
+
+### Do not (even if it “looks cleaner”)
+
+```typescript
+// BAD — do not ship this pattern
+type AccessApiClient = Pick<AccessApi, "getMe">;
+function identity(api: AccessApiClient) {
+  return api.getMe();
+}
+
+// BAD — hides ops from analyze gate
+const { getMe } = accessApi;
+await getMe();
+
+// BAD — dynamic
+await (api as any)[operationId](params);
+```
+
+**Why:** narrowed types and indirection caused production lockouts when `--sync-gate-permissions` dropped permissions that runtime still needed. The CLI analyzer may recognize some `Pick<>` calls after platform fixes — **apps must still use full `*Api` factories** so grants, code review, and analysis stay aligned.
+
+### Release checklist
+
+1. `fusebase analyze gate --operations --json --feature <featureId>`
+2. `usedOps` must list every Gate operation the app calls at runtime (non-empty when SDK is used).
+3. `fusebase app update <appId> --sync-gate-permissions` before deploy when ops changed.
+4. Treat analyze **warnings about removed permissions** as a stop sign unless the change is intentional.
+
+See also `AGENTS.md` (Gate publish sequence) and `app-backend` skill (403 triage).
+
 ## Tokens permissions behavior
 
 When creating or updating API tokens, permission handling is soft by default (`strictPermissionValidation = false`).

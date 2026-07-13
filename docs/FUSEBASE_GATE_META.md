@@ -35,7 +35,7 @@ Options:
 ## What the analyzer does
 
 1. **Allowlist** — Reads operation ids from the installed SDK (`node_modules/@fusebase/fusebase-gate-sdk/dist/apis/*.js`, `opId: "..."`).
-2. **TypeScript usage** — Builds a program from your `tsconfig`, walks source files (excluding `node_modules` and `.d.ts`), and records **method names** called on values typed as **`OrgUsersApi` | `TokensApi` | `HealthApi` | `SystemApi`**.
+2. **TypeScript usage** — Builds a program from your `tsconfig`, walks source files (excluding `node_modules` and `.d.ts`), and records **method names** called on values typed as Gate SDK `*Api` instances. Prefer **full `*Api` factories in app code** (`createAccessApi(): AccessApi`); narrowed types like `Pick<AccessApi, "getMe">` may be detected but are **discouraged** because they hide operations from review and caused grant/sync drift in production.
 3. **Snapshot** — Writes sorted **`usedOps`**, **`sdkVersion`**, and timestamps into the current app’s **`fusebaseGateMeta`**.
 4. **Resolve permissions** (conditional) — If this run **changed** the `usedOps` set compared to the previous snapshot, calls **`resolveGateOperationPermissions`** with the current `usedOps` and merges the returned **`permissions`** array into the snapshot. Any reviewed **`manualPermissions`** are also merged into `permissions`.
 

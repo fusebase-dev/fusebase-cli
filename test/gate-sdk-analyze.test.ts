@@ -21,4 +21,15 @@ describe("findGatePermissionDiagnostics", () => {
       }),
     ).toEqual([]);
   });
+
+  it("warns when sync removes permissions that were previously granted", () => {
+    const diagnostics = findGatePermissionDiagnostics({
+      usedOps: ["listOrgUsers"],
+      permissions: ["org.members.read"],
+      previousPermissions: ["health.read", "org.members.read"],
+    });
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toContain("will remove permission(s)");
+    expect(diagnostics[0]).toContain("health.read");
+  });
 });

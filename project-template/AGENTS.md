@@ -176,7 +176,7 @@ SDK token usage in app runtime:
 - **`window.FBS_FEATURE_TOKEN` / cookie `fbsfeaturetoken`** (browser) and **`process.env.FBS_FEATURE_TOKEN`** (backend env) are different artifacts — same name, different scope. Browser token is visitor JWE; backend env is the deploy-time service token with app permissions.
 - Public/visitor apps can open with a visitor app token, but visitor tokens normally do **not** receive isolated-store permissions. For public portal reads/writes, use an app backend with a service token plus trusted portal/workspace context. Prefer `trustedRuntimeContext.portalId` / `trustedRuntimeContext.workspaceId` when the token has `isolated_store.rls.delegate`; if unavailable in the target environment, a custom `rlsContext` key such as `req_portal_id` is only a reviewed temporary fallback derived from trusted auth context.
 - In local `fusebase dev start`, `FBS_FEATURE_TOKEN` may be absent in backend env. Backend-only service-token code may use `process.env.FBS_FEATURE_TOKEN ?? process.env.GATE_MCP_TOKEN` for dev, but browser/UI code must never read `.env` or use MCP/service tokens.
-- On **deploy**, backend `FBS_FEATURE_TOKEN` must be sent to Gate as **`x-app-feature-token`**, not `Authorization: Bearer`. Use **`FBS_ORG_ID`** for org id; do not reject the token when `getMe().scopes` is empty — verify isolated-store access with `listIsolatedStores` instead (see `app-backend` skill).
+- On **deploy**, backend `FBS_FEATURE_TOKEN` must be sent to Gate as **`x-app-feature-token`**, not `Authorization: Bearer`. Use **`FBS_ORG_ID`** for org id; do not reject the token when `getMe().scopes` is empty — verify isolated-store access with `listIsolatedStores` instead (see `app-backend` skill). **`getMe` does not require `health.read` in the app grant** (authenticated-only op).
 
 **Rules**:
 
@@ -472,7 +472,7 @@ Covers:
 
 **Load when working with Fusebase Gate or platform-level flows** — organizations, org user lists and membership, Gate tokens and authorization scopes, health/bootstrap, and how to use the **Gate MCP** and **Gate SDK** during development vs runtime.
 
-The skill explains how to interact with the **broader Fusebase ecosystem** beyond dashboard data: for example org-scoped user operations, platform services, email and campaign-related flows, automation, and integrations **as exposed through Gate** (see `references/*.md` for each topic). **Verify the fusebase-gate MCP server** is available before gate `tool_call` work (see skill).
+The skill explains how to interact with the **broader Fusebase ecosystem** beyond dashboard data: for example org-scoped user operations, platform services, email and campaign-related flows, automation, and integrations **as exposed through Gate** (see `references/*.md` for each topic). **Verify the fusebase-gate MCP server** is available before gate `tool_call` work (see skill). For runtime SDK code, follow **full `*Api` factory patterns** — not `Pick<>` / narrowed client types — so `fusebase analyze gate` and permission sync stay aligned with production calls.
 
 For one-click client onboarding into AI Apps, load **`references/app-magic-links.md`**, **`references/fusebase-auth.md`**, and **`app-backend/SKILL.md`** (§ Magic-link session exchange): together they cover `createAppMagicLink` (owner invite), `requestAppMagicLink` (visitor self-service, generic-200 contract), and activation, including the 24h TTL and the `reason=expired|revoked` failure modes. Activation is handled server-side by the platform at `/_auth/magiclink/{key}` (HttpOnly cookies + redirect); the SPA scaffold only forwards legacy `/link?id={key}` email URLs to that endpoint and never activates links or writes session cookies itself.
 
@@ -487,7 +487,7 @@ For file upload functionality (separate service, not part of dashboard SDK).
 
 ### ✅ handling-authentication-errors
 
-**Required for all apps**. Covers handling `AppTokenValidationError` (401) responses when the app token expires, including the `AuthExpiredModal` component pattern.
+**Required for all apps.** Two layers: (1) platform `AppTokenValidationError` / `AuthExpiredModal`; (2) backend session apps — `/api/account/me` probe: **401 only** = logout, 5xx/network = retry during deploy, never false anon. Load before any auth bootstrap or global API error handler.
 
 ### ✅ app-ui-design
 
@@ -529,7 +529,7 @@ When `git-debug-commits` is enabled, these rules are mandatory:
 
 ### ✅ app-backend
 
-**Load when an app needs a backend API** (REST endpoints, WebSockets, custom logic). Covers when to add a backend, `backend/` folder structure, Hono setup, `/api` route reservation, and `fusebase.json` backend config (including `backend.minReplicas` — **set it to `1` for webhook/always-on apps** so the backend stays warm and does not drop deliveries on cold start). **The backend is optional** — only add when the app genuinely needs backend logic beyond dashboard SDK calls. **No code is shared between SPA and backend** — each side defines its own types independently. **Backends are not shared among apps** — only the app that owns the `backend/` folder can access it.
+**Load when an app needs a backend API** (REST endpoints, WebSockets, custom logic). Covers when to add a backend, `backend/` folder structure, Hono setup, `/api` route reservation, and `fusebase.json` backend config (`backend.minReplicas` only — **`maxReplicas` is not supported**; platform may scale to 3 replicas). Set `minReplicas: 1` for webhook/always-on apps. Session bootstrap during deploy: skill **handling-authentication-errors**. **The backend is optional** — only add when the app genuinely needs backend logic beyond dashboard SDK calls. **No code is shared between SPA and backend** — each side defines its own types independently. **Backends are not shared among apps** — only the app that owns the `backend/` folder can access it.
 
 ### ✅ app-secrets
 
@@ -620,6 +620,7 @@ For apps that use Dashboard SDK or Gate SDK at runtime, a successful deploy is *
 If the app uses Fusebase Gate SDK:
 
 - run `fusebase app update <appId> --sync-gate-permissions` after changing Gate SDK operations and before `fusebase deploy` or before calling the deployment published
+- **SDK typing:** use factories that return full `*Api` classes (`AccessApi`, `OrgUsersApi`, …) with direct method calls — **do not** use `Pick<AccessApi, …>`, minimal interfaces, method destructuring, or `any` for Gate clients in production (breaks `fusebase analyze gate` / causes grant drift). See skill **fusebase-gate** § Gate SDK runtime patterns.
 - when investigating **403** Gate errors (`Token missing required permission`, `token subject not allowed`), compare `fusebaseGateMeta.usedOps` vs `permissions` and run `fusebase analyze gate` before blaming a platform regression — especially after bumping `@fusebase/fusebase-gate-sdk`
 - do not treat `Permissions: none` as success unless the app intentionally requires no runtime permissions
 - run `fusebase analyze gate --operations --json --feature <featureId>` before publish and confirm `usedOps` is not empty when Gate SDK is used in runtime code
@@ -746,6 +747,7 @@ You can only claim completion if:
 - ✅ **Gate apps require `--sync-gate-permissions`**: If runtime code uses `@fusebase/fusebase-gate-sdk`, run `fusebase app update <appId> --sync-gate-permissions` before calling the app published.
 - ✅ **`Permissions: none` is a blocker for runtime-integrated apps**: If CLI output shows `Permissions: none`, do not present the app as fully published unless it intentionally requires no runtime permissions.
 - ✅ **Gate analysis sanity check**: Run `fusebase analyze gate --operations --json --feature <featureId>` and verify `usedOps` is non-empty for Gate-integrated runtime code. Empty `usedOps` with active Gate SDK usage is a release blocker.
+- ✅ **Gate SDK typing**: Factories return full `*Api` classes with direct method calls — no `Pick<AccessApi, …>`, minimal interfaces, or method destructuring in production (see **fusebase-gate** skill).
 <% if (it.flags?.includes("isolated-stores")) { %>
 - ✅ **Isolated-store source scope check**: If isolated SQL runtime/status/apply returns `403 Token cannot access isolated store`, call Gate `me` / `whoami`, use the actual `client` scope, and verify the store has matching `sourceScopes`. Current Gate MCP tokens may use project `productId` as client scope rather than child `apps[].id`; fix with `attachIsolatedStoreSourceScope` when authorized, not by rebaselining migrations.
 - ✅ **Isolated SQL schema final gate**: If isolated SQL schema changed, `postgres/migrations/` must contain matching new/updated migration file(s) and manifest updates. Otherwise completion is blocked.

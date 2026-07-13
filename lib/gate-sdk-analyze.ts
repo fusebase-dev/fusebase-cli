@@ -147,6 +147,7 @@ export async function analyzeFeatureGatePermissions(args: {
     usedOps: result.usedOps,
     permissions: gatePermissions,
     usesTrustedRuntimeContext: result.usesTrustedRuntimeContext,
+    previousPermissions: feature.fusebaseGateMeta?.permissions,
   })) {
     onWarning?.(diagnostic);
   }

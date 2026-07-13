@@ -419,6 +419,35 @@ if (!token) throw new Error("No Gate token in env");
 
 Probe both when unsure: try `feature` header first, then `bearer`; keep the transport that actually passes a capability check (below).
 
+**`getMe` — no `health.read` grant required**
+
+`AccessApi.getMe` is an identity introspection call. It requires a valid user or app token but **no named Gate permission** (same class as `getHealth`). Do not add `health.read` to `fusebaseGateMeta.permissions` solely to call `getMe`, and do not treat a missing `health.read` grant as the reason `getMe` fails — look for transport/header issues first.
+
+**Gate SDK typing — use full `*Api` factories (not `Pick<>`)**
+
+`fusebase analyze gate` / `--sync-gate-permissions` derive the published grant from static analysis. **Production code must use straightforward SDK patterns:**
+
+```typescript
+// GOOD
+export function createAccessApi(token: string): AccessApi {
+  return new AccessApi(createGateSdkClient(token));
+}
+await createAccessApi(token).getMe();
+```
+
+```typescript
+// BAD — do not use in production (hides ops from analyze gate; caused prod lockouts)
+type Client = Pick<AccessApi, "getMe">;
+function loadMe(api: Client) { return api.getMe(); }
+```
+
+- Factory return type = full SDK class (`AccessApi`, `OrgUsersApi`, `IsolatedStoresApi`, …).
+- No `Pick` / `Omit` / minimal interfaces for Gate clients.
+- No destructuring Gate methods (`const { getMe } = api`).
+- Before deploy: `fusebase analyze gate --feature <id>` → `usedOps` must match runtime calls.
+
+See `fusebase-gate` skill § Gate SDK runtime patterns and `references/sdk.md` § Permission sync typing rules.
+
 **Org id — do not derive from `getMe().scopes` on deploy**
 
 On deploy, `getMe()` for `FBS_FEATURE_TOKEN` may return `type: "user"` with **empty `scopes` and `permissions`** even when `listIsolatedStores` / `insertIsolatedStoreSqlRow` work. Do **not** gate store access on `getMe().auth.scopes`.
@@ -493,7 +522,38 @@ Backend commands (`dev`, `build`, `start`) run from the `backend/` subdirectory 
 
 ### `backend.minReplicas` (keep the backend warm)
 
-Optional integer. Minimum number of backend replicas to keep running. 0 by default. 0 means scale to zero (cold starts).
+Optional integer `0..3`. Minimum replicas the platform keeps running. **`0` (default)** = scale to zero when idle (cold starts on next request).
+
+| `minReplicas` | Platform behavior (today) |
+| ------------- | ------------------------- |
+| omitted / `0` | Scale to zero; `maxReplicas` defaults to **3** when scaled up |
+| `1` | One warm replica; deploy logs show `Resolved scale: minReplicas=1, maxReplicas=3` |
+| `2`–`3` | N warm replicas; `maxReplicas` = `max(3, minReplicas)` |
+
+Use **`1`** for webhook / always-on inbound integrations (see above). Prefer `1` over `3` — each warm replica runs 24/7.
+
+### `backend.maxReplicas` — **not supported (do not use)**
+
+**There is no `backend.maxReplicas` in the platform contract today.** If you add it to `fusebase.json`, the CLI may accept it in the file but **deploy ignores it silently** — nimbus-ai always resolves `maxReplicas` via `resolveBackendScale()` (default cap **3**, bumped only when `minReplicas > 3`).
+
+**Never document or code against `maxReplicas=1` in fusebase.json.** A comment like “we pin single replica in fusebase.json” is false unless you also accept that the platform may run up to 3 replicas under load.
+
+**If your backend assumes one process** (in-memory rate limiter, module-level cache, KB version stamp):
+
+- Treat multi-replica as possible even with `minReplicas: 1` (HPA can scale to 3).
+- Move counters/cache to **isolated store**, dashboard rows, or Redis sidecar — or document the multiplied limit as acceptable.
+- Do **not** rely on `maxReplicas` in fusebase.json until the platform implements and validates it.
+
+### Deploy restarts the backend (SPA must tolerate it)
+
+Every **`fusebase deploy`** rolls the backend container. Users refreshing during rollout may see **502** from app-wrapper while the pod is not ready.
+
+Apps with an httpOnly session cookie (`app_session`, etc.) **must** implement session bootstrap per skill **handling-authentication-errors** § session probe invariant:
+
+- Only **401** on `/api/account/me` means logged out.
+- **5xx / network** → retry (e.g. 400 ms + 1200 ms), then “Can't reach server” — **do not** clear the session cookie.
+
+Without this, every deploy briefly “logs out” users who refresh in the rollout window.
 
 ## Deriving the Public Base URL from the Request
 

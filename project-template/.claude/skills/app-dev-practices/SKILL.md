@@ -140,6 +140,16 @@ Apps run as the main window. The platform sets a `fbsfeaturetoken` cookie automa
 
 **All apps MUST handle token expiration** (`AppTokenValidationError` / 401). See skill **handling-authentication-errors** for the implementation pattern.
 
+### Backend session apps (httpOnly cookie)
+
+If the app has a **backend** and the SPA boots auth from **`GET /api/account/me`** (or similar) with `credentials: 'include'`:
+
+- Load **handling-authentication-errors** § **session probe invariant** before writing auth bootstrap code.
+- **401 only** → login screen. **502/5xx/network** → retry with deploy tolerance, then transient error — **never** `setState('anon')` on proxy errors.
+- **`fusebase deploy` restarts the backend** — session probe must survive the rollout window (see skill for retry delays).
+
+Do not conflate this with platform `fbsfeaturetoken` expiry (`AppTokenValidationError` modal) — they are separate layers.
+
 ## User Details
 
 <% if (it.flags?.includes("portal-specific-apps")) { %>

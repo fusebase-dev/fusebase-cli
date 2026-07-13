@@ -305,6 +305,117 @@ describe("collectUsedOperations scoped by app path", () => {
     rmSync(dir, { recursive: true });
   });
 
+  it("detects SDK operations on Pick<AccessApi, 'getMe'> receivers", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-pick-access-"));
+    const appDir = join(dir, "apps", "identity");
+    mkdirSync(appDir, { recursive: true });
+
+    writeFileSync(
+      join(dir, "tsconfig.json"),
+      JSON.stringify(
+        {
+          compilerOptions: {
+            target: "ES2020",
+            module: "ESNext",
+            moduleResolution: "Bundler",
+            strict: true,
+          },
+          include: ["apps/**/*.ts"],
+        },
+        null,
+        2,
+      ),
+    );
+
+    writeFileSync(
+      join(appDir, "index.ts"),
+      `
+      class AccessApi {
+        getMe() {}
+        getMyOrgAccess() {}
+      }
+
+      type AccessApiClient = Pick<AccessApi, "getMe">;
+
+      function loadIdentity(api: AccessApiClient) {
+        return api.getMe();
+      }
+
+      loadIdentity(new AccessApi());
+      `,
+    );
+
+    const loaded = loadTsProgram(dir);
+    expect(loaded).not.toBeNull();
+
+    const used = collectUsedOperations(
+      loaded!.program,
+      new Set(["getMe", "getMyOrgAccess"]),
+      new Set(["AccessApi"]),
+      appDir,
+    );
+
+    expect([...used]).toEqual(["getMe"]);
+
+    rmSync(dir, { recursive: true });
+  });
+
+  it("detects SDK operations on Pick with union keys", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-pick-union-"));
+    const appDir = join(dir, "apps", "identity");
+    mkdirSync(appDir, { recursive: true });
+
+    writeFileSync(
+      join(dir, "tsconfig.json"),
+      JSON.stringify(
+        {
+          compilerOptions: {
+            target: "ES2020",
+            module: "ESNext",
+            moduleResolution: "Bundler",
+            strict: true,
+          },
+          include: ["apps/**/*.ts"],
+        },
+        null,
+        2,
+      ),
+    );
+
+    writeFileSync(
+      join(appDir, "index.ts"),
+      `
+      class AccessApi {
+        getMe() {}
+        getMyOrgAccess() {}
+      }
+
+      type AccessApiClient = Pick<AccessApi, "getMe" | "getMyOrgAccess">;
+
+      function loadIdentity(api: AccessApiClient) {
+        api.getMe();
+        api.getMyOrgAccess();
+      }
+
+      loadIdentity(new AccessApi());
+      `,
+    );
+
+    const loaded = loadTsProgram(dir);
+    expect(loaded).not.toBeNull();
+
+    const used = collectUsedOperations(
+      loaded!.program,
+      new Set(["getMe", "getMyOrgAccess"]),
+      new Set(["AccessApi"]),
+      appDir,
+    );
+
+    expect([...used].sort()).toEqual(["getMe", "getMyOrgAccess"]);
+
+    rmSync(dir, { recursive: true });
+  });
+
   it("falls back to tsconfig.app and app-local node_modules SDK", async () => {
     const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-app-sdk-root-"));
     const appDir = join(dir, "apps", "workspace-permissions");

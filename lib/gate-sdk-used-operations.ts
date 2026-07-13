@@ -100,6 +100,49 @@ export function loadTsProgram(projectRoot: string): {
   return null;
 }
 
+function unwrapTypes(type: ts.Type): ts.Type[] {
+  if (type.isUnion()) {
+    return type.types.flatMap((member) => unwrapTypes(member));
+  }
+  if (type.isIntersection()) {
+    return type.types.flatMap((member) => unwrapTypes(member));
+  }
+  return [type];
+}
+
+function extractStringLiteralKeys(type: ts.Type): Set<string> {
+  const keys = new Set<string>();
+  if (type.isUnion()) {
+    for (const member of type.types) {
+      for (const key of extractStringLiteralKeys(member)) {
+        keys.add(key);
+      }
+    }
+    return keys;
+  }
+  if (type.isStringLiteral()) {
+    keys.add(type.value);
+    return keys;
+  }
+  return keys;
+}
+
+function getPickTypeArguments(
+  type: ts.Type,
+): { baseType: ts.Type; keys: Set<string> } | null {
+  if (type.aliasSymbol?.getName() !== "Pick") {
+    return null;
+  }
+  const args = type.aliasTypeArguments;
+  if (!args || args.length < 2) {
+    return null;
+  }
+  return {
+    baseType: args[0]!,
+    keys: extractStringLiteralKeys(args[1]!),
+  };
+}
+
 function isGateApiInstanceType(
   type: ts.Type,
   apiClassNames: ReadonlySet<string>,
@@ -112,11 +155,76 @@ function isGateApiInstanceType(
   if (trySym(type.symbol)) return true;
   if (trySym(type.aliasSymbol)) return true;
 
+  const target = (type as ts.TypeReference).target;
+  if (trySym(target?.symbol)) return true;
+
   if (type.isUnion()) {
     return type.types.some((t) => isGateApiInstanceType(t, apiClassNames));
   }
   if (type.isIntersection()) {
     return type.types.some((t) => isGateApiInstanceType(t, apiClassNames));
+  }
+
+  return false;
+}
+
+function receiverSupportsGateSdkOperation(
+  checker: ts.TypeChecker,
+  receiverType: ts.Type,
+  methodName: string,
+  apiClassNames: ReadonlySet<string>,
+): boolean {
+  if (isGateApiInstanceType(receiverType, apiClassNames)) {
+    return true;
+  }
+
+  for (const memberType of unwrapTypes(receiverType)) {
+    const pick = getPickTypeArguments(memberType);
+    if (
+      pick &&
+      pick.keys.has(methodName) &&
+      isGateApiInstanceType(pick.baseType, apiClassNames)
+    ) {
+      return true;
+    }
+
+    const prop = memberType.getProperty(methodName);
+    if (!prop) continue;
+
+    for (const decl of prop.declarations ?? []) {
+      if (!ts.isMethodDeclaration(decl) && !ts.isMethodSignature(decl)) {
+        continue;
+      }
+      const parent = decl.parent;
+      if (
+        (ts.isClassDeclaration(parent) || ts.isInterfaceDeclaration(parent)) &&
+        parent.name &&
+        apiClassNames.has(parent.name.text)
+      ) {
+        return true;
+      }
+    }
+
+    const valueDeclaration = prop.valueDeclaration;
+    if (valueDeclaration) {
+      const propType = checker.getTypeOfSymbolAtLocation(
+        prop,
+        valueDeclaration,
+      );
+      const signatures = propType.getCallSignatures();
+      for (const signature of signatures) {
+        const declaration = signature.getDeclaration();
+        const parent = declaration?.parent;
+        if (
+          parent &&
+          (ts.isClassDeclaration(parent) || ts.isInterfaceDeclaration(parent)) &&
+          parent.name &&
+          apiClassNames.has(parent.name.text)
+        ) {
+          return true;
+        }
+      }
+    }
   }
 
   return false;
@@ -173,7 +281,14 @@ export function collectUsedOperations(
         }
 
         const receiverType = checker.getTypeAtLocation(receiverExpr);
-        if (isGateApiInstanceType(receiverType, apiClassNames)) {
+        if (
+          receiverSupportsGateSdkOperation(
+            checker,
+            receiverType,
+            methodName,
+            apiClassNames,
+          )
+        ) {
           used.add(methodName);
         }
       }
