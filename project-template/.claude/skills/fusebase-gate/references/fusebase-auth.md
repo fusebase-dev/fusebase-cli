@@ -1,7 +1,7 @@
 ---
-version: "1.4.0"
+version: "1.5.0"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-07-10"
+last_synced: "2026-07-14"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -19,6 +19,9 @@ category: specialized
 - [Architecture Rules](#architecture-rules)
 - [Org Onboarding](#org-onboarding)
 - [Public Registration With Org Membership](#public-registration-with-org-membership)
+- [Auth Operation Client Matrix](#auth-operation-client-matrix)
+- [`getMyOrgAccess` `source` Field](#getmyorgaccess-source-field)
+- [Gate Error Envelope Decoding](#gate-error-envelope-decoding)
 - [Two Names For Feature Token](#two-names-for-feature-token)
 - [App `accessPrincipals` Vs Org Membership](#app-accessprincipals-vs-org-membership)
 - [Visitor Access Vs Open API (Platform Edge)](#visitor-access-vs-open-api-platform-edge)
@@ -72,6 +75,32 @@ Acceptance flows that require `registerFusebaseOrgMember` (create account **and*
 - Grant `org.members.write` on the app feature (`fusebase sync` / redeploy) before testing registration-with-membership.
 - For instant password-based onboarding, prefer `registerFusebaseOrgMember` with `autoConfirmEmail: true`. `autoConfirmClientInvite` is only for `addOrgUser` org-only client invites and does not affect auth-form account registration.
 - After success, set the returned `sessionId` as an app-domain cookie and verify membership with `getMyOrgAccess` (session header + feature token as documented for user-context reads).
+
+## Auth Operation Client Matrix
+
+Use the **smallest** token that satisfies the op contract. Wrong subject → `403 token subject not allowed` or `403 Authenticated user-bound context is required (authType=visitor)`.
+
+| Operation | Who calls | Gate client / token |
+| --- | --- | --- |
+| `loginFusebaseUser`, `registerFusebaseUser`, `requestFusebasePasswordRestore` | App backend BFF (visitor-safe) | `createClient({ baseUrl })` — **no** feature token |
+| `registerFusebaseOrgMember`, `addOrgUser` | App backend only | `process.env.FBS_FEATURE_TOKEN` (service token with `org.members.write`) |
+| `logoutFusebaseUser` | App backend on behalf of signed-in user | User-context token (`fbsfeaturetoken` / session), not the service token |
+| `getMyOrgAccess` (user identity) | App backend from browser request | Request `fbsfeaturetoken` cookie — **not** `FBS_FEATURE_TOKEN` |
+
+Never call `registerFusebaseOrgMember` / `addOrgUser` from the SPA with a visitor cookie. Never use `FBS_FEATURE_TOKEN` to answer "who is the current user?".
+
+## `getMyOrgAccess` `source` Field
+
+`source` is the caller's **org role** (`member`, `client`, `owner`, `none`) — not a security/trust tier. `owner` is still a live human account with org-wide powers; do not treat it as a service identity. For magic-link exchange, fail-closed on `source === 'member'` with a real `userId` when the product expects a recipient client/member — reject `none` (visitor) and unexpected `owner` unless the flow explicitly allows it.
+
+## Gate Error Envelope Decoding
+
+Gate BFF errors are often wrapped. Read **status + inner code**, not only the outer HTTP status:
+
+- **`upstreamStatus: 401`** inside a **500** response on login/register usually means **wrong password or invalid credentials** — not a transient server fault. Do not retry blindly.
+- **`-20` / `403` from auth-form anti-abuse** — registration or login blocked by rate/abuse policy. **Not transient**; backoff, surface human copy, do not spin retry loops.
+- **`403 token subject not allowed`** — wrong token type for the op (see matrix above), not "platform denies org join".
+- **`403` with `authType=visitor` on org writes** — backend forwarded visitor `fbsfeaturetoken` instead of `FBS_FEATURE_TOKEN`.
 
 ## Two Names For Feature Token
 
@@ -165,7 +194,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 ## Version
 
-- **Version**: 1.4.0
+- **Version**: 1.5.0
 - **Category**: specialized
-- **Last synced**: 2026-07-10
+- **Last synced**: 2026-07-14
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

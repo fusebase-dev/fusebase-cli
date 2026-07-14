@@ -1,7 +1,7 @@
 ---
-version: "1.5.0"
+version: "1.6.0"
 mcp_prompt: appMagicLinks
-last_synced: "2026-07-10"
+last_synced: "2026-07-14"
 title: "Fusebase Gate App Magic Link Operations"
 category: specialized
 ---
@@ -30,6 +30,7 @@ category: specialized
 - [App Session Exchange After Activation](#app-session-exchange-after-activation)
   - [Test vs Production session policy](#test-vs-production-session-policy)
   - [Don't register non-secrets](#dont-register-non-secrets)
+- [Invite Lifecycle And Orphan Links](#invite-lifecycle-and-orphan-links)
 - [Working Rules](#working-rules)
 
 ---
@@ -181,6 +182,16 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 - The same rule applies to other already-public values such as `productId`, the app subdomain, or Fusebase host URLs (`FBS_*` config). `fusebase secret create` is reserved for credentials that must not appear in the repo (HMAC keys, third-party API tokens, OAuth client secrets).
 - A Test-mode magic-link app needs **zero** `fusebase secret create` calls for the magic-link flow itself. A Production-mode app needs exactly one: `APP_SESSION_SECRET` for the app-owned session cookie.
 
+## Invite Lifecycle And Orphan Links
+
+Gate exposes **create**, **bulk create**, **request**, and **activate** only — there is **no list, revoke, or delete API** for app magic links today.
+
+- A `createAppMagicLink` row lives for the **24h TTL** (`expiresAt`). While active, another invite to the same email may be blocked or behave unexpectedly depending on nimbus-ai state — do not assume you can "delete and recreate" from the app.
+- **Mail dispatch failure does not roll back** the persisted row. The API still returns `{ id, magicLinkUrl, expiresAt }`; the owner can copy `magicLinkUrl` manually. Treat a failed SMTP/log as a delivery problem, not a failed create.
+- **Lost HTTP response after create:** if your app times out or crashes after Gate accepted the call, the link row **already exists** in nimbus-ai. Rolling back a local dashboard row or assuming "no response = no link" leaves an **orphan** that blocks the email until TTL expires.
+- **Safe recovery:** call `requestAppMagicLink` for the same email with the intended `redirectPath` (self-service resend; 30s per-(org,app,email) cooldown). Do **not** rely on deleting your local invite record as cleanup.
+- **Idempotent invite UX:** track `invited_at` / delivery status in your app tables; offer explicit **Resend** via `requestAppMagicLink`, not another blind `createAppMagicLink` loop.
+
 ## Working Rules
 
 - Always inspect the exact contract with `tools_describe` or `sdk_describe` before integration work — the request and response shapes are versioned independently from this prompt.
@@ -192,7 +203,7 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 
 ## Version
 
-- **Version**: 1.5.0
+- **Version**: 1.6.0
 - **Category**: specialized
-- **Last synced**: 2026-07-10
+- **Last synced**: 2026-07-14
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

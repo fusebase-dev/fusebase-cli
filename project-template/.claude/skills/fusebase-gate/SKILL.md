@@ -105,54 +105,18 @@ After connection is established: discover operations via `tools_list` / `tools_s
 
 ## Gate SDK runtime patterns for reliable permission sync
 
-When runtime code uses `@fusebase/fusebase-gate-sdk`, `fusebase analyze gate` and `fusebase app update --sync-gate-permissions` derive the **published Gate grant** from static analysis of SDK method calls. **Use straightforward SDK shapes in production code** — do not narrow API types for convenience.
+When runtime code uses `@fusebase/fusebase-gate-sdk`, `fusebase feature update --sync-gate-permissions` relies on static analysis of SDK method calls. Prefer these patterns so operations are detected reliably:
 
-### Required patterns (production)
-
-1. **Factory returns a full SDK API class** — not a picked/minimal interface:
-   ```typescript
-   import { AccessApi, createClient } from "@fusebase/fusebase-gate-sdk";
-
-   export function createAccessApi(appToken: string): AccessApi {
-     return new AccessApi(
-       createClient({
-         baseUrl: GATE_BASE_URL,
-         defaultHeaders: { "x-app-feature-token": appToken },
-       }),
-     );
-   }
-
-   // Call sites: direct method on the full Api instance
-   const accessApi = createAccessApi(token);
-   await accessApi.getMe();
-   await accessApi.getMyOrgAccess({ path: { orgId } });
-   ```
-2. **One factory per SDK API surface** you use (`AccessApi`, `OrgUsersApi`, `IsolatedStoresApi`, …) — same style as `AGENTS.md` § Gate browser example (`createOrgUsersApi`, `createGateTokensApi`).
-3. **Direct calls on the instance:** `await api.listWorkspaces(...)`.
-4. **Pre-publish gate check (release blocker):**
+1. Keep direct method calls on API instances:
+   - `const api = createWorkspacesApi(token)`
+   - `await api.listWorkspaces(...)`
+2. Prefer strongly typed API factories (`WorkspacesApi`, `NotesApi`, etc.), avoid `any` return types for Gate API objects.
+3. Avoid dynamic call patterns for Gate operations:
+   - avoid destructuring methods (`const { listWorkspaces } = api`)
+   - avoid computed operation names (`api[opName]` call style) unless the key is a string literal
+4. Keep a pre-publish check in your workflow:
    - `fusebase analyze gate --operations --json --feature <featureId>`
-   - if runtime imports Gate SDK and `usedOps` is empty → **stop** and fix call patterns before publish/deploy
-   - if analyze warns that sync will **remove** permissions → confirm intentionally before `--sync-gate-permissions`
-
-### Forbidden / avoid in production (breaks or hides `usedOps`)
-
-| Pattern | Why avoid |
-|--------|-----------|
-| `Pick<AccessApi, "getMe">` / `Omit<...>` / hand-rolled `{ getMe(): ... }` | Hides operations from permission sync; caused prod lockouts when grants were trimmed (see `fusebase analyze gate` docs). CLI may detect some `Pick<>` shapes now — **still do not use in app code**. |
-| Destructuring methods (`const { getMe } = api`) | Analyzer may miss the op |
-| `api[opName](...)` with non-literal `opName` | Dynamic op — not analyzable |
-| `any` / untyped Gate client | Skips reliable detection |
-| Wrapper that forwards via string op id instead of SDK method | Same |
-
-**Rule of thumb:** if a human cannot grep `api.getMe(` or `accessApi.listOrgUsers(`, the analyzer probably cannot either.
-
-### Identity & org resolution (pair with typing rules)
-
-- Use **`FBS_ORG_ID`** on deploy — do not derive org from `getMe().auth.scopes` (visitor tokens may have empty scopes).
-- `getMe` does **not** require `health.read` in the grant (identity op). See `app-backend` skill.
-- Service/backend: `x-app-feature-token` for `FBS_FEATURE_TOKEN`; do not use `getMyOrgAccess` with service tokens (`userOnly`).
-
-Details: `references/sdk.md` § Permission sync typing rules; `app-backend` skill § Gate 403 triage.
+   - if runtime imports Gate SDK and `usedOps` is empty, treat it as a blocker and fix before publish.
 
 
 ## Token permission mode (default soft)

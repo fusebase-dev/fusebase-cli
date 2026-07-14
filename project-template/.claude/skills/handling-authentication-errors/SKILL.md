@@ -224,3 +224,49 @@ export async function fetchCurrentUser(
 | ----- | -------- | --------- | ------------------- |
 | Platform token | Gate/Dashboard via `app-api` proxy | Token expired → refresh page modal | Transient — retry, not logout |
 | App session cookie | `/api/account/me` (your backend) | Not logged in → login screen | Transient — retry + “server unavailable”, **keep cookie** |
+
+---
+
+## Same-origin `/api/*` and the platform proxy
+
+### Feature token source (cookie, not embed)
+
+For same-origin `fetch('/api/…')`, the browser sends the **`fbsfeaturetoken` cookie** automatically. The platform rotates this cookie; an embedded `window.FBS_FEATURE_TOKEN` from the initial HTML **does not**.
+
+- **Read order:** cookie `fbsfeaturetoken` first; treat `window.FBS_FEATURE_TOKEN` as bootstrap-only (first paint), never as the live token after navigation.
+- **Do not** send `x-app-feature-token` on same-origin `/api/*` unless you have a deliberate cross-origin reason. The scaffold pattern is bare `fetch('/api/items', { credentials: 'include' })` — the proxy authenticates from the cookie.
+- **Do not retry** opaque redirects or 302 chains on mutations — a stale token will not heal on retry.
+
+### Proxy returns `302` on API requests (not `401`)
+
+Today the app-wrapper may answer **invalid/expired session on `/api/*`** with `302 Location: …/auth/?appSuccess=…` instead of `401` JSON. For `fetch()` this is catastrophic:
+
+- Default `fetch` follows the redirect → cross-origin CORS → `TypeError: NetworkError` with **no status, no body**
+- The app cannot distinguish “token dead” from “server down”
+
+**Workaround until platform fix ([NIM-42325](https://nimbusweb.atlassian.net/browse/NIM-42325)):**
+
+```typescript
+const res = await fetch('/api/tenant/invites', {
+  method: 'POST',
+  credentials: 'include',
+  redirect: 'manual', // see opaqueredirect instead of silent CORS failure
+  headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+  body: JSON.stringify(payload),
+})
+if (res.type === 'opaqueredirect' || res.status === 302) {
+  // Probe session — do not assume logout from redirect alone
+  const verdict = await probeSessionWithDeployTolerance()
+  if (verdict === 'anon') showAuthExpiredModal()
+  else showTransientError()
+}
+```
+
+`redirect: 'manual'` is **self-defense**, not approval of the design. After NIM-42325 lands, keep handling `401` explicitly; `opaqueredirect` should become rare on `/api/*`.
+
+### Proxy slowdown windows
+
+Under load, the proxy may return a redirect **after it already forwarded the request** to your backend. Symptom: mutation “failed” in the UI but side effect happened; or `GET /me` flips to anon for a few seconds with a valid cookie.
+
+- On `opaqueredirect` / ambiguous auth failure: **poll** `probeSessionWithDeployTolerance()` (~7s total), do not clear cookies on the first miss.
+- On failed **mutations**: **reconcile with server state** (list/read) before offering retry — the write may have succeeded.

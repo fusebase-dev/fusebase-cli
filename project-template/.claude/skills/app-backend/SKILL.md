@@ -555,6 +555,28 @@ Apps with an httpOnly session cookie (`app_session`, etc.) **must** implement se
 
 Without this, every deploy briefly “logs out” users who refresh in the rollout window.
 
+### Logout: clear session cookies correctly
+
+Call Gate `logoutFusebaseUser` from the **app backend** (user-context token), then clear **app-owned** cookies in the response. Gate returns which platform cookies to clear; your BFF must apply them on the app domain.
+
+**Rules:**
+
+1. **Backend first** — run logout on the server; do not only clear cookies client-side from localStorage flags.
+2. **Overwrite, do not delete-only** — some browsers/proxies ignore `Max-Age=0` deletes on `Set-Cookie`. Prefer setting an **expired tombstone** cookie (`value=""`, `maxAge: 0`, same `name`/`path`/`domain`/`sameSite`/`secure` as the live cookie).
+3. **Client logout flag** — if the SPA keeps a “signed out” flag, it must win over stale cookies until the next successful login probe.
+4. **Tests** — assert **`Set-Cookie` attributes** (`Max-Age`, `Path`, `HttpOnly`), not merely that a `Set-Cookie` header exists.
+
+```typescript
+// After logoutFusebaseUser — tombstone app session
+setCookie(c, 'app_session', '', {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'Lax',
+  path: '/',
+  maxAge: 0,
+})
+```
+
 ## Deriving the Public Base URL from the Request
 
 **NEVER hardcode `localhost` in callback/redirect URLs** (e.g. OAuth redirect URIs, webhook URLs, links sent to external services). An app's backend runs behind a proxy — `localhost` only works during local dev and breaks in production.
