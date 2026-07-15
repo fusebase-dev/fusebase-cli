@@ -655,25 +655,25 @@ Manage sidecar containers for an app backend or for a specific cron job. Sidecar
 
 ```bash
 # Add a sidecar to the backend (default — same as today)
-fusebase sidecar add --app <appId> --name <name> --image <image> \
+fusebase sidecar add --app <appPath> --name <name> --image <image> \
   [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
   [--secret KEY|KEY:ALIAS ...]
 
 # Add a sidecar to a specific cron job
-fusebase sidecar add --app <appId> --job <jobName> --name <name> --image <image> \
+fusebase sidecar add --app <appPath> --job <jobName> --name <name> --image <image> \
   [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
   [--secret KEY|KEY:ALIAS ...]
 
 # Remove a sidecar
-fusebase sidecar remove --app <appId> --name <name> [--job <jobName>]
+fusebase sidecar remove --app <appPath> --name <name> [--job <jobName>]
 
 # List configured sidecars
-fusebase sidecar list --app <appId> [--job <jobName>]
+fusebase sidecar list --app <appPath> [--job <jobName>]
 ```
 
 **Options:**
 
-- `--app <appId>` (required) — app ID. `--feature` (`-f`) is accepted as a deprecated alias.
+- `--app <appPath>` (required) — the app's `path` in `fusebase.json` (the declarative entry key; a platform `id` is only assigned at deploy-time reconcile). `--feature` (`-f`) is accepted as a deprecated alias.
 - `--name <name>` (required for add/remove) — sidecar name. Lowercase letters, digits, and hyphens; max 63 chars; must start with a lowercase letter.
 - `--image <image>` (required for add) — Docker image reference (e.g. `browserless/chrome:latest`)
 - `--port <port>` — port the sidecar listens on (informational; `localhost:<port>` from the main container)

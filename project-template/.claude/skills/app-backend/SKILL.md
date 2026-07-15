@@ -60,7 +60,7 @@ Sidecars are pre-built Docker images that run alongside the app backend in the s
 
 ```bash
 # Add a sidecar to an app backend
-fusebase sidecar add --app <appId> --name chromium --image browserless/chrome:latest --port 9222
+fusebase sidecar add --app <appPath> --name chromium --image browserless/chrome:latest --port 9222
 ```
 
 The sidecar is accessible from the backend at `http://localhost:<port>`. Max 3 sidecars per app.
@@ -82,7 +82,7 @@ const data = await response.json();
 Each sidecar can have its own env vars (not shared with the backend):
 
 ```bash
-fusebase sidecar add --app <appId> --name redis --image redis:7 --port 6379 --env REDIS_MAXMEMORY=256mb
+fusebase sidecar add --app <appPath> --name redis --image redis:7 --port 6379 --env REDIS_MAXMEMORY=256mb
 ```
 
 ### Debugging Sidecars
@@ -909,7 +909,7 @@ Add a sidecar to a job:
 
 ```bash
 fusebase sidecar add \
-  --app <appId> \
+  --app <appPath> \
   --job <jobName> \
   --name <name> \
   --image <dockerImage> \

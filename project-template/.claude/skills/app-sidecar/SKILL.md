@@ -26,7 +26,7 @@ Sidecars are pre-built Docker images deployed alongside an app backend in the sa
 
 ```bash
 fusebase sidecar add \
-  --app <appId> \
+  --app <appPath> \
   --name <name> \
   --image <dockerImage> \
   [--port <port>] \
@@ -51,13 +51,13 @@ fusebase sidecar add \
 ### Remove a Sidecar
 
 ```bash
-fusebase sidecar remove --app <appId> --name <name>
+fusebase sidecar remove --app <appPath> --name <name>
 ```
 
 ### List Sidecars
 
 ```bash
-fusebase sidecar list --app <appId>
+fusebase sidecar list --app <appPath>
 ```
 
 `--feature` (`-f`) is accepted as a deprecated alias for `--app` (`-a`).
@@ -267,7 +267,7 @@ To give a job its own auxiliary container (for example a headless browser used o
 
 ```bash
 fusebase sidecar add \
-  --app <appId> \
+  --app <appPath> \
   --job <jobName> \
   --name <name> \
   --image <dockerImage> \

@@ -95,6 +95,22 @@ function parseSecretEntries(secretArgs: string[]): SidecarSecretEntry[] {
   return result;
 }
 
+// An app entry has no platform `id` yet (it is assigned at deploy-time
+// reconcile), so `--app` is matched by local `path` only — consistent with
+// `fusebase job`.
+function findFeatureIndex(features: FeatureConfig[], appId: string): number {
+  return features.findIndex((f) => f.path === appId);
+}
+
+function availableAppsLabel(features: FeatureConfig[]): string {
+  return (
+    features
+      .map((f) => f.path)
+      .filter(Boolean)
+      .join(", ") || "(none)"
+  );
+}
+
 function findJobOrExit(
   feature: FeatureConfig,
   appId: string,
@@ -129,7 +145,7 @@ function resolveAppId(opts: {
 
 const addCommand = new Command("add")
   .description("Add a sidecar container to an app backend in fusebase.json")
-  .option("-a, --app <appId>", "App ID to add the sidecar to")
+  .option("-a, --app <app>", "App path to add the sidecar to")
   .addOption(
     new Option("-f, --feature <featureId>", "Deprecated alias for --app")
       .hideHelp(),
@@ -188,10 +204,10 @@ const addCommand = new Command("add")
       }
 
       const features = fuseConfig.apps ?? [];
-      const featureIndex = features.findIndex((f) => f.id === appId);
+      const featureIndex = findFeatureIndex(features, appId);
       if (featureIndex === -1) {
         console.error(
-          `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+          `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${availableAppsLabel(features)}`,
         );
         process.exit(1);
       }
@@ -320,7 +336,7 @@ const removeCommand = new Command("remove")
   .description(
     "Remove a sidecar container from an app backend in fusebase.json",
   )
-  .option("-a, --app <appId>", "App ID to remove the sidecar from")
+  .option("-a, --app <app>", "App path to remove the sidecar from")
   .addOption(
     new Option("-f, --feature <featureId>", "Deprecated alias for --app")
       .hideHelp(),
@@ -348,10 +364,10 @@ const removeCommand = new Command("remove")
       }
 
       const features = fuseConfig.apps ?? [];
-      const featureIndex = features.findIndex((f) => f.id === appId);
+      const featureIndex = findFeatureIndex(features, appId);
       if (featureIndex === -1) {
         console.error(
-          `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+          `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${availableAppsLabel(features)}`,
         );
         process.exit(1);
       }
@@ -411,7 +427,7 @@ const removeCommand = new Command("remove")
 
 const listCommand = new Command("list")
   .description("List sidecar containers for an app backend")
-  .option("-a, --app <appId>", "App ID to list sidecars for")
+  .option("-a, --app <app>", "App path to list sidecars for")
   .addOption(
     new Option("-f, --feature <featureId>", "Deprecated alias for --app")
       .hideHelp(),
@@ -432,10 +448,10 @@ const listCommand = new Command("list")
     }
 
     const features = fuseConfig.apps ?? [];
-    const feature = features.find((f) => f.id === appId);
+    const feature = features[findFeatureIndex(features, appId)];
     if (!feature) {
       console.error(
-        `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${features.map((f) => f.id).join(", ") || "(none)"}`,
+        `Error: App "${appId}" not found in ${FUSE_JSON}. Available apps: ${availableAppsLabel(features)}`,
       );
       process.exit(1);
     }

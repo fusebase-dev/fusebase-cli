@@ -145,7 +145,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -183,7 +183,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "missing",
           "--name",
@@ -215,7 +215,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -235,7 +235,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -250,7 +250,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -271,7 +271,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--name",
           "chromium",
           "--image",
@@ -287,7 +287,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -317,7 +317,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -332,7 +332,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -348,7 +348,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "remove",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -371,7 +371,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -386,7 +386,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "remove",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -407,7 +407,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--name",
           "backend-redis",
           "--image",
@@ -420,7 +420,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -432,7 +432,7 @@ describe("fusebase sidecar --job", () => {
       );
 
       const listRes = await runCli(
-        ["sidecar", "list", "--feature", "app-1", "--job", "screenshot"],
+        ["sidecar", "list", "--feature", "apps/app-1", "--job", "screenshot"],
         ws,
       );
       expect(listRes.exitCode).toBe(0);
@@ -447,7 +447,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--name",
           "backend-redis",
           "--image",
@@ -460,7 +460,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--job",
           "screenshot",
           "--name",
@@ -472,11 +472,11 @@ describe("fusebase sidecar --job", () => {
       );
 
       const listRes = await runCli(
-        ["sidecar", "list", "--feature", "app-1"],
+        ["sidecar", "list", "--feature", "apps/app-1"],
         ws,
       );
       expect(listRes.exitCode).toBe(0);
-      expect(listRes.stdout).toContain('Sidecars for app "app-1"');
+      expect(listRes.stdout).toContain('Sidecars for app "apps/app-1"');
       expect(listRes.stdout).toContain("backend-redis");
       expect(listRes.stdout).not.toContain("chromium");
     });
@@ -493,7 +493,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--name",
           "redis",
           "--image",
@@ -520,7 +520,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--app",
-          "app-1",
+          "apps/app-1",
           "--name",
           "redis",
           "--image",
@@ -529,7 +529,7 @@ describe("fusebase sidecar --job", () => {
         ws,
       );
       expect(res.exitCode).toBe(0);
-      expect(res.stdout).toContain('Added sidecar "redis" to app "app-1"');
+      expect(res.stdout).toContain('Added sidecar "redis" to app "apps/app-1"');
       expect(res.stderr).not.toContain("[deprecated]");
       const cfg = readFuseJson(ws);
       expect(cfg.apps[0]!.backend!.sidecars).toEqual([
@@ -543,7 +543,7 @@ describe("fusebase sidecar --job", () => {
           "sidecar",
           "add",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--name",
           "redis",
           "--image",

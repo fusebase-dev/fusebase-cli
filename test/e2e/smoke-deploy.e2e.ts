@@ -208,19 +208,37 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
         debugOutput("app create", appCreate),
       ).toBe(0);
 
+      // `app create` only writes the declarative fusebase.json entry — the real
+      // platform app is created at deploy-time reconcile, so no `id` exists yet.
       const afterApp = readFuseJson(fuseJsonPath);
-      const appId = afterApp.apps?.[0]?.id;
-      expect(appId).toBeTruthy();
+      expect(afterApp.apps?.[0]?.id).toBeFalsy();
+
+      // 5b. Reconcile infrastructure only (`deploy --nocode`) to create the
+      //     platform app and write its resolved id back into fusebase.json.
+      //     The secret + token API calls below need a real platform app id
+      //     before the code deploy runs.
+      const nocode = await runCli(["deploy", "--nocode"], {
+        cwd: workspace.cwd,
+        home: workspace.home,
+      });
+      expect(nocode.exitCode, debugOutput("deploy --nocode", nocode)).toBe(0);
+
+      const appId = readFuseJson(fuseJsonPath).apps?.[0]?.id;
+      expect(
+        appId,
+        `deploy --nocode must write the resolved app id back into ${fuseJsonPath}`,
+      ).toBeTruthy();
 
       // 6. Sidecar — verification is just "deploy succeeds with sidecar
       //    configured", per the clarification round. nginx:alpine is a
-      //    cheap, well-known image.
+      //    cheap, well-known image. `sidecar`/`job` resolve `--app` by the
+      //    declarative entry's `path`, not the platform id.
       const sidecar = await runCli(
         [
           "sidecar",
           "add",
-          "--feature",
-          appId!,
+          "--app",
+          appDir,
           "--name",
           "nginx",
           "--image",
@@ -236,8 +254,8 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
         [
           "job",
           "create",
-          "--feature",
-          appId!,
+          "--app",
+          appDir,
           "--name",
           "touch-cron",
           "--cron",
@@ -439,7 +457,7 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
 interface FuseConfigShape {
   orgId?: string;
   productId?: string;
-  apps?: Array<{ id: string; path?: string }>;
+  apps?: Array<{ id?: string; path?: string }>;
 }
 
 interface SmokeMarker {
