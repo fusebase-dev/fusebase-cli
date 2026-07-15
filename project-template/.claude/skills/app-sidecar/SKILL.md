@@ -256,7 +256,6 @@ fusebase deploy
 # Output includes:
 # Deploying app "my-scraper" with sidecars: chromium
 ```
-<% if (it.flags?.includes("job-sidecars")) { %>
 
 ## Job Sidecars
 
@@ -377,7 +376,6 @@ When `process.exit(0)` runs, the replica completes and `chromium` is torn down w
 ### Local Dev
 
 `fusebase dev start` does **not** start cron jobs nor any sidecars (backend or job). Job sidecars take effect only after `fusebase deploy`.
-<% } %>
 
 ## Checklist
 
@@ -388,7 +386,5 @@ When `process.exit(0)` runs, the replica completes and `chromium` is torn down w
 - [ ] Tested sidecar locally with Docker (optional but recommended)
 - [ ] Deployed and verified with `fusebase remote-logs runtime`
 - [ ] Total CPU/memory = backend (small, 0.5/1 Gi) + Σ sidecar tiers ≤ 2 CPU / 4 Gi (Azure cap)
-<% if (it.flags?.includes("job-sidecars")) { %>
 - [ ] If a cron job needs an auxiliary container, attached sidecars to the **job** (not the backend) using `fusebase sidecar add --job <jobName>`
 - [ ] Verified job sidecar count is at most 3 per job (independent of backend cap)
-<% } %>

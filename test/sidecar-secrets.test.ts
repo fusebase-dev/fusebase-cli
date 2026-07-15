@@ -62,10 +62,9 @@ function setupWorkspace(): Workspace {
   const fusebaseConfigDir = join(home, ".fusebase");
   mkdirSync(fusebaseConfigDir, { recursive: true });
 
-  // job-sidecars flag enabled so we can also exercise --job for secrets.
   writeFileSync(
     join(fusebaseConfigDir, "config.json"),
-    JSON.stringify({ env: "dev", flags: ["job-sidecars"] }, null, 2),
+    JSON.stringify({ env: "dev" }, null, 2),
     "utf-8",
   );
 

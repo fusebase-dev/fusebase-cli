@@ -535,7 +535,7 @@ fusebase sidecar list --app <appId>
 
 Sidecars are stored in `fusebase.json` under `apps[].backend.sidecars[]` and deployed on the next `fusebase deploy`.
 
-<% if (it.flags?.includes("job-sidecars")) { %>**Per-job sidecars (`--job <jobName>`):**
+**Per-job sidecars (`--job <jobName>`):**
 
 Cron jobs declared under `apps[].backend.jobs[]` deploy as **independent** Azure Container Apps Jobs and do **not** share the backend container app's network namespace. To give a specific cron job its own auxiliary container (e.g. a headless browser used only by a screenshot cron), pass `--job <jobName>` to all three subcommands:
 
@@ -552,7 +552,6 @@ fusebase sidecar list --app <appId> --job <jobName>
 ```
 
 When `--job` is omitted, all three subcommands target backend sidecars exactly as before. Each job has its own 3-sidecar cap, independent of the backend cap. Sidecar names are unique per scope — the same name (e.g. `chromium`) may exist on the backend and on a job. Per-job sidecars are stored under `apps[].backend.jobs[].sidecars[]` in `fusebase.json` and deployed on the next `fusebase deploy`. See the **app-sidecar** skill for full details (networking, termination, examples).
-<% } %>
 
 ### Remote Logs (Deployed Backends)
 

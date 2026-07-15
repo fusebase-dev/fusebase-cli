@@ -52,7 +52,7 @@ interface Workspace {
   cleanup: () => void;
 }
 
-function setupWorkspace(opts: { withFlag: boolean }): Workspace {
+function setupWorkspace(): Workspace {
   const root = mkdtempSync(join(tmpdir(), "fusebase-sidecar-job-"));
   const cwd = join(root, "project");
   const home = join(root, "home");
@@ -61,9 +61,6 @@ function setupWorkspace(opts: { withFlag: boolean }): Workspace {
   mkdirSync(fusebaseConfigDir, { recursive: true });
 
   const cliConfig: Record<string, unknown> = { env: "dev" };
-  if (opts.withFlag) {
-    cliConfig.flags = ["job-sidecars"];
-  }
   writeFileSync(
     join(fusebaseConfigDir, "config.json"),
     JSON.stringify(cliConfig, null, 2),
@@ -137,9 +134,9 @@ describe("fusebase sidecar --job", () => {
     ws?.cleanup();
   });
 
-  describe("with job-sidecars flag enabled", () => {
+  describe("per-job sidecars", () => {
     beforeEach(() => {
-      ws = setupWorkspace({ withFlag: true });
+      ws = setupWorkspace();
     });
 
     it("add --job writes sidecar under jobs[].sidecars", async () => {
@@ -485,56 +482,9 @@ describe("fusebase sidecar --job", () => {
     });
   });
 
-  describe("with job-sidecars flag disabled", () => {
+  describe("backend sidecars (no --job)", () => {
     beforeEach(() => {
-      ws = setupWorkspace({ withFlag: false });
-    });
-
-    it("add --job is rejected with a flag-required error", async () => {
-      const res = await runCli(
-        [
-          "sidecar",
-          "add",
-          "--feature",
-          "app-1",
-          "--job",
-          "screenshot",
-          "--name",
-          "chromium",
-          "--image",
-          "img",
-        ],
-        ws,
-      );
-      expect(res.exitCode).not.toBe(0);
-      expect(res.stderr).toContain("requires the 'job-sidecars' flag");
-    });
-
-    it("remove --job is rejected with a flag-required error", async () => {
-      const res = await runCli(
-        [
-          "sidecar",
-          "remove",
-          "--feature",
-          "app-1",
-          "--job",
-          "screenshot",
-          "--name",
-          "chromium",
-        ],
-        ws,
-      );
-      expect(res.exitCode).not.toBe(0);
-      expect(res.stderr).toContain("requires the 'job-sidecars' flag");
-    });
-
-    it("list --job is rejected with a flag-required error", async () => {
-      const res = await runCli(
-        ["sidecar", "list", "--feature", "app-1", "--job", "screenshot"],
-        ws,
-      );
-      expect(res.exitCode).not.toBe(0);
-      expect(res.stderr).toContain("requires the 'job-sidecars' flag");
+      ws = setupWorkspace();
     });
 
     it("backend sidecar add still works (byte-identical behavior preserved)", async () => {
@@ -561,7 +511,7 @@ describe("fusebase sidecar --job", () => {
 
   describe("--app / --feature flag rename", () => {
     beforeEach(() => {
-      ws = setupWorkspace({ withFlag: false });
+      ws = setupWorkspace();
     });
 
     it("sidecar add --app works as the primary flag without deprecation warning", async () => {

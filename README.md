@@ -662,7 +662,7 @@ fusebase sidecar add --app <appId> --name <name> --image <image> \
   [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
   [--secret KEY|KEY:ALIAS ...]
 
-# Add a sidecar to a specific cron job (requires the job-sidecars flag)
+# Add a sidecar to a specific cron job
 fusebase sidecar add --app <appId> --job <jobName> --name <name> --image <image> \
   [--port <port>] [--tier small|medium|large] [--env KEY=VALUE ...] \
   [--secret KEY|KEY:ALIAS ...]
@@ -683,7 +683,7 @@ fusebase sidecar list --app <appId> [--job <jobName>]
 - `--tier small|medium|large` — resource tier (default: `small`)
 - `--env KEY=VALUE` — environment variables, repeatable
 - `--secret KEY|KEY:ALIAS` — whitelist an app secret key (registered via `fusebase secret create`) to inject into the sidecar as an env var, repeatable. Use `KEY:ALIAS` to expose the secret under a different env var name inside the sidecar. On collision between sidecar `env` and a secret key, the sidecar's static `env` value wins. Deploy fails with a `ValidationError` listing every missing key if any referenced secret is not registered for the app.
-- `--job <jobName>` — attach the sidecar to the named cron job instead of the backend. **Requires the `job-sidecars` flag** (`fusebase config set-flag job-sidecars`). Without `--job`, all three subcommands target backend sidecars exactly as today.
+- `--job <jobName>` — attach the sidecar to the named cron job instead of the backend. Without `--job`, all three subcommands target backend sidecars exactly as today.
 
 **Limits and rules:**
 
@@ -818,7 +818,6 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); also turns on required template references and `isolated_store.*` permissions in `fusebase env create` |
 | `postgres-rls` | Enables experimental RLS manifest helpers for isolated SQL stores |
 | `portal-specific-apps` | Includes portal-specific app guidance in prompts: `fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
-| `job-sidecars` | Enables per-job sidecar containers for cron jobs. Unlocks `--job <jobName>` on `fusebase sidecar add/remove/list` so sidecars can be attached to specific cron jobs (`apps[].backend.jobs[].sidecars[]`) in addition to the backend. Each job has its own 3-sidecar cap, independent of the backend cap; sidecar names are unique per scope. Also gates the per-job sidecar sections of the `app-sidecar` and `app-backend` skill templates. |
 | `cross-app-api-calls-analysis` | Enables hidden `fusebase analyze app-apis` command and cross-app API dependency guidance in generated prompts/skills. |
 
 Enable a flag globally, then refresh the project template:

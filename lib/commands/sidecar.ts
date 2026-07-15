@@ -4,7 +4,6 @@ import { join } from "path";
 import {
   loadFuseConfig,
   invalidateFuseConfigCache,
-  hasFlag,
   type BackendJobConfig,
   type FeatureConfig,
   type SidecarConfig,
@@ -96,16 +95,6 @@ function parseSecretEntries(secretArgs: string[]): SidecarSecretEntry[] {
   return result;
 }
 
-function ensureJobFlagOrExit(jobName: string | undefined): void {
-  if (jobName === undefined) return;
-  if (!hasFlag("job-sidecars")) {
-    console.error(
-      `Error: --job requires the 'job-sidecars' flag. Run: fusebase config set-flag job-sidecars`,
-    );
-    process.exit(1);
-  }
-}
-
 function findJobOrExit(
   feature: FeatureConfig,
   appId: string,
@@ -169,7 +158,7 @@ const addCommand = new Command("add")
   )
   .option(
     "-j, --job <jobName>",
-    "Attach the sidecar to the named cron job instead of the backend (requires 'job-sidecars' flag)",
+    "Attach the sidecar to the named cron job instead of the backend",
   )
   .action(
     (opts: {
@@ -184,7 +173,6 @@ const addCommand = new Command("add")
       job?: string;
     }) => {
       const appId = resolveAppId(opts);
-      ensureJobFlagOrExit(opts.job);
 
       const fuseJsonPath = join(process.cwd(), FUSE_JSON);
 
@@ -340,12 +328,11 @@ const removeCommand = new Command("remove")
   .requiredOption("-n, --name <name>", "Sidecar name to remove")
   .option(
     "-j, --job <jobName>",
-    "Remove from the named cron job instead of the backend (requires 'job-sidecars' flag)",
+    "Remove from the named cron job instead of the backend",
   )
   .action(
     (opts: { app?: string; feature?: string; name: string; job?: string }) => {
       const appId = resolveAppId(opts);
-      ensureJobFlagOrExit(opts.job);
 
       const fuseJsonPath = join(process.cwd(), FUSE_JSON);
 
@@ -431,11 +418,10 @@ const listCommand = new Command("list")
   )
   .option(
     "-j, --job <jobName>",
-    "List sidecars for the named cron job instead of the backend (requires 'job-sidecars' flag)",
+    "List sidecars for the named cron job instead of the backend",
   )
   .action((opts: { app?: string; feature?: string; job?: string }) => {
     const appId = resolveAppId(opts);
-    ensureJobFlagOrExit(opts.job);
 
     const fuseConfig = loadFuseConfig();
     if (!fuseConfig) {

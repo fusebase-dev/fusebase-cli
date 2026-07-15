@@ -346,7 +346,6 @@ export const KNOWN_FLAGS = [
   "postgres-rls",
   "legacy-dashboards-db",
   "portal-specific-apps",
-  "job-sidecars",
   "cross-app-api-calls-analysis",
   "declarative-manifest",
   MANAGED_INTEGRATIONS_FLAG,
@@ -366,8 +365,6 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Expose dashboard DB/dashboard creation guidance and enable dashboard-service database/dashboard management permissions in MCP tokens.",
   "portal-specific-apps":
     "Include portal-specific app prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
-  "job-sidecars":
-    "Enable per-job sidecar containers for cron jobs (`fusebase sidecar add --job <name>`).",
   "cross-app-api-calls-analysis":
     "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
   "declarative-manifest":

@@ -835,7 +835,7 @@ Before adding a backend:
 
 Cron jobs run on a schedule using the **same Docker image** as the app backend. Each job is an independent process that executes a command on a cron schedule and exits.
 
-> **⚠️ Cron jobs cannot reach backend sidecars on `localhost`.** Cron jobs are deployed as **independent Azure Container Apps Jobs**, not as part of the backend container app, so they do not share the backend's network namespace. A cron container that calls `http://localhost:9222` (or any other backend sidecar port) will fail with `fetch failed`.<% if (it.flags?.includes("job-sidecars")) { %> If a cron needs an auxiliary container, declare a **per-job sidecar** — see [Job Sidecars](#job-sidecars) below.<% } else { %> If a cron needs an auxiliary container, call back to the main backend over its public URL (`/api/...`), where the backend can use its own sidecars.<% } %>
+> **⚠️ Cron jobs cannot reach backend sidecars on `localhost`.** Cron jobs are deployed as **independent Azure Container Apps Jobs**, not as part of the backend container app, so they do not share the backend's network namespace. A cron container that calls `http://localhost:9222` (or any other backend sidecar port) will fail with `fetch failed`. If a cron needs an auxiliary container, declare a **per-job sidecar** — see [Job Sidecars](#job-sidecars) below.
 
 ### 1. Register the job in fusebase.json
 
@@ -901,7 +901,6 @@ fusebase job delete --app <%= it.flags?.includes("declarative-manifest") ? "<app
 
 This removes the job from `backend.jobs` in `fusebase.json`. On the next `fusebase deploy` the job will be automatically deleted from cloud infrastructure.
 
-<% if (it.flags?.includes("job-sidecars")) { %>
 ### Job Sidecars
 
 Each cron job can declare its own sidecar containers under `apps[].backend.jobs[].sidecars`. Sidecars share the **job replica's** network namespace, not the backend's, so the main job container talks to them on `localhost:<port>` exactly the way the backend talks to its own sidecars.
@@ -943,11 +942,10 @@ Key constraints:
 
 For full details (config format, networking, debugging), see the **app-sidecar** skill.
 
-<% } %>### Cron Jobs Checklist
+### Cron Jobs Checklist
 
 - [ ] App already has a `backend/` folder and a `backend` block in `fusebase.json` (backend is scaffolded first)
 - [ ] Added `cron:<job-name>` npm script to `backend/package.json`
 - [ ] Ran `fusebase job create` to register the job
 - [ ] Ran `fusebase deploy` to deploy the app — **cron jobs only run after deployment**, not during `fusebase dev start`
-<% if (it.flags?.includes("job-sidecars")) { %>- [ ] If the cron needs an auxiliary container (browser, cache, etc.), attached sidecars to the **job** via `fusebase sidecar add --job <jobName>` (not the backend)
-<% } %>
+- [ ] If the cron needs an auxiliary container (browser, cache, etc.), attached sidecars to the **job** via `fusebase sidecar add --job <jobName>` (not the backend)
