@@ -9,11 +9,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-// NIM-secrets: the `declarative-manifest` flag gates `fusebase secret create`.
-// Flag ON  → only edits fusebase.json `apps[].secrets` (no network) — proven
-//            offline because HOME config has no apiKey yet the run succeeds.
-// Flag OFF → legacy path registers on the platform immediately, so the same run
-//            fails at the "No API key configured" guard (a network attempt).
+// NIM-secrets: `fusebase secret create` only edits fusebase.json `apps[].secrets`
+// (no network) — proven offline because HOME config has no apiKey yet the run
+// succeeds.
 
 const REPO_ROOT = resolve(import.meta.dir, "..");
 const CLI_ENTRY = join(REPO_ROOT, "index.ts");
@@ -100,37 +98,20 @@ const CREATE_ARGS = [
   "STRIPE_KEY:Stripe secret",
 ];
 
-describe("fusebase secret create — declarative-manifest flag", () => {
+describe("fusebase secret create", () => {
   let ws: Workspace;
   afterEach(() => ws?.cleanup());
 
-  describe("flag ON", () => {
-    beforeEach(() => {
-      ws = setupWorkspace(["declarative-manifest"]);
-    });
-
-    it("writes the key to apps[].secrets in fusebase.json with no network", async () => {
-      const res = await runCli(CREATE_ARGS, { cwd: ws.cwd, home: ws.home });
-      expect(res.exitCode).toBe(0);
-      const cfg = JSON.parse(readFileSync(ws.fuseJsonPath, "utf-8"));
-      expect(cfg.apps[0].secrets).toEqual([
-        { key: "STRIPE_KEY", description: "Stripe secret" },
-      ]);
-    });
+  beforeEach(() => {
+    ws = setupWorkspace([]);
   });
 
-  describe("flag OFF (legacy)", () => {
-    beforeEach(() => {
-      ws = setupWorkspace([]);
-    });
-
-    it("takes the legacy backend path (fails at the apiKey guard, no manifest write)", async () => {
-      const res = await runCli(CREATE_ARGS, { cwd: ws.cwd, home: ws.home });
-      expect(res.exitCode).not.toBe(0);
-      expect(`${res.stdout}${res.stderr}`).toContain("No API key configured");
-      // Legacy never writes secrets into fusebase.json.
-      const cfg = JSON.parse(readFileSync(ws.fuseJsonPath, "utf-8"));
-      expect(cfg.apps[0].secrets).toBeUndefined();
-    });
+  it("writes the key to apps[].secrets in fusebase.json with no network", async () => {
+    const res = await runCli(CREATE_ARGS, { cwd: ws.cwd, home: ws.home });
+    expect(res.exitCode).toBe(0);
+    const cfg = JSON.parse(readFileSync(ws.fuseJsonPath, "utf-8"));
+    expect(cfg.apps[0].secrets).toEqual([
+      { key: "STRIPE_KEY", description: "Stripe secret" },
+    ]);
   });
 });

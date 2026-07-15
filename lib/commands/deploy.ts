@@ -37,9 +37,7 @@ import { getFusebaseAppHost } from "../config";
 import { logger } from "../logger";
 import {
   getConfig,
-  hasFlag,
   loadFuseConfig,
-  requireAppId,
   validateMinReplicas,
   writeResolvedAppIdToFusebaseJson,
   type BackendConfig,
@@ -674,63 +672,45 @@ export const deployCommand = new Command("deploy")
 
     logger.debug("Fetched product: %j", app);
 
-    // Resolve each app declaration to a platform id. The declarative manifest
-    // (optional id, subdomain reconcile, auto-create) is experimental and gated
-    // behind the `declarative-manifest` flag (NIM-41963). Flag off → legacy
-    // path: every deployable entry must carry a real `id`, no bind/create.
+    // Resolve each app declaration to a platform id. Reconcile declarations
+    // against the platform: bind id-less entries to an existing app by
+    // subdomain, create the missing ones — before any deploy call so the loop
+    // uses the resolved id, never a hand-authored one.
     let deployTargets: DeployTarget[];
-    if (hasFlag("declarative-manifest")) {
-      // Reconcile declarations against the platform: bind id-less entries to an
-      // existing app by subdomain, create the missing ones — before any deploy
-      // call so the loop uses the resolved id, never a hand-authored one.
-      try {
-        console.log("Reconciling apps...");
-        deployTargets = (await reconcileApps(
-          deployableApps,
-          features
-        )).map(result => ({
-          appConfig: result.appConfig,
-          appId: result.appId,
-          logLine: formatReconcileLine(result),
-          action: result.action,
-        }));
-        for (const target of deployTargets) {
-          console.log(`   ${target.logLine}`);
+    try {
+      console.log("Reconciling apps...");
+      deployTargets = (await reconcileApps(
+        deployableApps,
+        features
+      )).map(result => ({
+        appConfig: result.appConfig,
+        appId: result.appId,
+        logLine: formatReconcileLine(result),
+        action: result.action,
+      }));
+      for (const target of deployTargets) {
+        console.log(`   ${target.logLine}`);
+      }
+      // Send the model/agent tracking captured at `app create` for apps this
+      // reconcile just created — create no longer sends it (NIM-41997).
+      // Best-effort; never blocks deploy.
+      for (const target of deployTargets) {
+        if (target.action === "created") {
+          sendCodingStatsForCreatedApp(
+            config.apiKey!,
+            fuseConfig.orgId,
+            fuseConfig.productId,
+            target.appId,
+            target.appConfig,
+          );
         }
-        // Send the model/agent tracking captured at `app create` for apps this
-        // reconcile just created — in declarative mode create no longer sends
-        // it (NIM-41997). Best-effort; never blocks deploy.
-        for (const target of deployTargets) {
-          if (target.action === "created") {
-            sendCodingStatsForCreatedApp(
-              config.apiKey!,
-              fuseConfig.orgId,
-              fuseConfig.productId,
-              target.appId,
-              target.appConfig,
-            );
-          }
-        }
+      }
 
-        console.log("");
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`Error: Failed to reconcile apps: ${message}`);
-        process.exit(1);
-      }
-    } else {
-      try {
-        deployTargets = deployableApps.map((appConfig) => ({
-          appConfig,
-          appId: requireAppId(appConfig),
-          logLine: `legacy id ${appConfig.id}`,
-          action: "legacy" as const,
-        }));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`Error: ${message}`);
-        process.exit(1);
-      }
+      console.log("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Error: Failed to reconcile apps: ${message}`);
+      process.exit(1);
     }
 
     // `--nocode`: infrastructure only. Reconcile already bound/created the

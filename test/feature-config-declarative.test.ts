@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   assertDeployableFeature,
   invalidateFuseConfigCache,
-  KNOWN_FLAGS,
   loadFuseConfig,
   requireAppId,
   type FeatureConfig,
@@ -89,12 +88,5 @@ describe("declarative FeatureConfig", () => {
         expect(() => assertDeployableFeature(app)).not.toThrow();
       }
     });
-  });
-
-  // NIM-41963: the declarative manifest + deploy reconcile are gated behind the
-  // `declarative-manifest` flag. Guards `deploy.ts`'s hasFlag("declarative-manifest")
-  // string against drift from the registered flag list.
-  it("registers the declarative-manifest flag", () => {
-    expect(KNOWN_FLAGS).toContain("declarative-manifest");
   });
 });

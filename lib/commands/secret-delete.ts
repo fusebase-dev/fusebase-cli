@@ -4,19 +4,14 @@ import { join } from "path";
 import {
   loadFuseConfig,
   invalidateFuseConfigCache,
-  hasFlag,
   type AppSecretDeclaration,
   type FeatureConfig,
 } from "../config";
 
 const FUSE_JSON = "fusebase.json";
 
-const DECLARATIVE = hasFlag("declarative-manifest");
-
 function findFeatureIndex(features: FeatureConfig[], appId: string): number {
-  return features.findIndex((f) =>
-    DECLARATIVE ? f.path === appId : f.id === appId,
-  );
+  return features.findIndex((f) => f.path === appId);
 }
 
 function detectIndent(src: string): number {
@@ -33,7 +28,7 @@ export const secretDeleteCommand = new Command("delete")
   )
   .option(
     "-a, --app <app>",
-    DECLARATIVE ? "App path to remove the secret from" : "App ID to remove the secret from",
+    "App path to remove the secret from",
   )
   .addOption(
     new Option("--feature <featureId>", "Deprecated alias for --app").hideHelp(),

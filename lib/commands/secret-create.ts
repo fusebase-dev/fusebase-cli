@@ -4,22 +4,15 @@ import { join } from "path";
 import {
   loadFuseConfig,
   invalidateFuseConfigCache,
-  getConfig,
-  hasFlag,
   type AppSecretDeclaration,
   type FeatureConfig,
 } from "../config";
-import { setAppSecrets, fetchOrg } from "../api";
 
 const FUSE_JSON = "fusebase.json";
 
-// The declarative model (behind the flag) turns `secret create` into a local
-// fusebase.json edit — the real platform secret is registered at deploy/dev-start
-// reconcile. Legacy (flag off) keeps the original behavior: register the key on
-// the platform immediately. `--app` is matched by local `path` in declarative
-// mode (no platform id yet) and used as the platform app id in legacy mode.
-const DECLARATIVE = hasFlag("declarative-manifest");
-
+// `secret create` is a local fusebase.json edit — the real platform secret is
+// registered at deploy/dev-start reconcile. `--app` is matched by local `path`
+// (no platform id yet).
 function findFeatureIndex(features: FeatureConfig[], appPath: string): number {
   return features.findIndex((f) => f.path === appPath);
 }
@@ -33,9 +26,7 @@ function availableAppsLabel(features: FeatureConfig[]): string {
   );
 }
 
-const APP_OPTION_DESCRIPTION = DECLARATIVE
-  ? "App path to add the secret to"
-  : "App ID to add the secret to";
+const APP_OPTION_DESCRIPTION = "App path to add the secret to";
 
 function detectIndent(src: string): number {
   const match = src.match(/^[\t ]*"[^"]+"\s*:/m);
@@ -67,10 +58,10 @@ function parseSecretArg(
 }
 
 /**
- * Declarative path (flag on): write the keys into the app's `secrets` array in
- * fusebase.json. Idempotent — updates the description if a key already exists,
- * appends otherwise. No network; the platform secret is registered at
- * deploy/dev-start reconcile with an empty value for the human to fill in the UI.
+ * Write the keys into the app's `secrets` array in fusebase.json. Idempotent —
+ * updates the description if a key already exists, appends otherwise. No
+ * network; the platform secret is registered at deploy/dev-start reconcile with
+ * an empty value for the human to fill in the UI.
  */
 function runDeclarative(appPath: string, secrets: AppSecretDeclaration[]): void {
   const fuseJsonPath = join(process.cwd(), FUSE_JSON);
@@ -136,73 +127,10 @@ function runDeclarative(appPath: string, secrets: AppSecretDeclaration[]): void 
   );
 }
 
-/**
- * Legacy path (flag off): register the keys on the platform immediately (with
- * empty values) and print the UI URL to set their values.
- */
-async function runLegacy(
-  appId: string,
-  secrets: AppSecretDeclaration[],
-): Promise<void> {
-  const fuseConfig = loadFuseConfig();
-  if (!fuseConfig || !fuseConfig.orgId || !fuseConfig.productId) {
-    console.error(
-      "Error: Invalid fusebase.json. Missing orgId or productId. Run 'fusebase init' first.",
-    );
-    process.exit(1);
-  }
-
-  const config = getConfig();
-  if (!config.apiKey) {
-    console.error("Error: No API key configured. Run 'fusebase auth' first.");
-    process.exit(1);
-  }
-
-  const payload = secrets.map((s) => ({
-    key: s.key,
-    value: "",
-    description: s.description,
-  }));
-
-  try {
-    const result = await setAppSecrets(
-      config.apiKey,
-      fuseConfig.orgId,
-      fuseConfig.productId,
-      appId,
-      payload,
-    );
-    console.log(`✓ Created ${result.secrets.length} secret(s):`);
-    for (const secret of result.secrets) {
-      const desc = secret.description ? ` — ${secret.description}` : "";
-      console.log(`  • ${secret.key}${desc}`);
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error("Error: Failed to create secrets:", error.message);
-    } else {
-      console.error("Error: Failed to create secrets.");
-    }
-    process.exit(1);
-  }
-
-  try {
-    const org = await fetchOrg(config.apiKey, fuseConfig.orgId);
-    const url = `https://${org.effectiveDomain}/dashboard/${fuseConfig.orgId}/apps/features/${appId}/secrets`;
-    console.log(`\nSet secret values at:\n  ${url}`);
-  } catch (error) {
-    console.error(
-      "Warning: Could not fetch org domain to generate the secrets URL.",
-    );
-  }
-}
-
 export const secretCreateCommand = new Command("create")
   .description(
-    DECLARATIVE
-      ? "Declare secret keys for an app in fusebase.json (values are set in the UI). " +
-          "Missing keys are registered on the platform on the next `fusebase deploy` / `fusebase dev start`."
-      : "Create secrets (with empty values) for an app and print the URL to set their values",
+    "Declare secret keys for an app in fusebase.json (values are set in the UI). " +
+      "Missing keys are registered on the platform on the next `fusebase deploy` / `fusebase dev start`.",
   )
   .option("-a, --app <app>", APP_OPTION_DESCRIPTION)
   .addOption(
@@ -243,10 +171,6 @@ export const secretCreateCommand = new Command("create")
         process.exit(1);
       }
 
-      if (DECLARATIVE) {
-        runDeclarative(appId, options.secret);
-      } else {
-        await runLegacy(appId, options.secret);
-      }
+      runDeclarative(appId, options.secret);
     },
   );

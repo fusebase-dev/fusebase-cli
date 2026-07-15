@@ -578,7 +578,7 @@ describe("fusebase sidecar --job", () => {
           "job",
           "create",
           "--app",
-          "app-1",
+          "apps/app-1",
           "--name",
           "send-reports",
           "--cron",
@@ -590,7 +590,7 @@ describe("fusebase sidecar --job", () => {
       );
       expect(res.exitCode).toBe(0);
       expect(res.stdout).toContain(
-        'Added cron job "send-reports" to app "app-1"',
+        'Added cron job "send-reports" to app "apps/app-1"',
       );
       expect(res.stderr).not.toContain("[deprecated]");
     });
@@ -601,7 +601,7 @@ describe("fusebase sidecar --job", () => {
           "job",
           "create",
           "--feature",
-          "app-1",
+          "apps/app-1",
           "--name",
           "send-reports",
           "--cron",

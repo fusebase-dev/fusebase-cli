@@ -21,7 +21,6 @@ import {
 import {
   loadFuseConfig,
   getConfig,
-  hasFlag,
   requireAppId,
   writeResolvedAppIdToFusebaseJson,
   type FeatureConfig,
@@ -325,16 +324,11 @@ devCommand
       throw new Error("No feature selected.");
     }
 
-    // Under the declarative-manifest flag, an app entry may not have a platform
-    // id yet (declarative). Resolve it now: bind the subdomain to an existing
-    // platform app, else create one — so `dev start` runs against a real app and
-    // the id is persisted for next time (NIM-41996). Legacy entries (with an id)
-    // and flag-off runs are unchanged.
-    if (
-      hasFlag("declarative-manifest") &&
-      !selectedFeature.id &&
-      selectedFeature.subdomain
-    ) {
+    // A declarative app entry may not have a platform id yet. Resolve it now:
+    // bind the subdomain to an existing platform app, else create one — so
+    // `dev start` runs against a real app and the id is persisted for next time
+    // (NIM-41996). Legacy entries (with an id) are unchanged.
+    if (!selectedFeature.id && selectedFeature.subdomain) {
       try {
         const { apps: platformApps } = await fetchApps(
           config.apiKey,

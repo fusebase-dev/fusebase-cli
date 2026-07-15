@@ -208,7 +208,7 @@ describe("isolated SQL bundle CLI flag", () => {
   it("builds JSON without requiring the legacy isolated-stores flag", async () => {
     const ws = writeCliWorkspace();
     const result = await runCli(
-      ["isolated-store", "sql", "bundle", "--app", "app-1", "--json"],
+      ["isolated-store", "sql", "bundle", "--app", "apps/app-1", "--json"],
       ws.projectDir,
       ws.homeDir,
     );
@@ -229,7 +229,7 @@ describe("isolated SQL bundle CLI flag", () => {
   it("warns when an RLS manifest is present but postgres-rls flag is disabled", async () => {
     const ws = writeCliWorkspace();
     const result = await runCli(
-      ["isolated-store", "sql", "bundle", "--app", "app-1"],
+      ["isolated-store", "sql", "bundle", "--app", "apps/app-1"],
       ws.projectDir,
       ws.homeDir,
     );
@@ -244,7 +244,7 @@ describe("isolated SQL bundle CLI flag", () => {
   it("attaches RLS manifest only when postgres-rls flag is enabled", async () => {
     const ws = writeCliWorkspace(["postgres-rls"]);
     const result = await runCli(
-      ["isolated-store", "sql", "bundle", "--app", "app-1", "--json"],
+      ["isolated-store", "sql", "bundle", "--app", "apps/app-1", "--json"],
       ws.projectDir,
       ws.homeDir,
     );

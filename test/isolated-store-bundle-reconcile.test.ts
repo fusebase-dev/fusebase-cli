@@ -10,10 +10,10 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
 
 // `fusebase isolated-store sql bundle --apply` ensures the app exists on the
-// platform first: under declarative-manifest an app is authored with only a
-// `path` and may not be deployed yet, so apply reconciles it (bind/create) to
-// resolve the real app id. Read-only paths (e.g. `--status`) must NOT reconcile,
-// since creating/mutating the app would be an unexpected side effect.
+// platform first: an app is authored with only a `path` and may not be deployed
+// yet, so apply reconciles it (bind/create) to resolve the real app id.
+// Read-only paths (e.g. `--status`) must NOT reconcile, since creating/mutating
+// the app would be an unexpected side effect.
 //   - `--apply`, id-less entry, no apiKey → fails at the reconcile apiKey guard,
 //     proving apply takes the reconcile network path before the build.
 //   - `--status`, id-less entry → fails at `requireAppId` (no reconcile), proving
@@ -118,7 +118,7 @@ describe("fusebase isolated-store sql bundle — app reconcile", () => {
   afterEach(() => ws?.cleanup());
 
   it("--apply reconciles an id-less declarative app before building (fails at apiKey guard)", async () => {
-    ws = setupWorkspace(["declarative-manifest"], {
+    ws = setupWorkspace([], {
       subdomain: "my-app",
       path: "apps/my-app",
       ...STORE,
@@ -140,7 +140,7 @@ describe("fusebase isolated-store sql bundle — app reconcile", () => {
   });
 
   it("--status returns a predefined 'not deployed' status for an id-less entry (no reconcile, no network)", async () => {
-    ws = setupWorkspace(["declarative-manifest"], {
+    ws = setupWorkspace([], {
       subdomain: "my-app",
       path: "apps/my-app",
       ...STORE,
@@ -160,7 +160,7 @@ describe("fusebase isolated-store sql bundle — app reconcile", () => {
   });
 
   it("builds offline when the entry already carries a real id (no reconcile)", async () => {
-    ws = setupWorkspace(["declarative-manifest"], {
+    ws = setupWorkspace([], {
       id: "app-123",
       subdomain: "my-app",
       path: "apps/my-app",

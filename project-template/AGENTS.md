@@ -585,10 +585,10 @@ Key commands:
 - `fusebase dev start` - Start development server (creates per-session debug logs in the selected app directory under `logs/dev-<timestamp>/`, including `browser-logs.jsonl`, `access-logs.jsonl`, `backend-logs.jsonl`, and `frontend-dev-server-logs.jsonl`)
 - `fusebase app create --name=NAME --subdomain=FEATURE_SUB --path=PATH --dev-command=CMD --build-command=CMD --output-dir=DIR [--permissions="dashboardView.DASH_ID:VIEW_ID.read,write"]` `[--coding-agent=<agent> --model=<model>]` - Register app (all six core options required; served from subdomain root). **Set `--permissions` here at creation time** if the app needs dashboard access — do not defer to a separate `app update` step. **Always include `--coding-agent` and `--model`** to report anonymous usage stats.
 - `fusebase deploy` - Deploy apps (runs lint then build per app)
-- `fusebase isolated-store sql bundle --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> [--alias <alias>] [--stage dev|prod] [--status|--rls-status|--dry-run|--apply --yes|--json]` - Build the SQL migration bundle from `postgres/migrations/` plus `apps[].isolatedStores.sql[]`; use before/apply through Gate instead of hand-building JSON. Optional RLS manifest forwarding requires `fusebase config set-flag postgres-rls`.
+- `fusebase isolated-store sql bundle --app <appPath> [--alias <alias>] [--stage dev|prod] [--status|--rls-status|--dry-run|--apply --yes|--json]` - Build the SQL migration bundle from `postgres/migrations/` plus `apps[].isolatedStores.sql[]`; use before/apply through Gate instead of hand-building JSON. Optional RLS manifest forwarding requires `fusebase config set-flag postgres-rls`.
 - `fusebase update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed SDK deps/install), outside app directory runs CLI update only; use `--skip-product` for CLI-only mode even inside app
 - `fusebase env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `fusebase config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
-- `fusebase secret create --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> --secret "KEY:description"` - Create app secrets (empty values), prints URL to set values (`--feature` is a deprecated alias for `--app`)
+- `fusebase secret create --app <appPath> --secret "KEY:description"` - Create app secrets (empty values), prints URL to set values (`--feature` is a deprecated alias for `--app`)
 
 Lint: run `npm run lint` from project root (or from an app directory). The project template includes ESLint (TypeScript/JavaScript plus `@eslint/json` for `*.json`). Invalid JSON — including a raw line break inside a quoted string — is reported as a parse error. Deploy runs lint automatically before build for each app that has a `lint` script.
 
@@ -666,7 +666,7 @@ For SQL stores, keep app-owned schema files under `postgres/migrations/` and con
 }
 ```
 
-Use `fusebase isolated-store sql bundle --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> --json` to inspect the exact Gate body. Use `--status`, `--rls-status`, and `--dry-run` before `--apply --yes`. The command reads `GATE_MCP_TOKEN` from `.env` for Gate calls. `rlsManifest` is attached only when the `postgres-rls` flag is enabled; otherwise SQL migrations still work and RLS validation is skipped.
+Use `fusebase isolated-store sql bundle --app <appPath> --json` to inspect the exact Gate body. Use `--status`, `--rls-status`, and `--dry-run` before `--apply --yes`. The command reads `GATE_MCP_TOKEN` from `.env` for Gate calls. `rlsManifest` is attached only when the `postgres-rls` flag is enabled; otherwise SQL migrations still work and RLS validation is skipped.
 
 RLS verification checklist after schema apply:
 

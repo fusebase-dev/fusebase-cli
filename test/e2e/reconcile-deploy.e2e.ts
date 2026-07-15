@@ -64,13 +64,11 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli declarative deploy reconcile", () =>
 
   beforeAll(() => {
     const env = getE2eEnv();
-    // The declarative manifest + deploy reconcile is gated behind the
-    // `declarative-manifest` flag (NIM-41963); seed it so deploy takes the
-    // reconcile path instead of the default legacy id-required path.
+    // The declarative manifest + deploy reconcile is always on: deploy resolves
+    // each entry's app id (bind/create) instead of requiring a legacy id.
     workspace = createCliWorkspace({
       env: env.env,
       apiKey: env.apiKey,
-      extraConfig: { flags: ["declarative-manifest"] },
     });
   });
 

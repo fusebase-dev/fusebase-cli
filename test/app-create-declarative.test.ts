@@ -9,9 +9,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-// NIM-41989: with the `declarative-manifest` flag on, `fusebase app create`
-// only writes the fusebase.json entry — it does NOT create the app on the
-// platform (the real app is created later by `fusebase deploy` reconcile).
+// NIM-41989: `fusebase app create` only writes the fusebase.json entry — it
+// does NOT create the app on the platform (the real app is created later by
+// `fusebase deploy` reconcile).
 // The proof here is offline: HOME config has no apiKey, so a successful run
 // means no backend call was made.
 
@@ -100,12 +100,12 @@ const CREATE_ARGS = [
   "dist",
 ];
 
-describe("fusebase app create — declarative-manifest flag", () => {
+describe("fusebase app create — declarative manifest", () => {
   let ws: Workspace;
   afterEach(() => ws?.cleanup());
 
   it("writes an id-less fusebase.json entry and makes no backend call", async () => {
-    ws = setupWorkspace(["declarative-manifest"]);
+    ws = setupWorkspace([]);
     const res = await runCli(CREATE_ARGS, ws);
 
     expect(res.exitCode, res.stderr).toBe(0);
@@ -120,7 +120,7 @@ describe("fusebase app create — declarative-manifest flag", () => {
   });
 
   it("persists --coding-agent/--model so deploy/dev-start can send them later (NIM-41997)", async () => {
-    ws = setupWorkspace(["declarative-manifest"]);
+    ws = setupWorkspace([]);
     const res = await runCli(
       [...CREATE_ARGS, "--coding-agent", "claude_code", "--model", "claude-opus-4-8"],
       ws,
@@ -133,7 +133,7 @@ describe("fusebase app create — declarative-manifest flag", () => {
   });
 
   it("preserves an existing platform id when re-running create for the same subdomain", async () => {
-    ws = setupWorkspace(["declarative-manifest"]);
+    ws = setupWorkspace([]);
     // Simulate an entry that already got a written-back id from a prior deploy.
     writeFileSync(
       ws.fuseJsonPath,
@@ -150,13 +150,5 @@ describe("fusebase app create — declarative-manifest flag", () => {
     const config = JSON.parse(readFileSync(ws.fuseJsonPath, "utf-8"));
     expect(config.apps).toHaveLength(1);
     expect(config.apps[0].id).toBe("app-123");
-  });
-
-  it("legacy (flag off) requires an api key, proving the flag gates the backend call", async () => {
-    ws = setupWorkspace([]);
-    const res = await runCli(CREATE_ARGS, ws);
-
-    expect(res.exitCode).toBe(1);
-    expect(res.stderr + res.stdout).toContain("No API key configured");
   });
 });

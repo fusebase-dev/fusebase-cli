@@ -33,7 +33,6 @@ Every Fusebase Apps project requires a `fusebase.json` file in the project root.
 
 For details on the `fusebase.json` schema, see references/fusebase-json-schema.md.
 
-<% if (it.flags?.includes("declarative-manifest")) { %>
 ### Declarative manifest — never invent an app `id`
 
 `apps[]` is **declarative**: an app entry carries `subdomain` + `name` and **omits the
@@ -58,7 +57,6 @@ to the app with a matching `subdomain`, or creates it if missing. The product `i
   "build": { "command": "npm run build", "outputDir": "dist" }
 }
 ```
-<% } %>
 
 ## App Permissions
 
@@ -375,24 +373,24 @@ During `fusebase init`, only **required** MCP servers (per the catalog, respecti
 ### Create App Secrets
 
 ```bash
-fusebase secret create --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> --secret <KEY:description> [--secret ...]
+fusebase secret create --app <appPath> --secret <KEY:description> [--secret ...]
 ```
 
 Creates secrets (with empty values) for an app and prints the URL where you can set the actual values.
 
 **Required Options:**
 
-- `--app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %>` - <%= it.flags?.includes("declarative-manifest") ? "App path (from `apps[].path` in `fusebase.json`)" : "App ID" %> to create secrets for. `--feature` is accepted as a deprecated alias.
+- `--app <appPath>` - App path (from `apps[].path` in `fusebase.json`) to create secrets for. `--feature` is accepted as a deprecated alias.
 - `--secret <KEY:description>` - Secret to create. Format: `KEY` or `KEY:description`. **Repeatable** — pass multiple `--secret` flags to create several secrets at once.
 
 **Examples:**
 
 ```bash
 # Create a single secret
-fusebase secret create --app <%= it.flags?.includes("declarative-manifest") ? "apps/my-app" : "abc123" %> --secret "API_KEY:Third-party API key"
+fusebase secret create --app apps/my-app --secret "API_KEY:Third-party API key"
 
 # Create multiple secrets at once
-fusebase secret create --app <%= it.flags?.includes("declarative-manifest") ? "apps/my-app" : "abc123" %> \
+fusebase secret create --app apps/my-app \
   --secret "API_KEY:Third-party API key" \
   --secret "DB_PASSWORD:Database connection password" \
   --secret "WEBHOOK_SECRET"
@@ -466,7 +464,7 @@ The project template includes ESLint (`npm run lint`) and root `npm run typechec
 ### Isolated SQL Bundle / RLS Manifest
 
 ```bash
-fusebase isolated-store sql bundle --app <%= it.flags?.includes("declarative-manifest") ? "<appPath>" : "<appId>" %> [--alias <alias>] [--stage dev|prod] [--json|--status|--dry-run|--apply --yes]
+fusebase isolated-store sql bundle --app <appPath> [--alias <alias>] [--stage dev|prod] [--json|--status|--dry-run|--apply --yes]
 ```
 
 Use this for app-owned isolated SQL schema work. It reads `apps[].isolatedStores.sql[]` from `fusebase.json`, loads `postgres/migrations/manifest.json`, and computes Gate-canonical checksums from SQL file bytes.
@@ -480,10 +478,10 @@ fusebase config set-flag postgres-rls
 Examples:
 
 ```bash
-fusebase isolated-store sql bundle --app <%= it.flags?.includes("declarative-manifest") ? "apps/client-portal" : "client-portal" %> --json
-fusebase isolated-store sql bundle --app <%= it.flags?.includes("declarative-manifest") ? "apps/client-portal" : "client-portal" %> --stage dev --status
-fusebase isolated-store sql bundle --app <%= it.flags?.includes("declarative-manifest") ? "apps/client-portal" : "client-portal" %> --stage dev --dry-run
-fusebase isolated-store sql bundle --app <%= it.flags?.includes("declarative-manifest") ? "apps/client-portal" : "client-portal" %> --stage dev --apply --yes
+fusebase isolated-store sql bundle --app apps/client-portal --json
+fusebase isolated-store sql bundle --app apps/client-portal --stage dev --status
+fusebase isolated-store sql bundle --app apps/client-portal --stage dev --dry-run
+fusebase isolated-store sql bundle --app apps/client-portal --stage dev --apply --yes
 ```
 
 Gate calls use `GATE_MCP_TOKEN` from `.env`. Do `--status` and `--dry-run` before any real `--apply`.

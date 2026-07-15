@@ -4,36 +4,28 @@ import { join } from "path";
 import {
   loadFuseConfig,
   invalidateFuseConfigCache,
-  hasFlag,
   type BackendJobConfig,
   type FeatureConfig,
 } from "../config";
 
 const FUSE_JSON = "fusebase.json";
 
-// Under the declarative-manifest flag an app entry has no platform `id` yet
-// (it is assigned at deploy-time reconcile), so `--app` is matched by local
-// `path` only. Legacy (flag off) keeps the strict `id`-only match.
-const DECLARATIVE = hasFlag("declarative-manifest");
-
+// An app entry has no platform `id` yet (it is assigned at deploy-time
+// reconcile), so `--app` is matched by local `path` only.
 function findFeatureIndex(features: FeatureConfig[], appId: string): number {
-  return features.findIndex((f) =>
-    DECLARATIVE ? f.path === appId : f.id === appId,
-  );
+  return features.findIndex((f) => f.path === appId);
 }
 
 function availableAppsLabel(features: FeatureConfig[]): string {
   return (
     features
-      .map((f) => (DECLARATIVE ? f.path : f.id))
+      .map((f) => f.path)
       .filter(Boolean)
       .join(", ") || "(none)"
   );
 }
 
-const APP_OPTION_DESCRIPTION = DECLARATIVE
-  ? "App path to add the job to"
-  : "App ID to add the job to";
+const APP_OPTION_DESCRIPTION = "App path to add the job to";
 
 function resolveAppId(opts: { app?: string; feature?: string }): string {
   const appId = opts.app ?? opts.feature;
@@ -153,7 +145,7 @@ const deleteCommand = new Command("delete")
   .description("Remove a cron job from an app's backend in fusebase.json")
   .option(
     "-a, --app <app>",
-    DECLARATIVE ? "App path to remove the job from" : "App ID to remove the job from",
+    "App path to remove the job from",
   )
   .addOption(
     new Option("-f, --feature <featureId>", "Deprecated alias for --app")

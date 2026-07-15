@@ -35,14 +35,9 @@ type SqlBundleOptions = {
 
 const ISOLATED_SQL_RLS_FLAG = "postgres-rls";
 
-// Under the declarative-manifest flag an app entry has no platform `id` yet
-// (it is assigned at deploy-time reconcile), so `--app` is matched by local
-// `path` only. Legacy (flag off) keeps the strict `id`-only match.
-const DECLARATIVE = hasFlag("declarative-manifest");
-
-const APP_OPTION_DESCRIPTION = DECLARATIVE
-  ? "App path from fusebase.json apps[]"
-  : "App id from fusebase.json apps[]";
+// An app entry has no platform `id` yet (it is assigned at deploy-time
+// reconcile), so `--app` is matched by local `path` only.
+const APP_OPTION_DESCRIPTION = "App path from fusebase.json apps[]";
 
 function writeStdoutLine(text: string): void {
   process.stdout.write(`${text}\n`);
@@ -53,15 +48,15 @@ function resolveAppConfig(appRef: string) {
   if (fuseConfig === null) {
     throw new Error("Project is not initialized. Run 'fusebase init' first.");
   }
-  const appConfig = (fuseConfig.apps ?? []).find((app) =>
-    DECLARATIVE ? app.path === appRef : app.id === appRef,
+  const appConfig = (fuseConfig.apps ?? []).find(
+    (app) => app.path === appRef,
   );
   if (appConfig === undefined) {
     const known = (fuseConfig.apps ?? [])
-      .map((app) => (DECLARATIVE ? app.path : app.id))
+      .map((app) => app.path)
       .filter(Boolean)
       .join(", ");
-    const label = DECLARATIVE ? "paths" : "ids";
+    const label = "paths";
     throw new Error(
       known.length > 0
         ? `App "${appRef}" not found in fusebase.json. Known app ${label}: ${known}`
@@ -78,15 +73,11 @@ type SqlRlsStatusResponse = {
   rlsEnabledCount?: number;
 };
 
-// True when a declarative entry has not been deployed to the platform yet. In
-// declarative mode the resolved `id` is written back into fusebase.json at
-// deploy time, so an id-less entry reliably means "no platform app (and thus no
-// isolated store) exists yet". Legacy (flag-off) entries always carry an id.
+// True when an app entry has not been deployed to the platform yet. The
+// resolved `id` is written back into fusebase.json at deploy time, so an id-less
+// entry reliably means "no platform app (and thus no isolated store) exists yet".
 function appIsUndeployed(appConfig: FeatureConfig): boolean {
-  return (
-    DECLARATIVE &&
-    (appConfig.id === undefined || appConfig.id.trim().length === 0)
-  );
+  return appConfig.id === undefined || appConfig.id.trim().length === 0;
 }
 
 // Predefined migration status for an app that isn't on the platform yet, so a
@@ -106,20 +97,18 @@ function buildUndeployedStatus(appConfig: FeatureConfig) {
 }
 
 // Applying migrations targets an app's isolated store, so the app must exist on
-// the platform. Under the declarative-manifest flag an entry is authored with
-// only a `path`/`subdomain` and the platform app may not exist yet — so
-// reconcile it now, exactly like `fusebase dev` start (NIM-41996): bind the
-// subdomain to an existing app, else create one, sync its declared state,
-// persist the resolved id, and return the config carrying that id. Only the
-// mutating `--apply` path calls this (creating the app is an unexpected side
-// effect for read-only status/dry-run). A legacy or already-reconciled entry
-// (id present) and flag-off runs are returned untouched with no network call.
+// the platform. An entry is authored with only a `path`/`subdomain` and the
+// platform app may not exist yet — so reconcile it now, exactly like `fusebase
+// dev` start (NIM-41996): bind the subdomain to an existing app, else create
+// one, sync its declared state, persist the resolved id, and return the config
+// carrying that id. Only the mutating `--apply` path calls this (creating the
+// app is an unexpected side effect for read-only status/dry-run). An
+// already-reconciled entry (id present) is returned untouched with no network call.
 async function ensureAppExists(
   appConfig: FeatureConfig,
   fuseConfig: FuseConfig,
 ): Promise<FeatureConfig> {
   if (
-    !DECLARATIVE ||
     (appConfig.id !== undefined && appConfig.id.trim().length > 0) ||
     appConfig.subdomain === undefined ||
     appConfig.subdomain.length === 0

@@ -118,7 +118,6 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); includes supporting `fusebase-gate` references and `isolated_store.*` permissions in `fusebase env create` |
 | `portal-specific-apps` | Includes portal-specific app prompts and references (`fusebase-portal-specific-apps`, `{{CurrentPortal}}` filters, and auth-context guidance for portal runtime) |
 | `cross-app-api-calls-analysis` | Enables the hidden `fusebase analyze app-apis` and `fusebase app-api-contracts` commands and cross-app API dependency guidance in generated prompts/skills. |
-| `declarative-manifest` | Enables declarative `fusebase.json` apps (optional `id`, `subdomain` match) and the deploy-time reconcile (bind/create). Off (default): `fusebase deploy` requires a legacy `id` on every app entry. |
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 
@@ -136,18 +135,13 @@ the platform `id` (the `productId` always stays). The id is resolved at deploy t
 }
 ```
 
-**Declarative manifest & deploy reconcile (NIM-41746) — behind the `declarative-manifest` flag (NIM-41963):**
-
-The behavior below is active only when `fusebase config set-flag declarative-manifest` is
-enabled. With the flag **off** (default) `fusebase deploy` uses the legacy path: every
-deployable `apps[]` entry must carry a real platform `id`, and deploy never binds or creates.
+**Declarative manifest & deploy reconcile (NIM-41746):**
 
 - `apps[].id` is **optional**. Declarative entries omit it and use `subdomain` as the
   match key; legacy entries that still carry a real `id` keep working unchanged (back-compat).
 - `fusebase app create` (NIM-41989) **only writes the declarative `apps[]` entry** — it does
-  **not** create the app on the platform. The real app is created at deploy. (Off/legacy: `app
-  create` calls the platform and writes the returned `id`.) `--access`/`--permissions` need a
-  deployed app id, so set them with `app update <appId>` after the first deploy.
+  **not** create the app on the platform. The real app is created at deploy. `--access`/`--permissions`
+  need a deployed app id, so set them with `app update <appId>` after the first deploy.
   `--coding-agent`/`--model` tracking is stored in the entry and sent to the
   platform when deploy/dev-start actually creates the app (NIM-41997).
 - `fusebase deploy` runs a **reconcile** step before deploying: per app entry it trusts a

@@ -347,7 +347,6 @@ export const KNOWN_FLAGS = [
   "legacy-dashboards-db",
   "portal-specific-apps",
   "cross-app-api-calls-analysis",
-  "declarative-manifest",
   MANAGED_INTEGRATIONS_FLAG,
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
@@ -367,8 +366,6 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include portal-specific app prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
   "cross-app-api-calls-analysis":
     "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
-  "declarative-manifest":
-    "Enable declarative `fusebase.json` apps (optional `id`, `subdomain` match) and deploy-time reconcile (bind/create). Off → deploy requires a legacy `id`.",
   [MANAGED_INTEGRATIONS_FLAG]:
     "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
   // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
