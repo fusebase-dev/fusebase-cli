@@ -117,7 +117,6 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `mcp-gate-debug` | Includes the `mcp-gate-debug` skill: after Gate MCP sessions, produce a short debug summary (what worked, friction, improvements) with emphasis on isolated stores debugging |
 | `isolated-stores` | Enables isolated stores functionality (SQL/NoSQL); includes supporting `fusebase-gate` references and `isolated_store.*` permissions in `fusebase env create` |
 | `portal-specific-apps` | Includes portal-specific app prompts and references (`fusebase-portal-specific-apps`, `{{CurrentPortal}}` filters, and auth-context guidance for portal runtime) |
-| `api-exploration` | Includes the `api-exploration` skill: verify API endpoint behavior with temporary tokens and test scripts before writing app code. Complements MCP discovery. |
 | `cross-app-api-calls-analysis` | Enables the hidden `fusebase analyze app-apis` and `fusebase app-api-contracts` commands and cross-app API dependency guidance in generated prompts/skills. |
 | `declarative-manifest` | Enables declarative `fusebase.json` apps (optional `id`, `subdomain` match) and the deploy-time reconcile (bind/create). Off (default): `fusebase deploy` requires a legacy `id` on every app entry. |
 

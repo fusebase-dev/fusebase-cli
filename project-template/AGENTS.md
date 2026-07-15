@@ -13,9 +13,7 @@ This file is the **definitive guide** for AI agents and LLMs working with Fuseba
 - ✅ upload files if exposed as MCP tool
 - ✅ discover schemas, IDs, permissions
 - ❌ **If MCP tools are not available, STOP and follow MCP troubleshooting steps - do NOT create workarounds**
-<% if (it.flags?.includes("api-exploration")) { %>
 - ✅ **verify API calls with test scripts** — when unsure about endpoint behavior or response shapes, use the **api-exploration** skill to create temporary tokens and run test scripts (`_test-api.ts` / `_test-sdk.ts`). These are **not** MCP workarounds; they test the real API directly. Clean up test files after verification.
-<% } %>
 
 **Inside the app (runtime code — UI and optional app `backend/`): use the SDK for every operation it covers.**
 
@@ -200,9 +198,7 @@ SDK token usage in app runtime:
 - [ ] **Dashboard data SDK `path` params** — for `getDashboardViewData` / `batchPutDashboardData` / similar, use `{ path: { dashboardId, viewId } }` in **both** SPA and **`backend/`**; do not pass flat `{ dashboardId, viewId }` copied from MCP `tool_call` args.
 - [ ] **Type safety** — no `any`/broad casts on SDK JSON; see [Type safety invariant](#type-safety-invariant-non-negotiable).
 - [ ] **Scaffolded app** (if creating a new app): Ran `fusebase scaffold --template spa` before writing app files
-<% if (it.flags?.includes("api-exploration")) { %>
 - [ ] **API verification** — if unsure about an endpoint's behavior or response shape, load skill **api-exploration** and run a test script with a temporary token before writing app code
-<% } %>
 <% if (it.flags?.includes("app-business-docs")) { %>
 - [ ] **Business logic doc** — After material domain or workflow changes, load skill **app-business-docs** and update `docs/en/business-logic.md` (English); re-run when debugging shows the story and code diverge
 <% } %>
@@ -262,9 +258,7 @@ Load skills as described in [Required Skills](#required-skills) before discovery
 **Important**: All domain/business operations must be executed via **`tool_call`** with `opId` and `args`. Only meta/builtin tools can be called directly.
 
 **Workflow:** Bootstrap/connection context → have domain knowledge (if **fusebase-dashboards** skill is in context, that is sufficient; otherwise load domain prompts via `prompts_search` with a **group filter** — see that skill; never call `prompts_search({})` without groups) → discover operations via `tools_search`/`tools_list` → `tools_describe` → execute via `tool_call`.
-<% if (it.flags?.includes("api-exploration")) { %>
 **Endpoint verification:** If you need to confirm an endpoint's actual response shape or behavior before writing app code, use the **api-exploration** skill — create a temporary token and run a test script. This complements MCP discovery; it does not replace it.
-<% } %>
 
 **Critical**: Never hardcode database/dashboard/view IDs. Always discover them via MCP first. Concrete opIds and flow details are in the **fusebase-dashboards** skill.
 
@@ -438,9 +432,7 @@ with `fusebase app create` and let the CLI write the `id`.
 **ABSOLUTELY FORBIDDEN** — see [Golden Rule](#golden-rule) for the full list of prohibited actions.
 
 **How MCP MUST be called**: only through the LLM's built-in MCP tool mechanism (`tool_call` with `opId` + `args`). Never via raw HTTP, `curl`, or custom bridges to replace MCP.
-<% if (it.flags?.includes("api-exploration")) { %>
 **Exception:** Test scripts from the **api-exploration** skill (`_test-api.ts` / `_test-sdk.ts`) are allowed for verifying endpoint behavior — they call the real API, not MCP. Always clean up test files afterward.
-<% } %>
 
 **If MCP tools are not available**: **STOP**, inform the user, follow the troubleshooting protocol (check config, suggest restart, verify .env), and wait for MCP to be properly configured. Do not work around it.
 
@@ -535,11 +527,9 @@ When `git-debug-commits` is enabled, these rules are mandatory:
 
 **Load when an app backend reads `process.env` for API keys, passwords, or other sensitive config.** Covers creating secrets via `fusebase secret create`, accessing them at runtime, local development, and the checklist for verifying all secrets are registered. **After writing backend code that uses secrets from `process.env`**, you **must** run `fusebase secret create` to register every secret key — otherwise the backend will fail at runtime.
 
-<% if (it.flags?.includes("api-exploration")) { %>
 ### ✅ api-exploration
 
 **Load when you need to verify an API endpoint's actual behavior** before writing app code — response shapes, error codes, or request formats. Uses temporary tokens and test scripts (`_test-api.ts` / `_test-sdk.ts`) to make direct API calls. Complements MCP discovery; does not replace it. Clean up test files after use.
-<% } %>
 
 ### ✅ app-sidecar
 
