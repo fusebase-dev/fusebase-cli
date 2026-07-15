@@ -170,6 +170,68 @@ export const BACKEND_ONLY_GATE_PERMISSIONS = [
   "isolated_store.rls.bypass",
 ] as const;
 
+/**
+ * Canonical Gate permission vocabulary. Single source of truth shared with the
+ * Gate MCP token policy (lib/mcp-token-policy.ts) and used to validate declared
+ * `apps[].backendOnlyGatePermissions` extras on sync so bogus strings are
+ * rejected instead of silently persisted to the remote manifest (NIM-42263).
+ */
+export const GATE_PERMISSIONS_BASE = [
+  "automation.delete",
+  "automation.read",
+  "automation.write",
+  "billing.read",
+  "billing.write",
+  "email.write",
+  "notes.read",
+  "notes.write",
+  "org.groups.read",
+  "org.groups.write",
+  "org.members.read",
+  "org.members.write",
+  "org.read",
+  "org.write",
+  "token.delete",
+  "token.read",
+  "token.write",
+] as const;
+
+export const FILE_GATE_PERMISSIONS = [
+  "files.read",
+  "files.write",
+] as const;
+
+export const GATE_PERMISSIONS_ISOLATED = [
+  "isolated_store.control.write",
+  "isolated_store.data.write",
+  "isolated_store.delete",
+  "isolated_store.execute",
+  "isolated_store.read",
+  "isolated_store.schema.write",
+] as const;
+
+export const GATE_PERMISSIONS_PORTALS = [
+  "portals.read",
+  "portals.write",
+  "portals.delete",
+  "portals.create",
+  "portals.manage",
+] as const;
+
+/** Every Gate permission the platform recognizes (superset of MCP-token + backend-only). */
+export const KNOWN_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
+  ...GATE_PERMISSIONS_BASE,
+  ...FILE_GATE_PERMISSIONS,
+  ...GATE_PERMISSIONS_ISOLATED,
+  ...GATE_PERMISSIONS_PORTALS,
+  ...BACKEND_ONLY_GATE_PERMISSIONS,
+]);
+
+/** Return the entries that are not part of the known Gate permission vocabulary. */
+export function findUnknownGatePermissions(permissions: string[]): string[] {
+  return permissions.filter((permission) => !KNOWN_GATE_PERMISSIONS.has(permission));
+}
+
 export const TRUSTED_RUNTIME_CONTEXT_DELEGATE_PERMISSION =
   "isolated_store.rls.delegate";
 
@@ -273,6 +335,14 @@ export function buildSyncedBackendOnlyGatePermissions(params: {
     fromRemoteManifest,
   } = params;
   const extras = fusebaseJsonDeclared ? fromFusebaseJson : fromRemoteManifest;
+  const unknown = findUnknownGatePermissions(extras);
+  if (unknown.length > 0) {
+    throw new Error(
+      `Invalid backendOnlyGatePermissions: ${unknown.join(", ")}. ` +
+        "Declare only known Gate permissions (e.g. org.members.read, portals.read, " +
+        "isolated_store.read) in fusebase.json — see docs/PERMISSIONS.md.",
+    );
+  }
   return mergeBackendOnlyGatePermissionLists(
     platformBackendOnly,
     declaredStoreBackendOnly,

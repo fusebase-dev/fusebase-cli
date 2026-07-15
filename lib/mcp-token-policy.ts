@@ -1,6 +1,12 @@
 import { createHash } from "crypto";
 import type { CreateTokenRequest } from "./api";
 import { hasFlag } from "./config";
+import {
+  FILE_GATE_PERMISSIONS,
+  GATE_PERMISSIONS_BASE,
+  GATE_PERMISSIONS_ISOLATED,
+  GATE_PERMISSIONS_PORTALS,
+} from "./permissions";
 
 /** Bump when fingerprint inputs change so old .env values force refresh once. */
 export const MCP_POLICY_SCHEMA_VERSION = 5 as const;
@@ -36,48 +42,6 @@ const DASHBOARDS_PERMISSIONS_DB_MANAGEMENT = [
   "view.delete",
   "view.write",
 ] as const;
-
-const GATE_PERMISSIONS_BASE = [
-  "automation.delete",
-  "automation.read",
-  "automation.write",
-  "billing.read",
-  "billing.write",
-  "email.write",
-  "notes.read",
-  "notes.write",
-  "org.groups.read",
-  "org.groups.write",
-  "org.members.read",
-  "org.members.write",
-  "org.read",
-  "org.write",
-  "token.delete",
-  "token.read",
-  "token.write",
-] as const;
-
-const FILE_PERMISSIONS = [
-  "files.read",
-  "files.write",
-] as const;
-
-const GATE_PERMISSIONS_ISOLATED = [
-  "isolated_store.control.write",
-  "isolated_store.data.write",
-  "isolated_store.delete",
-  "isolated_store.execute",
-  "isolated_store.read",
-  "isolated_store.schema.write",
-] as const;
-
-const GATE_PERMISSIONS_PORTALS: string[] = [
-  "portals.read",
-  "portals.write",
-  "portals.delete",
-  "portals.create",
-  "portals.manage"
-]
 
 function dashboardsDbManagementEnabled(): boolean {
   return hasFlag("legacy-dashboards-db");
@@ -143,7 +107,7 @@ export function dashboardsMcpPolicyDescriptor(): Record<string, unknown> {
 export function gateMcpPolicyDescriptor(): Record<string, unknown> {
   const permissions = [
     ...GATE_PERMISSIONS_BASE,
-    ...FILE_PERMISSIONS,
+    ...FILE_GATE_PERMISSIONS,
     ...GATE_PERMISSIONS_ISOLATED,
     ...GATE_PERMISSIONS_PORTALS,
   ].sort((a, b) => a.localeCompare(b));
@@ -194,7 +158,7 @@ export function getLegacyPermissionsOnlyFingerprints(): {
         product: "gate-mcp",
         permissions: [
           ...GATE_PERMISSIONS_BASE,
-          ...FILE_PERMISSIONS,
+          ...FILE_GATE_PERMISSIONS,
           ...GATE_PERMISSIONS_ISOLATED,
         ],
         isolated_postgres_default: true,
@@ -249,7 +213,7 @@ export function buildDashboardsMcpTokenRequest(orgId: string): CreateTokenReques
 export function buildGateMcpTokenRequest(orgId: string, appId: string): CreateTokenRequest {
   const permissions = [
     ...GATE_PERMISSIONS_BASE,
-    ...FILE_PERMISSIONS,
+    ...FILE_GATE_PERMISSIONS,
     ...GATE_PERMISSIONS_ISOLATED,
     ...GATE_PERMISSIONS_PORTALS,
   ];
