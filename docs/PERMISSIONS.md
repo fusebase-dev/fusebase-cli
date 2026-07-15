@@ -354,6 +354,18 @@ truth for non-store extras:
 Platform-fixed (`delegate`/`bypass`) and `--declare-backend-only-gate-permissions`
 store perms are derived from analysis and are unaffected by clearing extras.
 
+#### Validation of declared extras (NIM-42263)
+
+On `--sync-gate-permissions`, declared `apps[].backendOnlyGatePermissions` entries
+(or the remote-manifest fallback set, when the field is absent) are validated
+against the known Gate permission vocabulary (`KNOWN_GATE_PERMISSIONS` in
+`lib/permissions.ts` — the same catalog the Gate MCP token grants, plus the
+platform-fixed `isolated_store.rls.*`). An unknown entry (e.g.
+`not_a_real_permission.bogus.write`) fails the sync **before** anything is posted:
+the CLI exits non-zero with an explicit error and nothing is written to the remote
+manifest or `fusebase.json`. Valid extras such as `org.members.read`,
+`portals.read`, and `isolated_store.read` pass unchanged.
+
 ### Final request shape
 
 The backend receives one final replacement payload.
@@ -378,6 +390,7 @@ That means:
 | `apps[].backendOnlyGatePermissions` non-empty in `fusebase.json` | On sync, **merge** into `manifest.backendOnlyGatePermissions` (non-store extras such as `org.members.read`, `portals.read`). Written back sorted to `fusebase.json` after sync. |
 | `apps[].backendOnlyGatePermissions` **absent** from `fusebase.json` | Legacy: remote manifest extras are preserved (API-patch / Ovation pattern). |
 | `apps[].backendOnlyGatePermissions: []` (declared empty) in `fusebase.json` | Explicit clear (NIM-42223): extras dropped, remote manifest updated to empty, field removed from `fusebase.json`; not resurrected on next sync. |
+| `apps[].backendOnlyGatePermissions` contains an unknown Gate permission | On sync, **rejected** (NIM-42263): CLI fails fast with a non-zero exit and explicit error; nothing posted to the remote manifest. |
 
 ## `fusebase app create`
 

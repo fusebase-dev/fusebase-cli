@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   buildSyncedBackendOnlyGatePermissions,
   declareStorePermissionsBackendOnly,
+  findUnknownGatePermissions,
   isBackendOnlyGatePermissionsDeclared,
   isStoreGatePermission,
   mergeFeaturePermissions,
@@ -496,6 +497,64 @@ describe("buildSyncedBackendOnlyGatePermissions", () => {
         fromRemoteManifest: ["org.groups.write"],
       }),
     ).toEqual(["org.groups.write"]);
+  });
+});
+
+describe("findUnknownGatePermissions", () => {
+  it("returns [] for known Gate permissions", () => {
+    expect(
+      findUnknownGatePermissions([
+        "org.members.read",
+        "portals.read",
+        "isolated_store.read",
+        "isolated_store.rls.delegate",
+        "files.write",
+      ]),
+    ).toEqual([]);
+  });
+
+  it("returns the unknown entries", () => {
+    expect(
+      findUnknownGatePermissions([
+        "org.members.read",
+        "not_a_real_permission.bogus.write",
+      ]),
+    ).toEqual(["not_a_real_permission.bogus.write"]);
+  });
+});
+
+describe("buildSyncedBackendOnlyGatePermissions validation", () => {
+  it("throws on a bogus fusebase.json extra", () => {
+    expect(() =>
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: [],
+        declaredStoreBackendOnly: [],
+        fromFusebaseJson: ["not_a_real_permission.bogus.write"],
+        fromRemoteManifest: [],
+      }),
+    ).toThrow(/not_a_real_permission\.bogus\.write/);
+  });
+
+  it("throws on a bogus remote-manifest fallback extra", () => {
+    expect(() =>
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: [],
+        declaredStoreBackendOnly: [],
+        fromFusebaseJson: [],
+        fromRemoteManifest: ["totally.made.up"],
+      }),
+    ).toThrow(/totally\.made\.up/);
+  });
+
+  it("accepts valid non-store extras", () => {
+    expect(
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: [],
+        declaredStoreBackendOnly: [],
+        fromFusebaseJson: ["org.members.read", "portals.read"],
+        fromRemoteManifest: [],
+      }),
+    ).toEqual(["org.members.read", "portals.read"]);
   });
 });
 
