@@ -10,6 +10,7 @@ import {
   parsePrincipals,
   readBackendOnlyGatePermissionsFromManifest,
   splitGatePermissionStrings,
+  subtractBackendOnlyFromRuntime,
   withTrustedRuntimeContextDelegatePermission,
 } from "../lib/permissions.ts";
 
@@ -417,6 +418,29 @@ describe("declareStorePermissionsBackendOnly", () => {
       runtimePermissions: ["org.groups.write"],
       backendOnlyPermissions: [],
     });
+  });
+});
+
+describe("subtractBackendOnlyFromRuntime", () => {
+  it("removes analyzed non-store extras that are declared backend-only", () => {
+    expect(
+      subtractBackendOnlyFromRuntime(
+        ["portals.read", "org.members.read", "files.write"],
+        ["org.members.read", "portals.read"],
+      ),
+    ).toEqual(["files.write"]);
+  });
+
+  it("keeps runtime perms not present in the backend-only list", () => {
+    expect(
+      subtractBackendOnlyFromRuntime(["files.write"], ["isolated_store.rls.delegate"]),
+    ).toEqual(["files.write"]);
+  });
+
+  it("returns an empty set when every runtime perm is backend-only", () => {
+    expect(
+      subtractBackendOnlyFromRuntime(["portals.read"], ["portals.read"]),
+    ).toEqual([]);
   });
 });
 

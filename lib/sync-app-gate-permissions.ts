@@ -14,6 +14,7 @@ import {
   readBackendOnlyGatePermissionsFromFeature,
   readBackendOnlyGatePermissionsFromManifest,
   splitGatePermissionStrings,
+  subtractBackendOnlyFromRuntime,
 } from "./permissions.ts";
 
 export interface SyncAppGatePermissionsOptions {
@@ -89,6 +90,14 @@ export async function syncAppGatePermissions(
     fusebaseJsonDeclared: backendOnlyDeclaredInFusebaseJson,
     fromRemoteManifest: readBackendOnlyGatePermissionsFromManifest(app.manifest),
   });
+
+  // Strip any analyzed perm that is declared backend-only (store perms via the
+  // declare flow, non-store extras via fusebase.json / manifest) from the
+  // browser-embedded runtime set so it never lands in app.permissions / gst.
+  gatePermissions = subtractBackendOnlyFromRuntime(
+    gatePermissions,
+    backendOnlyGatePermissions,
+  );
 
   if (
     !options.declareBackendOnlyGatePermissions &&
