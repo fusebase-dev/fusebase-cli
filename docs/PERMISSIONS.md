@@ -311,7 +311,11 @@ Two categories are kept out of the browser and stored in
    `--declare-backend-only-gate-permissions`.
 3. **App-declared non-store permissions** — list in `fusebase.json` under
    `apps[].backendOnlyGatePermissions` (e.g. `org.members.read`, `portals.read` for gateway apps).
-   Merged on `--sync-gate-permissions`; runtime stays in `app.permissions`, browser gst subtracts via manifest.
+   Merged on `--sync-gate-permissions`. On sync the CLI **subtracts** every merged
+   backend-only permission from the runtime `gate` set written to `app.permissions`, so a
+   permission the analyzer re-emits (e.g. `getPortal` → `portals.read`) is stripped from the
+   browser and lives only in `manifest.backendOnlyGatePermissions` (NIM-42264). The backend
+   `/_token` mint still unions the manifest list back in for server-side calls.
 
 #### `--declare-backend-only-gate-permissions` (opt-in, legacy-safe)
 
@@ -373,7 +377,7 @@ That means:
 | `app update <id> --access="..."` | Change access only; permissions untouched |
 | `app update <id> --access="..." --sync-gate-permissions` | Change access and replace `gate` |
 | `app update <id> --sync-gate-permissions --declare-backend-only-gate-permissions` | Replace `gate` minus `isolated_store.*`, which move to `manifest.backendOnlyGatePermissions` |
-| `apps[].backendOnlyGatePermissions` non-empty in `fusebase.json` | On sync, **merge** into `manifest.backendOnlyGatePermissions` (non-store extras such as `org.members.read`, `portals.read`). Written back sorted to `fusebase.json` after sync. |
+| `apps[].backendOnlyGatePermissions` non-empty in `fusebase.json` | On sync, **merge** into `manifest.backendOnlyGatePermissions` (non-store extras such as `org.members.read`, `portals.read`) **and subtract them from runtime `gate`** so they never ship in `app.permissions` / browser gst (NIM-42264). Written back sorted to `fusebase.json` after sync. |
 | `apps[].backendOnlyGatePermissions` **absent** from `fusebase.json` | Legacy: remote manifest extras are preserved (API-patch / Ovation pattern). |
 | `apps[].backendOnlyGatePermissions: []` (declared empty) in `fusebase.json` | Explicit clear (NIM-42223): extras dropped, remote manifest updated to empty, field removed from `fusebase.json`; not resurrected on next sync. |
 

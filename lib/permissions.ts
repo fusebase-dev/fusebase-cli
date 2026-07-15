@@ -280,6 +280,23 @@ export function buildSyncedBackendOnlyGatePermissions(params: {
   );
 }
 
+/**
+ * Remove permissions that are declared backend-only from the browser-embedded
+ * runtime set. The analyzer can re-emit a manifest-listed non-store permission
+ * (e.g. `getPortal` → `portals.read`) that also appears in the merged
+ * `backendOnlyGatePermissions`; such perms must never ship in `app.permissions`
+ * / browser gst. Store perms are already routed out via the declare flow.
+ */
+export function subtractBackendOnlyFromRuntime(
+  runtimePermissions: string[],
+  backendOnlyGatePermissions: string[],
+): string[] {
+  const backendOnly = new Set(backendOnlyGatePermissions);
+  return normalizeGatePermissionStrings(
+    runtimePermissions.filter((permission) => !backendOnly.has(permission)),
+  );
+}
+
 export function declareStorePermissionsBackendOnly(runtimePermissions: string[]): {
   runtimePermissions: string[];
   backendOnlyPermissions: string[];
