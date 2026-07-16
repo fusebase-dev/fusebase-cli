@@ -346,6 +346,35 @@ Creates or overwrites `.env` with `DASHBOARDS_MCP_TOKEN` and `DASHBOARDS_MCP_URL
 
 On successful create/update, CLI refreshes both Dashboards and Gate MCP tokens. In interactive terminals, it offers to run `fusebase config ide --force` immediately for all IDE MCP configs; if declined, it prints that command as the next step.
 
+### App environments (experimental, flag `environments`)
+
+Named environment profiles let one project target several platform contexts
+(e.g. `prod` customer org, `prod-beta` beta stage, `dev` org on the dev
+platform). Per environment: `environments/<name>.json` (committed lockfile —
+backend, org, product, resolved app ids, per-env subdomains, store ids,
+test-user fixtures, `protected` marker) plus a gitignored `.env.<name>`
+(MCP tokens/secrets); the active env's dotenv is materialized into `.env`.
+
+```bash
+fusebase env init                 # adopt: current context becomes the first env
+fusebase env add dev --backend dev --org <orgId>
+fusebase env use dev              # switch (offers re-auth + token refresh)
+fusebase env list                 # envs, backends, auth state
+fusebase env status               # active env: ids resolved? tokens fresh?
+fusebase env tokens               # write MCP tokens into .env.<active>
+fusebase deploy --env dev         # first deploy bootstraps product/apps in that org
+```
+
+Any command accepts `--env <name>`; CI can use `FUSEBASE_ENV` +
+`FUSEBASE_API_KEY`. Auth is per backend: `fusebase auth --dev` and
+`fusebase auth` store separate keys. Never copy platform ids between
+environment files — deploy reconcile resolves and records them.
+
+Deployed bundles include `fusebase-env.json`; the template's `EnvPanel`
+component (`?envpanel=1`) shows the current stage (red PROD badge for
+protected envs) with links to counterpart deployments, and tests can read it
+to assert they target the intended stage.
+
 ### Configure optional MCP integrations
 
 ```bash

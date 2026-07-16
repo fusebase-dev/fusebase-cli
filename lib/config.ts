@@ -8,12 +8,33 @@ import {
 } from "fs";
 import { homedir } from "os";
 import type { AppAccessPrincipal, AppPermissions } from "./api";
+import {
+  effectiveSubdomain,
+  environmentAppKey,
+  getActiveEnvironment,
+  getActiveEnvironmentBackend,
+  writeEnvironmentAppResolution,
+  type ActiveEnvironment,
+} from "./environments";
 
 export const CONFIG_DIR = join(homedir(), ".fusebase");
 export const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 
-export interface Config {
+/** Per-backend credentials (see docs/proposals/APP-ENVIRONMENTS.md §6). */
+export interface BackendAuth {
   apiKey?: string;
+}
+
+export interface Config {
+  /**
+   * Legacy single API key — the most recently authenticated key. Kept in sync
+   * on every auth so older CLI versions sharing ~/.fusebase keep working.
+   * Reads should rely on `getConfig().apiKey`, which resolves the effective
+   * key for the current backend (see `resolveEffectiveApiKey`).
+   */
+  apiKey?: string;
+  /** Per-backend API keys: `auth.dev` / `auth.prod` / `auth.local`. */
+  auth?: Partial<Record<string, BackendAuth>>;
   env?: string;
   updateChannel?: "prod" | "dev";
   flags?: string[];
@@ -167,6 +188,12 @@ export interface FeatureConfig {
   id?: string;
   /** App subdomain (`{subdomain}.thefusebase.app`); the declarative match key. */
   subdomain?: string;
+  /**
+   * Stable cross-environment app key for `environments/<name>.json` `apps{}`.
+   * Optional — defaults to `subdomain`. Set it when the default subdomain
+   * itself differs per environment (docs/proposals/APP-ENVIRONMENTS.md §4.1).
+   */
+  key?: string;
   /** App title shown in the platform. */
   name?: string;
   /**
@@ -297,6 +324,11 @@ export interface AppApiDependenciesSnapshot {
 export interface FuseConfig {
   /** written but not used, only for debug purposes */
   env?: string;
+  /**
+   * Default environment name for the `environments` feature (lowest-priority
+   * source in active-environment resolution; see lib/environments.ts).
+   */
+  defaultEnvironment?: string;
   orgId: string;
   productId: string;
   apps?: FeatureConfig[];
@@ -306,13 +338,29 @@ export interface FuseConfig {
 }
 
 let configCache: Config | null = null;
+let configFilePathOverride: string | null = null;
 
-export function getConfig(): Config {
+/** Test-only: redirect global config reads/writes to a temp file (null restores). */
+export function setConfigFilePathForTests(path: string | null): void {
+  configFilePathOverride = path;
+  configCache = null;
+}
+
+function getConfigFilePath(): string {
+  return configFilePathOverride ?? CONFIG_FILE;
+}
+
+/**
+ * Raw global config as stored on disk (cached). Internal building block:
+ * writers merge against this, and `getEnv()` reads it to avoid recursion.
+ * Command code should use `getConfig()`, which resolves the effective apiKey.
+ */
+export function getRawConfig(): Config {
   if (configCache) {
     return configCache;
   }
   try {
-    const data = readFileSync(CONFIG_FILE, "utf-8");
+    const data = readFileSync(getConfigFilePath(), "utf-8");
     configCache = JSON.parse(data) as Config;
     return configCache;
   } catch {
@@ -320,16 +368,66 @@ export function getConfig(): Config {
   }
 }
 
+/**
+ * Effective API key for the current backend:
+ * `FUSEBASE_API_KEY` env var (CI override) > `auth[<backend>].apiKey` >
+ * legacy top-level `apiKey`.
+ */
+function resolveEffectiveApiKey(raw: Config): string | undefined {
+  const fromEnvVar = process.env.FUSEBASE_API_KEY;
+  if (fromEnvVar && fromEnvVar.length > 0) {
+    return fromEnvVar;
+  }
+  const backend = getEnv();
+  const fromAuthMap = backend ? raw.auth?.[backend]?.apiKey : undefined;
+  return fromAuthMap ?? raw.apiKey;
+}
+
+/**
+ * Global config with `apiKey` resolved for the current backend. Returns a
+ * fresh copy on every call — mutations do not affect the cache; persist
+ * changes via `setConfig()` / `setBackendApiKey()` (they merge against the
+ * raw on-disk config, so the substituted apiKey is never written back).
+ */
+export function getConfig(): Config {
+  const raw = getRawConfig();
+  return { ...raw, apiKey: resolveEffectiveApiKey(raw) };
+}
+
 export function setConfig(updates: Partial<Config>): void {
-  const current = getConfig();
+  const current = getRawConfig();
   const next = { ...current, ...updates };
   mkdirSync(CONFIG_DIR, { recursive: true });
-  writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2), "utf-8");
+  writeFileSync(getConfigFilePath(), JSON.stringify(next, null, 2), "utf-8");
   configCache = next;
 }
 
+/**
+ * Store an API key for a backend: writes `auth[<backend>].apiKey` and mirrors
+ * it into the legacy top-level `apiKey` (most-recently-authenticated key) so
+ * older CLI versions sharing ~/.fusebase keep working.
+ *
+ * First-auth migration: when the auth map is still empty but a legacy key
+ * exists for a *different* backend (per the stored global `env`), that key is
+ * preserved into its own slot. Otherwise `auth --dev` would overwrite the
+ * legacy key with the dev key and orphan prod (its fallback would resolve to
+ * the wrong backend's key → 401).
+ */
+export function setBackendApiKey(backend: string, apiKey: string): void {
+  const current = getRawConfig();
+  const auth: NonNullable<Config["auth"]> = { ...current.auth };
+  if (current.apiKey && Object.keys(auth).length === 0) {
+    const legacyBackend = current.env ?? "prod";
+    if (legacyBackend !== backend) {
+      auth[legacyBackend] = { apiKey: current.apiKey };
+    }
+  }
+  auth[backend] = { apiKey };
+  setConfig({ apiKey, auth });
+}
+
 export function getUpdateChannel(): "prod" | "dev" {
-  return getConfig().updateChannel ?? "prod";
+  return getRawConfig().updateChannel ?? "prod";
 }
 
 /** Known experimental flags. */
@@ -347,6 +445,8 @@ export const KNOWN_FLAGS = [
   "legacy-dashboards-db",
   "portal-specific-apps",
   "cross-app-api-calls-analysis",
+  "environments",
+  "dev-backend",
   MANAGED_INTEGRATIONS_FLAG,
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
@@ -366,17 +466,41 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include portal-specific app prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
   "cross-app-api-calls-analysis":
     "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
+  environments:
+    "Enable named app environments (`environments/<name>.json` + `.env.<name>`, `fusebase env` commands, per-env backend/org). Off → legacy single-env behavior. See docs/proposals/APP-ENVIRONMENTS.md.",
+  "dev-backend":
+    "Internal: show the dev/prod platform-backend choice in interactive env prompts. Off (default) → interactive flows assume prod; explicit --backend still works.",
   [MANAGED_INTEGRATIONS_FLAG]:
     "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
   // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
     // "Enable personal authorization for managed integrations.",
 };
 
+/**
+ * Flags implied by other flags. Empty since `declarative-manifest` graduated
+ * (declarative reconcile is the default) — the mechanism stays for future
+ * flag dependencies. Implied flags are never persisted to disk.
+ */
+const IMPLIED_FLAGS: Record<string, readonly string[]> = {};
+
 export function getFlags(): string[] {
-  const flags = getConfig().flags ?? [];
+  // Raw read: getConfig() resolves the effective apiKey via getEnv(), which
+  // consults the environments feature flag — going through getConfig() here
+  // would recurse (getConfig → getEnv → hasFlag → getFlags → getConfig).
+  // Copy: the cached raw config's array must never be mutated (implied
+  // entries would leak into setConfig merges and get persisted).
+  const flags = [...(getRawConfig().flags ?? [])];
   for (const flag of ALWAYS_ON_FLAGS) {
     if (!flags.includes(flag)) {
       flags.push(flag);
+    }
+  }
+  for (const [flag, implied] of Object.entries(IMPLIED_FLAGS)) {
+    if (!flags.includes(flag)) continue;
+    for (const impliedFlag of implied) {
+      if (!flags.includes(impliedFlag)) {
+        flags.push(impliedFlag);
+      }
     }
   }
   return flags
@@ -503,9 +627,67 @@ export function rewriteLegacyFeaturePathsInRaw(
   return { rewritten };
 }
 
+/**
+ * Overlay the active environment's platform bindings onto the raw
+ * fusebase.json (docs/proposals/APP-ENVIRONMENTS.md §7). `orgId`/`productId`
+ * come from the env lockfile; each app entry gets its env-resolved `id`,
+ * env-effective `subdomain`, and per-env isolated-store `storeId`s. Values in
+ * fusebase.json are NEVER borrowed across environments — a legacy id there
+ * belongs to the environment that adopted it at `env init`, so entries without
+ * an env binding come out unresolved (declarative), not with a foreign id.
+ * The raw parse stays cached; the overlay is applied per call (the active
+ * environment can change within a process via `--env`).
+ */
+function overlayEnvironmentOnFuseConfig(
+  raw: FuseConfig,
+  active: ActiveEnvironment,
+): FuseConfig {
+  const apps = (raw.apps ?? []).map((app) => {
+    const key = environmentAppKey(app);
+    const entry = key ? active.config.apps?.[key] : undefined;
+    const next: FeatureConfig = { ...app, ...(key ? { key } : {}) };
+
+    if (entry?.id) {
+      next.id = entry.id;
+    } else {
+      delete next.id;
+    }
+    if (app.subdomain && key) {
+      next.subdomain = effectiveSubdomain(active.config, key, app.subdomain);
+    }
+    if (next.isolatedStores?.sql) {
+      next.isolatedStores = {
+        ...next.isolatedStores,
+        sql: next.isolatedStores.sql.map((store) => {
+          const storeId = store.alias
+            ? entry?.stores?.[store.alias]
+            : undefined;
+          const copy = { ...store };
+          if (storeId) {
+            copy.storeId = storeId;
+          } else {
+            delete copy.storeId;
+          }
+          return copy;
+        }),
+      };
+    }
+    return next;
+  });
+
+  return {
+    ...raw,
+    orgId: active.config.orgId,
+    // May be undefined for a not-yet-deployed environment; deploy's reconcile
+    // creates the product and persists it into the env lockfile.
+    productId: active.config.productId as string,
+    ...(raw.apps ? { apps } : {}),
+  };
+}
+
 export const loadFuseConfig = (): FuseConfig | null => {
   if (fuseConfigLoaded) {
-    return fuseConfigCache;
+    return applyEnvironmentOverlay(fuseConfigCache);
   }
   fuseConfigLoaded = true;
 
@@ -539,8 +721,16 @@ export const loadFuseConfig = (): FuseConfig | null => {
       // Ignore parse errors
     }
   }
-  return fuseConfigCache;
+  return applyEnvironmentOverlay(fuseConfigCache);
 };
+
+/** Apply the active-environment overlay to a cached raw config (see above). */
+function applyEnvironmentOverlay(raw: FuseConfig | null): FuseConfig | null {
+  if (!raw) return raw;
+  const active = getActiveEnvironment();
+  if (!active) return raw;
+  return overlayEnvironmentOnFuseConfig(raw, active);
+}
 
 /**
  * Rename a leftover legacy `features/` directory at the project root to
@@ -928,10 +1118,27 @@ function getFeatureIndexById(
   featureId: string,
 ): number {
   const apps = Array.isArray(raw.apps) ? raw.apps : [];
-  return apps.findIndex((app) => {
+  const byId = apps.findIndex((app) => {
     if (!app || typeof app !== "object") return false;
     return (app as Record<string, unknown>).id === featureId;
   });
+  if (byId !== -1) return byId;
+
+  // App environments keep resolved ids in environments/<name>.json, so raw
+  // fusebase.json often has no apps[].id. Fall back to stable key / path /
+  // subdomain, then to the sole app entry for single-app projects.
+  const byKey = apps.findIndex((app) => {
+    if (!app || typeof app !== "object") return false;
+    const entry = app as Record<string, unknown>;
+    return (
+      entry.key === featureId ||
+      entry.path === featureId ||
+      entry.subdomain === featureId
+    );
+  });
+  if (byKey !== -1) return byKey;
+  if (apps.length === 1) return 0;
+  return -1;
 }
 
 function readPreviousGateSnapshotForFeature(
@@ -1475,6 +1682,39 @@ export function writeResolvedAppIdToFusebaseJson(
   return true;
 }
 /**
+ * Persist a reconcile-resolved app id to the right place (NIM-41875):
+ * active environment → `environments/<name>.json` `apps[<key>].id` (plus the
+ * created subdomain, so the lockfile records the immutable platform value);
+ * legacy mode → the declarative `apps[]` entry in fusebase.json. Best-effort
+ * semantics are the caller's concern. Returns true when something was written.
+ */
+export function persistResolvedAppId(
+  projectRoot: string,
+  appConfig: FeatureConfig,
+  appId: string,
+  options?: { createdSubdomain?: string },
+): boolean {
+  const active = getActiveEnvironment(projectRoot);
+  if (active) {
+    const key = environmentAppKey(appConfig);
+    if (!key) return false;
+    writeEnvironmentAppResolution(projectRoot, active.name, key, {
+      id: appId,
+      ...(options?.createdSubdomain
+        ? { subdomain: options.createdSubdomain }
+        : {}),
+    });
+    return true;
+  }
+  if (!appConfig.subdomain) return false;
+  return writeResolvedAppIdToFusebaseJson(
+    projectRoot,
+    appConfig.subdomain,
+    appId,
+  );
+}
+
+/**
  * Persist `apps[].backendOnlyGatePermissions` in fusebase.json after a successful sync.
  * An empty `permissions` list removes the field (explicit cleanup).
  */
@@ -1521,8 +1761,32 @@ export function writeBackendOnlyGatePermissionsToFusebaseJson(
   invalidateFuseConfigCache();
 }
 
+let processEnvOverride: string | undefined;
+
+/**
+ * Force the backend env for the rest of this process. Used by auth flows:
+ * `fusebase auth --dev` must validate the key against the dev API even when
+ * the stored global `env` (or an active environment) points elsewhere.
+ */
+export function setProcessEnvOverride(env: string | undefined): void {
+  processEnvOverride = env;
+}
+
 export const getEnv = (): string | undefined => {
-  const config = getConfig();
+  if (processEnvOverride) {
+    return processEnvOverride;
+  }
+
+  // Active app environment (environments/<name>.json) wins: its `backend`
+  // decides hosts and API base URLs. Legacy mode (no environments/ dir or
+  // flag off) returns undefined here and keeps the chain below untouched.
+  const backend = getActiveEnvironmentBackend();
+  if (backend) {
+    return backend;
+  }
+
+  // Raw read — getConfig() would recurse (it resolves apiKey via getEnv()).
+  const config = getRawConfig();
   if (config.env) {
     return config.env;
   }
@@ -1541,5 +1805,10 @@ export function getFusebaseHost(): string {
 
 /** Fusebase app host (apps subdomain, no protocol). In .env as FUSEBASE_APP_HOST. */
 export function getFusebaseAppHost(): string {
-  return getEnv() === "prod" ? "thefusebase.app" : "dev-thefusebase-app.com";
+  return getFusebaseAppHostForBackend(getEnv() ?? "prod");
+}
+
+/** App host for an explicit backend — for cross-environment URLs (env panel counterparts). */
+export function getFusebaseAppHostForBackend(backend: string): string {
+  return backend === "prod" ? "thefusebase.app" : "dev-thefusebase-app.com";
 }

@@ -2,12 +2,25 @@ import { useState, useEffect } from 'react'
 import { AuthTokenExpiredError, getFeatureToken } from './lib/api'
 import { MAGIC_LINK_ROUTE, buildLegacyMagicLinkRedirect } from './lib/magic-link'
 import { AuthExpiredModal } from './components/AuthExpiredModal'
+import { EnvPanel } from './components/EnvPanel'
 
 function App() {
   if (typeof window !== 'undefined' && window.location.pathname === MAGIC_LINK_ROUTE) {
     return <LegacyMagicLinkRedirect />
   }
-  return <AppContent />
+  return (
+    <>
+      <AppContent />
+      {/*
+        Staff/debug environment panel (app environments). Deliberately outside
+        the token gate — it must stay visible when auth is broken, which is
+        exactly when you need to know which stage you are on. Hidden unless
+        enabled with `?envpanel=1`; renders nothing on legacy deploys. Gate
+        behind your app's role check before exposing in client-facing apps.
+      */}
+      <EnvPanel />
+    </>
+  )
 }
 
 /**

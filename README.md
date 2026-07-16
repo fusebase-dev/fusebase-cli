@@ -16,6 +16,7 @@ See:
 - [Architecture Documentation](docs/ARCHITECTURE.md)
 - [CLI Flows](docs/CLI-FLOWS.md)
 - [Git Configuration Guide](docs/guides/git-config.md)
+- [App Environments Guide](docs/guides/environments.md) — one project targeting dev/prod/beta platform contexts (`fusebase env`, experimental)
 - [Conceptual Model](docs/CONCEPTS.md)
 - [App Permissions](docs/PERMISSIONS.md) — canonical model for `dashboardView`, `database`, `gate`, and `app update`
 - [Fusebase Gate meta (`fusebaseGateMeta`)](docs/FUSEBASE_GATE_META.md) — Gate SDK analyze flow and `fusebase.json` snapshot
@@ -710,6 +711,55 @@ fusebase env create
 
 ---
 
+### `fusebase env …` — app environments (experimental, flag `environments`)
+
+Named environment profiles let one project target several platform contexts —
+e.g. `prod` (customer org), `prod-beta` (beta stage on the prod platform),
+`dev` (dev platform org).
+
+**Full guide: [docs/guides/environments.md](docs/guides/environments.md)**
+(getting started, day-to-day commands, auth, env panel, fixtures, gotchas).
+Design rationale: [docs/proposals/APP-ENVIRONMENTS.md](docs/proposals/APP-ENVIRONMENTS.md).
+
+- `environments/<name>.json` (committed) — the env lockfile: `backend`
+  (`dev`|`prod`|`local`), `orgId`, `productId`, per-app resolved `id`,
+  per-env `subdomain` / `subdomainSuffix` (subdomains are globally unique per
+  backend), isolated-store ids by alias, `fixtures.testUsers`, `protected`.
+- `.env.<name>` (gitignored) — per-env MCP tokens and secrets. The active
+  env's file is **materialized into `.env`**, so IDE configs, the dev server,
+  and app code keep reading the single `.env` they always did.
+- Active env: `--env <name>` on any command > `FUSEBASE_ENV` >
+  `.fusebase/state.json` (set by `env use`) > `defaultEnvironment` in
+  fusebase.json > single-env auto-pick. Without an `environments/` dir
+  everything behaves exactly as before (legacy mode).
+- Auth is per backend: `auth.dev` / `auth.prod` in `~/.fusebase/config.json`
+  (`fusebase auth [--dev]` binds a key to that backend; `FUSEBASE_API_KEY`
+  overrides in CI).
+
+| Command | Behavior |
+|---------|----------|
+| `fusebase env init [--name <n>] [--strip]` | Adopt environments: current fusebase.json context becomes the first env; `.env` → `.env.<name>`; `--strip` moves `apps[].id`/`storeId` out of the manifest |
+| `fusebase env add [name] [--backend <dev\|prod>] [--org <orgId>] [--product <id>] [--subdomain-suffix <s>] [--protected]` | New env file; in a terminal, missing parameters are prompted interactively (org picked from the live org list of the chosen backend) |
+| `fusebase env clone <from> <to> [--org] [--backend] [--subdomain-suffix]` | Copy structure/fixtures; platform ids cleared |
+| `fusebase env use <name> [--tokens]` | Switch active env; offers re-auth for the backend and token refresh |
+| `fusebase env list` / `env status` | Envs with backend/org/auth; active env detail incl. per-app id resolution and MCP token freshness |
+| `fusebase env tokens [--env <name>]` | Write MCP tokens into `.env.<name>` (and materialize `.env` when active) |
+| `fusebase env remove <name> [--yes]` (alias `delete`) | Remove the env's **local** files (lockfile + `.env.<name>`, clears active state); deployed product/apps on the platform are NOT deleted |
+| `fusebase env strip [--into <name>]` | Move leftover env-specific ids (`apps[].id`, store `storeId`) from fusebase.json into an environment lockfile; ids unknown to every env are first recorded into the home env (matching org/product) or `--into` |
+
+First deploy of a new environment bootstraps it: `fusebase deploy --env <name>`
+creates the product (declarative flag required), binds/creates apps by their
+env-effective subdomains, and writes resolved ids back into the env lockfile.
+Deploy also bakes **`fusebase-env.json`** into the bundle — read by the
+template's floating `EnvPanel` (staff/debug surface: env name, backend, org,
+appId, links to counterpart deployments; `?envpanel=1` to show) and usable by
+Playwright tests to assert they run against the intended stage.
+
+`protected: true` marks production-like envs; `fusebase env use` prints a
+warning banner for them.
+
+---
+
 ### `fusebase isolated-store sql bundle`
 
 Builds the Gate SQL migration request body from app-owned files and, when requested, calls Gate status/dry-run/apply using `GATE_MCP_TOKEN` from `.env`.
@@ -816,6 +866,8 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `postgres-rls` | Enables experimental RLS manifest helpers for isolated SQL stores |
 | `portal-specific-apps` | Includes portal-specific app guidance in prompts: `fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
 | `cross-app-api-calls-analysis` | Enables hidden `fusebase analyze app-apis` command and cross-app API dependency guidance in generated prompts/skills. |
+| `environments` | Enables named app environments: `environments/<name>.json` + `.env.<name>`, the `fusebase env` command group, `--env <name>` on every command, per-backend auth. See [docs/proposals/APP-ENVIRONMENTS.md](docs/proposals/APP-ENVIRONMENTS.md). |
+| `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
 
 Enable a flag globally, then refresh the project template:
 

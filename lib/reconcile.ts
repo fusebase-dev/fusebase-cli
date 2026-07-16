@@ -48,8 +48,10 @@ export type CreateAppFn = (
 ) => Promise<{ id: string }>;
 
 
-const config = getConfig();
-const fuseConfig = loadFuseConfig();
+// Config/context are resolved at call time, never at module init: the effective
+// apiKey depends on the backend and the org/product on the active environment,
+// both of which are selected (e.g. via `--env` in the preAction hook) after
+// this module is imported.
 
 // Order-insensitive canonical form of access principals, for change detection.
 function normalizePrincipals(principals?: AppAccessPrincipal[]): string {
@@ -70,6 +72,8 @@ function normalizePermissions(permissions?: AppPermissions): string {
 }
 
 function createAppCreateFunction () {
+  const config = getConfig();
+  const fuseConfig = loadFuseConfig();
   assert(fuseConfig, "fusebase.json not found or invalid in createAppCreateFunction");
 
   return (title: string, subdomain: string, path: string) => createApp(
@@ -164,7 +168,8 @@ export async function reconcileApps(
   platformApps: AppPlatformState[],
   createFn: CreateAppFn = createAppCreateFunction(),
 ): Promise<ReconcileResult[]> {
-
+  const config = getConfig();
+  const fuseConfig = loadFuseConfig();
   assert(fuseConfig, "fusebase.json not found or invalid in reconcileApps");
 
   const results = await reconcileAppsEnsureAppsExist(appConfigs, platformApps, createFn)
