@@ -1,11 +1,22 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { getConfig, loadFuseConfig } from "../config";
 import { fetchAppToken } from "../api";
 
 export const tokenCreateCommand = new Command("create")
   .description("Create a short-lived product development token for an app")
-  .requiredOption("--feature <featureId>", "Feature ID to create token for")
-  .action(async (options: { feature: string }) => {
+  .option("-a, --app <appId>", "App ID to create token for")
+  .addOption(
+    new Option("--feature <featureId>", "Deprecated alias for --app").hideHelp(),
+  )
+  .action(async (options: { app?: string; feature?: string }) => {
+    const appId = options.app ?? options.feature;
+    if (!appId) {
+      console.error("Error: --app is required.");
+      process.exit(1);
+    }
+    if (options.feature && !options.app) {
+      console.warn("[deprecated] --feature is deprecated; use --app instead.");
+    }
     const fuseConfig = loadFuseConfig();
     if (!fuseConfig || !fuseConfig.orgId || !fuseConfig.productId) {
       console.error(
@@ -25,7 +36,7 @@ export const tokenCreateCommand = new Command("create")
         config.apiKey,
         fuseConfig.orgId,
         fuseConfig.productId,
-        options.feature,
+        appId,
         { short: true },
       );
       console.log('Your short-lived (a few minutes TTL) token is:\n')
