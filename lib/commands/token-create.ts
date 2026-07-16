@@ -28,6 +28,7 @@ export const tokenCreateCommand = new Command("create")
         options.feature,
         { short: true },
       );
+      console.log('Your short-lived (a few minutes TTL) token is:\n')
       console.log(result.token);
     } catch (error) {
       if (error instanceof Error) {
