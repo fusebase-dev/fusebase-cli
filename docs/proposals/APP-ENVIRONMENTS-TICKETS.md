@@ -139,18 +139,16 @@ Conventions: types per NIM issue-type table; labels free-form (`apps`,
 > detects platform regressions on deployed apps (043/041 class). Plan:
 > `apps-cli/docs/proposals/MULTI-ENV-APPS-AND-PLATFORM-TESTING.md` Workstream C.
 
-### B1 — Env-parameterized Playwright harness
+### B1 — Env-parameterized Playwright harness — ✅ DONE (apps-cli template)
 
-- **Type:** Task
-- **Summary:** PW harness: fixtures/base URLs from environments/<name>.json + .env.<name>; stage assertion via fusebase-env.json
-- **Labels:** `apps`, `e2e-tests`, `environments`
-- **Description:** Shared harness (playwright.config + helpers) that reads the
-  target env's lockfile (base URL from effective subdomain, `fixtures.testUsers`)
-  and credentials from `.env.<name>` (`PW_USER_<KEY>_PASSWORD` convention).
-  Every spec asserts the intended stage via `fusebase-env.json` /
-  `data-testid="fbs-env-panel-name"` before running. Selected with
-  `FUSEBASE_ENV=<name>`.
-- **AC:** one command runs the same spec set against dev and prod-test envs.
+- **Status:** shipped on `feature/app-environments` as
+  `fusebase scaffold --template e2e` (`feature-templates/e2e/`): harness
+  (`helpers/env.ts` — env resolution, per-app base URLs, fixtures with
+  `PW_USER_<KEY>_PASSWORD`), stage-guard spec (asserts `fusebase-env.json`
+  matches the target env), fixture-driven role-matrix example with per-env
+  self-skip, per-env JSON report (`reports/<env>.json`), `app-e2e-tests`
+  authoring skill (QA+AI loop). Verified live: same suite green against
+  prod-beta and prod in the multienv sandbox.
 
 ### B2 — Sentinel app #1: `auth-matrix`
 
@@ -167,16 +165,39 @@ Conventions: types per NIM issue-type table; labels free-form (`apps`,
 - **AC:** full run green on dev and prod-test; failures produce
   request-id/trace output suitable for `issues/` triage.
 
-### B3 — CI runner + Teams reporting
+### B3a — Runner-agnostic CI templates (GitLab CI + GitHub Actions)
 
 - **Type:** Task
-- **Summary:** CI: scheduled sentinel smoke on dev after platform deploys; prod-test after releases; report to Teams service-status
+- **Summary:** CI templates for the e2e suite: same contract on GitLab CI and GitHub Actions
 - **Labels:** `e2e-tests`
-- **Description:** GitLab CI schedule (or scout agent) running the sentinel
-  suite: dev after each gate/api-nx/nimbus-ai deploy (hook into
-  helm-chart-updater flow), prod-test after release. Result summary to the
-  Teams `service-status` channel with per-case status and request ids on
-  failure. `FUSEBASE_ENV` + `FUSEBASE_API_KEY` one-liner invocation.
+- **Description:** Execution must NOT couple to GitLab — internal apps live on
+  the company GitLab, customer apps may live on GitHub. The runner contract is
+  already fixed by the B1 template: `FUSEBASE_ENV=<env> npm test` → exit code
+  + `reports/<env>.json`. Ship thin templates for both providers (playwright
+  image / setup action, env matrix axis, `PW_USER_*` + `FUSEBASE_API_KEY` as
+  CI secrets, JSON report as artifact), distributed with the e2e scaffold.
+  Internal sentinel apps additionally get a schedule (dev after
+  gate/api-nx/nimbus-ai deploys, prod-test after releases) + Teams
+  `service-status` notification.
+
+### B3b — Central run registry: push-based publish to Gate + Studio UI
+
+- **Type:** Task
+- **Summary:** fusebase test publish → Gate run registry; Studio panel next to contract testing
+- **Labels:** `apps`, `e2e-tests`, `gate`
+- **Description:** Mirror the app-api-contracts pattern (author/run anywhere →
+  publish centrally): a CLI step (`fusebase test publish --env <name>`; also
+  the last CI step on any provider) uploads the normalized `reports/<env>.json`
+  via public-api → Gate (`publishTestRun`, storage table + `listTestRuns` /
+  `getTestRun` ops per the writing-new-ops skill). Studio extends the existing
+  `AppApiContractTestingDialog` pattern with an e2e panel: registered suites
+  per app/project, run history per environment, case-level report rendering.
+  **Studio↔VCS linking is thereby solved by inversion**: Studio shows published
+  runs regardless of where they executed (GitLab, GitHub, laptop). A trigger
+  button is an optional adapter for the internal GitLab only (server-side
+  trigger token behind a Gate op); no trigger for external GitHub repos in v1.
+- **AC:** run from any CI appears in Studio with per-case results; secrets
+  never leave CI (Gate stores reports/manifests only).
 
 ### B4 — QA authoring loop (manual check → PW spec)
 
