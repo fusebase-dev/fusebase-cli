@@ -1,19 +1,26 @@
 import { test, expect } from "@playwright/test";
-import { fixtureUser, resolveTargetEnvironment } from "../helpers/env";
+import {
+  appBaseUrl,
+  createSignInMagicLink,
+  fixtureUser,
+  resolveTargetEnvironment,
+} from "../helpers/env";
 
 /**
- * EXAMPLE: fixture-driven role matrix. Copy this pattern for real cases.
+ * Fixture-driven role matrix — copy this pattern for real cases.
  *
- * Fixture identities live in `environments/<name>.json` → fixtures.testUsers
- * (committed); passwords live in `.env.<name>` as PW_USER_<KEY>_PASSWORD
- * (gitignored / CI variables). A case self-skips when its fixture is not
- * configured for the target env, so the same spec set stays runnable on every
- * environment while fixtures are being rolled out.
+ * Sign-in is passwordless: Gate mints a magic link for the fixture email and
+ * the spec activates it (the platform sets session cookies). Requirements:
+ *  - fixture identities in `environments/<name>.json` → fixtures.testUsers
+ *  - `GATE_MCP_TOKEN` in `.env.<name>` (refresh: `fusebase env tokens`)
  *
- * Never hardcode credentials or ids in specs — everything comes from the env.
+ * A case self-skips when its fixture is not configured for the target env, so
+ * the same spec set stays runnable everywhere while fixtures roll out.
+ * Never hardcode credentials or ids — everything comes from the env.
  */
 
 const env = resolveTargetEnvironment();
+const appHost = new URL(appBaseUrl(env)).host;
 
 const ROLES = ["owner", "member", "client"] as const;
 
@@ -23,17 +30,20 @@ for (const roleKey of ROLES) {
     test.skip(
       !user,
       `fixture "${roleKey}" not configured for env "${env.name}" ` +
-        `(add to environments/${env.name}.json fixtures.testUsers + ` +
-        `PW_USER_${roleKey.toUpperCase()}_PASSWORD to .env.${env.name})`,
+        `(add to environments/${env.name}.json fixtures.testUsers)`,
     );
 
-    test("loads the app entry", async ({ page }) => {
-      await page.goto("/");
+    test("signs in via magic link and reaches the app", async ({ page }) => {
+      const { magicLinkUrl } = await createSignInMagicLink(env, roleKey);
+      await page.goto(magicLinkUrl, { waitUntil: "domcontentloaded" });
+      // Activation sets session cookies and redirects into the app.
+      await page.waitForURL((url) => url.host === appHost, { timeout: 20000 });
       await expect(page.locator("#root")).toBeAttached();
-      // TODO: sign in as `user` via your app's auth flow (magic link /
-      // platform login), then assert what THIS role must and must not see.
-      // Keep assertions role-differential: a client must NOT see admin
-      // surfaces; an owner must.
+
+      // TODO: assert what THIS role must and must not see. Keep assertions
+      // role-differential: a client must NOT see admin surfaces; an owner
+      // must. Absence assertions catch fail-open regressions — the expensive
+      // class.
     });
   });
 }

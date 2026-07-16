@@ -25,6 +25,15 @@ export default defineConfig({
   use: {
     baseURL: appBaseUrl(env),
     trace: "retain-on-failure",
+    // "New headless" (real Chrome binary) — the classic headless shell trips
+    // the platform's bot heuristics on session handoffs (magic-link
+    // activation loops on ERR_TOO_MANY_REDIRECTS). The prod auth host is
+    // stricter still — hide the automation marker as well; if a session
+    // handoff spec keeps looping locally, verify with `npm run test:headed`.
+    channel: "chromium",
+    launchOptions: {
+      args: ["--disable-blink-features=AutomationControlled"],
+    },
   },
   metadata: {
     fusebaseEnv: env.name,

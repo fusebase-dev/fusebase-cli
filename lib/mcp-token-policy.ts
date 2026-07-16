@@ -5,6 +5,7 @@ import {
   FILE_GATE_PERMISSIONS,
   GATE_PERMISSIONS_BASE,
   GATE_PERMISSIONS_ISOLATED,
+  GATE_PERMISSIONS_MAGIC_LINKS,
   GATE_PERMISSIONS_PORTALS,
 } from "./permissions";
 
@@ -110,6 +111,7 @@ export function gateMcpPolicyDescriptor(): Record<string, unknown> {
     ...FILE_GATE_PERMISSIONS,
     ...GATE_PERMISSIONS_ISOLATED,
     ...GATE_PERMISSIONS_PORTALS,
+    ...GATE_PERMISSIONS_MAGIC_LINKS,
   ].sort((a, b) => a.localeCompare(b));
   return {
     schema: MCP_POLICY_SCHEMA_VERSION,
@@ -216,6 +218,7 @@ export function buildGateMcpTokenRequest(orgId: string, appId: string): CreateTo
     ...FILE_GATE_PERMISSIONS,
     ...GATE_PERMISSIONS_ISOLATED,
     ...GATE_PERMISSIONS_PORTALS,
+    ...GATE_PERMISSIONS_MAGIC_LINKS,
   ];
   return {
     scopes: [

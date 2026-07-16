@@ -167,16 +167,75 @@ export function appBaseUrl(env: TargetEnvironment, appKey?: string): string {
   return `https://${subdomain}.${appHostForBackend(env.config.backend)}`;
 }
 
-/** Fixture user by key; password from .env.<name> `PW_USER_<KEY>_PASSWORD`. */
+/**
+ * Fixture user by key. Password (`PW_USER_<KEY>_PASSWORD` in .env.<name>) is
+ * optional — magic-link sign-in needs no password at all.
+ */
 export function fixtureUser(
   env: TargetEnvironment,
   key: string,
-): { email: string; password: string; role?: string } | null {
+): { email: string; password?: string; role?: string } | null {
   const user = env.config.fixtures?.testUsers?.find((u) => u.key === key);
   if (!user) return null;
-  const password = env.secrets[`PW_USER_${key.toUpperCase()}_PASSWORD`];
-  if (!password) return null;
-  return { email: user.email, password, role: user.role };
+  return {
+    email: user.email,
+    password: env.secrets[`PW_USER_${key.toUpperCase()}_PASSWORD`],
+    role: user.role,
+  };
+}
+
+/**
+ * Sign a fixture user into the app via a platform magic link — no password,
+ * no mailbox: Gate's `createAppMagicLink` returns the activation URL directly
+ * and the platform sets session cookies on activation.
+ *
+ * Requires `GATE_MCP_TOKEN` in `.env.<name>` (policy includes
+ * `app_magic_link.write`; refresh stale tokens with `fusebase env tokens`).
+ * NOTE: the Gate route's `:appId` is the legacy naming for today's PRODUCT id.
+ */
+export async function createSignInMagicLink(
+  env: TargetEnvironment,
+  fixtureKey: string,
+): Promise<{ magicLinkUrl: string; email: string }> {
+  const user = env.config.fixtures?.testUsers?.find(
+    (u) => u.key === fixtureKey,
+  );
+  if (!user) {
+    throw new Error(
+      `fixture "${fixtureKey}" not configured for env "${env.name}"`,
+    );
+  }
+  const gateToken = env.secrets.GATE_MCP_TOKEN;
+  const host = env.secrets.FUSEBASE_HOST;
+  if (!gateToken || !host) {
+    throw new Error(
+      `GATE_MCP_TOKEN / FUSEBASE_HOST missing in .env.${env.name} — run \`fusebase env tokens --env ${env.name}\``,
+    );
+  }
+  if (!env.config.productId) {
+    throw new Error(
+      `environment "${env.name}" has no productId — deploy it first`,
+    );
+  }
+  const res = await fetch(
+    `https://app-api.${host}/v4/api/proxy/gate-service/v1/${env.config.orgId}/apps/${env.config.productId}/magic-links`,
+    {
+      method: "POST",
+      headers: {
+        "x-gate-token": gateToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email: user.email }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `createAppMagicLink failed: ${res.status} ${body.slice(0, 300)}`,
+    );
+  }
+  const data = (await res.json()) as { magicLinkUrl: string };
+  return { magicLinkUrl: data.magicLinkUrl, email: user.email };
 }
 
 /**

@@ -201,6 +201,17 @@ export const FILE_GATE_PERMISSIONS = [
   "files.write",
 ] as const;
 
+/**
+ * App magic-link management (owner/admin invite flow). In the Gate MCP token
+ * policy so IDE agents and e2e harnesses can mint sign-in links for fixture
+ * users (`createAppMagicLink` returns the activation URL — no mailbox needed).
+ * Deliberately NOT in the legacy fingerprint baseline: adding it bumps the
+ * current policy fingerprint so existing `.env`s show STALE and refresh.
+ */
+export const GATE_PERMISSIONS_MAGIC_LINKS = [
+  "app_magic_link.write",
+] as const;
+
 export const GATE_PERMISSIONS_ISOLATED = [
   "isolated_store.control.write",
   "isolated_store.data.write",
