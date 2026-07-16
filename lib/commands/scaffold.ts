@@ -110,6 +110,17 @@ export const scaffoldCommand = new Command("scaffold")
       await copyTemplate(templateId, targetDir);
       console.log(`✓ Scaffolded template '${templateId}' into ${targetDir}`);
 
+      // E2E suite is self-contained: install its deps right away so
+      // `FUSEBASE_ENV=<env> npm test` works out of the box.
+      if (templateId === "e2e") {
+        await runNpmInstall(targetDir);
+        console.log(
+          "\nNext: cd " +
+            relative(process.cwd(), targetDir) +
+            " && npx playwright install chromium && FUSEBASE_ENV=<env> npm test",
+        );
+      }
+
       // Install dependencies
       if (templateId === "backend") {
         await ensureOpenApiSpec(targetDir);
