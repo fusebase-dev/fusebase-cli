@@ -27,6 +27,7 @@ import { VERSION } from "./lib/version";
 import { registerErrorReporter } from "./lib/error-reporter";
 import { instrumentAllCommands } from "./lib/command-logger";
 import { flushAgentAssetsRefreshAfterMigration, loadFuseConfig, getUpdateChannel } from "./lib/config";
+import { setEnvironmentOverride } from "./lib/environments";
 import { detectLinkedOrLocalCli } from "./lib/commands/cli";
 import { evaluateLauncherGate } from "./lib/launcher-self-check";
 import { REQUIRED_LAUNCHER } from "./lib/required-launcher";
@@ -36,7 +37,14 @@ registerErrorReporter();
 
 const program = new Command();
 
-program.hook("preAction", async () => {
+program.hook("preAction", async (_thisCommand, actionCommand) => {
+  // `--env <name>` (attached to every leaf command below) selects the app
+  // environment for this invocation; wins over FUSEBASE_ENV and the
+  // per-checkout state. Applied before any config/host resolution.
+  const envName = (actionCommand.optsWithGlobals() as { env?: string }).env;
+  if (typeof envName === "string" && envName.length > 0) {
+    setEnvironmentOverride(envName);
+  }
   loadFuseConfig();
   await flushAgentAssetsRefreshAfterMigration(process.cwd());
 });
@@ -107,6 +115,27 @@ program.addCommand(apiCommand);
 program.addCommand(isolatedStoreCommand);
 program.addCommand(appApiContractsCommand, { hidden: true });
 program.addCommand(analyzeCommand, { hidden: true });
+
+// Attach `--env <name>` to every leaf command so any invocation can target a
+// named app environment (applied centrally in the preAction hook above).
+// Commands that already define their own --env (e.g. `env tokens`) keep it.
+function attachEnvOption(command: Command): void {
+  const isLeaf = command.commands.length === 0;
+  if (isLeaf) {
+    const hasEnvOption = command.options.some((o) => o.long === "--env");
+    if (!hasEnvOption) {
+      command.option(
+        "--env <name>",
+        "Run against the named app environment (environments/<name>.json)",
+      );
+    }
+    return;
+  }
+  for (const sub of command.commands) {
+    attachEnvOption(sub);
+  }
+}
+attachEnvOption(program);
 
 instrumentAllCommands(program);
 

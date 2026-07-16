@@ -47,6 +47,11 @@ export interface CreateEnvOptions {
   refreshDashboardsToken?: boolean;
   /** Refresh gate MCP token/key values in `.env` (default: true). */
   refreshGateToken?: boolean;
+  /**
+   * Dotenv file name to write (default `.env`). App environments write
+   * per-env files (`.env.<name>`); the active env is materialized into `.env`.
+   */
+  envFileName?: string;
 }
 
 export interface CreateEnvResult {
@@ -187,8 +192,11 @@ async function generateGateMcpToken(
  * - If .env exists but missing MCP vars: add them
  * - If .env exists with MCP vars: skip (unless force=true)
  */
-export async function readEnvFileMap(targetDir: string): Promise<Map<string, string>> {
-  const envPath = join(targetDir, ".env");
+export async function readEnvFileMap(
+  targetDir: string,
+  envFileName = ".env",
+): Promise<Map<string, string>> {
+  const envPath = join(targetDir, envFileName);
   if (!(await fileExists(envPath))) {
     return new Map();
   }
@@ -205,8 +213,9 @@ export async function createEnvFile(options: CreateEnvOptions): Promise<CreateEn
     force = false,
     refreshDashboardsToken = true,
     refreshGateToken = true,
+    envFileName = ".env",
   } = options;
-  const envPath = join(targetDir, ".env");
+  const envPath = join(targetDir, envFileName);
 
   try {
     let existingContent = "";

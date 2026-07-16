@@ -225,6 +225,20 @@ export async function fetchCurrentUser(
 | Platform token | Gate/Dashboard via `app-api` proxy | Token expired → refresh page modal | Transient — retry, not logout |
 | App session cookie | `/api/account/me` (your backend) | Not logged in → login screen | Transient — retry + “server unavailable”, **keep cookie** |
 
+## `getMe` status `0` (network/CORS) — wrong backend host, not auth
+
+A `getMe`/Gate call failing with HTTP status **0** is almost never an auth
+problem: the request left for the **wrong platform host** (typically a
+build-time `VITE_FUSEBASE_HOST`-style constant baked from another backend)
+and died on network/CORS. Fix the host resolution — see “Runtime host
+resolution” in the project `AGENTS.md`: same-origin relative paths first,
+otherwise derive from `window.location.hostname` or `/fusebase-env.json`
+(`backend` field), never from build-time env in the frontend.
+
+**Never let a failed `getMe` block the whole app load.** When
+`/fusebase-env.json` is present, `orgId`/`appId` are already known — render
+the shell and confine the auth error to the affected area.
+
 ---
 
 ## Same-origin `/api/*` and the platform proxy

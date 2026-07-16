@@ -1,21 +1,13 @@
-import { mkdir, writeFile } from "fs/promises";
-import { CONFIG_DIR, CONFIG_FILE, getConfig, type Config } from "../../config";
+import {
+  getConfig,
+  setBackendApiKey,
+  setConfig,
+  setProcessEnvOverride,
+} from "../../config";
+import { environmentsFeatureEnabled } from "../../environments";
 import { fetchOrgs } from "../../api";
 import { logger } from "../../logger";
 import { openBrowser } from "../utils/open-browser";
-
-async function ensureConfigDir(): Promise<void> {
-  try {
-    await mkdir(CONFIG_DIR, { recursive: true });
-  } catch {
-    // Directory already exists
-  }
-}
-
-async function saveConfig(config: Config): Promise<void> {
-  await ensureConfigDir();
-  await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
-}
 
 /**
  * Generate a random code verifier for PKCE
@@ -172,16 +164,21 @@ export async function runAuthFlow(
   console.log("Starting authentication flow...");
 
   try {
-    const apiKey = await startOAuthFlow(isDev, options);
-
+    const backend = isDev ? "dev" : "prod";
     // Validate against the same environment we got the key from (avoid 401 when
     // getEnv() would use fusebase.json or ~/.fusebase/config.json and hit the wrong API)
-    const config = getConfig();
-    config.env = isDev ? "dev" : "prod";
-    config.apiKey = apiKey;
+    setProcessEnvOverride(backend);
+
+    const apiKey = await startOAuthFlow(isDev, options);
     await fetchOrgs(apiKey);
 
-    await saveConfig(config);
+    setBackendApiKey(backend, apiKey);
+    if (!environmentsFeatureEnabled()) {
+      // Legacy behavior: auth also switches the machine-global env. With
+      // environments enabled the backend comes from the active environment,
+      // so auth no longer flips it.
+      setConfig({ env: backend });
+    }
 
     console.log("✓ Authentication successful");
     return apiKey;

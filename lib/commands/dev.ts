@@ -22,10 +22,11 @@ import {
   loadFuseConfig,
   getConfig,
   requireAppId,
-  writeResolvedAppIdToFusebaseJson,
+  persistResolvedAppId,
   type FeatureConfig,
   type FuseConfig,
 } from "../config";
+import { getActiveEnvironment } from "../environments";
 import { detectDevServerUrl } from "../framework-detect";
 import {
   fetchAppSecrets,
@@ -277,10 +278,17 @@ devCommand
       process.exit(1);
     }
 
-    // Load fusebase.json
+    // Load fusebase.json (with the active environment's overlay when set)
     const fuseConfig = loadFuseConfig();
     if (!fuseConfig || !fuseConfig.orgId || !fuseConfig.productId) {
-      console.error("Error: Invalid fusebase.json. Missing orgId or productId.");
+      const activeEnvironment = getActiveEnvironment();
+      if (activeEnvironment && !fuseConfig?.productId) {
+        console.error(
+          `Error: environment "${activeEnvironment.name}" has no productId yet. Run \`fusebase deploy --env ${activeEnvironment.name} --nocode\` to provision it first.`,
+        );
+      } else {
+        console.error("Error: Invalid fusebase.json. Missing orgId or productId.");
+      }
       process.exit(1);
     }
 
@@ -357,11 +365,12 @@ devCommand
         }
         // Best-effort write-back — a failure here must not stop the dev server.
         try {
-          writeResolvedAppIdToFusebaseJson(
-            process.cwd(),
-            selectedFeature.subdomain,
-            resolved.appId,
-          );
+          persistResolvedAppId(process.cwd(), selectedFeature, resolved.appId, {
+            createdSubdomain:
+              resolved.action === "created"
+                ? selectedFeature.subdomain
+                : undefined,
+          });
         } catch (error) {
           logger.debug(
             "Failed to write resolved app id: %s",

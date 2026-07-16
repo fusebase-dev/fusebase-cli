@@ -1,7 +1,27 @@
-# App Environments (Design Proposal)
+# App Environments (Design)
 
-**Status:** draft for discussion.
+**Status:** implemented behind the `environments` flag (branch `feature/app-environments`).
 **Parent:** [MULTI-ENV-APPS-AND-PLATFORM-TESTING.md](./MULTI-ENV-APPS-AND-PLATFORM-TESTING.md) — Workstream A, detailed design.
+
+**Implementation map:** core — `lib/environments.ts` (+ overlay in
+`lib/config.ts` `loadFuseConfig`); auth map — `lib/config.ts`
+(`auth.<backend>`, effective-apiKey resolution) + `lib/commands/auth.ts` /
+`steps/auth-flow.ts`; commands — `lib/commands/env.ts`; reconcile write-back +
+first-deploy bootstrap + env-info injection — `lib/commands/deploy.ts`,
+`dev.ts`, `isolated-store.ts`; panel —
+`feature-templates/spa/src/components/EnvPanel.tsx`. Tests:
+`test/environments.test.ts`, `test/auth-backend-config.test.ts`,
+`test/env-commands.test.ts`, `test/env-overlay.test.ts`.
+
+**Deviations from the draft:** `.env` is a materialized copy of
+`.env.<active>` refreshed by `env use`/`env tokens` (instead of a symlink /
+process-env injection — open question 3 resolved this way); the env-info
+payload is deliberately timestamp-free so it never churns deploy hashes
+(§10.1's `deployedAt`/`version` dropped); panel visibility is opt-in via
+`?envpanel=1` + localStorage with role-gating left to the app (§10.2's
+automatic staff detection is a follow-up); `env init` auto-derives the first
+env's name from the current backend, `--name` overrides (open question 3 of
+§13).
 
 ---
 
@@ -33,21 +53,26 @@ a chosen one.
   store ids, resource ids, test fixtures. Stored in `environments/<name>.json`,
   **committed to git**.
 - **Backend** — the platform stage (`dev` | `prod` | `local`), a *field inside* an
-  environment, not the environment itself. Several environments may share a backend
-  (e.g. `prod` = clean customer org, `prod-test` = QA org on the prod platform).
-  This deliberately splits today's overloaded "env" into two notions.
+  environment, not the environment itself. Several environments may share a backend:
+  `prod` = clean customer org, `prod-beta` = beta stage on the prod platform,
+  `prod-test` = QA org. This deliberately splits today's overloaded "env" into two
+  notions.
 - **Active environment** — per-checkout selection (not committed), plus per-command
   override.
+- **A deployed bundle *is* an environment.** Environment identity is deploy-time:
+  tokens, `gst`/`dst`, store bindings are minted per app id. There is no runtime
+  environment flipping; "switching" between deployed stages is navigation between
+  their URLs (§10).
 
 ### Example
 
 ```
 environments/
-  prod.json        # backend: prod, org: customer, protected
-  prod-test.json   # backend: prod, org: QA
-  dev.json         # backend: dev, org: issues/dev org
+  prod.json        # backend: prod, customer org, protected
+  prod-beta.json   # backend: prod, same or QA org, subdomainSuffix "-beta"
+  dev.json         # backend: dev, dev org
 .env.prod          # MCP tokens + secrets for prod (gitignored)
-.env.prod-test
+.env.prod-beta
 .env.dev
 fusebase.json      # env-neutral declaration
 ```
@@ -83,12 +108,19 @@ fusebase.json      # env-neutral declaration
 }
 ```
 
-- `apps` is keyed by the **manifest app key** (see §7 — `subdomain` from
-  `fusebase.json` is the default key). Per-env `subdomain` override exists because
-  subdomains are **globally unique per backend** (`{subdomain}.thefusebase.app` is a
-  DNS name): two environments on the same backend cannot reuse one subdomain.
-  `subdomainSuffix` is a convenience for bulk renaming (`client-portal` →
-  `client-portal-test`); explicit per-app `subdomain` wins.
+- `apps` is keyed by the **app key**: a new optional `key` field on
+  `fusebase.json` `apps[]`, defaulting to the entry's `subdomain`. The key is
+  env-stable by definition; subdomains are not (see below), so the key — not the
+  subdomain — is the join between manifest and environments. Existing projects
+  never need to set `key` explicitly until they rename a subdomain per env.
+- **Per-env `subdomain`** exists because subdomains are **globally unique per
+  backend** (`{subdomain}.thefusebase.app` is a DNS name): two environments on the
+  same backend cannot reuse one subdomain. Canonical case — production + beta on
+  the prod platform: `prod` keeps `client-portal`, `prod-beta` sets
+  `client-portal-beta` (or just `subdomainSuffix: "-beta"` env-wide; explicit
+  per-app `subdomain` wins over the suffix). Each env is a fully separate app
+  record on the platform — own id, permissions, stores, magic links. Isolation is
+  the feature: beta cannot touch production data.
 - Everything the platform owns and resolves lands here (this file **is** the env
   lockfile): reconcile write-back (NIM-41875) targets this file instead of
   `fusebase.json` when environments are enabled.
@@ -115,9 +147,14 @@ Rationale for two layers instead of a single `.env.prod`-style dotenv: ids/store
 resources are structured and must be diffable/committable; tokens must not be
 committed. A dotenv file cannot be both.
 
+`fusebase dev start` **injects** the active env's `.env.<name>` values into the
+spawned app/backend processes, so app code that reads `FUSEBASE_HOST`/`FBS_*` from
+the process env keeps working without knowing about file naming.
+
 ### 4.3 Active-environment state (gitignored)
 
-`.fusebase/state.json` in the project root (dir added to `.gitignore` by the CLI):
+`.fusebase/state.json` in the project root (dir added to `.gitignore` by the CLI;
+also the future home for other per-checkout state — dev-server ports, caches):
 
 ```json
 { "activeEnvironment": "dev" }
@@ -170,10 +207,11 @@ Global config gains per-backend auth; auth is decoupled from backend selection:
 
 Environments **extend** the declarative model (NIM-41746); they don't replace it.
 
-- `fusebase.json` becomes fully env-neutral: `apps[]` keep `subdomain` (the default
-  match key / app key), `name`, `path`, `dev`, `build`, `backend`, permission meta,
-  store **aliases** — and **no `id`**. `orgId`/`productId` remain as legacy fallback,
-  ignored (with a warning) when `environments/` exists.
+- `fusebase.json` becomes fully env-neutral: `apps[]` keep `key` (optional,
+  defaults to `subdomain`), `subdomain` (default value), `name`, `path`, `dev`,
+  `build`, `backend`, permission meta, store **aliases** — and **no `id`**.
+  `orgId`/`productId` remain as legacy fallback, ignored (with a warning) when
+  `environments/` exists.
 - Reconcile (deploy/dev-start) works per environment: match env-effective subdomain →
   bind or create in `environment.orgId`/`productId` → **write back into
   `environments/<name>.json`**, not into `fusebase.json`.
@@ -222,7 +260,7 @@ New `fusebase env` subcommand group (the existing `env create` is folded in as
 | `fusebase env init [--strip]` | Adopt environments in an existing project (§8.2) |
 | `fusebase env add <name> --backend <dev\|prod> --org <orgId> [--product <id>] [--subdomain-suffix <s>]` | Create a new environment file (no platform calls) |
 | `fusebase env clone <from> <to> --org <orgId> [--backend …]` | New env file copying structure/fixture keys from an existing one (ids cleared) |
-| `fusebase env use <name>` | Switch active env (writes `.fusebase/state.json`); checks `auth[backend]` and **offers re-auth** when missing; offers `env tokens` refresh when `.env.<name>` is absent/stale |
+| `fusebase env use <name> [--tokens]` | Switch active env (writes `.fusebase/state.json`); checks `auth[backend]` and **offers re-auth** when missing; offers `env tokens` refresh when `.env.<name>` is absent/stale (`--tokens` refreshes without asking, for scripts) |
 | `fusebase env list` | Envs with backend, org, active marker, auth status |
 | `fusebase env status` | Active env: backend, org/product, auth ok/missing, per-app id resolved/unresolved, `.env.<name>` token fingerprints fresh/stale |
 | `fusebase env tokens [--env <name>]` | Today's `env create` per environment: writes `.env.<name>` MCP tokens for that env's backend+org |
@@ -231,13 +269,69 @@ New `fusebase env` subcommand group (the existing `env create` is folded in as
 All existing commands gain `--env <name>` (deploy, dev start, app update, analyze,
 isolated-store, secret, remote-logs, integrations/config ide where relevant).
 
-## 10. Answers to the open design questions
+## 10. Env-info injection & in-app env panel
+
+The env layer gets a **runtime surface**: a floating, staff-only panel inside the
+deployed app showing where you are and letting you jump between stages.
+
+### 10.1 Injection contract (CLI-side)
+
+At `fusebase deploy --env X` (and `dev start`) the CLI knows everything the panel
+needs and bakes it into the build — no runtime "which env am I in" API:
+
+```json
+{
+  "env": "prod-beta",
+  "protected": false,
+  "backend": "prod",
+  "orgId": "u25klv",
+  "productId": "prod_abc",
+  "appKey": "client-portal",
+  "appId": "v1qsg…",
+  "deployedAt": "2026-07-14T…",
+  "version": "…",
+  "counterparts": [
+    { "env": "prod", "url": "https://client-portal.thefusebase.app", "protected": true, "sameOrg": true }
+  ]
+}
+```
+
+Delivery: Vite define (`window.__FUSEBASE_ENV__`) or a `fusebase-env.json` asset
+next to the bundle. `counterparts` is derived from the other `environments/*.json`
+files at deploy time. Store ids / resource maps may be included for the panel's
+info view; secrets never.
+
+### 10.2 Panel semantics
+
+- **Switching = navigation.** A deployed bundle *is* an env (§3); the switcher
+  navigates to the counterpart URL. Same org on `.thefusebase.app` → session is
+  shared (NIM-41842), transition is seamless. Different org → re-login; the panel
+  says so explicitly ("beta: different org, sign-in required"). App state
+  (open records etc.) does not carry over — entity ids differ per env by design.
+- **Staff-only.** Render only for `owner`/`manager` from `getMe`; never for
+  visitor/client. Ids are not secrets, but the panel is an admin surface.
+- **`protected` marker.** Red "PROD" badge on protected envs — the UI mirror of
+  the CLI guardrail (§4.1), cheap insurance against "thought I was on beta".
+- **Debug surface.** The panel is the standard home for the in-app observability
+  the issues workspace already demands (env name, ids, token role/scopes, recent
+  API errors) — replaces per-app ad-hoc debug consoles.
+- **Test hook.** Playwright specs (parent doc, Workstream C) read env
+  name/appId from the panel via a stable selector and assert they run against the
+  intended stage — cheap protection against pointing a test run at the wrong org.
+
+### 10.3 Placement
+
+Component ships in `project-template` (+ skill); apps never configure it by hand —
+the data contract comes entirely from the CLI at deploy time.
+
+## 11. Answers to the original design questions
 
 1. **`.env.prod` vs `environments/prod.json`** → both, with a strict split:
    structured committable ids/fixtures in `environments/<name>.json`, secrets and
    MCP tokens in `.env.<name>` (§4).
 2. **Env ≠ backend stage** → `backend` is a field inside the environment (§3);
-   any number of envs per backend (clean org + QA org on prod).
+   any number of envs per backend (clean org + beta + QA org on prod), subdomain
+   uniqueness handled per env (§4.1).
 3. **Test users for Playwright** → fixture identities in the env file
    (`fixtures.testUsers`), passwords in `.env.<name>` by naming convention (§4.2).
    Separate file not needed until fixtures grow; the schema leaves room
@@ -253,40 +347,28 @@ isolated-store, secret, remote-logs, integrations/config ide where relevant).
 7. **Legacy apps** → untouched in legacy mode; adoption is one `fusebase env init`;
    ids left in `fusebase.json` stay harmless (§8).
 
-## 11. Additional proposals (beyond the asks)
+## 12. Resolved decisions
 
-- **Prod guardrail:** `protected: true` + banner + confirmation on mutating
-  commands (§4.1). Directly addresses the "QA on prod tenant" incidents (Ovation).
-- **Fix an existing footgun:** today `fusebase auth --dev` silently flips the
-  global env under *all* projects on the machine, and `.env` MCP tokens go stale
-  without warning. Per-backend auth + per-env `.env.<name>` + `env status`
-  fingerprint check eliminate the class.
-- **Dev-server safety:** `fusebase dev start` against a `protected` env warns
-  (local dev against a clean customer org is almost always a mistake).
-- **`fusebase.json` `env` field:** currently dead ("debug only") — deprecate in
-  favor of `defaultEnvironment`.
-- **Resource discovery helper:** `fusebase resources discover --env <name>` to
-  fill `apps.<key>.resources` by name-matching dashboards/views (parent doc, open
-  question 2); apps read resources via a generated `config/resources.ts` that
-  consumes env-injected values (Workstream A3).
-- **CI ergonomics:** `FUSEBASE_ENV` + `FUSEBASE_API_KEY` make any pipeline
-  one-liner: `FUSEBASE_ENV=prod-test fusebase deploy --yes`.
-- **Sentinel/test apps** (Workstream C) get their env matrix for free: the same
-  repo carries `environments/{dev,prod-test}.json` and CI switches with a flag.
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | App key in env `apps{}` | Explicit optional `key` on `apps[]`, defaults to `subdomain` (§4.1) — subdomain itself may differ per env, so it cannot be the join key |
+| 2 | `env use` token refresh | Offer in TTY; `--tokens` flag refreshes without prompting (scripts/CI) (§9) |
+| 3 | App code reading `.env` | `dev start` injects `.env.<active>` into spawned processes; `.env` symlink kept during deprecation window (§4.2, §8.2) |
+| 4 | `productId` per env? | Yes — products are per-backend platform entities; one per environment (§4.1) |
+| 5 | Active-env state location | `.fusebase/state.json`, gitignored; future home for other per-checkout state (§4.3) |
+| 6 | Same-backend stages (prod + beta) | Per-env `subdomain` / `subdomainSuffix`; separate app records; isolation by design (§4.1) |
+| 7 | Runtime env awareness | Deploy-time injection + staff-only panel; switching is navigation, never runtime flipping (§10) |
 
-## 12. Open questions
+## 13. Remaining open questions
 
-1. App key in `environments/<name>.json` `apps{}` — manifest `subdomain` (current
-   declarative key) vs a new explicit `key` field on `apps[]`? Subdomain-as-key
-   breaks if the default subdomain itself differs per env; an explicit optional
-   `key` (defaults to subdomain) is safer. Leaning explicit optional `key`.
-2. Should `env use` auto-refresh `.env.<name>` tokens (network call) or only
-   offer? Leaning offer-in-TTY / flag `--tokens` for scripts.
-3. `.env` compatibility for app backends that read `FBS_*`/`FUSEBASE_HOST` from
-   the project `.env` during `dev start` — inject from `.env.<active>` into the
-   spawned process instead of relying on the file name?
-4. Does `productId` belong per-environment (current design) or can one product
-   span backends? (It cannot — products are per-backend entities; per-env it is.)
-5. Store the active env in `.fusebase/state.json` vs reuse the existing
-   `logs/`-style app dir? New dot-dir keeps project root clean and gives a home
-   for future per-checkout state (dev-server ports, caches).
+1. `counterparts` in the injection contract: include **all** envs or only
+   non-protected ones on the same backend? (Leaning: all, panel greys out
+   cross-backend entries.)
+2. Panel implementation form: template-copied component vs a tiny published
+   package (`@fusebase/env-panel`) updatable via managed deps? (Leaning: managed
+   package — panel fixes shouldn't require template re-scaffold.)
+3. Does `env init` need a `--name` override for the first env when the current
+   backend name (`prod`) is not how the team calls it?
+4. Interaction with managed apps (`managed-app-org-setups`): a managed install is
+   effectively a platform-side environment — should the env file be able to
+   reference a managed setup instead of a raw org?

@@ -137,6 +137,50 @@ Read from the project **`.env`** when you need the host for links or docs:
 - **FUSEBASE_HOST**: {FUSEBASE_HOST}
 - **FUSEBASE_APP_HOST**: {FUSEBASE_APP_HOST} (apps subdomain, e.g. for app URLs)
 
+### Runtime host resolution (multi-env safe — REQUIRED)
+
+**Never bake a platform host into the frontend bundle** (no
+`VITE_FUSEBASE_HOST`-style constants for choosing API endpoints). A bundle
+built with one backend's host and deployed against another silently sends SDK
+calls cross-backend (`getMe` fails with status `0` — network/CORS — and blocks
+the whole app load). Instead, resolve at runtime, in this order:
+
+1. **Same-origin relative paths** for app-api/proxy calls — no host needed at
+   all; the platform routes them. Prefer this always.
+2. When an absolute host is unavoidable, derive it from
+   **`window.location.hostname`** (`…dev-thefusebase-app.com` → dev hosts,
+   `…thefusebase.app` → prod hosts) or from **`/fusebase-env.json`**
+   (`backend` field; present on environment-aware deploys).
+3. Build-time env values are acceptable only for **backend** code (server
+   processes get the correct values from platform secrets / deploy-time env).
+
+**Degrade gracefully:** a failed `getMe` must not block the entire app load.
+When env info is present, `orgId`/`appId` are already known — render the
+shell, surface the auth error in the affected area only (see the
+`handling-authentication-errors` skill).
+
+### Runtime context priority (orgId / appId / backend)
+
+Deploys inject the environment context **synchronously** as
+`window.__FUSEBASE_ENV__` in `index.html` (same payload as
+`/fusebase-env.json` — env name, `backend`, `orgId`, `productId`, `appId`).
+Resolve runtime context in this strict order:
+
+1. `window.__FUSEBASE_ENV__` (synchronous — available before any request;
+   no race);
+2. `/fusebase-env.json` fetch (older deploys);
+3. `getMe` — for **user** identity only; it must never override the
+   deploy-time `orgId`/`appId`;
+4. build-time constants (`VITE_FBS_ORG_ID` and similar) — **last resort**,
+   and never on a hostname that belongs to a different backend than the one
+   they were baked for.
+
+Do not fire data requests that need `orgId` before the context is resolved —
+with `window.__FUSEBASE_ENV__` that resolution is synchronous, so there is
+nothing to wait for. A Gate `FORBIDDEN` ("User does not have access to this
+organization") right after load is the signature of a stale baked org id
+racing the env context.
+
 ## Token Sources
 
 ### MCP Token (Development)

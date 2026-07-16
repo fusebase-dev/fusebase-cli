@@ -1,22 +1,15 @@
 import { Command } from "commander";
-import { mkdir, writeFile } from "fs/promises";
 import { fetchOrgs } from "../api";
-import { CONFIG_DIR, CONFIG_FILE, getConfig, type Config } from "../config";
+import {
+  CONFIG_DIR,
+  getEnv,
+  setBackendApiKey,
+  setConfig,
+  setProcessEnvOverride,
+} from "../config";
+import { environmentsFeatureEnabled } from "../environments";
 import { runAuthFlow } from "./steps/auth-flow";
 import { flushReport } from "../error-reporter";
-
-async function ensureConfigDir(): Promise<void> {
-  try {
-    await mkdir(CONFIG_DIR, { recursive: true });
-  } catch {
-    // Directory already exists
-  }
-}
-
-async function saveConfig(config: Config): Promise<void> {
-  await ensureConfigDir();
-  await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
-}
 
 export const authCommand = new Command("auth")
   .description("Set the API key for authentication")
@@ -27,11 +20,15 @@ export const authCommand = new Command("auth")
   .action(async (options: { apiKey?: string; dev: boolean; open: boolean }) => {
     const apiKey = options.apiKey;
     const isDev = options.dev;
+    // `--dev` targets dev explicitly; otherwise keep the legacy semantics —
+    // authenticate against the machine's current env (config `env` /
+    // process.env.ENV chain). Hardcoding "prod" here broke `auth --api-key`
+    // with a dev key on env=dev machines (CI e2e regression).
+    const backend = isDev ? "dev" : (getEnv() ?? "prod");
 
-    if (isDev) {
-      // globally set ENV var because global config is not yet created, so environment will be decided by this variable in getEnv()
-      process.env.ENV = "dev";
-    }
+    // Validate the key against that backend, regardless of an active
+    // environment in the cwd.
+    setProcessEnvOverride(backend);
 
     // If no API key provided, start OAuth flow
     if (!apiKey) {
@@ -54,12 +51,13 @@ export const authCommand = new Command("auth")
       await flushReport();
       process.exit(1);
     }
-    const config = getConfig();
-    config.apiKey = apiKey;
-    if (isDev) {
-      config.env = "dev";
+    setBackendApiKey(backend, apiKey);
+    if (isDev && !environmentsFeatureEnabled()) {
+      // Legacy behavior: `auth --dev` also switches the machine-global env.
+      // With environments enabled the backend comes from the active
+      // environment, so auth no longer flips it.
+      setConfig({ env: "dev" });
     }
-    await saveConfig(config);
 
     console.log("✓ API key saved successfully");
   });

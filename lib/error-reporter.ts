@@ -46,6 +46,8 @@ function collectReportFiles(): ReportFile[] {
       const raw = readFileSync(CONFIG_FILE, "utf-8");
       const config = JSON.parse(raw);
       delete config.apiKey;
+      // Per-backend keys (auth.dev/auth.prod) are credentials too.
+      delete config.auth;
       files.push({
         name: "config.json",
         content: Buffer.from(JSON.stringify(config, null, 2)),

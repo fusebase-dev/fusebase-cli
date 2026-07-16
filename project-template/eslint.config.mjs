@@ -68,7 +68,9 @@ export default tseslint.config(
       "coverage/**",
       ".claude/**",
       ".codex/**",
-      ".agents/**"
+      ".agents/**",
+      // Vendored SDK sources are third-party code — not subject to app lint.
+      "vendor/**"
     ],
   }
 );

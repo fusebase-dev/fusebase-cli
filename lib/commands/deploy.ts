@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { createHash } from "crypto";
-import { readFile, readdir, stat } from "fs/promises";
-import { join, relative } from "path";
+import { readFile, readdir, stat, writeFile as writeFileAsync } from "fs/promises";
+import { basename, join, relative } from "path";
 import { homedir } from "os";
 import mime from "mime";
 import cliProgress from "cli-progress";
@@ -22,6 +22,7 @@ import {
   copyFrontendParams,
   updateApp,
   createApp,
+  createProduct,
   sendCodingStatsForCreatedApp,
   type Product,
   type App,
@@ -33,18 +34,27 @@ import {
   type UpdateAppRequest,
 } from "../api";
 import { mergeFeaturePermissions } from "../permissions";
-import { getFusebaseAppHost } from "../config";
+import { getEnv, getFusebaseAppHost } from "../config";
 import { logger } from "../logger";
 import {
   getConfig,
   loadFuseConfig,
   validateMinReplicas,
-  writeResolvedAppIdToFusebaseJson,
+  persistResolvedAppId,
   type BackendConfig,
   type FeatureConfig,
   type SidecarConfig,
 } from "../config";
 import { formatReconcileLine, reconcileApps, type ReconcileAction } from "../reconcile";
+import {
+  buildEnvInfoPayload,
+  environmentAppKey,
+  getActiveEnvironment,
+  injectEnvInfoIntoIndexHtml,
+  writeEnvironmentProductId,
+} from "../environments";
+import { readEnvFileMap } from "./steps/create-env";
+import { getFusebaseAppHostForBackend } from "../config";
 import {
   buildPublishedAppApiManifest,
   loadAndValidateOpenApiFile,
@@ -187,6 +197,7 @@ async function runCommand(
   command: string,
   cwd: string,
   label: string,
+  extraEnv?: Record<string, string>,
 ): Promise<void> {
   console.log(`   ${label}...`);
   logger.debug("Running command: %s in %s", command, cwd);
@@ -196,6 +207,10 @@ async function runCommand(
       shell: true,
       cwd,
       stdio: ["inherit", "pipe", "pipe"],
+      // Target-environment vars win over inherited/stale ones so build-time
+      // reads (e.g. Vite VITE_*/FUSEBASE_HOST) match the env being deployed,
+      // not whichever .env happens to be materialized.
+      env: extraEnv ? { ...process.env, ...extraEnv } : process.env,
     });
 
     let stdout = "";
@@ -443,7 +458,10 @@ async function runLintIfPresent(featurePath: string): Promise<void> {
   }
 }
 
-async function runBuildCommand(featureConfig: FeatureConfig): Promise<void> {
+async function runBuildCommand(
+  featureConfig: FeatureConfig,
+  extraEnv?: Record<string, string>,
+): Promise<void> {
   const buildCommand = featureConfig.build?.command;
   if (!buildCommand) {
     return;
@@ -454,7 +472,7 @@ async function runBuildCommand(featureConfig: FeatureConfig): Promise<void> {
     : process.cwd();
 
   // Dependencies are already installed by the deploy loop before lint
-  await runCommand(buildCommand, featurePath, "Building");
+  await runCommand(buildCommand, featurePath, "Building", extraEnv);
 }
 
 async function publishOpenApiManifestIfPresent(params: {
@@ -558,19 +576,18 @@ type AppServerState = Partial<
 
 
 
-// Persist a reconcile-resolved id back into an id-less declarative `apps[]`
-// entry (NIM-41875). Best-effort — a write failure must not fail the deploy.
-function persistResolvedId(featureConfig: FeatureConfig, featureId: string): void {
+// Persist a reconcile-resolved id back into the env lockfile (active
+// environment) or the id-less declarative `apps[]` entry (legacy, NIM-41875).
+// Best-effort — a write failure must not fail the deploy.
+function persistResolvedId(
+  featureConfig: FeatureConfig,
+  featureId: string,
+  options?: { createdSubdomain?: string },
+): void {
   if (featureConfig.id || !featureConfig.subdomain) return;
   try {
-    if (
-      writeResolvedAppIdToFusebaseJson(
-        process.cwd(),
-        featureConfig.subdomain,
-        featureId,
-      )
-    ) {
-      console.log(`   ✓ Saved app id ${featureId} to fusebase.json`);
+    if (persistResolvedAppId(process.cwd(), featureConfig, featureId, options)) {
+      console.log(`   ✓ Saved app id ${featureId}`);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -602,7 +619,8 @@ export const deployCommand = new Command("deploy")
       process.exit(1);
     }
 
-    if (!fuseConfig.orgId || !fuseConfig.productId) {
+    const activeEnvironment = getActiveEnvironment();
+    if (!fuseConfig.orgId || (!fuseConfig.productId && !activeEnvironment)) {
       console.error("Error: Invalid fusebase.json. Missing orgId or productId.");
       process.exit(1);
     }
@@ -612,6 +630,51 @@ export const deployCommand = new Command("deploy")
     if (!config.apiKey) {
       console.error("Error: No API key configured. Run 'fusebase auth' first.");
       process.exit(1);
+    }
+
+    // Target-env vars for build subprocesses: builds must see the deployed
+    // environment's values (FUSEBASE_HOST, VITE_*, …) even when `.env` is
+    // materialized from a different (active) environment. Field bug: a baked
+    // prod VITE_FUSEBASE_HOST in a dev deploy sent the Gate SDK cross-backend.
+    let buildEnvVars: Record<string, string> | undefined;
+    if (activeEnvironment) {
+      console.log(
+        `Environment: ${activeEnvironment.name} (backend: ${activeEnvironment.config.backend}, org: ${activeEnvironment.config.orgId})`,
+      );
+      const envFileMap = await readEnvFileMap(
+        process.cwd(),
+        `.env.${activeEnvironment.name}`,
+      );
+      if (envFileMap.size > 0) {
+        buildEnvVars = Object.fromEntries(envFileMap);
+      }
+    }
+
+    // A not-yet-deployed environment has no product: create it in the env's
+    // org now and persist the id into the env lockfile (first-deploy bootstrap,
+    // docs/proposals/APP-ENVIRONMENTS.md §8.3). Declarative reconcile is the
+    // default since the declarative-manifest flag graduated.
+    if (!fuseConfig.productId && activeEnvironment) {
+      try {
+        const title = basename(process.cwd());
+        console.log(`Creating product "${title}" in org ${fuseConfig.orgId}...`);
+        const product = await createProduct(
+          config.apiKey,
+          fuseConfig.orgId,
+          title,
+        );
+        writeEnvironmentProductId(
+          process.cwd(),
+          activeEnvironment.name,
+          product.id,
+        );
+        fuseConfig.productId = product.id;
+        console.log(`   ✓ Created product ${product.id} (saved to environments/${activeEnvironment.name}.json)`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Error: Failed to create product: ${message}`);
+        process.exit(1);
+      }
     }
 
     // Find apps with path configured
@@ -666,7 +729,11 @@ export const deployCommand = new Command("deploy")
       );
       features = featuresResponse.apps;
     } catch (error) {
-      console.error("Error: Failed to fetch product or apps from API.");
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Error: Failed to fetch product or apps from API: ${message}`);
+      console.error(
+        `   (org: ${fuseConfig.orgId}, product: ${fuseConfig.productId}, backend: ${getEnv()})`,
+      );
       process.exit(1);
     }
 
@@ -717,8 +784,11 @@ export const deployCommand = new Command("deploy")
     // apps on the platform above; persist any resolved ids and stop before the
     // code deploy loop (no build, no upload, no backend deploy).
     if (nocode) {
-      for (const { appConfig, appId } of deployTargets) {
-        persistResolvedId(appConfig, appId);
+      for (const { appConfig, appId, action } of deployTargets) {
+        persistResolvedId(appConfig, appId, {
+          createdSubdomain:
+            action === "created" ? appConfig.subdomain : undefined,
+        });
       }
       console.log(
         `\n✓ Reconciled ${deployTargets.length} app(s) (--nocode: code deployment skipped).`,
@@ -738,7 +808,7 @@ export const deployCommand = new Command("deploy")
       error?: string;
     }> = [];
 
-    for (const { appConfig, appId } of deployTargets) {
+    for (const { appConfig, appId, action } of deployTargets) {
       const featureBasePath = join(process.cwd(), appConfig.path!);
 
       console.log(`📦 App: ${appId}`);
@@ -888,7 +958,7 @@ export const deployCommand = new Command("deploy")
         } else {
           // Branches A, D: build + upload frontend
           if (appConfig.build?.command) {
-            await runBuildCommand(appConfig);
+            await runBuildCommand(appConfig, buildEnvVars);
           }
 
           // ── Resolve upload directory and listing ──────────────────────────
@@ -905,6 +975,40 @@ export const deployCommand = new Command("deploy")
             throw new Error(
               `output directory does not exist: ${outputDirPath}`,
             );
+          }
+
+          // Bake env-info into the bundle for the in-app env panel and test
+          // runners (docs/proposals/APP-ENVIRONMENTS.md §10). Deterministic
+          // payload — no timestamps — and the frontend hash is computed from
+          // sources, so this never churns the hash-skip. Env mode only.
+          if (activeEnvironment) {
+            const envInfo = buildEnvInfoPayload({
+              projectRoot: process.cwd(),
+              active: activeEnvironment,
+              appKey: environmentAppKey(appConfig) ?? appConfig.subdomain ?? appId,
+              appId,
+              effectiveSubdomain: appConfig.subdomain,
+              appHostForBackend: getFusebaseAppHostForBackend,
+            });
+            await writeFileAsync(
+              join(uploadDir, "fusebase-env.json"),
+              JSON.stringify(envInfo, null, 2) + "\n",
+              "utf-8",
+            );
+            // Synchronous global in index.html: app code reads
+            // window.__FUSEBASE_ENV__ before any fetch resolves — no race
+            // between stale build-time constants and the env-info request.
+            try {
+              const indexHtmlPath = join(uploadDir, "index.html");
+              const html = await readFile(indexHtmlPath, "utf-8");
+              const injected = injectEnvInfoIntoIndexHtml(html, envInfo);
+              if (injected) {
+                await writeFileAsync(indexHtmlPath, injected, "utf-8");
+              }
+            } catch {
+              // No index.html (non-SPA output) — the JSON asset still ships.
+            }
+            console.log(`   ✓ Wrote fusebase-env.json (env: ${activeEnvironment.name})`);
           }
 
           // Exclude backend folder from static upload when it lives in uploadDir
@@ -1155,10 +1259,13 @@ export const deployCommand = new Command("deploy")
         const sub = feature?.sub ?? appConfig.subdomain;
         const featureUrl = sub ? `https://${sub}.${domain}/` : "";
 
-        // Persist the reconcile-resolved id back into fusebase.json for
-        // declarative (id-less) entries, so the next deploy takes the legacy
-        // fast path and the manifest records the real platform id (NIM-41875).
-        persistResolvedId(appConfig, appId);
+        // Persist the reconcile-resolved id (env lockfile or fusebase.json)
+        // for declarative (id-less) entries, so the next deploy takes the
+        // legacy fast path and the real platform id is recorded (NIM-41875).
+        persistResolvedId(appConfig, appId, {
+          createdSubdomain:
+            action === "created" ? appConfig.subdomain : undefined,
+        });
 
         results.push({
           appId,

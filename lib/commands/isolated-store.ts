@@ -4,7 +4,7 @@ import {
   getConfig,
   hasFlag,
   loadFuseConfig,
-  writeResolvedAppIdToFusebaseJson,
+  persistResolvedAppId,
   type FeatureConfig,
   type FuseConfig,
 } from "../config";
@@ -136,11 +136,10 @@ async function ensureAppExists(
   // Best-effort write-back so the next run takes the id fast path — a failure
   // here must not stop the command.
   try {
-    writeResolvedAppIdToFusebaseJson(
-      process.cwd(),
-      appConfig.subdomain,
-      resolved.appId,
-    );
+    persistResolvedAppId(process.cwd(), appConfig, resolved.appId, {
+      createdSubdomain:
+        resolved.action === "created" ? appConfig.subdomain : undefined,
+    });
   } catch {
     // ignore: the reconcile already resolved the id in-memory for this run.
   }
