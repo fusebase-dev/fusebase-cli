@@ -34,6 +34,25 @@ FUSEBASE_ENV=<env> npm test
    `.env.<name>` locally / CI variables in pipelines. Reports and traces are
    gitignored.
 
+## Before minting magic links: pin the app's access principals
+
+`createAppMagicLink` appends a **user principal** to the app
+(`addToAccessPrincipals` defaults to true). If the app's principal list was
+EMPTY (platform default = "open for org roles"), that first append flips the
+semantics to "ONLY the listed principals" — locking out the owner and
+everyone else (`Access Denied` on `/_auth/`). Field incident, not a theory.
+
+Fix/prevention: give the app explicit principals **before** the first
+magic-link test run, e.g.
+
+```bash
+fusebase app update <appId> --env <name> \
+  --access=orgRole:owner,orgRole:manager,orgRole:member,orgRole:client
+```
+
+(add `visitor` for public envs). Fixture users keep access via
+`orgRole:client`.
+
 ## Converting a manual QA scenario into a spec
 
 When the user (or QA) describes a manually verified scenario:
