@@ -63,7 +63,20 @@ Any runner works — the contract is just:
 FUSEBASE_ENV=<env> npm test   # exit code + reports/<env>.json
 ```
 
-Wire it as a GitLab CI job or GitHub Actions workflow with `FUSEBASE_ENV` as
-the matrix axis and `PW_USER_*` as CI secrets. (Central publishing of
-`reports/<env>.json` to the platform registry — coming as `fusebase test
-publish`.)
+Ready-made templates in `ci/`:
+
+- **GitLab CI** — copy the job from `ci/gitlab-e2e.yml` into your root
+  `.gitlab-ci.yml` (matrix over `FUSEBASE_ENV`, playwright image, reports as
+  artifacts, schedules for prod-test smoke).
+- **GitHub Actions** — copy `ci/github-e2e.yml` to `.github/workflows/e2e.yml`.
+
+Secrets in CI (no dotenv files there): the harness falls back from
+`.env.<name>` to process env — plain key or env-suffixed for matrices
+(`GATE_MCP_TOKEN_DEV`, `GATE_MCP_TOKEN_PROD_TEST`,
+`PW_USER_CLIENT_PASSWORD_PROD_TEST`, …). Mint gate tokens with
+`fusebase env tokens --env <name>` and copy the value from `.env.<name>` into
+the CI variable. Magic-link sign-in needs no passwords at all.
+
+Keep protected (production) environments on schedules/manual runs, not on
+every merge request. (Central publishing of `reports/<env>.json` to the
+platform registry — coming as `fusebase test publish`.)

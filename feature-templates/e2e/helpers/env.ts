@@ -129,6 +129,25 @@ export function resolveTargetEnvironment(): TargetEnvironment {
   return { name, projectRoot, config, secrets };
 }
 
+/**
+ * Resolve a secret for the target environment. Local runs read `.env.<name>`;
+ * CI has no dotenv files (they are gitignored), so process env is the
+ * fallback — first with an env-name suffix for matrix jobs, then plain:
+ *
+ *   1. `.env.<name>` file value
+ *   2. process.env[`<KEY>_<ENV_NAME>`]  (env name uppercased, "-" → "_",
+ *      e.g. GATE_MCP_TOKEN_PROD_TEST)
+ *   3. process.env[<KEY>]
+ */
+export function secret(
+  env: TargetEnvironment,
+  key: string,
+): string | undefined {
+  if (env.secrets[key]) return env.secrets[key];
+  const suffix = env.name.toUpperCase().replace(/-/g, "_");
+  return process.env[`${key}_${suffix}`] ?? process.env[key];
+}
+
 function appHostForBackend(backend: string): string {
   return backend === "prod" ? "thefusebase.app" : "dev-thefusebase-app.com";
 }
@@ -179,7 +198,7 @@ export function fixtureUser(
   if (!user) return null;
   return {
     email: user.email,
-    password: env.secrets[`PW_USER_${key.toUpperCase()}_PASSWORD`],
+    password: secret(env, `PW_USER_${key.toUpperCase()}_PASSWORD`),
     role: user.role,
   };
 }
@@ -205,13 +224,18 @@ export async function createSignInMagicLink(
       `fixture "${fixtureKey}" not configured for env "${env.name}"`,
     );
   }
-  const gateToken = env.secrets.GATE_MCP_TOKEN;
-  const host = env.secrets.FUSEBASE_HOST;
-  if (!gateToken || !host) {
+  const gateToken = secret(env, "GATE_MCP_TOKEN");
+  if (!gateToken) {
     throw new Error(
-      `GATE_MCP_TOKEN / FUSEBASE_HOST missing in .env.${env.name} — run \`fusebase env tokens --env ${env.name}\``,
+      `GATE_MCP_TOKEN missing for env "${env.name}" — locally run ` +
+        `\`fusebase env tokens --env ${env.name}\`; in CI set the ` +
+        `GATE_MCP_TOKEN_${env.name.toUpperCase().replace(/-/g, "_")} variable`,
     );
   }
+  // Platform host derives from the env's backend — never from build-time or
+  // dotenv values (CI has no dotenv files).
+  const host =
+    env.config.backend === "prod" ? "thefusebase.com" : "dev-thefusebase.com";
   if (!env.config.productId) {
     throw new Error(
       `environment "${env.name}" has no productId — deploy it first`,

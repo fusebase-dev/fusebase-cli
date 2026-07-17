@@ -54,6 +54,10 @@ When the user (or QA) describes a manually verified scenario:
 ## Reports / CI
 
 `reports/<env>.json` is the machine-readable result per environment — the
-contract for any CI (GitLab CI, GitHub Actions: run `FUSEBASE_ENV=<env> npm
-test`, keep the JSON as artifact). Central publishing to the platform registry
-is planned as `fusebase test publish`.
+contract for any CI is `FUSEBASE_ENV=<env> npm test`. Ready-made templates
+ship in `tests/e2e/ci/`: `gitlab-e2e.yml` (copy the job into the root
+`.gitlab-ci.yml`) and `github-e2e.yml` (copy to `.github/workflows/e2e.yml`).
+CI has no dotenv files — the harness falls back to process env, plain or
+env-suffixed (`GATE_MCP_TOKEN_DEV`, `PW_USER_CLIENT_PASSWORD_PROD_TEST`).
+Keep protected environments on schedules/manual runs. Central publishing to
+the platform registry is planned as `fusebase test publish`.
