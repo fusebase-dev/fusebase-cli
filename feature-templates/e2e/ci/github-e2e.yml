@@ -47,6 +47,8 @@ jobs:
           GATE_MCP_TOKEN_PROD_TEST: ${{ secrets.GATE_MCP_TOKEN_PROD_TEST }}
         run: |
           npm ci
+          # browser matching the locked playwright version (image browsers drift)
+          npx playwright install chromium
           npx playwright test
       - name: Upload reports
         if: always()

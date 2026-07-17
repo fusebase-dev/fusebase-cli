@@ -25,6 +25,10 @@ e2e:
   script:
     - cd tests/e2e
     - npm ci
+    # Browser matching the LOCKED playwright version — the image only
+    # guarantees system deps; its preinstalled browsers drift when the
+    # lockfile resolves a newer @playwright/test.
+    - npx playwright install chromium
     - npx playwright test
   artifacts:
     when: always
