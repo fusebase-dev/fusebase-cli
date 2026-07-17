@@ -1,6 +1,6 @@
 ---
 name: app-e2e-tests
-description: Author and run environment-aware Playwright e2e tests for this Fusebase project. Use when: 1. Adding or scaffolding e2e tests (fusebase scaffold --template e2e), 2. Converting a manually verified scenario into a Playwright spec, 3. Running the same test set against dev and prod environments, 4. Wiring test users/fixtures per environment.
+description: "Author and run environment-aware Playwright e2e tests for this Fusebase project. Use when: 1. Adding or scaffolding e2e tests (fusebase scaffold --template e2e), 2. Converting a manually verified scenario into a Playwright spec, 3. Running the same test set against dev and prod environments, 4. Wiring test users/fixtures per environment."
 ---
 
 # App E2E tests (environment-aware)
