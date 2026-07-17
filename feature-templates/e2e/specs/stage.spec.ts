@@ -39,7 +39,7 @@ test.describe("stage guard", () => {
       !returned,
       `platform kept the anonymous session on ${new URL(page.url()).host} — ` +
         "this app requires a signed-in session; cover it with fixture-based " +
-        "sign-in specs (see auth-matrix.example.spec.ts)",
+        "sign-in specs (copy examples/role-matrix.spec.ts into specs/)",
     );
     await expect(page.locator("#root")).toBeAttached();
     // The env panel (staff/debug surface) renders even while auth loads;

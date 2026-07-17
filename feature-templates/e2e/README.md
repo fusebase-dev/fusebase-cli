@@ -27,6 +27,14 @@ and `reports/<env>-html/`.
   bundle's `fusebase-env.json` matches the target env before anything else.
   Keep it; never delete it.
 
+## Optional recipes (`examples/`)
+
+`examples/` is NOT executed — it holds copy-when-needed patterns. Today:
+`role-matrix.spec.ts` — passwordless per-role sign-in via platform magic
+links (fixture-driven, self-skipping). Copy it into `specs/` only if your app
+has role-differentiated access worth testing; a public or single-role app
+doesn't need it.
+
 ## Fixtures (test users)
 
 | What | Where | Committed |

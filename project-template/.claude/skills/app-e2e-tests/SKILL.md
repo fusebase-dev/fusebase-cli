@@ -26,7 +26,7 @@ FUSEBASE_ENV=<env> npm test
    `helpers/env.ts` (`environments/<name>.json` + `.env.<name>`). A spec that
    embeds a URL or id will silently break on the other environment.
 3. **Fixtures self-skip.** Use the `fixtureUser(env, key)` + `test.skip`
-   pattern (see `auth-matrix.example.spec.ts`) so specs stay runnable while
+   pattern (see `examples/role-matrix.spec.ts`) so specs stay runnable while
    fixtures roll out per env.
 4. **Cleanup.** Tests that create data must delete it — prod-test environments
    are real orgs.

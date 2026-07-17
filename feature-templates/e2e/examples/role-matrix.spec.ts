@@ -7,7 +7,10 @@ import {
 } from "../helpers/env";
 
 /**
- * Fixture-driven role matrix — copy this pattern for real cases.
+ * RECIPE — not executed from examples/. Copy into specs/ when your app has
+ * role-differentiated access worth testing (public/single-role apps don't).
+ *
+ * Fixture-driven role matrix:
  *
  * Sign-in is passwordless: Gate mints a magic link for the fixture email and
  * the spec activates it (the platform sets session cookies). Requirements:
