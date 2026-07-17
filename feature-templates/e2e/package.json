@@ -1,0 +1,14 @@
+{
+  "name": "e2e-tests",
+  "private": true,
+  "description": "Environment-aware Playwright e2e suite for this Fusebase project",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.x"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "id": "e2e",
+  "name": "Playwright E2E test suite",
+  "description": "Environment-aware end-to-end test suite (Playwright). Reads environments/<name>.json + .env.<name>, runs the same spec set against any environment (dev/prod), asserts the target stage before testing. Scaffold into tests/e2e at the project root.",
+  "stack": "playwright, typescript"
+}

@@ -1,0 +1,61 @@
+# E2E suite on GitHub Actions — copy to .github/workflows/e2e.yml
+#
+# Runner contract (provider-agnostic): FUSEBASE_ENV=<env> npm test
+#   → exit code + tests/e2e/reports/<env>.json
+#
+# Repository secrets to configure (Settings → Secrets and variables → Actions):
+#   GATE_MCP_TOKEN_<ENV>            e.g. GATE_MCP_TOKEN_DEV, GATE_MCP_TOKEN_PROD_TEST
+#                                   (env name uppercased, "-" → "_"; mint with
+#                                   `fusebase env tokens --env <name>` and copy
+#                                   from .env.<name>)
+#   PW_USER_<KEY>_PASSWORD[_<ENV>]  only for password-based fixtures
+#                                   (magic-link sign-in needs none)
+#
+# Adjust the matrix to your environments. Keep protected (production) envs on
+# schedule/dispatch only — not on every pull request.
+
+name: e2e
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1-5" # weekday smoke; adjust or remove
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment to test (overrides the matrix)"
+        required: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.49.0-noble
+    strategy:
+      fail-fast: false
+      matrix:
+        fusebase_env: ["dev"]
+        # fusebase_env: ["dev", "prod-test"]  # enable when the env + fixtures exist
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run e2e suite
+        working-directory: tests/e2e
+        env:
+          FUSEBASE_ENV: ${{ github.event.inputs.env || matrix.fusebase_env }}
+          GATE_MCP_TOKEN_DEV: ${{ secrets.GATE_MCP_TOKEN_DEV }}
+          GATE_MCP_TOKEN_PROD_TEST: ${{ secrets.GATE_MCP_TOKEN_PROD_TEST }}
+        run: |
+          npm ci
+          # browser matching the locked playwright version (image browsers drift)
+          npx playwright install chromium
+          npx playwright test
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reports-${{ github.event.inputs.env || matrix.fusebase_env }}
+          path: |
+            tests/e2e/reports/
+            tests/e2e/test-results/
+          retention-days: 14

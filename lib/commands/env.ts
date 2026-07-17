@@ -221,8 +221,13 @@ async function runTokensForEnvironment(
 
   ensureEnvGitignoreEntries(cwd);
 
-  const activeName = resolveActiveEnvironmentName(cwd)?.name;
-  if (activeName === env.name && materializeActiveEnvFile(cwd, env.name)) {
+  // Materialize into `.env` only for the STICKY active env (state file /
+  // default) — a one-shot `--env <other>` run must not overwrite the active
+  // env's materialized `.env`.
+  const stickyActive =
+    readActiveEnvironmentState(cwd) ??
+    listEnvironmentNames(cwd).filter((n, _i, all) => all.length === 1)[0];
+  if (stickyActive === env.name && materializeActiveEnvFile(cwd, env.name)) {
     console.log(`✓ Materialized .env from .env.${env.name}`);
   }
 

@@ -1,0 +1,4 @@
+[test]
+# Unit tests live in test/ only — template trees (feature-templates/e2e
+# ships Playwright *.spec.ts files) must not be picked up by `bun test`.
+root = "./test"

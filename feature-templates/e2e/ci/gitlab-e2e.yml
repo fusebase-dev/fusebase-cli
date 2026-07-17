@@ -1,0 +1,46 @@
+# E2E suite on GitLab CI — copy this job into your root .gitlab-ci.yml
+# (or `include: local: tests/e2e/ci/gitlab-e2e.yml` and add the stage).
+#
+# Runner contract (provider-agnostic): FUSEBASE_ENV=<env> npm test
+#   → exit code + tests/e2e/reports/<env>.json
+#
+# CI/CD variables to configure (Settings → CI/CD → Variables, masked):
+#   GATE_MCP_TOKEN_<ENV>            e.g. GATE_MCP_TOKEN_DEV, GATE_MCP_TOKEN_PROD_TEST
+#                                   (env name uppercased, "-" → "_"; mint with
+#                                   `fusebase env tokens --env <name>` and copy
+#                                   from .env.<name>)
+#   PW_USER_<KEY>_PASSWORD[_<ENV>]  only for password-based fixtures
+#                                   (magic-link sign-in needs none)
+#
+# Adjust the FUSEBASE_ENV matrix to your environments. Keep protected
+# (production) envs out of merge-request runs — schedule/manual only.
+
+e2e:
+  stage: test
+  image: mcr.microsoft.com/playwright:v1.49.0-noble
+  parallel:
+    matrix:
+      - FUSEBASE_ENV: ["dev"]
+      # - FUSEBASE_ENV: ["prod-test"]   # enable when the env + fixtures exist
+  script:
+    - cd tests/e2e
+    - npm ci
+    # Browser matching the LOCKED playwright version — the image only
+    # guarantees system deps; its preinstalled browsers drift when the
+    # lockfile resolves a newer @playwright/test.
+    - npx playwright install chromium
+    - npx playwright test
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - tests/e2e/reports/
+      - tests/e2e/test-results/
+  rules:
+    # Merge requests + default branch run the dev matrix; scheduled pipelines
+    # (Build → Pipeline schedules) are the place for prod-test smoke.
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - when: manual
+      allow_failure: true
