@@ -420,6 +420,11 @@ The `--access` option replaces the entire access principal list. Principals are 
 |-----------|-------------|
 | `visitor` | Any unauthenticated visitor (public access) |
 | `orgRole:<id>` | Org members with a specific role. Valid ids: `guest`, `client`, `member`, `manager`, `owner` |
+| `portalMember` | Member of the portal the app is embedded in (portal-scoped, no id) |
+| `portalManager` | Portal member who is an org `manager`/`owner` (portal-scoped, no id) |
+| `portalClient` | Portal member who is an org `client` (portal-scoped, no id) |
+
+Portal principals are **context-relative**: they only match when the app is opened from inside a portal (the platform resolves them from the verified portal context). Outside a portal they never match, so an app restricted to only portal principals is unreachable when opened directly.
 
 **Examples:**
 
@@ -435,6 +440,9 @@ fusebase app update feat_abc123 --access=orgRole:member,orgRole:client
 
 # Public access + org members
 fusebase app update feat_abc123 --access=visitor,orgRole:member
+
+# Portal-embedded app: only clients and managers of the embedding portal
+fusebase app update feat_abc123 --access=portalClient,portalManager
 
 # Replace dashboard/database permissions only
 fusebase app update feat_abc123 --permissions="dashboardView.dash_1:view_1.read;database.id:db_1.write"

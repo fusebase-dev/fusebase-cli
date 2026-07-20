@@ -57,7 +57,12 @@ export type AppAccessPrincipalType =
   | "user"
   | "orgRole"
   | "orgGroup"
-  | "visitor";
+  | "visitor"
+  // Portal-scoped, context-relative principals (resolved against the portal the
+  // app is embedded in). They only match when the app is opened from a portal.
+  | "portalMember"
+  | "portalManager"
+  | "portalClient";
 
 export interface AppAccessPrincipal {
   type: AppAccessPrincipalType;

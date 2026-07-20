@@ -65,6 +65,35 @@ describe("parsePrincipals", () => {
     });
   });
 
+  describe("portal principals", () => {
+    it("parses bare portalClient with empty id", () => {
+      expect(parsePrincipals("portalClient")).toEqual([{ type: "portalClient", id: "" }]);
+    });
+
+    it("parses portalManager and portalMember", () => {
+      expect(parsePrincipals("portalManager,portalMember")).toEqual([
+        { type: "portalManager", id: "" },
+        { type: "portalMember", id: "" },
+      ]);
+    });
+
+    it("is case-insensitive on the portal principal name", () => {
+      expect(parsePrincipals("PortalClient")).toEqual([{ type: "portalClient", id: "" }]);
+    });
+
+    it("rejects a portal principal with an id", () => {
+      expect(() => parsePrincipals("portalClient:123")).toThrow(/does not accept an id/);
+    });
+
+    it("mixes portal principals with orgRole", () => {
+      expect(parsePrincipals("portalClient,portalManager,orgRole:owner")).toEqual([
+        { type: "portalClient", id: "" },
+        { type: "portalManager", id: "" },
+        { type: "orgRole", id: "owner" },
+      ]);
+    });
+  });
+
   describe("multiple principals", () => {
     it("parses visitor and orgRole:member", () => {
       expect(parsePrincipals("visitor,orgRole:member")).toEqual([

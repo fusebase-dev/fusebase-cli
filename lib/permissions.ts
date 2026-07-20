@@ -1,5 +1,6 @@
 import type {
   AppAccessPrincipal,
+  AppAccessPrincipalType,
   AppGatePermissionItem,
   AppPermissionItem,
   AppPermissions,
@@ -9,12 +10,22 @@ import type {
 const VALID_ORG_ROLES = ['guest', 'client', 'member', 'manager', 'owner'];
 const VALID_RESOURCE_PRIVILEGES: AppResourcePermissionPrivilege[] = ["read", "write"];
 
+// Portal-scoped, context-relative principals. They match against the portal the
+// app is embedded in (the platform resolves them from the verified portal context),
+// so they take no id. Outside a portal they never match.
+const PORTAL_PRINCIPALS: Record<string, AppAccessPrincipalType> = {
+  portalmember: 'portalMember',
+  portalmanager: 'portalManager',
+  portalclient: 'portalClient',
+};
+
 /**
  * Parse access principals string into AppAccessPrincipal array.
  * Format: comma-separated list of "type" or "type:id"
  * Examples:
  *   "visitor" → [{ type: "visitor", id: "0" }]
  *   "orgRole:member" → [{ type: "orgRole", id: "member" }]
+ *   "portalClient" → [{ type: "portalClient", id: "" }]
  *   "visitor,orgRole:member,orgRole:guest" → [visitor, member, guest]
  */
 export function parsePrincipals(input: string): AppAccessPrincipal[] {
@@ -30,8 +41,10 @@ export function parsePrincipals(input: string): AppAccessPrincipal[] {
       const type = part.toLowerCase();
       if (type === 'visitor') {
         principals.push({ type: 'visitor', id: '0' });
+      } else if (PORTAL_PRINCIPALS[type]) {
+        principals.push({ type: PORTAL_PRINCIPALS[type], id: '' });
       } else {
-        throw new Error(`Invalid principal "${part}". Use "visitor" or "orgRole:<id>". Valid orgRole ids: ${VALID_ORG_ROLES.join(', ')}`);
+        throw new Error(`Invalid principal "${part}". Use "visitor", "orgRole:<id>", or a portal principal (${Object.values(PORTAL_PRINCIPALS).join(', ')}). Valid orgRole ids: ${VALID_ORG_ROLES.join(', ')}`);
       }
     } else {
       const type = part.substring(0, colonIdx).trim().toLowerCase();
@@ -44,8 +57,11 @@ export function parsePrincipals(input: string): AppAccessPrincipal[] {
           throw new Error(`Invalid orgRole id "${id}". Valid ids: ${VALID_ORG_ROLES.join(', ')}`);
         }
         principals.push({ type: 'orgRole', id });
+      } else if (PORTAL_PRINCIPALS[type]) {
+        // Portal principals are context-relative and take no id.
+        throw new Error(`Portal principal "${PORTAL_PRINCIPALS[type]}" does not accept an id. Use it bare, e.g. "${PORTAL_PRINCIPALS[type]}".`);
       } else {
-        throw new Error(`Invalid principal type "${type}". Valid types: visitor, orgRole`);
+        throw new Error(`Invalid principal type "${type}". Valid types: visitor, orgRole, ${Object.values(PORTAL_PRINCIPALS).join(', ')}`);
       }
     }
   }

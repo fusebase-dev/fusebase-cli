@@ -228,7 +228,7 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
 export const appUpdateCommand = new Command("update")
   .description("Update an app's settings")
   .argument("<appId>", "App ID to update")
-  .option("--access <principals>", "Set access principals, comma-separated (e.g., visitor or the org roles like orgRole:member, etc.)")
+  .option("--access <principals>", "Set access principals, comma-separated (e.g., visitor, org roles like orgRole:member, or portal principals portalClient/portalManager/portalMember)")
   .option("--permissions <permissions>", "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read)")
   .option("--sync-gate-permissions", "Analyze this app path and sync generated Gate permissions")
   .option(

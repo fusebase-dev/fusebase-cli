@@ -275,7 +275,7 @@ fusebase app create --name <name> --subdomain <subdomain> --path <path> --dev-co
 
 **Optional Options**:
 
-- `--access <principals>`: Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`)
+- `--access <principals>`: Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`, or portal-scoped `portalClient`/`portalManager`/`portalMember`)
 - `--permissions <permissions>`: Set manual resource permissions (format: `dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read`)
 
 **Prerequisites**:
