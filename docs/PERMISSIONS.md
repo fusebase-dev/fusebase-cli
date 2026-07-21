@@ -318,6 +318,8 @@ Two categories are kept out of the browser and stored in
    permission the analyzer re-emits (e.g. `getPortal` → `portals.read`) is stripped from the
    browser and lives only in `manifest.backendOnlyGatePermissions` (NIM-42264). The backend
    `/_token` mint still unions the manifest list back in for server-side calls.
+   The `Permissions: … gate [...]` line printed by `app update` is the **published**
+   (post-subtraction) set — what is sent to the platform, not the raw analyzer output.
 
 #### `--declare-backend-only-gate-permissions` (opt-in, legacy-safe)
 
