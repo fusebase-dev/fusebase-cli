@@ -1,7 +1,7 @@
 ---
-version: "1.4.0"
+version: "1.5.0"
 mcp_prompt: notes
-last_synced: "2026-07-01"
+last_synced: "2026-07-21"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -25,6 +25,11 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - createWorkspaceNote creates a workspace note and can optionally append initial content after creation.
 - appendWorkspaceNoteContent appends text or html to the end of an existing workspace note without replacing existing content.
 - addWorkspaceNoteAttachment attaches a `storedFileUUID` to a workspace note and appends the matching editor blot.
+- createWorkspaceMarkdownNote creates a v3 note whose source of truth is markdown stored in note-service.
+- getWorkspaceMarkdownNote reads a v3 note's markdown and current `revision`.
+- updateWorkspaceMarkdownNoteContent replaces the whole markdown document of a v3 note using an optimistic `revision` lock.
+- appendWorkspaceMarkdownNoteContent appends markdown to a v3 note with an optional `revision` lock.
+- addWorkspaceMarkdownNoteAttachment attaches a `storedFileUUID` to a v3 note and appends the matching markdown image or link.
 
 ## Identity And Scoping Rules
 
@@ -66,7 +71,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 ## Attachment Flow Rules
 
 - Upload files with the files operations first. Complete the upload and use the returned `storedFileUUID` for attachment creation. In Gate file responses this is file-service `storedFile.uuid` exposed as `storedFileUUID`; `fileId` is only an alias. Use the completion `readUrl` for direct file reads or image `src`.
-- `addWorkspaceNoteAttachment` creates the note-service attachment and then appends an editor blot.
+- `addWorkspaceNoteAttachment` creates the note-service attachment and then appends an editor blot. It is v2-only — for a v3 markdown note use `addWorkspaceMarkdownNoteAttachment`, which never touches the editor document.
 - Image attachments are inserted as `image` blots. All other attachment types are inserted as `file` blots.
 - The operation returns attachment metadata, not the full note body. Call `getWorkspaceNote` when you need refreshed markdown.
 
@@ -75,6 +80,15 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - Note reads require `notes.read` and org access.
 - Note creation, content append, and attachment writes require `notes.write` and org access.
 - If note-service or editor-server writes fail, verify caller permissions and workspace scope before assuming a schema mismatch.
+
+## Markdown (v3) Note Rules
+
+- Markdown ops only work on notes created with `createWorkspaceMarkdownNote`. Classic (v2) notes keep using `getWorkspaceNote`, `createWorkspaceNote`, and `appendWorkspaceNoteContent`.
+- Markdown is stored literally as the source of truth; no HTML conversion is needed or supported on these ops. Send real markdown, not HTML.
+- Every markdown response includes `note.revision`. Save it: `updateWorkspaceMarkdownNoteContent` requires the last-read `revision`, and `appendWorkspaceMarkdownNoteContent` accepts it optionally.
+- On HTTP 409 (`data.errorCode` = markdown_note_revision_conflict) the stored content changed since your read. Re-read with `getWorkspaceMarkdownNote` (or use `data.currentRevision`), reconcile, and retry the write.
+- Use update for full-document rewrites and append for adding to the end; do not emulate append by rewriting the whole document.
+- Attach files with `addWorkspaceMarkdownNoteAttachment`; it appends the markdown itself and returns the canonical attachment `url` plus the appended `markdown` snippet, so never hand-build the link format. To place the attachment somewhere other than the end, take that `url` and rewrite the document with `updateWorkspaceMarkdownNoteContent` using the returned `note.revision`.
 
 ## Working Rules
 
@@ -87,7 +101,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 
 ## Version
 
-- **Version**: 1.4.0
+- **Version**: 1.5.0
 - **Category**: specialized
-- **Last synced**: 2026-07-01
+- **Last synced**: 2026-07-21
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

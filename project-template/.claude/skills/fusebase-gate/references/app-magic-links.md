@@ -1,5 +1,5 @@
 ---
-version: "1.6.0"
+version: "1.7.0"
 mcp_prompt: appMagicLinks
 last_synced: "2026-07-14"
 title: "Fusebase Gate App Magic Link Operations"
@@ -58,6 +58,8 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 - `bulkCreateAppMagicLinks` — owner/admin bulk invite. Invites MANY users to ONE app in a single call (use instead of looping `createAppMagicLink`). Invites run with bounded concurrency (default 5, max 5; the rest are queued); `background=true` returns immediately with `status='processing'`. Per-invitee semantics match `createAppMagicLink`, and one failed invitee never aborts the batch.
 - `requestAppMagicLink` — visitor self-service flow. Visitor enters their email; Gate forwards to nimbus-ai which sends a magic link only when the email already has access under the App's current `accessPrincipals`. Always returns `{ ok: true }` so it cannot be used to enumerate emails or access state.
 - `activateAppMagicLink` — visitor activation. Exchanges a magic-link `globalId` for a session token, a Gate app token (`featureToken`), and a Dashboard token (`dashboardToken`), plus the `redirectPath` the SPA must navigate to.
+- `revokeAppMagicLink` — owner/admin revoke. `POST /:orgId/apps/:appId/magic-links/:globalId/revoke` soft-deletes a link so it can no longer be activated (activation then 404s) and the recipient email can be invited again. The fix for orphaned invites that would otherwise block a re-invite for 24h. Returns 404 for an unknown or already-revoked link. Requires `app_magic_link.write` + org access.
+- `listAppMagicLinks` — owner/admin support/debug. `GET /:orgId/apps/:appId/magic-links?email=` lists the app's active (non-revoked) links, newest first, with an optional email filter. Returns row metadata only (never token material). Use it to find the `globalId` of an orphaned invite to revoke. Requires `app_magic_link.write` + org access.
 
 ## When To Use Each Flow
 
@@ -123,7 +125,7 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 
 ## Access Model
 
-- `createAppMagicLink` requires `app_magic_link.write` plus org access. Granted by default to `owner`, `manager`, `member`, and `guest` org roles via the existing `GATE_ALL_PERMISSIONS` set.
+- `createAppMagicLink`, `bulkCreateAppMagicLinks`, `revokeAppMagicLink`, and `listAppMagicLinks` all require `app_magic_link.write` plus org access. Granted by default to `owner`, `manager`, `member`, and `guest` org roles via the existing `GATE_ALL_PERMISSIONS` set.
 - `requestAppMagicLink` and `activateAppMagicLink` are visitor endpoints (no permission, no session). The policy is enforced inside nimbus-ai by re-evaluating `accessPrincipals` against the resolved user.
 
 ## `accessPrincipals` Vs Org Membership
@@ -184,13 +186,13 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 
 ## Invite Lifecycle And Orphan Links
 
-Gate exposes **create**, **bulk create**, **request**, and **activate** only — there is **no list, revoke, or delete API** for app magic links today.
+Gate exposes **create**, **bulk create**, **request**, **activate**, plus owner-side **list** (`listAppMagicLinks`) and **revoke** (`revokeAppMagicLink`).
 
-- A `createAppMagicLink` row lives for the **24h TTL** (`expiresAt`). While active, another invite to the same email may be blocked or behave unexpectedly depending on nimbus-ai state — do not assume you can "delete and recreate" from the app.
+- A `createAppMagicLink` row lives for the **24h TTL** (`expiresAt`). Creating a new invite does not delete earlier rows; use `revokeAppMagicLink` to retire one explicitly.
 - **Mail dispatch failure does not roll back** the persisted row. The API still returns `{ id, magicLinkUrl, expiresAt }`; the owner can copy `magicLinkUrl` manually. Treat a failed SMTP/log as a delivery problem, not a failed create.
-- **Lost HTTP response after create:** if your app times out or crashes after Gate accepted the call, the link row **already exists** in nimbus-ai. Rolling back a local dashboard row or assuming "no response = no link" leaves an **orphan** that blocks the email until TTL expires.
-- **Safe recovery:** call `requestAppMagicLink` for the same email with the intended `redirectPath` (self-service resend; 30s per-(org,app,email) cooldown). Do **not** rely on deleting your local invite record as cleanup.
-- **Idempotent invite UX:** track `invited_at` / delivery status in your app tables; offer explicit **Resend** via `requestAppMagicLink`, not another blind `createAppMagicLink` loop.
+- **Lost HTTP response after create:** if your app times out or crashes after Gate accepted the call, the link row **already exists** in nimbus-ai. Rolling back a local dashboard row or assuming "no response = no link" leaves an **orphan**.
+- **Orphan recovery:** call `listAppMagicLinks?email=<addr>` to find the orphan's `globalId`, then `revokeAppMagicLink` it. After revoke the email can be invited again immediately with a fresh `createAppMagicLink`. Alternatively `requestAppMagicLink` re-sends a link to an email that still has access (self-service resend; 30s per-(org,app,email) cooldown).
+- **Idempotent invite UX:** track `invited_at` / delivery status in your app tables; offer explicit **Resend** (`requestAppMagicLink`) and **Revoke** (`revokeAppMagicLink`), not blind `createAppMagicLink` loops.
 
 ## Working Rules
 
@@ -203,7 +205,7 @@ Gate exposes **create**, **bulk create**, **request**, and **activate** only —
 
 ## Version
 
-- **Version**: 1.6.0
+- **Version**: 1.7.0
 - **Category**: specialized
 - **Last synced**: 2026-07-14
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
