@@ -1,23 +1,15 @@
 import { Command } from "commander";
-import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { updateApp, fetchApps } from "../api.ts";
 import type { AppAccessPrincipal, AppPermissions } from "../api.ts";
 import { getConfig, loadFuseConfig } from "../config.ts";
-import { analyzeFeatureGatePermissions } from "../gate-sdk-analyze.ts";
 import {
-  buildSyncedBackendOnlyGatePermissions,
-  declareStorePermissionsBackendOnly,
   formatPermissionItem,
-  isBackendOnlyGatePermissionsDeclared,
-  isStoreGatePermission,
   mergeFeaturePermissions,
   parsePermissions,
   parsePrincipals,
-  readBackendOnlyGatePermissionsFromFeature,
-  readBackendOnlyGatePermissionsFromManifest,
-  splitGatePermissionStrings,
 } from "../permissions.ts";
+import { resolveGateSyncPermissions } from "../sync-app-gate-permissions.ts";
 import { writeBackendOnlyGatePermissionsToFusebaseJson } from "../config.ts";
 
 export interface AppUpdateOptions {
@@ -105,42 +97,16 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         process.exit(1);
       }
 
-      const gateAnalysis = await analyzeFeatureGatePermissions({
-        projectRoot: resolve(process.cwd()),
-        feature: featureConfig,
+      const resolved = await resolveGateSyncPermissions({
+        cwd: resolve(process.cwd()),
         apiKey: config.apiKey,
-        alwaysResolvePermissions: true,
-        throwOnResolveFailure: true,
+        featureConfig,
+        appManifest: app.manifest,
+        declareBackendOnlyGatePermissions: options.declareBackendOnlyGatePermissions,
       });
-      const split = splitGatePermissionStrings(gateAnalysis.gatePermissions);
-      gatePermissions = split.runtimePermissions;
-
-      let declaredStoreBackendOnly: string[] = [];
-      if (options.declareBackendOnlyGatePermissions) {
-        const declared = declareStorePermissionsBackendOnly(gatePermissions);
-        gatePermissions = declared.runtimePermissions;
-        declaredStoreBackendOnly = declared.backendOnlyPermissions;
-      }
-
-      backendOnlyDeclaredInFusebaseJson = isBackendOnlyGatePermissionsDeclared(featureConfig);
-      backendOnlyGatePermissions = buildSyncedBackendOnlyGatePermissions({
-        platformBackendOnly: split.backendOnlyPermissions,
-        declaredStoreBackendOnly,
-        fromFusebaseJson: readBackendOnlyGatePermissionsFromFeature(featureConfig),
-        fusebaseJsonDeclared: backendOnlyDeclaredInFusebaseJson,
-        fromRemoteManifest: readBackendOnlyGatePermissionsFromManifest(app.manifest),
-      });
-
-      if (!options.declareBackendOnlyGatePermissions) {
-        if (
-          existsSync(join(resolve(process.cwd(), featureConfig.path), "backend")) &&
-          gatePermissions.some(isStoreGatePermission)
-        ) {
-          console.warn(
-            "Warning: store permissions will be embedded in browser gst. For gateway apps use --declare-backend-only-gate-permissions.",
-          );
-        }
-      }
+      gatePermissions = resolved.gatePermissions;
+      backendOnlyGatePermissions = resolved.backendOnlyGatePermissions;
+      backendOnlyDeclaredInFusebaseJson = resolved.backendOnlyDeclaredInFusebaseJson;
     }
 
     const updateRequest: {
