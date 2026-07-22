@@ -153,6 +153,22 @@ function appHostForBackend(backend: string): string {
 }
 
 /**
+ * Every app key declared in fusebase.json (`key` > `subdomain` > `id` >
+ * basename(path)). One Playwright project is generated per key so each app is
+ * tested against its own URL and isolated in the report.
+ */
+export function listAppKeys(projectRoot: string): string[] {
+  const fuseConfig = JSON.parse(
+    readFileSync(join(projectRoot, "fusebase.json"), "utf-8"),
+  ) as {
+    apps?: Array<{ key?: string; subdomain?: string; id?: string; path?: string }>
+  };
+  return (fuseConfig.apps ?? [])
+    .map((a) => a.key ?? a.subdomain ?? a.id ?? (a.path ? basename(a.path) : ""))
+    .filter((k): k is string => k.length > 0);
+}
+
+/**
  * Base URL of an app in the target environment. `appKey` is the fusebase.json
  * app key (subdomain by default); omit it when the project has a single app.
  */

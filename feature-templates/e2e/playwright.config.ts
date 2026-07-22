@@ -1,40 +1,52 @@
 import { defineConfig } from "@playwright/test";
-import { appBaseUrl, resolveTargetEnvironment } from "./helpers/env";
+import {
+  appBaseUrl,
+  listAppKeys,
+  resolveTargetEnvironment,
+} from "./helpers/env";
 
 /**
- * Environment-aware Playwright config. The target env is resolved once here
- * (FUSEBASE_ENV > active env > single env) and exposed to specs via
- * `use.baseURL` and the JSON report name. Same specs, any environment:
+ * Environment- AND app-aware Playwright config.
  *
- *   FUSEBASE_ENV=dev npm test
- *   FUSEBASE_ENV=prod-test npm test
+ * The target environment is resolved once (FUSEBASE_ENV > active env > single
+ * env). One PROJECT is generated per app declared in fusebase.json — each
+ * pinned to that app's env-effective URL. Every project runs:
+ *   - `specs/common/**`   universal checks, app-aware via the project name
+ *   - `specs/<appKey>/**` that app's own specs
+ *
+ * Run everything (all apps, one environment):   FUSEBASE_ENV=dev npm test
+ * Run a single app:                             npx playwright test --project=<appKey>
+ * CI splits by environment × app (see ci/).
  */
 const env = resolveTargetEnvironment();
+const appKeys = listAppKeys(env.projectRoot);
+
+const sharedUse = {
+  trace: "retain-on-failure" as const,
+  // "New headless" (real Chrome) + hide the automation marker — the classic
+  // headless shell and the visible marker trip the platform's bot heuristics
+  // on session handoffs (magic-link activation loops on ERR_TOO_MANY_REDIRECTS).
+  channel: "chromium",
+  launchOptions: { args: ["--disable-blink-features=AutomationControlled"] },
+};
 
 export default defineConfig({
-  testDir: "./specs",
   fullyParallel: true,
-  retries: process.env.CI ? 1 : 0,
-  // Normalized JSON report per environment — the artifact CI publishes
-  // (and, later, `fusebase test publish` pushes to the central registry).
+  // Real platform (auth handoffs, magic-link activation) is legitimately
+  // sensitive to concurrent auth-host traffic — retry once everywhere, twice
+  // in CI. A genuine break fails all attempts; a flaky handoff recovers.
+  retries: process.env.CI ? 2 : 1,
   reporter: [
     ["list"],
     ["json", { outputFile: `reports/${env.name}.json` }],
     ["html", { open: "never", outputFolder: `reports/${env.name}-html` }],
   ],
-  use: {
-    baseURL: appBaseUrl(env),
-    trace: "retain-on-failure",
-    // "New headless" (real Chrome binary) — the classic headless shell trips
-    // the platform's bot heuristics on session handoffs (magic-link
-    // activation loops on ERR_TOO_MANY_REDIRECTS). The prod auth host is
-    // stricter still — hide the automation marker as well; if a session
-    // handoff spec keeps looping locally, verify with `npm run test:headed`.
-    channel: "chromium",
-    launchOptions: {
-      args: ["--disable-blink-features=AutomationControlled"],
-    },
-  },
+  projects: appKeys.map((appKey) => ({
+    name: appKey,
+    testDir: "./specs",
+    testMatch: [`common/**/*.spec.ts`, `${appKey}/**/*.spec.ts`],
+    use: { baseURL: appBaseUrl(env, appKey), ...sharedUse },
+  })),
   metadata: {
     fusebaseEnv: env.name,
     backend: env.config.backend,

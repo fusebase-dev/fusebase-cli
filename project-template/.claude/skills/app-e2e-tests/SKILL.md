@@ -17,14 +17,29 @@ cd tests/e2e && npx playwright install chromium
 FUSEBASE_ENV=<env> npm test
 ```
 
+## Layout — one project per app
+
+`playwright.config.ts` generates **one Playwright project per app** in
+`fusebase.json` (`name` = the app's `key`, falling back to `subdomain`), each
+pinned to that app's env-effective URL. Specs live in:
+
+- `specs/common/**` — universal specs, run for EVERY app, app-aware via
+  `test.info().project.name`.
+- `specs/<appKey>/**` — that app's own specs.
+
+**Adding an app:** give it a short `key` in `fusebase.json` (e.g. `probe`),
+`mkdir specs/<key>`, add specs, add the key to the CI matrix `APP` list. Run a
+single app with `--project=<appKey>`.
+
 ## Non-negotiables
 
-1. **Stage guard stays.** `specs/stage.spec.ts` asserts the deployed bundle's
-   `fusebase-env.json` matches the target env. Never delete or reorder it away
-   — a run against the wrong stage is worse than no run.
+1. **Stage guard stays.** `specs/common/stage.spec.ts` asserts each app's
+   deployed `fusebase-env.json` matches the target env AND app. Never delete
+   it — a run against the wrong stage/app is worse than no run.
 2. **No hardcoded env data.** Hosts, org/app ids, credentials come only from
-   `helpers/env.ts` (`environments/<name>.json` + `.env.<name>`). A spec that
-   embeds a URL or id will silently break on the other environment.
+   `helpers/env.ts` (`environments/<name>.json` + `.env.<name>`) and the
+   project's `baseURL`. A spec that embeds a URL or id silently breaks on
+   another environment or app.
 3. **Fixtures self-skip.** Use the `fixtureUser(env, key)` + `test.skip`
    pattern (see `examples/role-matrix.spec.ts`) so specs stay runnable while
    fixtures roll out per env.

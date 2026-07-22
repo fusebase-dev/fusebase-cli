@@ -1,8 +1,8 @@
-# E2E tests (environment-aware)
+# E2E tests (environment- and app-aware)
 
 Playwright suite that runs the **same specs against any environment** of this
-project (dev, prod-test, …). Environments are managed by `fusebase env`
-(see the CLI's App Environments guide).
+project (dev, prod-test, …) and **splits by app**. Environments are managed by
+`fusebase env` (see the CLI's App Environments guide).
 
 ## Run
 
@@ -10,30 +10,49 @@ project (dev, prod-test, …). Environments are managed by `fusebase env`
 cd tests/e2e
 npm install && npx playwright install chromium   # first time
 
-FUSEBASE_ENV=dev npm test          # target the dev environment
-FUSEBASE_ENV=prod-test npm test    # same specs against prod-test
-npm test                           # active env (fusebase env use) / single env
+FUSEBASE_ENV=dev npm test                 # all apps against dev
+FUSEBASE_ENV=prod-test npm test           # same specs against prod-test
+FUSEBASE_ENV=dev npx playwright test --project=<appKey>   # one app
+npm test                                  # active env (fusebase env use)
 ```
 
 Reports land in `reports/<env>.json` (machine-readable, one per environment)
 and `reports/<env>-html/`.
 
-## How targeting works
+## Layout — one Playwright project per app
 
-- `helpers/env.ts` resolves the target env (`FUSEBASE_ENV` > active env >
-  single env) and reads `environments/<name>.json` + `.env.<name>`.
-- `use.baseURL` is the app's env-effective URL — specs use relative paths.
-- **`specs/stage.spec.ts` is the stage guard**: it asserts the deployed
-  bundle's `fusebase-env.json` matches the target env before anything else.
-  Keep it; never delete it.
+```
+specs/
+  common/          # universal specs — run for EVERY app (stage guard,
+                   #   env contract, anonymous session flow)
+  <appKey>/        # that app's own specs (create one folder per app)
+examples/          # opt-in recipes (not executed)
+```
+
+`playwright.config.ts` reads `fusebase.json` and generates **one project per
+app** (`name` = the app's key), each pinned to that app's env-effective URL.
+A project runs `specs/common/**` + `specs/<appKey>/**`. The common specs are
+app-aware via the project name (`test.info().project.name`).
+
+- **App key** = `fusebase.json` `apps[].key` (falls back to `subdomain`).
+  Give apps a short `key` (e.g. `probe`) so spec folders and `--project` names
+  stay clean while subdomains stay long.
+- **`specs/common/stage.spec.ts` is the stage guard** — it asserts each app's
+  deployed `fusebase-env.json` matches the target env and app before anything
+  else. Keep it.
+
+### Adding an app
+
+1. Give the app a `key` in `fusebase.json` (once).
+2. `mkdir specs/<key>` and put its specs there.
+3. Add the key to the CI matrix `APP` list (`ci/*.yml`).
 
 ## Optional recipes (`examples/`)
 
-`examples/` is NOT executed — it holds copy-when-needed patterns. Today:
+`examples/` is NOT executed — copy-when-needed patterns. Today:
 `role-matrix.spec.ts` — passwordless per-role sign-in via platform magic
-links (fixture-driven, self-skipping). Copy it into `specs/` only if your app
-has role-differentiated access worth testing; a public or single-role app
-doesn't need it.
+links (fixture-driven, self-skipping). Copy it into `specs/<appKey>/` only if
+that app has role-differentiated access worth testing.
 
 ## Fixtures (test users)
 
@@ -57,18 +76,21 @@ out per environment without breaking runs.
 
 ## CI
 
-Any runner works — the contract is just:
+Any runner works — the per-cell contract is:
 
 ```bash
-FUSEBASE_ENV=<env> npm test   # exit code + reports/<env>.json
+FUSEBASE_ENV=<env> npx playwright test --project=<app>   # exit code + reports/<env>.json
 ```
 
-Ready-made templates in `ci/`:
+Ready-made templates in `ci/` split by **environment × app** (each cell is one
+parallel job, own report artifact):
 
 - **GitLab CI** — copy the job from `ci/gitlab-e2e.yml` into your root
-  `.gitlab-ci.yml` (matrix over `FUSEBASE_ENV`, playwright image, reports as
-  artifacts, schedules for prod-test smoke).
+  `.gitlab-ci.yml` (`parallel:matrix` over `FUSEBASE_ENV` × `APP`, node_modules
+  cache, playwright image, schedules for prod-test smoke).
 - **GitHub Actions** — copy `ci/github-e2e.yml` to `.github/workflows/e2e.yml`.
+
+Add an app = one line in the matrix `APP` list.
 
 Secrets in CI (no dotenv files there): the harness falls back from
 `.env.<name>` to process env — plain key or env-suffixed for matrices

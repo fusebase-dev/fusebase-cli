@@ -1,28 +1,24 @@
 import { test, expect } from "@playwright/test";
-import { appBaseUrl, resolveTargetEnvironment } from "../helpers/env";
+import { resolveTargetEnvironment } from "../../helpers/env";
 
 /**
- * Anonymous session contract. An unauthenticated visit to the app must be
- * handed to the platform auth flow WITH a return pointer back to THIS
- * deployment — the class of flow that broke in prod incidents (gate/proxy
- * regressions on the session path). Runs without any fixtures.
+ * Anonymous session contract — runs for every app project. An unauthenticated
+ * visit must be handed to the platform auth flow WITH a return pointer back to
+ * THIS deployment (the class of flow that broke in prod session/proxy
+ * regressions). Runs without any fixtures.
  */
 
 const env = resolveTargetEnvironment();
-const baseUrl = appBaseUrl(env);
 
 test.describe("anonymous session flow", () => {
-  test("unauthenticated visit is handed to platform auth with a return url to this env", async ({
+  test("unauthenticated visit is handed to platform auth with a return url to this app", async ({
     page,
+    baseURL,
   }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
-
-    // Either the platform minted a visitor session and returned us to the
-    // app, or it parked us on the auth host — both are valid states; what is
-    // NEVER valid is landing anywhere else or losing the return pointer.
     await page.waitForTimeout(3000);
     const current = new URL(page.url());
-    const appHost = new URL(baseUrl).host;
+    const appHost = new URL(baseURL!).host;
 
     if (current.host === appHost) {
       // Visitor session worked — the app itself must be serving.
@@ -30,9 +26,8 @@ test.describe("anonymous session flow", () => {
       return;
     }
 
-    // Parked on auth: the return pointer must reference THIS environment's
-    // host — a bounce pointing at a sibling env would leak users across
-    // stages.
+    // Parked on auth: the return pointer must reference THIS app's host —
+    // a bounce pointing elsewhere would leak users across apps/stages.
     const appSuccess = current.searchParams.get("appSuccess");
     expect(
       appSuccess,
@@ -43,12 +38,12 @@ test.describe("anonymous session flow", () => {
 
   test("auth handoff host matches this environment's backend", async ({
     page,
+    baseURL,
   }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(3000);
     const host = new URL(page.url()).host;
-    const appHost = new URL(baseUrl).host;
-    if (host === appHost) return; // visitor session — nothing to assert here
+    if (host === new URL(baseURL!).host) return; // visitor session — nothing to assert
 
     // dev-backend apps must never hand sessions to prod auth hosts and vice
     // versa (the baked-host class of bugs).

@@ -1,22 +1,25 @@
 import { test, expect } from "@playwright/test";
 import {
-  appBaseUrl,
   fetchDeployedEnvInfo,
   resolveTargetEnvironment,
-} from "../helpers/env";
+} from "../../helpers/env";
 
 /**
- * Stage guard — keep this spec first. It proves the run targets the intended
- * environment before any functional test executes. If it fails, every other
- * result in this run is meaningless (wrong stage, stale deploy, or the app
+ * Stage guard — runs for every app project (project name = app key). Proves
+ * the deployment under test is the intended environment AND the intended app
+ * before any functional spec executes. If it fails, other results for this
+ * app in this run are meaningless (wrong stage/app, stale deploy, or the app
  * was deployed without environment mode).
  */
 
 const env = resolveTargetEnvironment();
 
 test.describe("stage guard", () => {
-  test(`deployment matches target environment "${env.name}"`, async () => {
-    const info = await fetchDeployedEnvInfo(appBaseUrl(env));
+  test("deployment matches target environment and app", async ({
+    baseURL,
+  }, testInfo) => {
+    const appKey = testInfo.project.name;
+    const info = await fetchDeployedEnvInfo(baseURL!);
     expect(
       info,
       "fusebase-env.json missing — deploy this app with `fusebase deploy --env <name>`",
@@ -24,6 +27,10 @@ test.describe("stage guard", () => {
     expect(info!.env).toBe(env.name);
     expect(info!.backend).toBe(env.config.backend);
     expect(info!.orgId).toBe(env.config.orgId);
+
+    // The deployed bundle must be THIS project's app, not a sibling.
+    const expectedId = env.config.apps?.[appKey]?.id;
+    if (expectedId) expect(info!.appId).toBe(expectedId);
   });
 
   test("app shell loads", async ({ page, baseURL }) => {
@@ -39,11 +46,9 @@ test.describe("stage guard", () => {
       !returned,
       `platform kept the anonymous session on ${new URL(page.url()).host} — ` +
         "this app requires a signed-in session; cover it with fixture-based " +
-        "sign-in specs (copy examples/role-matrix.spec.ts into specs/)",
+        "sign-in specs (see examples/role-matrix.spec.ts).",
     );
     await expect(page.locator("#root")).toBeAttached();
-    // The env panel (staff/debug surface) renders even while auth loads;
-    // on env-aware deploys it must show the same environment name.
     const panel = page.getByTestId("fbs-env-panel-name");
     if (await panel.isVisible().catch(() => false)) {
       await expect(panel).toContainText(env.name);
