@@ -37,10 +37,11 @@ jobs:
       matrix:
         # Split by environment × app. Add an app: give it a `key` in
         # fusebase.json, a specs/<key>/ folder, and a line to the app list.
+        # Use "integration" for cross-app / portal flows (specs/integration/).
         fusebase_env: ["dev"]
         app: ["probe"]
         # fusebase_env: ["dev", "prod-test"]  # enable when the env + fixtures exist
-        # app: ["probe", "checkout"]
+        # app: ["probe", "app-b", "integration"]
     steps:
       - uses: actions/checkout@v4
       - name: Run e2e suite

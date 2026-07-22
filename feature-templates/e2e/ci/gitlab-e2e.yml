@@ -23,9 +23,11 @@ e2e:
   parallel:
     matrix:
       - FUSEBASE_ENV: ["dev"]
-        APP: ["probe"] # one entry per app key in fusebase.json
+        # One entry per app key in fusebase.json, plus "integration" for
+        # cross-app / portal flows (present when specs/integration/ exists).
+        APP: ["probe"]
       # - FUSEBASE_ENV: ["prod-test"]   # enable when the env + fixtures exist
-      #   APP: ["probe"]
+      #   APP: ["probe", "app-b", "integration"]
   cache:
     key:
       files:

@@ -31,6 +31,15 @@ pinned to that app's env-effective URL. Specs live in:
 `mkdir specs/<key>`, add specs, add the key to the CI matrix `APP` list. Run a
 single app with `--project=<appKey>`.
 
+**Cross-app / portal flows** (registration → access propagation across apps +
+portal) span more than one app and have NO single baseURL — they do not
+belong to any app's project. Put them in `specs/integration/`; the config
+adds an `integration` project whose specs build each app's URL via
+`appBaseUrl(env, key)`. Add `integration` to the CI matrix `APP` list.
+Recipes: `examples/cross-app-access.spec.ts`, `examples/portal-access.spec.ts`.
+(Product-scoped magic links + one org = shared session across app subdomains,
+which is exactly what these flows assert.)
+
 ## Non-negotiables
 
 1. **Stage guard stays.** `specs/common/stage.spec.ts` asserts each app's

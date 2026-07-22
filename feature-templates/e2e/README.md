@@ -26,6 +26,9 @@ specs/
   common/          # universal specs — run for EVERY app (stage guard,
                    #   env contract, anonymous session flow)
   <appKey>/        # that app's own specs (create one folder per app)
+  integration/     # cross-app / portal flows spanning MORE THAN ONE app
+                   #   (optional — the `integration` project appears when
+                   #   this folder exists)
 examples/          # opt-in recipes (not executed)
 ```
 
@@ -33,6 +36,14 @@ examples/          # opt-in recipes (not executed)
 app** (`name` = the app's key), each pinned to that app's env-effective URL.
 A project runs `specs/common/**` + `specs/<appKey>/**`. The common specs are
 app-aware via the project name (`test.info().project.name`).
+
+**Cross-app / portal flows** (e.g. "signed into app A → has access to app B +
+portal") span more than one app, so they do NOT belong to a single app's
+project. Put them in `specs/integration/`; the config adds an `integration`
+project (no fixed baseURL — its specs build each app's URL via
+`appBaseUrl(env, key)`). Run with `--project=integration`; add `integration`
+to the CI matrix `APP` list. Recipes: `examples/cross-app-access.spec.ts`,
+`examples/portal-access.spec.ts`.
 
 - **App key** = `fusebase.json` `apps[].key` (falls back to `subdomain`).
   Give apps a short `key` (e.g. `probe`) so spec folders and `--project` names
