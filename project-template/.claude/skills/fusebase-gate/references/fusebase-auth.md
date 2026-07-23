@@ -1,7 +1,7 @@
 ---
-version: "1.5.0"
+version: "1.6.0"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-07-14"
+last_synced: "2026-07-23"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -45,6 +45,7 @@ These operations help AI Apps add Fusebase account registration, login, logout, 
 - `loginFusebaseUser` — visitor-safe email/password login. Returns `sessionId` plus `userId`, or a challenge. Never provisions org membership.
 - `completeFusebaseAuthChallenge` — completes auth-form challenges such as CAPTCHA, OTP, mail OTP, two-factor, and MFA states returned by register/login.
 - `requestFusebasePasswordRestore` — sends restore email through auth-form. It returns a generic `{ ok: true }` and must not be used for account enumeration.
+- `requestFusebaseRestoreKey` — protected white-label reset. Mints the restore key WITHOUT sending the platform email and returns `{ key, resetUrl, expiresAt }` so the app can send its own branded reset mail. Requires `auth.restore_key.write` and org access; visitors get 403.
 - `checkFusebasePasswordRestoreKey` and `resetFusebasePassword` — validate and complete password reset through user-service restore sessions.
 - `logoutFusebaseUser` — returns the app-domain cookies that the app must clear. Gate cannot delete cookies for an AI App host.
 
@@ -173,6 +174,9 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 - `requestFusebasePasswordRestore` forwards `email` as auth-form `login` and may pass `customAuthUrl`, `portalId`, and `workspaceId` when the app needs branded restore routing.
 - The restore request intentionally returns only `{ ok: true }`. The UI should always show generic copy such as "If an account exists, we sent instructions."
+- **Restore-link format:** the platform appends `/resetpass` to `customAuthUrl` and puts the key in query param `key`, i.e. `${customAuthUrl}/resetpass?key=<key>`. Omit `customAuthUrl` to use the default Fusebase host.
+- **`portalId` / `workspaceId`:** set BOTH to apply portal white-label branding — user-service overrides `customAuthUrl` with the portal domain, uses the portal name, and sends the `restore_portal_password` template. Setting only one has no branding effect.
+- **White-label reset (send your own email):** call `requestFusebaseRestoreKey` (POST `/:orgId/auth/fusebase/restore-key`, service token with `auth.restore_key.write`). It returns the raw `key` plus `resetUrl` (built from your `customAuthUrl`) and does NOT email the recipient, so the app sends a single branded reset mail. The key has the same TTL and one-time-use as the email flow. This endpoint is not visitor-safe — never call it from the browser.
 - Use `checkFusebasePasswordRestoreKey` for the reset screen and `resetFusebasePassword` to set the new password. These depend on `USER_SERVICE_URL` being configured for Gate.
 
 ## Google Auth
@@ -194,7 +198,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 ## Version
 
-- **Version**: 1.5.0
+- **Version**: 1.6.0
 - **Category**: specialized
-- **Last synced**: 2026-07-14
+- **Last synced**: 2026-07-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -1,7 +1,7 @@
 ---
-version: "1.7.0"
+version: "1.8.0"
 mcp_prompt: appMagicLinks
-last_synced: "2026-07-14"
+last_synced: "2026-07-23"
 title: "Fusebase Gate App Magic Link Operations"
 category: specialized
 ---
@@ -23,6 +23,7 @@ category: specialized
 - [Self-Service Rules (`requestAppMagicLink`)](#self-service-rules-requestappmagiclink)
 - [Activation Rules (`activateAppMagicLink`)](#activation-rules-activateappmagiclink)
 - [Deep-Link Redirect Usage](#deep-link-redirect-usage)
+- [Binding A Link To An App Entity (`meta`)](#binding-a-link-to-an-app-entity-meta)
 - [Expired-Link Handling](#expired-link-handling)
 - [Access Model](#access-model)
 - [`accessPrincipals` Vs Org Membership](#accessprincipals-vs-org-membership)
@@ -54,12 +55,14 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 
 ## Relevant Operations
 
-- `createAppMagicLink` — owner/admin invite flow. Creates a 24h magic link for an email and dispatches it via the `magic_link_app` mail template. Optionally provisions a brand-new user and adds a user principal to every App of the Product.
+- `createAppMagicLink` — owner/admin invite flow. Creates a magic link for an email (24h lifetime by default, or pass `ttlSeconds` to override) and dispatches it via the `magic_link_app` mail template. Optionally provisions a brand-new user and adds a user principal to every App of the Product.
+- `requestAppMagicLinkURL` — owner/admin, no-email sibling of `createAppMagicLink`. `POST /:orgId/apps/:appId/magic-link-url` with the SAME body/response and side effects, but the platform does NOT send the `magic_link_app` email — the response still carries `magicLinkUrl`, so a white-label app can deliver its own branded email. Use this instead of `createAppMagicLink` when the app sends the invite email itself (avoids the recipient getting two emails). Requires `app_magic_link.write` + org access.
 - `bulkCreateAppMagicLinks` — owner/admin bulk invite. Invites MANY users to ONE app in a single call (use instead of looping `createAppMagicLink`). Invites run with bounded concurrency (default 5, max 5; the rest are queued); `background=true` returns immediately with `status='processing'`. Per-invitee semantics match `createAppMagicLink`, and one failed invitee never aborts the batch.
 - `requestAppMagicLink` — visitor self-service flow. Visitor enters their email; Gate forwards to nimbus-ai which sends a magic link only when the email already has access under the App's current `accessPrincipals`. Always returns `{ ok: true }` so it cannot be used to enumerate emails or access state.
 - `activateAppMagicLink` — visitor activation. Exchanges a magic-link `globalId` for a session token, a Gate app token (`featureToken`), and a Dashboard token (`dashboardToken`), plus the `redirectPath` the SPA must navigate to.
 - `revokeAppMagicLink` — owner/admin revoke. `POST /:orgId/apps/:appId/magic-links/:globalId/revoke` soft-deletes a link so it can no longer be activated (activation then 404s) and the recipient email can be invited again. The fix for orphaned invites that would otherwise block a re-invite for 24h. Returns 404 for an unknown or already-revoked link. Requires `app_magic_link.write` + org access.
 - `listAppMagicLinks` — owner/admin support/debug. `GET /:orgId/apps/:appId/magic-links?email=` lists the app's active (non-revoked) links, newest first, with an optional email filter. Returns row metadata only (never token material). Use it to find the `globalId` of an orphaned invite to revoke. Requires `app_magic_link.write` + org access.
+- `removeAppAccessPrincipal` — owner/admin. `POST /:orgId/apps/:appId/access-principals/remove` with body `{ type, id }` removes an access principal from EVERY feature of the Product — the inverse of the invite grant. Use it to revoke a user's app access (`{ type: 'user', id: '<userId>' }`) or drop an `orgRole`/`orgGroup`/`visitor` grant. Idempotent: returns `{ removed: false, appsAffected: 0 }` when the principal was not present; 404 when the Product has no apps. Note this removes the app-access principal only — it does not remove the user from the org (see org member removal). Requires `app_magic_link.write` + org access.
 
 ## When To Use Each Flow
 
@@ -78,7 +81,9 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 
 ## Invite Flow Rules (`createAppMagicLink`)
 
-- The `appId` path segment is the **Product id** (`productId` from `fusebase.json`) — see the Terminology section. Body fields: `email` (required), `redirectPath` (optional; defaults to `/`), `addToAccessPrincipals` (optional; defaults to true).
+- The `appId` path segment is the **Product id** (`productId` from `fusebase.json`) — see the Terminology section. Body fields: `email` (required), `redirectPath` (optional; defaults to `/`), `addToAccessPrincipals` (optional; defaults to true), `meta` (optional opaque string, ≤ 4 KB UTF-8 — see the `meta` section below), `appFeatureId` (optional), `ttlSeconds` (optional).
+- `appFeatureId` (optional) is a child **App** globalId (`apps[].id` from `fusebase.json` / `fusebase app list`) that pins the sign-in host, so a multi-app Product can route the magic link per app. Omit it to fall back to the Product's first App (the previous behavior). Same field applies to `requestAppMagicLinkURL` and `bulkCreateAppMagicLinks`.
+- `ttlSeconds` (optional) is the link lifetime in seconds; it defaults to 86400 (24h) and is clamped server-side to 3600..604800 (1h..7d) rather than rejected. `ttlSeconds: 0` (or negative) is NOT 'no expiry' and does NOT expire the link immediately — it clamps UP to 3600 (1h), the shortest lifetime the platform can issue. Same field applies to `requestAppMagicLinkURL` and `bulkCreateAppMagicLinks`.
 - `addToAccessPrincipals: true` provisions the user record if needed and appends `{ type: "user", id: <userId> }` to every App of the Product, de-duplicated. Use this when inviting a brand-new client.
 - `addToAccessPrincipals: false` is only valid for emails that already have access. Sending it with an unknown email returns 404 — by design, so the caller does not silently dispatch a useless link.
 - The response is `{ id, magicLinkUrl, expiresAt }`. `id` is the `globalId` and is also embedded inside `magicLinkUrl`.
@@ -96,13 +101,14 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 ## Activation Rules (`activateAppMagicLink`)
 
 - The SPA at `/link` reads `id` and `redirect` from the query string, then activates the link by issuing `POST {gateBaseUrl}/apps/magic-links/{id}/activate`. The bundled SPA template currently calls this endpoint directly via `fetch` so it stays usable before `@fusebase/fusebase-gate-sdk` exposes `AppMagicLinksApi.activateAppMagicLink`. Once that SDK ships, prefer `activateAppMagicLink({ path: { globalId: id } })` over hand-rolled fetches; the wire request is identical (the server already stored `redirectPath` on the link row at create time, so the client never sends it on activation).
-- Successful response: `{ id, sessionToken, featureToken, dashboardToken, redirectPath, expiresAt, appFeatureId }`.
+- Successful response: `{ id, sessionToken, featureToken, dashboardToken, redirectPath, expiresAt, appFeatureId, meta }`.
   - `sessionToken` — Fusebase user session for the **magic-link recipient**. On **legacy SPA `/link` activation**, forward as `EverHelper-Session-ID` together with `x-app-feature-token`. On **platform email links** (`/_auth/magiclink/{key}`), org session lives on the org domain — the app host does not receive this as a cookie; use the post-activation exchange below instead.
   - `featureToken` — Gate token scoped to the resolved **App** (host unit). On platform email links, app-wrapper mints recipient-scoped `fbsfeaturetoken` on the app host (user id embedded in the JWE) — that cookie is the identity source for `getMyOrgAccess` on the app backend.
   - `dashboardToken` — dashboard-service token, scoped to the same App and target user. The bundled SPA persists it as the `fbsdashboardtoken` cookie so dashboard SDK calls (`@fusebase/dashboard-service-sdk`) can authenticate after activation; in the deployed app-wrapper flow it is bundled inside the gate feature token JWT, but the magic-link activation hands both tokens out as discrete strings.
   - `redirectPath` — relative path to navigate to after token persistence (`/` if the invite did not request a deep link).
   - `appFeatureId` — the resolved **App** id (host-bearing unit, formerly `feature`) the tokens are scoped to; it matches an `apps[].id` from `fusebase app list`, not a Product id.
   - `expiresAt` is included so the SPA can mirror the same expired UI without a second round-trip.
+  - `meta` — the opaque string supplied at create time, echoed back byte-for-byte (`null` for links created without it). See the `meta` section below.
 - Within the 24h TTL the link can be activated more than once (covers the "user opened the email twice" case).
 - Failure modes are well-typed:
   - `404 NotFound` — link id does not exist or the row is soft-deleted.
@@ -116,6 +122,16 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 - Always make `redirectPath` relative (`/proposals/abc`, `/invoices/123`). Absolute URLs would let the inviter point the activation to an unrelated origin.
 - The SPA is responsible for sanitizing `redirectPath` before navigating (reject schemes, reject `//host…` patterns) — Gate does not enforce this.
 - Pair `redirectPath` with the email subject the owner sends so the deep page matches the user's expectation ("View your proposal" → `/proposals/abc`).
+
+## Binding A Link To An App Entity (`meta`)
+
+- `meta` is an optional **opaque** string (≤ 4 KB UTF-8) on `createAppMagicLink` / `bulkCreateAppMagicLinks`. The platform never interprets it — it is stored on the link row and echoed back byte-for-byte at activation. Use it to bind a link to an app-side entity (e.g. an invitation id) instead of overloading `redirectPath` with app data.
+- The 4 KB cap is enforced in **UTF-8 bytes** (not JS string length); a multibyte value over the cap is rejected with `400`.
+- **Delivery is dual-channel.** Which one you read depends on the flow:
+  - **Legacy SPA `/link` + `activateAppMagicLink`:** `meta` is a field in the activation JSON response (`null` when the link had none).
+  - **Platform email links (`/_auth/magiclink/{key}`):** the SPA never sees the activation JSON, so Gate appends `?mlmeta=<urlencoded>` to the final app URL before the `/_auth/` handoff. Read it from `location.search` (`new URLSearchParams(location.search).get('mlmeta')`). It is placed in the query segment even when `redirectPath` carries a `#` fragment, and `mlmeta` is **reserved** — any `mlmeta` a `redirectPath` sets is replaced by the link-bound value.
+- **URL visibility:** on the platform-email flow `meta` rides in the address bar (`mlmeta`), same as an id smuggled through `redirectPath`. It does not hide the payload from the browser — it only gives it a dedicated channel separate from the navigation target. Do not put secrets in `meta`.
+- Omitting `meta` is fully backward compatible: legacy rows echo `meta: null`, and no `mlmeta` is added to the handoff URL.
 
 ## Expired-Link Handling
 
@@ -188,7 +204,7 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 
 Gate exposes **create**, **bulk create**, **request**, **activate**, plus owner-side **list** (`listAppMagicLinks`) and **revoke** (`revokeAppMagicLink`).
 
-- A `createAppMagicLink` row lives for the **24h TTL** (`expiresAt`). Creating a new invite does not delete earlier rows; use `revokeAppMagicLink` to retire one explicitly.
+- A `createAppMagicLink` row lives for the **24h TTL** (`expiresAt`) by default, or the clamped `ttlSeconds` when provided. Creating a new invite does not delete earlier rows; use `revokeAppMagicLink` to retire one explicitly.
 - **Mail dispatch failure does not roll back** the persisted row. The API still returns `{ id, magicLinkUrl, expiresAt }`; the owner can copy `magicLinkUrl` manually. Treat a failed SMTP/log as a delivery problem, not a failed create.
 - **Lost HTTP response after create:** if your app times out or crashes after Gate accepted the call, the link row **already exists** in nimbus-ai. Rolling back a local dashboard row or assuming "no response = no link" leaves an **orphan**.
 - **Orphan recovery:** call `listAppMagicLinks?email=<addr>` to find the orphan's `globalId`, then `revokeAppMagicLink` it. After revoke the email can be invited again immediately with a fresh `createAppMagicLink`. Alternatively `requestAppMagicLink` re-sends a link to an email that still has access (self-service resend; 30s per-(org,app,email) cooldown).
@@ -205,7 +221,7 @@ Gate exposes **create**, **bulk create**, **request**, **activate**, plus owner-
 
 ## Version
 
-- **Version**: 1.7.0
+- **Version**: 1.8.0
 - **Category**: specialized
-- **Last synced**: 2026-07-14
+- **Last synced**: 2026-07-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
