@@ -1,5 +1,5 @@
 ---
-version: "1.6.0"
+version: "1.7.2"
 mcp_prompt: fusebaseAuth
 last_synced: "2026-07-23"
 title: "Fusebase Auth For AI Apps"
@@ -23,6 +23,7 @@ category: specialized
 - [`getMyOrgAccess` `source` Field](#getmyorgaccess-source-field)
 - [Gate Error Envelope Decoding](#gate-error-envelope-decoding)
 - [Two Names For Feature Token](#two-names-for-feature-token)
+- [Browser Token Is Identity Only (Guarded App APIs)](#browser-token-is-identity-only-guarded-app-apis)
 - [App `accessPrincipals` Vs Org Membership](#app-accessprincipals-vs-org-membership)
 - [Visitor Access Vs Open API (Platform Edge)](#visitor-access-vs-open-api-platform-edge)
 - [Magic-Link → App Session Exchange](#magic-link--app-session-exchange)
@@ -107,6 +108,21 @@ Gate BFF errors are often wrapped. Read **status + inner code**, not only the ou
 
 - **`window.FBS_FEATURE_TOKEN` / cookie `fbsfeaturetoken`** (browser): visitor-scoped JWE from `/_auth/` for SPA and app-proxy. Cannot perform `org.members.write`.
 - **`process.env.FBS_FEATURE_TOKEN`** (backend pod env): deploy-time Gate **service** token with app permissions. Required for privileged provisioning from trusted BFF routes.
+
+## Browser Token Is Identity Only (Guarded App APIs)
+
+The platform-minted browser `fbsfeaturetoken` carries **identity only** — no scopes, no permissions. App API contract guards (`x-fusebase-allowed-callers`, `x-fusebase-required-permissions`) are evaluated against the **calling** identity, so a browser token can never satisfy them by design.
+
+Two supported ways to run a guarded operation for an end user:
+
+- **Dual-token (works today):** the app backend calls `callAppApi` with its own service token (`process.env.FBS_FEATURE_TOKEN`) and carries the user identity itself, after verifying the browser token.
+- **On-behalf-of (preferred):** the app backend calls `callAppApi` with its service token and passes the user's `fbsfeaturetoken` as `onBehalfOfUserToken`. Gate verifies it fail-closed and forwards `X-Fusebase-Verified-User-Id` / `X-Fusebase-Verified-User-Source: obo` to the runtime instead of hand-rolling forwarding.
+
+The app-wrapper proxy strips inbound `X-Fusebase-Verified-*` headers it cannot prove came from Gate, so they cannot be forged **through the app URL** — including on the auth-exempt `/api/webhooks/*` paths. Your backend's platform-provisioned deploy FQDN is a separate public origin that the proxy does not front, and the backend cannot tell the two apart — so OBO removes the dual-token plumbing, **not** the trust requirement. Do not treat a verified header as a bearer credential for anything you would not expose to any authenticated peer in the org.
+
+Denials are an honest **403** with a machine-readable `errorCode` under `data` in the error body (`app_api_caller_not_allowed`, `app_api_missing_permissions`, `app_api_operation_private`, `obo_user_token_org_mismatch`; an invalid OBO token is `401 obo_user_token_invalid`, an unknown or unpublished operation is `404 app_api_operation_not_found`, and a transient verifier outage is `503 obo_verification_unavailable`), never a 500-wrapped 404. Branch on `errorCode`, not on the message.
+
+Minting scopes or permissions into browser tokens is **not** the recommended path and is deliberately unsupported — the blast radius is every app host that already holds such a cookie. Use OBO.
 
 ## App `accessPrincipals` Vs Org Membership
 
@@ -198,7 +214,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 ## Version
 
-- **Version**: 1.6.0
+- **Version**: 1.7.2
 - **Category**: specialized
 - **Last synced**: 2026-07-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

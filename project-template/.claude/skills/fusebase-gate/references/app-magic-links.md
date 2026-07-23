@@ -1,5 +1,5 @@
 ---
-version: "1.8.0"
+version: "1.9.1"
 mcp_prompt: appMagicLinks
 last_synced: "2026-07-23"
 title: "Fusebase Gate App Magic Link Operations"
@@ -22,6 +22,7 @@ category: specialized
 - [Invite Flow Rules (`createAppMagicLink`)](#invite-flow-rules-createappmagiclink)
 - [Self-Service Rules (`requestAppMagicLink`)](#self-service-rules-requestappmagiclink)
 - [Activation Rules (`activateAppMagicLink`)](#activation-rules-activateappmagiclink)
+- [Activation Keys Are Host-Agnostic (Supported)](#activation-keys-are-host-agnostic-supported)
 - [Deep-Link Redirect Usage](#deep-link-redirect-usage)
 - [Binding A Link To An App Entity (`meta`)](#binding-a-link-to-an-app-entity-meta)
 - [Expired-Link Handling](#expired-link-handling)
@@ -115,6 +116,18 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
   - `403 Forbidden` with `reason="expired"` — TTL elapsed; show the expired-link UI and offer a request-link flow.
   - `403 Forbidden` with `reason="revoked"` — the target user no longer has access at activation time (principals mutated after the link was issued); fall back to the same expired-link UI or show "this link is no longer valid".
 - The SPA should branch on the `reason` field rather than the HTTP status alone so error copy stays stable as new reasons are added.
+
+## Activation Keys Are Host-Agnostic (Supported)
+
+Activation resolves the link by **key alone** — nimbus-ai never checks which host the key was opened on. Opening `https://<any-app-host>/_auth/magiclink/{key}` therefore activates the link and signs the recipient in **on that host**: app-wrapper proxies the route to Gate, and mints that host's `fbsfeaturetoken` after the session exchange. This is a **supported contract**, not an accident — one-click Launch and hub host-rewrite depend on it.
+
+Two separate boundaries decide whether a rewritten host works. Activation is key-only, but *being signed in* on the opened host needs an access principal on that **App**, and `createAppMagicLink` grants principals per **Product** (see above) — while the cookie handoff resolves the org from the opened host.
+
+- Supported: rewriting the activation host to any App host **of the same Product** (sibling Apps of the Product, managed subdomain ⇄ active custom domain).
+- Not supported: a host of a **different Product**, even in the same org. Activation succeeds, but app-wrapper evaluates access against the *opened* App: no matching principal renders the `access-denied` page, and a `visitor`-only match hands back a visitor-level token instead of the recipient's identity.
+- Not supported: a host **outside the link's org**. Same access outcome as above, plus the cookie handoff resolves the org from the *opened* host via `getAppByHost` — an unregistered host renders the generic error page, and a host registered to another org sends the recipient through that org's sign-in first. Fail loudly in the hub rather than rewriting across orgs.
+- The link's pinned `appFeatureId` scopes the `featureToken` in the **activation JSON** (legacy SPA `/link` flow). On platform email links the browser token comes from the host that was actually opened, so a rewritten host still gets a usable token.
+- If activation ever becomes host-bound, it must ship behind an explicit fallback flag with a long deprecation window — host rewrite is in production use today.
 
 ## Deep-Link Redirect Usage
 
@@ -221,7 +234,7 @@ Gate exposes **create**, **bulk create**, **request**, **activate**, plus owner-
 
 ## Version
 
-- **Version**: 1.8.0
+- **Version**: 1.9.1
 - **Category**: specialized
 - **Last synced**: 2026-07-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

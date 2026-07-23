@@ -1,7 +1,7 @@
 ---
-version: "1.6.4"
+version: "1.6.7"
 mcp_prompt: sdk
-last_synced: "2026-07-10"
+last_synced: "2026-07-23"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -38,6 +38,10 @@ Only then move to callAppApi or direct runtime probing if behavior still needs v
 Do not start by asking for raw OpenAPI export, manual endpoint lists, local source code, or dashboard/storage schema spelunking when a published app API exists.
 For security-sensitive app API operations, use contract-level policy: `x-fusebase-allowed-callers` for caller identity and `x-fusebase-required-permissions` for caller capability.
 `x-fusebase-required-permissions` must use the app API namespace `app_api.<namespace>.<capability>.<action>` (for example `app_api.client_portal.provision.write`), not built-in Gate permissions such as `isolated_store.read`.
+Those guards are evaluated against the **calling identity** (service token), never a browser token — browser `fbsfeaturetoken` is identity only and carries no scopes or permissions.
+To run a guarded operation for an end user, call `callAppApi` from the app backend with its service token and pass the user's `fbsfeaturetoken` as `onBehalfOfUserToken` in the body. Gate verifies it fail-closed (401 `obo_user_token_invalid`, 403 `obo_user_token_org_mismatch`) and forwards `X-Fusebase-Verified-User-Id` / `X-Fusebase-Verified-User-Source: obo` to the provider runtime — read the user id from those headers instead of hand-rolling dual-token forwarding.
+The platform proxy strips inbound `X-Fusebase-Verified-*` headers it cannot prove came from Gate, so they cannot be forged through the app URL. Your backend's deploy FQDN is a separate public origin that the proxy does not front, and the backend cannot tell the two apart — so OBO removes the dual-token plumbing, not the trust requirement. Do not treat a verified header as a bearer credential for anything you would not expose to any authenticated peer in the org.
+Denials come back as 403 with a machine-readable `errorCode` under `data` in the error body (`app_api_caller_not_allowed`, `app_api_missing_permissions`, `app_api_operation_private`); an unknown operation is a 404 `app_api_operation_not_found`. Branch on `errorCode`, not on the message.
 
 ## Main SDK Clients
 
@@ -97,7 +101,7 @@ Always handle SDK operation failures explicitly.
 
 ## Version
 
-- **Version**: 1.6.4
+- **Version**: 1.6.7
 - **Category**: meta
-- **Last synced**: 2026-07-10
+- **Last synced**: 2026-07-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

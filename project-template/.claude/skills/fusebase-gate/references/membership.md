@@ -1,7 +1,7 @@
 ---
 version: "1.2.0"
 mcp_prompt: membership
-last_synced: "2026-07-09"
+last_synced: "2026-07-23"
 title: "Fusebase Gate Membership And Portal Flows"
 category: specialized
 ---
@@ -85,6 +85,7 @@ These prompts cover organization member invites/removal, workspace selection, po
 
 - Use listOrgUsers first when you need to verify a target user's org role before account-level deletion.
 - removeOrgMember uses the numeric user id available from listOrgUsers. Gate resolves the internal org membership global id.
+- removeOrgMember is unconditional unless you pass a precondition. When undoing your own invite, pass **both** `expectedRole` (the role you invited with) and `expectedJoinedAfter` (unix seconds taken before the invite) so a pre-existing or since-promoted member is never removed — either one alone still allows removing a since-re-invited or unrelated newer member. A mismatch fails with 409 and removes nothing; a param sent with an empty value fails with 400 rather than removing unconditionally.
 - removeWorkspaceMember and removePortalMember use workspaceId plus numeric userId. Gate resolves the internal workspace membership global id when userId is passed; `members[].id` from listWorkspaceMembers is the same globalId.
 - Removing an org member removes org membership; org-service owns related workspace/group cleanup.
 - scheduleClientAccountDeletion takes numeric `userId` in the body and is allowed only for Client-role users in the requested org.
@@ -101,5 +102,5 @@ These prompts cover organization member invites/removal, workspace selection, po
 
 - **Version**: 1.2.0
 - **Category**: specialized
-- **Last synced**: 2026-07-09
+- **Last synced**: 2026-07-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
