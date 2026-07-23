@@ -4,10 +4,10 @@ import {
   createSignInMagicLink,
   fixtureUser,
   resolveTargetEnvironment,
-} from "../helpers/env";
+} from "../../helpers/env";
 
 /**
- * RECIPE — not executed from examples/. Copy into specs/ when your app has
+ * RECIPE — not executed from examples/. Copy into specs/<appKey>/ when your app has
  * role-differentiated access worth testing (public/single-role apps don't).
  *
  * Fixture-driven role matrix:

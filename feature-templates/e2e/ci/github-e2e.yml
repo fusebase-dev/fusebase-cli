@@ -35,8 +35,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Split by environment × app. Add an app: give it a `key` in
+        # fusebase.json, a specs/<key>/ folder, and a line to the app list.
+        # Use "integration" for cross-app / portal flows (specs/integration/).
         fusebase_env: ["dev"]
+        app: ["probe"]
         # fusebase_env: ["dev", "prod-test"]  # enable when the env + fixtures exist
+        # app: ["probe", "app-b", "integration"]
     steps:
       - uses: actions/checkout@v4
       - name: Run e2e suite
@@ -49,12 +54,12 @@ jobs:
           npm ci
           # browser matching the locked playwright version (image browsers drift)
           npx playwright install chromium
-          npx playwright test
+          npx playwright test --project="${{ matrix.app }}"
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-reports-${{ github.event.inputs.env || matrix.fusebase_env }}
+          name: e2e-reports-${{ github.event.inputs.env || matrix.fusebase_env }}-${{ matrix.app }}
           path: |
             tests/e2e/reports/
             tests/e2e/test-results/

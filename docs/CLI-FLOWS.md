@@ -806,22 +806,20 @@ For each deployable app:
 #### Step 2: Generate MCP Token
 
 - **Action**: Call `createDashboardsToken(apiKey, request)` via API
-- **Token permissions**: By default, read-only enough for dashboard discovery/integration:
+- **Token permissions**: By default, discover/read existing dashboards plus write row data, relations, and mutate existing view schema (no create/delete of DBs/dashboards):
   - `database.read`
   - `dashboard.read`
   - `template.read`
-  - `view.read`
-  - `data.read`
-  - `relation.read`
+  - `view.read`, `view.write`
+  - `data.read`, `data.write`
+  - `relation.read`, `relation.write`
   - `token.read`
   - `column.*.read`
 - **Optional expansion**: If `legacy-dashboards-db` is enabled, the token also gets dashboard DB management writes/deletes:
   - `database.write`, `database.delete`
   - `dashboard.write`, `dashboard.delete`
   - `template.write`
-  - `view.write`, `view.delete`
-  - `data.write`
-  - `relation.write`
+  - `view.delete`
   - `token.write`, `token.delete`
   - `column.*.write`
 - **Resource scope**: All databases, dashboards, views (`*`)

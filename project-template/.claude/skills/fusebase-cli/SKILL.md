@@ -346,6 +346,8 @@ Creates or overwrites `.env` with `DASHBOARDS_MCP_TOKEN` and `DASHBOARDS_MCP_URL
 
 On successful create/update, CLI refreshes both Dashboards and Gate MCP tokens. In interactive terminals, it offers to run `fusebase config ide --force` immediately for all IDE MCP configs; if declined, it prints that command as the next step.
 
+Default Dashboards MCP grants (see `lib/mcp-token-policy.ts`): discover/read existing dashboards, write row data (`data.write`), write relations (`relation.write`), and mutate existing view schema (`view.write`). It does **not** create or delete dashboard DBs/dashboards unless the global flag `legacy-dashboards-db` is enabled.
+
 ### App environments (experimental, flag `environments`)
 
 Named environment profiles let one project target several platform contexts

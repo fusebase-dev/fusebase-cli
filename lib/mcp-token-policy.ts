@@ -10,18 +10,21 @@ import {
 } from "./permissions";
 
 /** Bump when fingerprint inputs change so old .env values force refresh once. */
-export const MCP_POLICY_SCHEMA_VERSION = 5 as const;
+export const MCP_POLICY_SCHEMA_VERSION = 6 as const;
 
 /** Written to `.env` after token refresh — sole source of truth for policy drift checks (`fusebase product update`, `fusebase env create`). */
 export const DASHBOARDS_MCP_POLICY_FP_KEY = "DASHBOARDS_MCP_POLICY_FP";
 export const GATE_MCP_POLICY_FP_KEY = "GATE_MCP_POLICY_FP";
 
-const DASHBOARDS_PERMISSIONS_READONLY = [
+/** Default Dashboards MCP grants: discover + read/write row data + relations + mutate existing view schema. No create/delete of DBs/dashboards. */
+const DASHBOARDS_PERMISSIONS_DEFAULT = [
   "column.*.read",
   "dashboard.read",
   "data.read",
+  "data.write",
   "database.read",
   "relation.read",
+  "relation.write",
   "template.read",
   "token.read",
   "view.read",
@@ -49,7 +52,7 @@ function dashboardsDbManagementEnabled(): boolean {
 }
 
 function getDashboardsPermissions(): string[] {
-  const permissions = new Set<string>(DASHBOARDS_PERMISSIONS_READONLY);
+  const permissions = new Set<string>(DASHBOARDS_PERMISSIONS_DEFAULT);
   if (dashboardsDbManagementEnabled()) {
     for (const permission of DASHBOARDS_PERMISSIONS_DB_MANAGEMENT) {
       permissions.add(permission);
@@ -192,7 +195,7 @@ export function matchesCurrentOrLegacyFallback(stored: {
   );
 }
 
-/** Full API request for dashboards MCP token (org-scoped, existing-dashboard-safe by default). */
+/** Full API request for dashboards MCP token (org-scoped; default grants include data.write + relation.write + view.write, no DB/dashboard create/delete). */
 export function buildDashboardsMcpTokenRequest(orgId: string): CreateTokenRequest {
   const permissions = getDashboardsPermissions();
   return {

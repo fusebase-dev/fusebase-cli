@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@fusebase/dashboard-service-sdk": "^v1.25.11-sdk.1",
-    "@fusebase/fusebase-gate-sdk": "^v2.3.34-sdk.3"
+    "@fusebase/fusebase-gate-sdk": "^vv2.3.34-sdk.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
