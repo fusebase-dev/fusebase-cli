@@ -477,7 +477,7 @@ fusebase init --ide "cursor,vscode"
 - Creates `.env` file with:
   - `DASHBOARDS_MCP_URL=https://dashboards-mcp.{FUSEBASE_HOST}/mcp`
   - `DASHBOARDS_MCP_TOKEN=<generated-token>`
-- Token is generated via API with full permissions for the organization scope
+- Token is generated via API for the organization scope. Default Dashboards MCP grants include read + `data.write` + `relation.write` + `view.write` on existing dashboards (no DB/dashboard create/delete unless `legacy-dashboards-db` is enabled).
 
 **Behavior**:
 
