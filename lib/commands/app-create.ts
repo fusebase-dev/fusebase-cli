@@ -268,7 +268,7 @@ export const appCreateCommand = new Command("create")
   .requiredOption("--output-dir <dir>", "Build output directory (e.g., dist)")
   .option(
     "--access <principals>",
-    "Set access principals, comma-separated (e.g., visitor or the org roles like orgRole:member, etc.)",
+    "Set access principals, comma-separated (e.g., visitor, org roles like orgRole:member, or portal principals portalClient/portalManager/portalMember)",
   )
   .option(
     "--permissions <permissions>",
