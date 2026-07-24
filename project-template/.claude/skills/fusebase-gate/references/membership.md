@@ -1,5 +1,5 @@
 ---
-version: "1.2.0"
+version: "1.3.0"
 mcp_prompt: membership
 last_synced: "2026-07-23"
 title: "Fusebase Gate Membership And Portal Flows"
@@ -76,7 +76,8 @@ These prompts cover organization member invites/removal, workspace selection, po
 ## Workspace And Portal Member Listing
 
 - listWorkspaceMembers returns `{ members: OrgWorkspaceMember[] }` for one workspace after Gate confirms it belongs to `orgId`.
-- Each member includes `id` (workspaceMember globalId), `userId`, `role`, `workspaceId`, and timestamps — not email or org display name.
+- Each member includes `id` (workspaceMember globalId), `userId`, workspace `role`, `workspaceId`, and timestamps, plus org-membership fields joined by `userId`: `orgRole` (guest|client|member|manager|owner), `email`, `firstname`, `lastname`, and `isPortalManager`.
+- Portal chat/provisioning: one listPortalMembers call is enough to (a) filter clients via `orgRole === 'client'`, (b) filter portal managers via `isPortalManager` (the official flag; `true` when `orgRole` is `manager` (what invitePortalManager grants) or `owner` — do not re-derive it), and (c) build a `Chat with <firstname lastname | email>` channel name. No separate listOrgUsers join needed.
 - listPortalMembers uses the same response shape; pass the portal's underlying `workspaceId`, not the portal global id.
 - Workspace outside the org returns 404. Requires org.members.read and org access.
 - For per-facility or per-portal user management, prefer listWorkspaceMembers over listOrgUsers to avoid cross-workspace leakage.
@@ -100,7 +101,7 @@ These prompts cover organization member invites/removal, workspace selection, po
 
 ## Version
 
-- **Version**: 1.2.0
+- **Version**: 1.3.0
 - **Category**: specialized
 - **Last synced**: 2026-07-23
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

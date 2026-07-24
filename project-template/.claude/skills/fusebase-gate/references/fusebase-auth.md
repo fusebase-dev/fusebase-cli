@@ -1,7 +1,7 @@
 ---
-version: "1.7.2"
+version: "1.7.3"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-07-23"
+last_synced: "2026-07-24"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -28,6 +28,7 @@ category: specialized
 - [Visitor Access Vs Open API (Platform Edge)](#visitor-access-vs-open-api-platform-edge)
 - [Magic-Link → App Session Exchange](#magic-link--app-session-exchange)
   - [Test vs Production](#test-vs-production)
+  - [Platform token lifetime (not a durable visitor session)](#platform-token-lifetime-not-a-durable-visitor-session)
   - [Non-secrets — never `fusebase secret create`](#non-secrets--never-fusebase-secret-create)
 - [Challenge, 2FA, And MFA](#challenge-2fa-and-mfa)
 - [Password Restore](#password-restore)
@@ -173,6 +174,13 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 - Register the HMAC secret only here, with `fusebase secret create --feature <appId> --secret "APP_SESSION_SECRET:HMAC signing key for app-owned session cookie"`, then read it from `process.env.APP_SESSION_SECRET` in the backend.
 - Set the cookie `httpOnly`, `secure`, `sameSite=Lax`, `path=/`. Rotate by changing the secret + invalidating live cookies; do not rely on Fusebase cookies for revocation.
 
+### Platform token lifetime (not a durable visitor session)
+
+- **Invite link TTL** (`createAppMagicLink` / `ttlSeconds`, default 24h, clamped 1h–7d) is how long the email link can be **activated**. It is **not** how long the signed-in session lasts after activation.
+- After activation, the platform-minted `fbsfeaturetoken` on the app host is a **short-lived** credential (typically ~24h). Day-scale “stay signed in” is an **app** responsibility via the Production HMAC session cookie — not a platform cookie promise.
+- There is **no** supported silent refresh of that token from the app host for magic-link visitors (post-NH1 org `eversessionid` is org-domain only). Do **not** treat `…/auth/?appSuccess=…` failures as a broken visitor renew path.
+- When the platform token lapses after an app session exists, keep the app session and re-check entitlement from your store / service token; do not treat expired-platform-token `getMyOrgAccess` 401 as “user signed out”.
+
 ### Non-secrets — never `fusebase secret create`
 
 - `FUSEBASE_ORG_ID` is **not a secret** — it lives in `fusebase.json` (`orgId`) and is readable in plain text by anyone who can clone the app. Do not run `fusebase secret create … FUSEBASE_ORG_ID:…`. Read the value from `fusebase.json` (or platform-injected env if the deployed runtime exposes it) at app start.
@@ -205,6 +213,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 - Do not put these app routes under `/api/auth/*` in generated app backends; deployed platform proxies may reserve that prefix. Prefer `/api/account/*` or another app-owned prefix.
 - Do not confuse Fusebase platform cookies with app-domain cookies. The app must own its fallback session cookie on its own domain.
+- Do not expect multi-day “stay signed in” from `fbsfeaturetoken` alone, and do not treat ~24h expiry after magic-link activation as a platform outage — use the Production app-owned HMAC session cookie (see § Platform token lifetime).
 - Do not call org provisioning from login. If a user already has a stronger role, a login-time provisioning call can accidentally change the intended access model.
 - Do not call `registerFusebaseOrgMember` or `addOrgUser` from the SPA directly to Gate, and do not forward visitor `fbsfeaturetoken` from the signup request into those ops.
 - Do not downgrade a flow that requires org membership to account-only (`registerFusebaseUser`) without explicit product approval — `registerFusebaseUser` never adds org membership.
@@ -214,7 +223,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 ## Version
 
-- **Version**: 1.7.2
+- **Version**: 1.7.3
 - **Category**: specialized
-- **Last synced**: 2026-07-23
+- **Last synced**: 2026-07-24
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

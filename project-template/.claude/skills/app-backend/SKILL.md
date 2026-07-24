@@ -724,6 +724,13 @@ Pick the recipe based on what the app actually needs. **Do not auto-upgrade a sm
 - Cookie attributes: `httpOnly`, `secure`, `sameSite=Lax`, `path=/`. Rotate by changing the secret and invalidating active cookies; do not rely on Fusebase platform cookies for revocation.
 - Result: a Production-mode magic-link app needs exactly **one** `fusebase secret create` call (the HMAC secret).
 
+**Platform token lifetime (not a durable visitor session):**
+
+- **Invite link TTL** (`ttlSeconds`, default 24h, max 7d) is only how long the email link can be **activated** — not how long the signed-in session lasts.
+- After activation, `fbsfeaturetoken` on the app host is **short-lived** (typically ~24h). There is **no** supported silent renew from the app host for magic-link visitors (post-NH1 `eversessionid` is org-domain only). Do not treat `…/auth/?appSuccess=…` failures as a broken visitor renew path.
+- Day-scale “stay signed in” = **app-owned HMAC session** (Production recipe above). When the platform token lapses, keep the app session and re-check entitlement from your store / service token — do not bounce to sign-in solely on expired-platform-token `getMyOrgAccess` 401.
+- Anything that still needs a **live** platform feature token (browser proxy to Gate/Dashboard, some embeds) dies when that token expires — keep those behind the app backend or accept a fresh magic link.
+
 #### What is **not** a secret — never `fusebase secret create`
 
 `fusebase secret create` is reserved for credentials that must not appear in the repo or platform-readable config. The following are **not secrets** and must never be registered as such:
@@ -743,7 +750,7 @@ Before claiming the magic-link flow is done, verify:
 - [ ] Exchange **fail-closed:** `getMyOrgAccess` must return `source === 'member'` with a real user id before unlocking protected UI.
 - [ ] Legacy `/link` + `activateAppMagicLink`: if using activation JSON, POST `{ featureToken, sessionToken }` in the body (dual-token still valid for this path).
 - [ ] Test mode: no `APP_SESSION_SECRET`, no HMAC-signed app cookie, no `fusebase secret create` call for the magic-link flow.
-- [ ] Production mode (only if Memberspace/role-gated UI is required): exactly one `fusebase secret create … APP_SESSION_SECRET:…`, HMAC-signed app-owned session cookie, verified on every protected request.
+- [ ] Production mode (only if Memberspace/role-gated UI is required): exactly one `fusebase secret create … APP_SESSION_SECRET:…`, HMAC-signed app-owned session cookie, verified on every protected request; durable “stay signed in” does **not** depend on `fbsfeaturetoken` lasting beyond ~24h.
 - [ ] `fusebase secret list --feature <appId>` does **not** include `FUSEBASE_ORG_ID`, `productId`, app subdomain, or any other value that already lives in `fusebase.json`.
 
 For WebSockets:

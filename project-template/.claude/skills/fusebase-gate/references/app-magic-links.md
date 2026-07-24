@@ -1,7 +1,7 @@
 ---
-version: "1.9.1"
+version: "1.9.2"
 mcp_prompt: appMagicLinks
-last_synced: "2026-07-23"
+last_synced: "2026-07-24"
 title: "Fusebase Gate App Magic Link Operations"
 category: specialized
 ---
@@ -31,6 +31,7 @@ category: specialized
 - [Platform Edge: Visitor Token And `/api/*`](#platform-edge-visitor-token-and-api)
 - [App Session Exchange After Activation](#app-session-exchange-after-activation)
   - [Test vs Production session policy](#test-vs-production-session-policy)
+  - [Platform token lifetime (not a durable visitor session)](#platform-token-lifetime-not-a-durable-visitor-session)
   - [Don't register non-secrets](#dont-register-non-secrets)
 - [Invite Lifecycle And Orphan Links](#invite-lifecycle-and-orphan-links)
 - [Working Rules](#working-rules)
@@ -207,6 +208,14 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 - Register the HMAC secret here and only here: `fusebase secret create --feature <appId> --secret "APP_SESSION_SECRET:HMAC signing key for app-owned session cookie"`. Read it from `process.env.APP_SESSION_SECRET` at runtime.
 - Set cookie attributes `httpOnly`, `secure`, `sameSite=Lax`, `path=/`. Rotate by changing the secret + invalidating active cookies; do not depend on Fusebase platform cookies for revocation.
 
+### Platform token lifetime (not a durable visitor session)
+
+- **Invite link TTL** (`createAppMagicLink` / `ttlSeconds`, default 24h, clamped 1h–7d) is how long the email link can be **activated**. It is **not** how long the signed-in session lasts after activation.
+- After activation, the platform-minted `fbsfeaturetoken` (app feature token / JWE on the app host) is a **short-lived** credential — typically on the order of ~24h. Treat day-scale “stay signed in” as an **app** responsibility, not a platform cookie promise.
+- There is **no** supported silent refresh/renewal of that token from the app host for magic-link visitors: post-NH1, org `eversessionid` lives only on the org domain and is **not** present on `*.thefusebase.app` (or app CNAMEs). Do **not** treat `GET …/auth/?appSuccess=…` transport failures as a broken visitor renew path — that flow is not the durable-session mechanism for magic-link clients on the app host.
+- **Production portals / Memberspace:** the endorsed pattern is the **app-owned HMAC session cookie** (above). When the platform token lapses, keep serving the app session and re-derive entitlement from your store (or Gate with the backend service token) so revoke still 401s; do not bounce the user to sign-in solely because `getMyOrgAccess` returned 401 on an expired platform token after you already established an app session.
+- Paths that still require a **live** platform feature token (browser→Gate/Dashboard proxy, some embeds) will fail when that token expires — keep those behind the app backend, or accept re-auth via a fresh magic link.
+
 ### Don't register non-secrets
 
 - `FUSEBASE_ORG_ID` is **not a secret** — it lives in `fusebase.json` as `orgId` and is readable by anyone who clones the repo. Do not run `fusebase secret create … FUSEBASE_ORG_ID:…`. Read the value from `fusebase.json` (or platform-injected env where available) at app start.
@@ -234,7 +243,7 @@ Gate exposes **create**, **bulk create**, **request**, **activate**, plus owner-
 
 ## Version
 
-- **Version**: 1.9.1
+- **Version**: 1.9.2
 - **Category**: specialized
-- **Last synced**: 2026-07-23
+- **Last synced**: 2026-07-24
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
