@@ -7,6 +7,7 @@
     "index.ts",
     "lib",
     "dev-server",
+    "docs",
     "feature-templates",
     "project-template",
     "ide-configs",

@@ -7,6 +7,12 @@ description: "Complete guide for using the Fusebase CLI (fusebase) tool to initi
 
 This skill describes how to use the Fusebase CLI tool to manage and deploy Fusebase Apps apps.
 
+For environment migrations, pair this skill with the local project guides
+**App Environments Guide** and **App Environment Migration Guide**. When e2e
+tests are part of the work, also load skill **app-e2e-tests** and local guide
+**E2E Playwright Setup Guide**; when backend runtime env or Gate access is
+involved, also load **app-backend** and **fusebase-gate** as applicable.
+
 ## Overview
 
 The Fusebase CLI (`fusebase`) is a command-line tool for:
@@ -384,6 +390,11 @@ Deployed bundles include `fusebase-env.json`; the template's `EnvPanel`
 component (`?envpanel=1`) shows the current stage (red PROD badge for
 protected envs) with links to counterpart deployments, and tests can read it
 to assert they target the intended stage.
+
+When converting an existing app, follow the local guide **App Environment
+Migration Guide**: normalize `fusebase.json`, run `fusebase env init --strip`,
+add/clone non-prod envs, remove hardcoded backend/org/app ids from runtime
+code, then add readonly e2e smoke tests and CI.
 
 ### Configure optional MCP integrations
 

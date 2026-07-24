@@ -14,6 +14,12 @@ fusebase config set-flag environments
 filling the env lockfile — is default CLI behavior.)
 
 Design rationale: [APP-ENVIRONMENTS.md](../proposals/APP-ENVIRONMENTS.md).
+Migrating an existing app? Use
+[App Environment Migration Guide](environment-migration.md) as the conversion
+checklist.
+Adding tests? Use
+[E2E Playwright Setup Guide](e2e-playwright-setup.md) to choose safe env
+targets and wire CI.
 
 ---
 

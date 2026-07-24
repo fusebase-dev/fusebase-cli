@@ -702,7 +702,7 @@ Do **not** expect `eversessionid` on a same-origin `POST /api/account/from-magic
 4. **Fail-closed:** accept only `source === 'member'` with a real user id. Reject `source: 'none'` (visitor), `source: 'owner'` (owner-scoped / legacy), and missing/invalid responses — do not log in the wrong user.
 5. Backend responds with whatever the SPA needs (typically `{ userId }`).
 
-**Legacy SPA activation (`activateAppMagicLink` on `/link`):** the activation JSON still returns `{ featureToken, sessionToken, … }`. POST both in the **body** to `/api/account/from-magic-link`, or forward `sessionToken` as `EverHelper-Session-ID` together with `x-app-feature-token`. Dual-token in the request body still works here because tokens do not rely on cross-domain cookies.
+**Legacy SPA activation (`activateAppMagicLink` on `/link`):** the activation JSON still returns `{ featureToken, sessionToken, … }`. **`featureToken` alone is not enough** — bare `x-app-feature-token` to gate-proxy returns **`401 UNAUTHORIZED`**. Always POST both in the **body** to `/api/account/from-magic-link`, or forward the **mandatory** pair `x-app-feature-token: <featureToken>` + `EverHelper-Session-ID: <sessionToken>`. Dual-token in the request body still works here because tokens do not rely on cross-domain cookies.
 
 Run the exchange **before** `window.location.replace` to a protected route — the next HTML load may re-mint `fbsfeaturetoken` for a different Fusebase user already signed into the browser.
 

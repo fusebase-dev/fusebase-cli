@@ -9,6 +9,14 @@ One suite in `tests/e2e/`, same specs against every environment of the
 project. Environments (`fusebase env`) supply everything varying between
 stages: base URLs, org/app ids, test users.
 
+When e2e is being added as part of an environment migration, first follow the
+local guide **App Environment Migration Guide**, then use this skill for the
+Playwright harness and CI details.
+
+When adding e2e to an existing project, first follow the local guide
+**E2E Playwright Setup Guide**: audit environments, prefer non-prod targets,
+warn before any prod run, scaffold from the CLI template, and wire GitLab CI.
+
 ## Scaffold
 
 ```bash

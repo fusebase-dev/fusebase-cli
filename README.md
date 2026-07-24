@@ -17,6 +17,8 @@ See:
 - [CLI Flows](docs/CLI-FLOWS.md)
 - [Git Configuration Guide](docs/guides/git-config.md)
 - [App Environments Guide](docs/guides/environments.md) — one project targeting dev/prod/beta platform contexts (`fusebase env`, experimental)
+- [App Environment Migration Guide](docs/guides/environment-migration.md) — checklist for converting existing apps to env lockfiles, env-safe runtime config, readonly e2e, and CI
+- [E2E Playwright Setup Guide](docs/guides/e2e-playwright-setup.md) — add the CLI e2e template, choose safe env targets, and wire GitLab CI
 - [Conceptual Model](docs/CONCEPTS.md)
 - [App Permissions](docs/PERMISSIONS.md) — canonical model for `dashboardView`, `database`, `gate`, and `app update`
 - [Fusebase Gate meta (`fusebaseGateMeta`)](docs/FUSEBASE_GATE_META.md) — Gate SDK analyze flow and `fusebase.json` snapshot
@@ -727,6 +729,8 @@ e.g. `prod` (customer org), `prod-beta` (beta stage on the prod platform),
 
 **Full guide: [docs/guides/environments.md](docs/guides/environments.md)**
 (getting started, day-to-day commands, auth, env panel, fixtures, gotchas).
+For existing apps, use the migration checklist:
+[docs/guides/environment-migration.md](docs/guides/environment-migration.md).
 Design rationale: [docs/proposals/APP-ENVIRONMENTS.md](docs/proposals/APP-ENVIRONMENTS.md).
 
 - `environments/<name>.json` (committed) — the env lockfile: `backend`

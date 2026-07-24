@@ -30,6 +30,13 @@ Senior bar: **do not** “fix” errors with **`any`**, **`as any`**, **`as Reco
 
 All skills are located in `.claude/skills/`. When this document references a skill (e.g., `fusebase-cli`), look for `SKILL.md` in that folder.
 
+For named environment work, use local guide titles rather than repository-only
+links: **App Environments Guide** explains `fusebase env`; **App Environment
+Migration Guide** is the checklist for converting existing apps; **E2E
+Playwright Setup Guide** explains how to add the CLI e2e template and GitLab
+CI. Pair them with skills **fusebase-cli**, **app-e2e-tests**,
+**app-backend**, and **fusebase-gate** as the task requires.
+
 ## Custom additions in skill docs (update-safe rule)
 
 When adding project-specific guidance to skill markdown files (`SKILL.md` and `references/*.md`), place it only inside custom blocks:
