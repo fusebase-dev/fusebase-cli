@@ -1,7 +1,7 @@
 ---
-version: "1.7.3"
+version: "1.7.4"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-07-24"
+last_synced: "2026-07-26"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -198,9 +198,9 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 - `requestFusebasePasswordRestore` forwards `email` as auth-form `login` and may pass `customAuthUrl`, `portalId`, and `workspaceId` when the app needs branded restore routing.
 - The restore request intentionally returns only `{ ok: true }`. The UI should always show generic copy such as "If an account exists, we sent instructions."
-- **Restore-link format:** the platform appends `/resetpass` to `customAuthUrl` and puts the key in query param `key`, i.e. `${customAuthUrl}/resetpass?key=<key>`. Omit `customAuthUrl` to use the default Fusebase host.
+- **Restore-link format:** with `customAuthUrl` the platform appends `/resetpass` and puts the key in query param `key`, i.e. `${customAuthUrl}/resetpass?key=<key>` — your page must read `key` and call `resetFusebasePassword`. Without it the link is the platform auth-form page, `https://app.<fusebase-host>/auth/?f=resetpass&key=<key>&parentOrigin=`; auth-form serves the reset step only on `f=resetpass`, so a bare `/resetpass` path does not work there.
 - **`portalId` / `workspaceId`:** set BOTH to apply portal white-label branding — user-service overrides `customAuthUrl` with the portal domain, uses the portal name, and sends the `restore_portal_password` template. Setting only one has no branding effect.
-- **White-label reset (send your own email):** call `requestFusebaseRestoreKey` (POST `/:orgId/auth/fusebase/restore-key`, service token with `auth.restore_key.write`). It returns the raw `key` plus `resetUrl` (built from your `customAuthUrl`) and does NOT email the recipient, so the app sends a single branded reset mail. The key has the same TTL and one-time-use as the email flow. Gate rejects user and visitor subjects with 403, but the app-wrapper-minted `fbsfeaturetoken` cookie still resolves as the app's service token (NIM-42649) — unlike the platform-minted browser token above it embeds a gst, and gate cannot tell it from a backend call. So the calling credential must never be reachable from frontend code: call this op only from the app backend.
+- **White-label reset (send your own email):** call `requestFusebaseRestoreKey` (POST `/:orgId/auth/fusebase/restore-key`, service token with `auth.restore_key.write`). It returns the raw `key` plus a ready-to-use `resetUrl` (your `customAuthUrl` when given, otherwise the platform auth-form link) and does NOT email the recipient, so the app sends a single branded reset mail. The key has the same TTL and one-time-use as the email flow. Gate rejects user and visitor subjects with 403, but the app-wrapper-minted `fbsfeaturetoken` cookie still resolves as the app's service token (NIM-42649) — unlike the platform-minted browser token above it embeds a gst, and gate cannot tell it from a backend call. So the calling credential must never be reachable from frontend code: call this op only from the app backend.
 - **Who you may target:** the service token must be scoped to the `orgId` in the path (403 otherwise), and the target email must belong to that org and to NO other org — a key resets the GLOBAL Fusebase password, so users with a footprint elsewhere (another org, or a private org from self-registration) are refused with 404. Users your app provisioned via magic link work; a person who already had a Fusebase account does not.
 - Use `checkFusebasePasswordRestoreKey` for the reset screen and `resetFusebasePassword` to set the new password. These depend on `USER_SERVICE_URL` being configured for Gate.
 
@@ -224,7 +224,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 ## Version
 
-- **Version**: 1.7.3
+- **Version**: 1.7.4
 - **Category**: specialized
-- **Last synced**: 2026-07-24
+- **Last synced**: 2026-07-26
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
