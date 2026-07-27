@@ -1,5 +1,5 @@
 ---
-version: "1.7.4"
+version: "1.8.0"
 mcp_prompt: fusebaseAuth
 last_synced: "2026-07-26"
 title: "Fusebase Auth For AI Apps"
@@ -47,7 +47,7 @@ These operations help AI Apps add Fusebase account registration, login, logout, 
 - `loginFusebaseUser` — visitor-safe email/password login. Returns `sessionId` plus `userId`, or a challenge. Never provisions org membership.
 - `completeFusebaseAuthChallenge` — completes auth-form challenges such as CAPTCHA, OTP, mail OTP, two-factor, and MFA states returned by register/login.
 - `requestFusebasePasswordRestore` — sends restore email through auth-form. It returns a generic `{ ok: true }` and must not be used for account enumeration.
-- `requestFusebaseRestoreKey` — protected white-label reset. Mints the restore key WITHOUT sending the platform email and returns `{ key, resetUrl, expiresAt }` so the app can send its own branded reset mail. Requires `auth.restore_key.write` and org access; visitors get 403.
+- `requestFusebaseRestoreKey` — protected white-label reset. Mints the restore key WITHOUT sending the platform email and returns `{ key, platformResetUrl, expiresAt }` so the app can send its own branded reset mail. Requires `auth.restore_key.write` and org access; visitors get 403.
 - `checkFusebasePasswordRestoreKey` and `resetFusebasePassword` — validate and complete password reset through user-service restore sessions.
 - `logoutFusebaseUser` — returns the app-domain cookies that the app must clear. Gate cannot delete cookies for an AI App host.
 
@@ -100,7 +100,11 @@ Never call `registerFusebaseOrgMember` / `addOrgUser` from the SPA with a visito
 
 Gate BFF errors are often wrapped. Read **status + inner code**, not only the outer HTTP status:
 
-- **`upstreamStatus: 401`** inside a **500** response on login/register usually means **wrong password or invalid credentials** — not a transient server fault. Do not retry blindly.
+- **`401` with `errorCode: fusebase_auth_invalid_credentials`** on login/register — wrong password or unknown account. Never retry the same credentials. (Older gate builds returned this as a **500** carrying `upstreamStatus: 401`.)
+- **`401` with `errorCode: fusebase_auth_challenge_failed`** on `completeFusebaseAuthChallenge` — the OTP/MFA answer is wrong. **Do** re-prompt for the code; the challenge `state` is still usable.
+- **`401` with `errorCode: fusebase_auth_challenge_expired`** on `completeFusebaseAuthChallenge` — the challenge `state` or mailed code expired. Restart from login/register to get a fresh challenge.
+- **`400` with `errorCode: restore_key_invalid`** on `resetFusebasePassword` — the restore key is unknown, expired or already used. Mint a new one; retrying the same key never succeeds.
+- **`400` with `errorCode: password_rejected`** on `resetFusebasePassword` — the key is fine, the new password failed platform rules; `message` carries the rule to show the user.
 - **`-20` / `403` from auth-form anti-abuse** — registration or login blocked by rate/abuse policy. **Not transient**; backoff, surface human copy, do not spin retry loops.
 - **`403 token subject not allowed`** — wrong token type for the op (see matrix above), not "platform denies org join".
 - **`403` with `authType=visitor` on org writes** — backend forwarded visitor `fbsfeaturetoken` instead of `FBS_FEATURE_TOKEN`.
@@ -196,11 +200,11 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 ## Password Restore
 
-- `requestFusebasePasswordRestore` forwards `email` as auth-form `login` and may pass `customAuthUrl`, `portalId`, and `workspaceId` when the app needs branded restore routing.
+- `requestFusebasePasswordRestore` forwards `email` as auth-form `login`, and `portalId` / `workspaceId` when the app needs branded restore routing.
 - The restore request intentionally returns only `{ ok: true }`. The UI should always show generic copy such as "If an account exists, we sent instructions."
-- **Restore-link format:** with `customAuthUrl` the platform appends `/resetpass` and puts the key in query param `key`, i.e. `${customAuthUrl}/resetpass?key=<key>` — your page must read `key` and call `resetFusebasePassword`. Without it the link is the platform auth-form page, `https://app.<fusebase-host>/auth/?f=resetpass&key=<key>&parentOrigin=`; auth-form serves the reset step only on `f=resetpass`, so a bare `/resetpass` path does not work there.
-- **`portalId` / `workspaceId`:** set BOTH to apply portal white-label branding — user-service overrides `customAuthUrl` with the portal domain, uses the portal name, and sends the `restore_portal_password` template. Setting only one has no branding effect.
-- **White-label reset (send your own email):** call `requestFusebaseRestoreKey` (POST `/:orgId/auth/fusebase/restore-key`, service token with `auth.restore_key.write`). It returns the raw `key` plus a ready-to-use `resetUrl` (your `customAuthUrl` when given, otherwise the platform auth-form link) and does NOT email the recipient, so the app sends a single branded reset mail. The key has the same TTL and one-time-use as the email flow. Gate rejects user and visitor subjects with 403, but the app-wrapper-minted `fbsfeaturetoken` cookie still resolves as the app's service token (NIM-42649) — unlike the platform-minted browser token above it embeds a gst, and gate cannot tell it from a backend call. So the calling credential must never be reachable from frontend code: call this op only from the app backend.
+- **Restore-link format:** the platform email's link is built by the mail template, not by Gate. Its shape is not part of this contract — never hardcode or parse it. If the app needs a reset URL it controls, use `requestFusebaseRestoreKey` and send your own email.
+- **`portalId` / `workspaceId`:** set BOTH to apply portal white-label branding — user-service resolves the portal domain itself, uses the portal name, and sends the `restore_portal_password` template. Setting only one has no branding effect.
+- **White-label reset (send your own email):** call `requestFusebaseRestoreKey` (POST `/:orgId/auth/fusebase/restore-key`, service token with `auth.restore_key.write`). It returns the raw `key` and does NOT email the recipient, so the app sends a single branded reset mail. The key is NOT bound to a URL — host your reset page anywhere and embed the key however you like, e.g. `${yourApp}/account/new-password?t=<key>`; that page then calls `checkFusebasePasswordRestoreKey` and `resetFusebasePassword`. Same TTL and one-time-use as the email flow. Use the returned `platformResetUrl` if you have no reset page of your own. Backend only — the app-wrapper `fbsfeaturetoken` cookie also resolves as a token subject, so the calling credential must never be reachable from frontend code.
 - **Who you may target:** the service token must be scoped to the `orgId` in the path (403 otherwise), and the target email must belong to that org and to NO other org — a key resets the GLOBAL Fusebase password, so users with a footprint elsewhere (another org, or a private org from self-registration) are refused with 404. Users your app provisioned via magic link work; a person who already had a Fusebase account does not.
 - Use `checkFusebasePasswordRestoreKey` for the reset screen and `resetFusebasePassword` to set the new password. These depend on `USER_SERVICE_URL` being configured for Gate.
 
@@ -224,7 +228,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 ## Version
 
-- **Version**: 1.7.4
+- **Version**: 1.8.0
 - **Category**: specialized
 - **Last synced**: 2026-07-26
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
