@@ -112,9 +112,15 @@ async function writeWindowsInstallerLaunchers(installerPath: string): Promise<st
   return cmdLauncherPath;
 }
 
+/** Absolute cmd.exe path: `explorer.exe`/`cmd.exe` are PATH-resolved by libuv and
+ * fail with `ENOENT ... uv_spawn` when %SystemRoot% is missing from PATH. */
+export function resolveComSpec(env: NodeJS.ProcessEnv = process.env): string {
+  return env.ComSpec || join(env.SystemRoot || "C:\\Windows", "System32", "cmd.exe");
+}
+
 async function launchWindowsInstaller(installerPath: string): Promise<void> {
   const launcherPath = await writeWindowsInstallerLaunchers(installerPath);
-  await spawnDetached("explorer.exe", [launcherPath]);
+  await spawnDetached(resolveComSpec(), ["/c", launcherPath]);
 }
 
 /**
