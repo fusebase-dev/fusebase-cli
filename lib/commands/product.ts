@@ -91,7 +91,10 @@ async function computeAgentAssetsDigest(cwd: string): Promise<string> {
 
 function runNpmInstall(cwd: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn("npm", ["install"], {
+    // Windows has no bare `npm` executable (it is `npm.cmd`), so a shell-less
+    // spawn fails with `ENOENT ... uv_spawn 'npm'`. Run through the shell.
+    const child = spawn("npm install", {
+      shell: true,
       cwd,
       stdio: "inherit",
     });

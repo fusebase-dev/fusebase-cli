@@ -67,6 +67,27 @@ function escapePowerShellString(value: string): string {
   return value.replace(/'/g, "''");
 }
 
+/** The .cmd runs with the same PATH that failed to resolve `cmd.exe`, so it must not
+ * resolve `powershell.exe` through PATH either. `%SystemRoot%` is an environment
+ * variable set by Windows itself, independent of PATH; the bare name stays only as a
+ * last-resort fallback for a non-standard PowerShell location. */
+export function buildInstallerCmdScript(powershellLauncherFile: string): string {
+  return [
+    "@echo off",
+    "set LOG=%TEMP%\\fusebase-update\\installer-launch.log",
+    "if not exist \"%TEMP%\\fusebase-update\" mkdir \"%TEMP%\\fusebase-update\"",
+    "echo [%DATE% %TIME%] CMD launcher started.>> \"%LOG%\"",
+    "set PS=%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "if not exist \"%PS%\" set PS=powershell.exe",
+    "echo [%DATE% %TIME%] Running PowerShell launcher via %PS%.>> \"%LOG%\"",
+    `"%PS%" -NoProfile -ExecutionPolicy Bypass -File "%~dp0${powershellLauncherFile}" >> "%LOG%" 2>&1`,
+    "echo [%DATE% %TIME%] PowerShell launcher exit code: %ERRORLEVEL%.>> \"%LOG%\"",
+    "echo [%DATE% %TIME%] CMD launcher finished.>> \"%LOG%\"",
+    "exit /b 0",
+    "",
+  ].join("\r\n");
+}
+
 async function writeWindowsInstallerLaunchers(installerPath: string): Promise<string> {
   const launcherDir = join(tmpdir(), "fusebase-update");
   const powershellLauncherFile = "launch-installer.ps1";
@@ -95,26 +116,22 @@ async function writeWindowsInstallerLaunchers(installerPath: string): Promise<st
     "}",
     "",
   ].join("\r\n");
-  const cmdScript = [
-    "@echo off",
-    "set LOG=%TEMP%\\fusebase-update\\installer-launch.log",
-    "if not exist \"%TEMP%\\fusebase-update\" mkdir \"%TEMP%\\fusebase-update\"",
-    "echo [%DATE% %TIME%] CMD launcher started.>> \"%LOG%\"",
-    "echo [%DATE% %TIME%] Running PowerShell launcher.>> \"%LOG%\"",
-    `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0${powershellLauncherFile}" >> "%LOG%" 2>&1`,
-    "echo [%DATE% %TIME%] CMD launcher finished.>> \"%LOG%\"",
-    "exit /b 0",
-    "",
-  ].join("\r\n");
+  const cmdScript = buildInstallerCmdScript(powershellLauncherFile);
 
   await writeFile(powershellLauncherPath, powershellScript, "utf-8");
   await writeFile(cmdLauncherPath, cmdScript, "utf-8");
   return cmdLauncherPath;
 }
 
+/** Absolute cmd.exe path: `explorer.exe`/`cmd.exe` are PATH-resolved by libuv and
+ * fail with `ENOENT ... uv_spawn` when %SystemRoot% is missing from PATH. */
+export function resolveComSpec(env: NodeJS.ProcessEnv = process.env): string {
+  return env.ComSpec || join(env.SystemRoot || "C:\\Windows", "System32", "cmd.exe");
+}
+
 async function launchWindowsInstaller(installerPath: string): Promise<void> {
   const launcherPath = await writeWindowsInstallerLaunchers(installerPath);
-  await spawnDetached("explorer.exe", [launcherPath]);
+  await spawnDetached(resolveComSpec(), ["/c", launcherPath]);
 }
 
 /**
