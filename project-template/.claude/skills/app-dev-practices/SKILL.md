@@ -202,12 +202,16 @@ access mode never cause it to go missing.
 2. Local `fusebase dev start` — there is no portal embed locally, same as case 1.
 3. **Legacy portal blocks.** App blocks added to a portal before the platform started storing the
    portal context token (April 2026) carry no token, so the fields are absent even though the app
-   *is* embedded in a portal — for every viewer. Re-selecting the app in that block in the portal
-   customizer stores a token and fixes the block permanently.
+   *is* embedded in a portal — for every viewer. Fixable per block, see below.
 
 **Possibly stale** — if a portal block was copy-pasted from another portal, the stored token still
 carries the **source** portal's id, so `portalId` can name a different portal than the one the app
-is currently displayed in. Re-selecting the app in the block re-mints it for the current portal.
+is currently displayed in.
+
+**Fixing a block** (cases 3 and stale) — in the portal customizer, the block's app selection has to
+actually **change** for a token to be minted: pick a different app in that block, then the intended
+one again. Re-picking the *same* app is a no-op — the App picker ignores an unchanged value and no
+token is minted. If the product has only one app, delete the app block and add it again.
 
 **What this means in practice.** `Boolean(runtimeContext?.portalId)` is a good instant UX signal and
 is correct for every portal embed created normally today. Absence almost always means "not in a

@@ -15,7 +15,7 @@ When the user asks for an app that should show different information based on th
 Requests for the data in this view automatically receive the current portal in context, and that value is substituted into the view filter. 
 
 ## Writing from a portal
-If you need to add an entry to the table with a portal-based filter, you need to ensure that the row you have created contains the current portal. Get it via the `/auth/context` request described in the `app-dev-practices` skill. If `runtimeContext.portalId` is not present, then the app is currently running outside of the portal; therefore, the current portal should not be written to a filter column.
+If you need to add an entry to the table with a portal-based filter, you need to ensure that the row you have created contains the current portal. Get it via the `/auth/context` request described in the `app-dev-practices` skill. If `runtimeContext.portalId` is not present, you have no portal to write — leave the filter column empty. (Absence usually means "outside a portal", but not always; see "Detecting portal context" below.)
 
 ## Detecting portal context
 
@@ -28,10 +28,14 @@ signal — no server round-trip needed to decide what to render.
   so role and access mode never affect it.
 - Opened directly by the app's own URL, or run locally via `fusebase dev start` → both absent.
 - **Legacy portal blocks** added before April 2026 carry no portal context token, so the fields
-  are absent even inside a portal. Re-selecting the app in that block in the portal customizer
-  fixes it permanently.
+  are absent even inside a portal. Fixable per block in the portal customizer — see below.
 - A block **copy-pasted from another portal** keeps the source portal's token, so `portalId` can
-  name a different portal than the one displaying the app. Re-selecting the app re-mints it.
+  name a different portal than the one displaying the app. Same fix.
+
+Both are fixed by making the block's app selection actually **change**: pick a different app in
+that block and then the intended one again. Re-picking the *same* app does nothing — the App
+picker ignores an unchanged value, so no token is minted. If the product has only one app, delete
+the app block and add it again.
 
 Because of the last two cases, do not turn a missing `portalId` into an unrecoverable dead end —
 degrade to the standalone UI rather than a hard "open me from a portal" wall.
