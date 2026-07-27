@@ -204,9 +204,15 @@ access mode never cause it to go missing.
    portal context token (April 2026) carry no token, so the fields are absent even though the app
    *is* embedded in a portal — for every viewer. Fixable per block, see below.
 
-**Possibly stale** — if a portal block was copy-pasted from another portal, the stored token still
-carries the **source** portal's id, so `portalId` can name a different portal than the one the app
-is currently displayed in.
+**Possibly stale** — if the block was **copied from another portal**, the stored token still carries
+the **source** portal's id, so `portalId` can name a different portal than the one the app is
+currently displayed in. All of these copy the block verbatim, and nothing re-mints the token:
+
+- block copy-paste,
+- duplicating a page or folder from another portal ("Create from another portal"),
+- duplicating a whole portal, or creating a portal from a template — **every** app block in the new
+  portal carries the source/template portal's id,
+- synced-copy propagation into a page that lives in another portal.
 
 **Fixing a block** (cases 3 and stale) — in the portal customizer, the block's app selection has to
 actually **change** for a token to be minted: pick a different app in that block, then the intended

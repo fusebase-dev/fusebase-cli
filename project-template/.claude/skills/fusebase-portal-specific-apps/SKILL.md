@@ -29,8 +29,11 @@ signal — no server round-trip needed to decide what to render.
 - Opened directly by the app's own URL, or run locally via `fusebase dev start` → both absent.
 - **Legacy portal blocks** added before April 2026 carry no portal context token, so the fields
   are absent even inside a portal. Fixable per block in the portal customizer — see below.
-- A block **copy-pasted from another portal** keeps the source portal's token, so `portalId` can
-  name a different portal than the one displaying the app. Same fix.
+- A block **copied from another portal** keeps the source portal's token, so `portalId` can name a
+  different portal than the one displaying the app. That covers block copy-paste, duplicating a
+  page from another portal ("Create from another portal"), duplicating a whole portal or creating
+  one from a template (then *every* app block carries the template portal's id), and synced-copy
+  propagation into another portal's page. Same fix.
 
 Both are fixed by making the block's app selection actually **change**: pick a different app in
 that block and then the intended one again. Re-picking the *same* app does nothing — the App
