@@ -15,7 +15,31 @@ When the user asks for an app that should show different information based on th
 Requests for the data in this view automatically receive the current portal in context, and that value is substituted into the view filter. 
 
 ## Writing from a portal
-If you need to add an entry to the table with a portal-based filter, you need to ensure that the row you have created contains the current portal. Get it via the `/auth/context` request described in the `app-dev-practices` skill. When the app runs within the portal, the response may contain `runtimeContext.portalId`. If it is not present, then the app is currently running outside of the portal; therefore, the current portal should not be written to a filter column.
+If you need to add an entry to the table with a portal-based filter, you need to ensure that the row you have created contains the current portal. Get it via the `/auth/context` request described in the `app-dev-practices` skill. If `runtimeContext.portalId` is not present, then the app is currently running outside of the portal; therefore, the current portal should not be written to a filter column.
+
+## Detecting portal context
+
+`Boolean(runtimeContext?.portalId)` from `/auth/context` is the instant "am I inside a portal?"
+signal — no server round-trip needed to decide what to render.
+
+- Opened from a portal embed → `runtimeContext.portalId` and `runtimeContext.workspaceId` are
+  present for **every** portal role (client, manager, anonymous visitor) and **every** portal
+  access mode. The portal context token lives on the portal block, not on the viewer's session,
+  so role and access mode never affect it.
+- Opened directly by the app's own URL, or run locally via `fusebase dev start` → both absent.
+- **Legacy portal blocks** added before April 2026 carry no portal context token, so the fields
+  are absent even inside a portal. Re-selecting the app in that block in the portal customizer
+  fixes it permanently.
+- A block **copy-pasted from another portal** keeps the source portal's token, so `portalId` can
+  name a different portal than the one displaying the app. Re-selecting the app re-mints it.
+
+Because of the last two cases, do not turn a missing `portalId` into an unrecoverable dead end —
+degrade to the standalone UI rather than a hard "open me from a portal" wall.
+
+See "Portal context contract" in the `app-dev-practices` skill for the full contract.
+
+**It is a UX hint, not an authorization fact.** Access to portal data must still be authorized
+server-side by verifying the `portalFeatureContextToken`.
 
 ## Listing all portal pages where this app is embedded
 

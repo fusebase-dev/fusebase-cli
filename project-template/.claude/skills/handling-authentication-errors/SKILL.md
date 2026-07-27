@@ -161,6 +161,8 @@ type AuthContextResponse = {
   org?: {
     globalId: string
   }
+  // Portal context; present iff the app is opened from a portal embed.
+  // See "Portal context contract" in the app-dev-practices skill.
   runtimeContext?: {
     portalId?: string
     workspaceId?: string

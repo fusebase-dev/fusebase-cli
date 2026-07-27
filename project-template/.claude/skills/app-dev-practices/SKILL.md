@@ -164,6 +164,9 @@ type AuthContextResponse = {
   org?: {
     globalId: string
   }
+  // Portal context. Optional in the type because it is absent outside a portal;
+  // see "Portal context contract" below for exactly when it is present.
+  // `portalId` and `workspaceId` are always set together, or both absent.
   runtimeContext?: {
     portalId?: string
     workspaceId?: string
@@ -177,8 +180,45 @@ const authContext: AuthContextResponse = response.ok ? await response.json() : {
 const user = authContext.user ?? null
 // authenticated: { id: 4124, email: "testemail@gmail.com" }
 // anonymous visitor on a public app: null (user field is missing)
-// portal/workspace context (if available): authContext.runtimeContext
+
+const insidePortal = Boolean(authContext.runtimeContext?.portalId)
 ```
+
+### Portal context contract
+
+`portalId` and `workspaceId` are always set together, or both absent. Where they come from: the
+portal app block stores a portal context token, the portal appends it to the app's iframe URL, and
+the platform stamps its `portalId` / `workspaceId` into the `x-app-feature-token` minted when the
+app opens. The token is stored **on the block**, not derived from the viewer's session.
+
+**Present** — app opened from a portal embed whose block carries a portal context token. Because
+the token is a property of the block, this does not depend on who is looking: it is present for
+**every portal role (client, manager, anonymous visitor) and every portal access mode**. Role and
+access mode never cause it to go missing.
+
+**Absent** — the exhaustive list:
+
+1. The app is opened directly by its own URL, outside any portal.
+2. Local `fusebase dev start` — there is no portal embed locally, same as case 1.
+3. **Legacy portal blocks.** App blocks added to a portal before the platform started storing the
+   portal context token (April 2026) carry no token, so the fields are absent even though the app
+   *is* embedded in a portal — for every viewer. Re-selecting the app in that block in the portal
+   customizer stores a token and fixes the block permanently.
+
+**Possibly stale** — if a portal block was copy-pasted from another portal, the stored token still
+carries the **source** portal's id, so `portalId` can name a different portal than the one the app
+is currently displayed in. Re-selecting the app in the block re-mints it for the current portal.
+
+**What this means in practice.** `Boolean(runtimeContext?.portalId)` is a good instant UX signal and
+is correct for every portal embed created normally today. Absence almost always means "not in a
+portal" — but because of case 3, do not make it an unrecoverable dead end: prefer degrading to the
+standalone UI, or offer a way forward, rather than a hard "open me from a portal" wall that leaves a
+user on a legacy embed stuck.
+
+**This is a UX hint, not an authorization fact.** Use it to choose what to render. Anything that
+grants access to portal data must still be authorized server-side by verifying the
+`portalFeatureContextToken` — which is also what protects you from the stale-token case above. Do
+not derive permissions from `runtimeContext`.
 
 Important for public apps:
 
