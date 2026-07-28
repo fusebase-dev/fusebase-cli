@@ -552,8 +552,14 @@ export function mergeFeaturePermissions(args: {
   const existingItems = existingPermissions?.items ?? [];
   const manualItems = manualPermissions?.items ?? [];
   const manualResourceItems = manualItems.filter((item) => item.type !== "gate");
-  const manualGatePrivileges = manualItems
-    .filter((item): item is AppGatePermissionItem => item.type === "gate")
+  const manualGateItems = manualItems.filter(
+    (item): item is AppGatePermissionItem => item.type === "gate",
+  );
+  // Only unscoped gate items are flattened. A scoped item passes through whole: dropping its
+  // `resource` widens the minted token's resource_scope from that resource to the whole org.
+  const manualScopedGateItems = manualGateItems.filter((item) => item.resource);
+  const manualGatePrivileges = manualGateItems
+    .filter((item) => !item.resource)
     .flatMap((item) => item.privileges);
 
   // A Gate-only `--permissions` grant leaves the resource section untouched so it never
@@ -573,7 +579,11 @@ export function mergeFeaturePermissions(args: {
       : buildGatePermissionItems(gatePermissions);
 
   return {
-    items: [...resourceItems, ...addGatePrivileges(gateItems, manualGatePrivileges)],
+    items: [
+      ...resourceItems,
+      ...manualScopedGateItems,
+      ...addGatePrivileges(gateItems, manualGatePrivileges),
+    ],
   };
 }
 
@@ -619,7 +629,9 @@ export function seedPermissionsFromRemote(
   const analyzed = new Set(analyzedGatePrivileges ?? []);
 
   const items = remoteItems.flatMap((item): AppPermissionItem[] => {
-    if (item.type !== "gate") {
+    // Scoped items are kept whole: the meta only republishes privileges unscoped, so
+    // subtracting them here would drop the scope and bring the privilege back org-wide.
+    if (item.type !== "gate" || item.resource) {
       return [item];
     }
 

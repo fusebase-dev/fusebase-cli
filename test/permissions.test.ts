@@ -9,6 +9,7 @@ import {
   parsePermissions,
   parsePrincipals,
   readBackendOnlyGatePermissionsFromManifest,
+  seedPermissionsFromRemote,
   splitGatePermissionStrings,
   subtractBackendOnlyFromRuntime,
   withTrustedRuntimeContextDelegatePermission,
@@ -784,6 +785,64 @@ describe("mergeFeaturePermissions with hand-granted gate privileges (NIM-42737)"
       items: [
         { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
         { type: "gate", privileges: ["app_api.analytics.vse_usage.read"] },
+      ],
+    });
+  });
+
+  // The deploy shape: apps[].permissions arrives as manualPermissions. Dropping the
+  // resource here widens the minted token from that resource to the whole org.
+  it("keeps a resource-scoped gate item from manualPermissions scoped", () => {
+    const result = mergeFeaturePermissions({
+      manualPermissions: {
+        items: [
+          { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
+        ],
+      },
+      gatePermissions: ["token.read"],
+    });
+
+    expect(result).toEqual({
+      items: [
+        { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
+        { type: "gate", privileges: ["token.read"] },
+      ],
+    });
+  });
+});
+
+describe("seedPermissionsFromRemote", () => {
+  it("drops analyzed privileges from the unscoped gate item", () => {
+    expect(
+      seedPermissionsFromRemote(
+        {
+          items: [
+            { type: "database", resource: { databaseId: "db1" }, privileges: ["read"] },
+            { type: "gate", privileges: ["org.members.read", "token.read"] },
+          ],
+        },
+        ["token.read"],
+      ),
+    ).toEqual({
+      items: [
+        { type: "database", resource: { databaseId: "db1" }, privileges: ["read"] },
+        { type: "gate", privileges: ["org.members.read"] },
+      ],
+    });
+  });
+
+  it("keeps a scoped privilege that the meta republishes unscoped", () => {
+    expect(
+      seedPermissionsFromRemote(
+        {
+          items: [
+            { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
+          ],
+        },
+        ["portals.read"],
+      ),
+    ).toEqual({
+      items: [
+        { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
       ],
     });
   });
