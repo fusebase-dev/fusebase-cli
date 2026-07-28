@@ -66,6 +66,24 @@ which is exactly what these flows assert.)
    `.env.<name>` locally / CI variables in pipelines. Reports and traces are
    gitignored.
 
+## The first run after a deploy hits a cold backend
+
+App backends scale to zero (`backend.minReplicas` defaults to 0) and the
+platform does no post-deploy warm-up, so the **first** request after a deploy
+or an idle period pays a cold start (~10s). This suite runs exactly then.
+
+`playwright.config.ts` is already sized for it (`expect` 15s, action 15s,
+navigation 30s — CloudFront's origin-response ceiling, test 60s). Therefore:
+
+- **A first-request timeout is not flakiness.** Do not "fix" it by bumping
+  `retries` or adding a `waitForTimeout` — a spec that only passes on retry is
+  a cold start being hidden, and the next real regression hides behind it too.
+- **Do not add per-call `timeout:` overrides** to absorb start-up; the config
+  defaults already cover it. Override only when THAT step is genuinely slower
+  than a cold start, and say why in a comment.
+- Need a warm target (webhooks, always-on apps)? Set `backend.minReplicas: 1`
+  in `fusebase.json` instead of stretching test timeouts.
+
 ## Before minting magic links: pin the app's access principals
 
 `createAppMagicLink` appends a **user principal** to the app

@@ -17,6 +17,15 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
+/**
+ * Deadline for the harness's own `fetch` calls. App backends scale to zero
+ * (`backend.minReplicas` defaults to 0), so the first call after a deploy is
+ * always cold (~10s). Under CloudFront's 30s origin-response ceiling, so a
+ * request that would never be answered still fails fast with a clear message
+ * instead of hanging until the test timeout.
+ */
+const FETCH_TIMEOUT_MS = 20_000;
+
 export interface EnvFixtureUser {
   key: string;
   email: string;
@@ -266,6 +275,7 @@ export async function createSignInMagicLink(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email: user.email }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     },
   );
   if (!res.ok) {
@@ -301,10 +311,19 @@ export async function fetchDeployedEnvInfo(
   try {
     const res = await fetch(`${baseUrl}/fusebase-env.json`, {
       redirect: "manual",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     return (await res.json()) as DeployedEnvInfo;
-  } catch {
+  } catch (err) {
+    // A timeout is NOT "no env info" — report it, otherwise a cold/hung
+    // backend is misread as a bundle deployed without environment mode.
+    if (err instanceof Error && err.name === "TimeoutError") {
+      throw new Error(
+        `${baseUrl}/fusebase-env.json did not answer within ${FETCH_TIMEOUT_MS}ms ` +
+          `— cold backend beyond the expected start-up, or the app is down`,
+      );
+    }
     return null;
   }
 }
