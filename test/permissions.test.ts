@@ -227,7 +227,7 @@ describe("parsePermissions", () => {
 
     it("throws on wrong permission type", () => {
       expect(() => parsePermissions("unknownType.dash:view.read")).toThrow(
-        /Invalid permission type/
+        /Invalid permission/
       );
     });
 
@@ -301,12 +301,12 @@ describe("parsePermissions", () => {
 
     it("rejects a gate privilege with an unmintable action", () => {
       expect(() => parsePermissions("app_api.analytics.vse_usage.audit")).toThrow(
-        /Invalid permission type/
+        /Invalid permission/
       );
     });
 
     it("rejects a gate privilege with no action segment", () => {
-      expect(() => parsePermissions("app_api")).toThrow(/Invalid permission type/);
+      expect(() => parsePermissions("app_api")).toThrow(/Invalid permission/);
     });
 
     it("rejects a typo of a known gate privilege", () => {

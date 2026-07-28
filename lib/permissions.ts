@@ -106,8 +106,9 @@ export function parsePermissions(permissionsStr: string): AppPermissions {
     if (!RESOURCE_PERMISSION_TYPES.includes(segments[0]?.trim() ?? "")) {
       if (!GATE_PRIVILEGE_PATTERN.test(part)) {
         throw new Error(
-          `Invalid permission type "${segments[0] ?? part}". Allowed values: ${RESOURCE_PERMISSION_TYPES.join(', ')}, ` +
-            `or a Gate privilege such as "org.members.read" / "app_api.<namespace>.<capability>.<action>".`,
+          `Invalid permission "${part}". Expected a ${RESOURCE_PERMISSION_TYPES.join('/')} resource permission, ` +
+            `or a Gate privilege such as "org.members.read" / "app_api.<namespace>.<capability>.<action>" ` +
+            `ending in one of: read, write, delete, execute, create, manage, delegate, bypass.`,
         );
       }
       assertGrantableGatePrivilege(part);

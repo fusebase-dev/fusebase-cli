@@ -268,10 +268,16 @@ Merge semantics differ per section:
 - a **Gate-only** `--permissions` string leaves the remote resource set untouched, so granting a
   capability never silently drops dashboard/database access. `--permissions=""` still clears it.
 
-Hand-granted Gate privileges live on the remote app record. Because
-`--sync-gate-permissions` replaces the gate set from static analysis, re-run
-`--permissions` alongside it (or keep the grant in the `apps[].permissions` entry that
+Hand-granted Gate privileges live on the remote app record. Two paths replace the gate set
+from static analysis and therefore drop them:
+
+- `fusebase app update <appId> --sync-gate-permissions`
+- the `fusebase update` prompt *"Sync Gate permissions for N app(s) now?"*, which **defaults
+  to yes** — this is the one users hit by accident
+
+Re-run `--permissions` after either (or keep the grant in the `apps[].permissions` entry that
 `fusebase app create` writes into `fusebase.json`, which deploy reconcile merges back in).
+Merge-by-default is NIM-42739 / B4.
 
 > **App API policy extensions are not enforced yet.** `x-fusebase-required-permissions` and
 > `x-fusebase-allowed-callers` in an app's `openapi.json` are validated by `fusebase api validate`
