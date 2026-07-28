@@ -8,6 +8,7 @@ import {
   mergeFeaturePermissions,
   parsePermissions,
   parsePrincipals,
+  seedPermissionsFromRemote,
 } from "../permissions.ts";
 import { resolveGateSyncPermissions } from "../sync-app-gate-permissions.ts";
 import {
@@ -166,17 +167,16 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     // only reached the remote record is reverted by the next `fusebase deploy` (NIM-42737).
     if (permissions !== undefined) {
       const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
-      // Writing this entry makes reconcile PATCH the app to match it, so seed the resource
-      // section from the remote record when nothing is declared locally — otherwise the first
-      // grant would narrow the app to a subset. Remote gate privileges are left out on purpose:
-      // fusebaseGateMeta already carries the analyzed ones, and copying them here would leave a
-      // later --sync-gate-permissions unable to prune them.
+      // Writing this entry makes reconcile PATCH the app to match it, so seed it from the remote
+      // record when nothing is declared locally — otherwise the first grant would narrow the app
+      // to a subset. Gate privileges are seeded minus the ones fusebaseGateMeta already
+      // republishes, so --sync-gate-permissions can still prune the analyzed set.
       const localPermissions = featureConfig
         ? mergeFeaturePermissions({
             manualPermissions: permissions,
-            existingPermissions: featureConfig.permissions ?? {
-              items: app.permissions?.items.filter((item) => item.type !== "gate") ?? [],
-            },
+            existingPermissions:
+              featureConfig.permissions ??
+              seedPermissionsFromRemote(app.permissions, featureConfig.fusebaseGateMeta?.permissions),
           })
         : undefined;
 

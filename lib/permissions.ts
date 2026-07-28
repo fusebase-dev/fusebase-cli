@@ -604,6 +604,32 @@ function addGatePrivileges(
   );
 }
 
+/**
+ * Seed `apps[].permissions` from the remote app record for an app that declares none locally
+ * (NIM-42737). Writing the entry makes deploy reconcile PATCH the app to match it, so anything
+ * the remote holds and the local project cannot rebuild has to be carried over. Gate privileges
+ * already in the analyze snapshot are dropped: reconcile republishes those from
+ * `fusebaseGateMeta`, and keeping them here would make `--sync-gate-permissions` unable to prune.
+ */
+export function seedPermissionsFromRemote(
+  remotePermissions: AppPermissions | undefined,
+  analyzedGatePrivileges: string[] | undefined,
+): AppPermissions {
+  const remoteItems = remotePermissions?.items ?? [];
+  const analyzed = new Set(analyzedGatePrivileges ?? []);
+
+  const items = remoteItems.flatMap((item): AppPermissionItem[] => {
+    if (item.type !== "gate") {
+      return [item];
+    }
+
+    const privileges = item.privileges.filter((privilege) => !analyzed.has(privilege));
+    return privileges.length > 0 ? [{ ...item, privileges }] : [];
+  });
+
+  return { items };
+}
+
 export function formatPermissionItem(item: AppPermissionItem): string {
   if (item.type === "dashboardView") {
     return `${item.type} ${item.resource.dashboardId}:${item.resource.viewId} [${item.privileges.join(", ")}]`;

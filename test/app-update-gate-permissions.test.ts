@@ -116,6 +116,39 @@ describe("runAppUpdate --permissions persists the grant into fusebase.json", () 
     expect(written.items.map((item) => item.type).sort()).toEqual(["dashboardView", "gate"]);
   });
 
+  it("keeps remote-only gate privileges so the first grant cannot revoke them", async () => {
+    localApp = { id: "app-1", path: "apps/x" };
+    remotePermissions = {
+      items: [{ type: "gate", privileges: ["org.members.read", "token.read"] }],
+    };
+    await runAppUpdate("app-1", { permissions: "app_api.analytics.vse_usage.read" });
+    remotePermissions = undefined;
+
+    expect(gatePrivileges(permissionsWriteBacks.at(-1)!.permissions)).toEqual([
+      "app_api.analytics.vse_usage.read",
+      "org.members.read",
+      "token.read",
+    ]);
+  });
+
+  it("leaves analyzed privileges to fusebaseGateMeta so sync can still prune them", async () => {
+    localApp = {
+      id: "app-1",
+      path: "apps/x",
+      fusebaseGateMeta: { permissions: ["token.read"] },
+    };
+    remotePermissions = {
+      items: [{ type: "gate", privileges: ["org.members.read", "token.read"] }],
+    };
+    await runAppUpdate("app-1", { permissions: "app_api.analytics.vse_usage.read" });
+    remotePermissions = undefined;
+
+    expect(gatePrivileges(permissionsWriteBacks.at(-1)!.permissions)).toEqual([
+      "app_api.analytics.vse_usage.read",
+      "org.members.read",
+    ]);
+  });
+
   it("does not write when the app is not declared in this project", async () => {
     localApp = { id: "other-app", path: "apps/y" };
     const before = permissionsWriteBacks.length;

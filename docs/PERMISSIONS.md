@@ -275,6 +275,12 @@ rebuilds the app's permissions from `fusebase.json` alone, so a grant that exist
 remote record is silently reverted by the next `fusebase deploy`. Commit the change. If the app
 is not declared in this project's `fusebase.json` the CLI warns and grants remotely only.
 
+When the app has no `apps[].permissions` yet, the first grant **seeds** the entry from the remote
+record — otherwise writing it would narrow the app to just the new grant on the next deploy. Gate
+privileges already listed in `apps[].fusebaseGateMeta.permissions` are left out of the seed:
+reconcile republishes those from the snapshot, and copying them into the manual set would leave
+`--sync-gate-permissions` unable to ever prune them.
+
 Three paths rebuild the gate set from static analysis and therefore drop a grant that is
 *not* in `fusebase.json`:
 
