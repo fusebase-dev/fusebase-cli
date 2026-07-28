@@ -161,6 +161,9 @@ type AuthContextResponse = {
   org?: {
     globalId: string
   }
+  // Portal context; only when opened from a portal embed — and not for every
+  // embed (legacy blocks carry no token).
+  // See "Portal context contract" in the app-dev-practices skill.
   runtimeContext?: {
     portalId?: string
     workspaceId?: string
