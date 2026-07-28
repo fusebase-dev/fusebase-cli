@@ -1714,14 +1714,11 @@ export function persistResolvedAppId(
   );
 }
 
-/**
- * Persist `apps[].backendOnlyGatePermissions` in fusebase.json after a successful sync.
- * An empty `permissions` list removes the field (explicit cleanup).
- */
-export function writeBackendOnlyGatePermissionsToFusebaseJson(
+/** Read-modify-write one `apps[]` entry in fusebase.json. */
+function updateFusebaseJsonAppEntry(
   projectRoot: string,
   featureId: string,
-  permissions: string[],
+  mutate: (entry: Record<string, unknown>) => void,
 ): void {
   const fuseJsonPath = join(projectRoot, "fusebase.json");
   if (!existsSync(fuseJsonPath)) {
@@ -1748,17 +1745,50 @@ export function writeBackendOnlyGatePermissionsToFusebaseJson(
   }
 
   const entry = { ...(featureRaw as Record<string, unknown>) };
-  if (permissions.length > 0) {
-    entry.backendOnlyGatePermissions = [...permissions].sort((a, b) => a.localeCompare(b));
-  } else {
-    // Empty result = explicit clear: remove the field entirely rather than leaving `[]`.
-    delete entry.backendOnlyGatePermissions;
-  }
+  mutate(entry);
   apps[featureIndex] = entry;
   raw.apps = apps;
 
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
   invalidateFuseConfigCache();
+}
+
+/**
+ * Persist `apps[].backendOnlyGatePermissions` in fusebase.json after a successful sync.
+ * An empty `permissions` list removes the field (explicit cleanup).
+ */
+export function writeBackendOnlyGatePermissionsToFusebaseJson(
+  projectRoot: string,
+  featureId: string,
+  permissions: string[],
+): void {
+  updateFusebaseJsonAppEntry(projectRoot, featureId, (entry) => {
+    if (permissions.length > 0) {
+      entry.backendOnlyGatePermissions = [...permissions].sort((a, b) => a.localeCompare(b));
+    } else {
+      // Empty result = explicit clear: remove the field entirely rather than leaving `[]`.
+      delete entry.backendOnlyGatePermissions;
+    }
+  });
+}
+
+/**
+ * Persist `apps[].permissions` in fusebase.json after `app update --permissions` (NIM-42737).
+ * Deploy reconcile rebuilds the app's permission set from fusebase.json alone, so a grant that
+ * only ever reached the remote record is reverted by the next `fusebase deploy`.
+ */
+export function writeAppPermissionsToFusebaseJson(
+  projectRoot: string,
+  featureId: string,
+  permissions: AppPermissions,
+): void {
+  updateFusebaseJsonAppEntry(projectRoot, featureId, (entry) => {
+    if (permissions.items.length > 0) {
+      entry.permissions = permissions;
+    } else {
+      delete entry.permissions;
+    }
+  });
 }
 
 let processEnvOverride: string | undefined;

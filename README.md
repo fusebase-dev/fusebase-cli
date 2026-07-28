@@ -457,7 +457,9 @@ fusebase app update feat_abc123 --access=portalClient,portalManager
 # Replace dashboard/database permissions only
 fusebase app update feat_abc123 --permissions="dashboardView.dash_1:view_1.read;database.id:db_1.write"
 
-# Grant an app API capability to a caller app (added to the Gate set, nothing is dropped)
+# Grant an app API capability to a caller app (added to the Gate set, nothing is dropped).
+# The result is written back to apps[].permissions in fusebase.json — commit it, or the
+# next `fusebase deploy` reverts the grant.
 fusebase app update feat_abc123 --permissions="app_api.analytics.vse_usage.read"
 
 # Sync Gate permissions only

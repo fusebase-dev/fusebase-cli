@@ -334,6 +334,10 @@ fusebase app update аgjg851jguanadi41 --access=visitor --permissions="dashboard
 fusebase app update аgjg851jguanadi41 --permissions="app_api.analytics.vse_usage.read"
 ```
 
+The grant is written back into `apps[].permissions` in `fusebase.json` — commit it. Deploy
+rebuilds the app's permissions from `fusebase.json`, so a grant that lives only on the remote
+app record is reverted by the next `fusebase deploy`.
+
 > App API policy extensions (`x-fusebase-allowed-callers`, `x-fusebase-required-permissions`)
 > are **currently ignored at runtime** — the publish path does not propagate them yet. Grant
 > the capability now so it is durable, but do not rely on the extensions for authorization.

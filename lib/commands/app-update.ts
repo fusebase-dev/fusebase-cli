@@ -10,7 +10,10 @@ import {
   parsePrincipals,
 } from "../permissions.ts";
 import { resolveGateSyncPermissions } from "../sync-app-gate-permissions.ts";
-import { writeBackendOnlyGatePermissionsToFusebaseJson } from "../config.ts";
+import {
+  writeAppPermissionsToFusebaseJson,
+  writeBackendOnlyGatePermissionsToFusebaseJson,
+} from "../config.ts";
 
 export interface AppUpdateOptions {
   access?: string;
@@ -156,6 +159,35 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       console.log(`  Permissions: ${updateRequest.permissions.items.length} item(s) configured`);
       for (const item of updateRequest.permissions.items) {
         console.log(`    - ${formatPermissionItem(item)}`);
+      }
+    }
+
+    // Deploy reconcile rebuilds the permission set from fusebase.json alone, so a grant that
+    // only reached the remote record is reverted by the next `fusebase deploy` (NIM-42737).
+    if (permissions !== undefined) {
+      const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
+      const localPermissions = featureConfig
+        ? mergeFeaturePermissions({
+            manualPermissions: permissions,
+            existingPermissions: featureConfig.permissions,
+          })
+        : undefined;
+
+      if (localPermissions) {
+        try {
+          writeAppPermissionsToFusebaseJson(resolve(process.cwd()), appIdArg, localPermissions);
+          console.log("  fusebase.json: apps[].permissions updated");
+        } catch (error) {
+          console.warn(
+            `  Warning: could not persist permissions to fusebase.json (${error instanceof Error ? error.message : String(error)}). ` +
+              "The grant is on the app record but `fusebase deploy` will revert it.",
+          );
+        }
+      } else {
+        console.warn(
+          `  Warning: app '${appIdArg}' is not in fusebase.json, so the grant was not persisted locally. ` +
+            "`fusebase deploy` from a project that declares this app will revert it.",
+        );
       }
     }
 

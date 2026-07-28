@@ -268,16 +268,26 @@ Merge semantics differ per section:
 - a **Gate-only** `--permissions` string leaves the remote resource set untouched, so granting a
   capability never silently drops dashboard/database access. `--permissions=""` still clears it.
 
-Hand-granted Gate privileges live on the remote app record. Two paths replace the gate set
-from static analysis and therefore drop them:
+**Durability.** `app update --permissions` writes the resulting permission set back into the
+app's `apps[].permissions` entry in `fusebase.json`, and prints
+`fusebase.json: apps[].permissions updated`. That entry is the durable record: deploy reconcile
+rebuilds the app's permissions from `fusebase.json` alone, so a grant that exists only on the
+remote record is silently reverted by the next `fusebase deploy`. Commit the change. If the app
+is not declared in this project's `fusebase.json` the CLI warns and grants remotely only.
+
+Three paths rebuild the gate set from static analysis and therefore drop a grant that is
+*not* in `fusebase.json`:
 
 - `fusebase app update <appId> --sync-gate-permissions`
 - the `fusebase update` prompt *"Sync Gate permissions for N app(s) now?"*, which **defaults
   to yes** — this is the one users hit by accident
+- `fusebase deploy` — reconcile PATCHes the app back to `apps[].permissions` +
+  `apps[].fusebaseGateMeta.permissions`, with no prompt and no output
 
-Re-run `--permissions` after either (or keep the grant in the `apps[].permissions` entry that
-`fusebase app create` writes into `fusebase.json`, which deploy reconcile merges back in).
-Merge-by-default is NIM-42739 / B4.
+Merge-by-default (and a revoke path) is NIM-42739 / B4.
+
+`app_magic_link.client_invite` cannot be granted this way: its action segment is outside the
+set the platform can mint into a token, so it fails the shape check.
 
 > **App API policy extensions are not enforced yet.** `x-fusebase-required-permissions` and
 > `x-fusebase-allowed-callers` in an app's `openapi.json` are validated by `fusebase api validate`
