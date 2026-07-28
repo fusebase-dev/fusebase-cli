@@ -1,3 +1,19 @@
+/**
+ * Deadline for every request this app makes.
+ *
+ * App backends run scale-to-zero (`minReplicas: 0` by default), so the first
+ * request after an idle period or a fresh deploy pays a cold start of up to
+ * ~10s — there is no platform warm-up. CloudFront aborts the request at 30s,
+ * which is the hard platform ceiling: nothing above that is reachable.
+ * Keep this between 15000 and 30000; do not shrink it to "feel fast".
+ *
+ * Use it on your own `fetch` calls: `fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })`.
+ * When you construct an SDK client (`createClient({ ... })` from
+ * `@fusebase/dashboard-service-sdk` / `@fusebase/fusebase-gate-sdk`), leave its
+ * 30000ms `timeout` default alone — it is intentional and must not be lowered.
+ */
+export const REQUEST_TIMEOUT_MS = 20000
+
 function collectErrorObjects(error: unknown): Record<string, unknown>[] {
   if (!error || typeof error !== 'object') return []
   const err = error as Record<string, unknown>

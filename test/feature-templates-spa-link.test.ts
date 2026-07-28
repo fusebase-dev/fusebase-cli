@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { REQUEST_TIMEOUT_MS } from '../feature-templates/spa/src/lib/api'
 import {
   MAGIC_LINK_ROUTE,
   PLATFORM_MAGIC_LINK_PATH,
@@ -36,5 +39,20 @@ describe('feature-templates/spa legacy /link redirect helpers', () => {
         '/_auth/magiclink/..%2F..%2Fevil',
       )
     })
+  })
+})
+
+describe('feature-templates/spa cold-start request timeout', () => {
+  it('keeps a cold-start-tolerant deadline under the 30s platform ceiling', () => {
+    expect(REQUEST_TIMEOUT_MS).toBeGreaterThanOrEqual(15000)
+    expect(REQUEST_TIMEOUT_MS).toBeLessThan(30000)
+  })
+
+  it('is actually applied to the template fetch calls', () => {
+    const envPanel = readFileSync(
+      join(import.meta.dir, '../feature-templates/spa/src/components/EnvPanel.tsx'),
+      'utf8',
+    )
+    expect(envPanel).toContain('AbortSignal.timeout(REQUEST_TIMEOUT_MS)')
   })
 })

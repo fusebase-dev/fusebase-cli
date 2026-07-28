@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { REQUEST_TIMEOUT_MS } from "../lib/api";
 
 /**
  * Floating environment panel (staff/debug surface).
@@ -118,7 +119,11 @@ export function EnvPanel() {
       return;
     }
     let cancelled = false;
-    fetch("/fusebase-env.json", { cache: "no-store" })
+    // Every fetch gets a cold-start-aware deadline (see REQUEST_TIMEOUT_MS).
+    fetch("/fusebase-env.json", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!cancelled && data && typeof data.env === "string") {
