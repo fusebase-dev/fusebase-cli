@@ -242,7 +242,7 @@ This command **always creates a new app** on Fusebase servers and configures its
 **Optional Options:**
 
 - `--access <principals>` - Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`, `visitor,orgRole:guest`)
-- `--permissions <permissions>` - Set dashboard view permissions (format: `dashboardView.dashboardId:viewId.read,write;...`)
+- `--permissions <permissions>` - Set dashboard view permissions (format: `dashboardView.dashboardId:viewId.read,write;...`). Entries that are Gate privileges instead — e.g. `app_api.<namespace>.<capability>.<action>` or `org.members.read` — are **added** to the app's Gate permissions rather than replacing them.
 - `--backend-dev-command <command>` - Backend dev command (e.g., `npm run dev`). Only if the app has a `backend/` folder.
 - `--backend-build-command <command>` - Backend build command (e.g., `npm run build`). Only if the app has a `backend/` folder.
 - `--backend-start-command <command>` - Backend start command for production (e.g., `npm run start`). Only if the app has a `backend/` folder.
@@ -273,7 +273,7 @@ Update settings for an existing app.
 **Options:**
 
 - `--access <principals>` - Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`, `visitor,orgRole:guest`)
-- `--permissions <permissions>` - Set dashboard view permissions (format: `dashboardView.dashboardId:viewId.read,write;...`)
+- `--permissions <permissions>` - Set dashboard view permissions (format: `dashboardView.dashboardId:viewId.read,write;...`). Entries that are Gate privileges instead — e.g. `app_api.<namespace>.<capability>.<action>` or `org.members.read` — are **added** to the app's Gate permissions rather than replacing them.
 - `--sync-gate-permissions` - Analyze Gate SDK calls in the app's runtime code and sync the detected operations as Gate permissions on the app. Required before an app that uses `@fusebase/fusebase-gate-sdk` can be considered fully published.
 
 **Access Principals:**
@@ -329,7 +329,14 @@ fusebase app update аgjg851jguanadi41 --permissions="dashboardView.dash1:view1.
 
 # Update both access and permissions
 fusebase app update аgjg851jguanadi41 --access=visitor --permissions="dashboardView.dash1:view1.read"
+
+# Grant an app API capability so this app may call another app's protected operation
+fusebase app update аgjg851jguanadi41 --permissions="app_api.analytics.vse_usage.read"
 ```
+
+> App API policy extensions (`x-fusebase-allowed-callers`, `x-fusebase-required-permissions`)
+> are **currently ignored at runtime** — the publish path does not propagate them yet. Grant
+> the capability now so it is durable, but do not rely on the extensions for authorization.
 
 ### Smart update (`fusebase update`)
 

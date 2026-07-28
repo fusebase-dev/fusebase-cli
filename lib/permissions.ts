@@ -10,6 +10,18 @@ import type {
 const VALID_ORG_ROLES = ['guest', 'client', 'member', 'manager', 'owner'];
 const VALID_RESOURCE_PRIVILEGES: AppResourcePermissionPrivilege[] = ["read", "write"];
 
+const RESOURCE_PERMISSION_TYPES = ["dashboardView", "database"];
+
+/**
+ * Gate privilege string accepted by `--permissions` (NIM-42737). Deliberately the
+ * intersection of what nimbus-ai stores and what Gate can mint into a token, so a
+ * grant that would be silently dropped at mint is rejected here instead.
+ * Covers both 2-segment built-ins (`notes.read`) and app API capabilities
+ * (`app_api.<namespace>.<capability>.<action>`).
+ */
+const GATE_PRIVILEGE_PATTERN =
+  /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*\.(?:read|write|delete|execute|create|manage|delegate|bypass)$/;
+
 // Portal-scoped, context-relative principals. They match against the portal the
 // app is embedded in (the platform resolves them from the verified portal context),
 // so they take no id. Outside a portal they never match.
@@ -75,17 +87,33 @@ export function parsePrincipals(input: string): AppAccessPrincipal[] {
  *   "dashboardView.dashboardId:viewId.read,write"
  *   "database.id:databaseId.read,write"
  *   "database.alias:databaseAlias.read"
+ *   "app_api.analytics.vse_usage.read"   (Gate privilege, incl. app API capabilities)
  * Multiple permission items are separated by semicolons.
  * Each permission item is separated by semicolon.
  * Each item format: type.resource.privileges (privileges comma-separated)
  */
 export function parsePermissions(permissionsStr: string): AppPermissions {
   const items: AppPermissionItem[] = [];
+  const gatePrivileges: string[] = [];
 
   const parts = permissionsStr.split(';').map(p => p.trim()).filter(p => p);
 
   for (const part of parts) {
     const segments = part.split('.');
+
+    // Anything that is not a dashboardView/database resource permission is read as a
+    // Gate privilege string (NIM-42737) — additive, the resource DSL is unchanged.
+    if (!RESOURCE_PERMISSION_TYPES.includes(segments[0]?.trim() ?? "")) {
+      if (!GATE_PRIVILEGE_PATTERN.test(part)) {
+        throw new Error(
+          `Invalid permission type "${segments[0] ?? part}". Allowed values: ${RESOURCE_PERMISSION_TYPES.join(', ')}, ` +
+            `or a Gate privilege such as "org.members.read" / "app_api.<namespace>.<capability>.<action>".`,
+        );
+      }
+      gatePrivileges.push(part);
+      continue;
+    }
+
     if (segments.length < 3) {
       throw new Error(
         `Invalid permission format: "${part}". Expected "dashboardView.dashboardId:viewId.privileges" or "database.id:databaseId.privileges"`,
@@ -174,11 +202,9 @@ export function parsePermissions(permissionsStr: string): AppPermissions {
 
       throw new Error(`Invalid database resource selector "${resourceKey}". Allowed values: id, alias`);
     }
-
-    throw new Error(`Invalid permission type "${permissionType}". Allowed values: dashboardView, database`);
   }
 
-  return { items };
+  return { items: [...items, ...buildGatePermissionItems(gatePrivileges)] };
 }
 
 export const BACKEND_ONLY_GATE_PERMISSIONS = [
@@ -464,10 +490,21 @@ export function mergeFeaturePermissions(args: {
   }
 
   const existingItems = existingPermissions?.items ?? [];
-  const resourceItems =
-    manualPermissions !== undefined
-      ? manualPermissions.items
-      : existingItems.filter((item) => item.type !== "gate");
+  const manualItems = manualPermissions?.items ?? [];
+  const manualResourceItems = manualItems.filter((item) => item.type !== "gate");
+  const manualGatePrivileges = manualItems
+    .filter((item): item is AppGatePermissionItem => item.type === "gate")
+    .flatMap((item) => item.privileges);
+
+  // A Gate-only `--permissions` grant leaves the resource section untouched so it never
+  // silently drops dashboardView/database grants. An empty `--permissions=""` still clears.
+  const replacesResources =
+    manualPermissions !== undefined &&
+    !(manualResourceItems.length === 0 && manualGatePrivileges.length > 0);
+  const resourceItems = replacesResources
+    ? manualResourceItems
+    : existingItems.filter((item) => item.type !== "gate");
+
   const gateItems =
     gatePermissions === undefined
       ? existingItems.filter(
@@ -476,8 +513,35 @@ export function mergeFeaturePermissions(args: {
       : buildGatePermissionItems(gatePermissions);
 
   return {
-    items: [...resourceItems, ...gateItems],
+    items: [...resourceItems, ...addGatePrivileges(gateItems, manualGatePrivileges)],
   };
+}
+
+/**
+ * Union hand-granted Gate privileges (`--permissions "app_api.…"`) into the unscoped
+ * gate item. They are additive: analyzed/remote gate privileges are never dropped.
+ */
+function addGatePrivileges(
+  gateItems: AppGatePermissionItem[],
+  privileges: string[],
+): AppGatePermissionItem[] {
+  if (privileges.length === 0) {
+    return gateItems;
+  }
+
+  const unscoped = gateItems.find((item) => !item.resource);
+  if (!unscoped) {
+    return [...gateItems, ...buildGatePermissionItems(privileges)];
+  }
+
+  return gateItems.map((item) =>
+    item === unscoped
+      ? {
+          ...item,
+          privileges: normalizeGatePermissionStrings([...item.privileges, ...privileges]),
+        }
+      : item,
+  );
 }
 
 export function formatPermissionItem(item: AppPermissionItem): string {

@@ -195,7 +195,7 @@ export const appUpdateCommand = new Command("update")
   .description("Update an app's settings")
   .argument("<appId>", "App ID to update")
   .option("--access <principals>", "Set access principals, comma-separated (e.g., visitor, org roles like orgRole:member, or portal principals portalClient/portalManager/portalMember)")
-  .option("--permissions <permissions>", "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read)")
+  .option("--permissions <permissions>", "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read;app_api.namespace.capability.read). Resource permissions replace the remote set; Gate privileges are added to it.")
   .option("--sync-gate-permissions", "Analyze this app path and sync generated Gate permissions")
   .option(
     "--declare-backend-only-gate-permissions",

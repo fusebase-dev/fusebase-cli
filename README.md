@@ -389,6 +389,14 @@ fusebase api validate --file openapi.json
 `x-fusebase-required-permissions` is intentionally namespaced with `app_api.` so app-to-app
 capabilities do not collide with system Gate permissions such as `isolated_store.read`.
 
+> **Not enforced at runtime yet.** Both extensions are validated here but are **currently
+> ignored** by the platform: the publish path does not propagate them, so `listAppApiOperations`
+> reports an empty policy and `callAppApi` enforces nothing. Grant the matching
+> `app_api.<namespace>.<capability>.<action>` capability to callers now
+> (`fusebase app update <appId> --permissions "app_api.…"`, see
+> [docs/PERMISSIONS.md](docs/PERMISSIONS.md)) so the grants are already in place when
+> enforcement ships.
+
 **Output:**
 
 - success summary with title, version, and operation ids
@@ -411,7 +419,7 @@ Update settings for an existing app.
 | Option | Description |
 |--------|-------------|
 | `--access <principals>` | Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`) |
-| `--permissions <permissions>` | Replace `dashboardView/database` permissions |
+| `--permissions <permissions>` | Replace `dashboardView/database` permissions; Gate privileges in the same string (e.g. `app_api.<ns>.<cap>.<action>`, `org.members.read`) are **added** to the `gate` set |
 | `--sync-gate-permissions` | Analyze the app path and replace `gate` permissions |
 
 **Access Principals:**
@@ -449,6 +457,9 @@ fusebase app update feat_abc123 --access=portalClient,portalManager
 # Replace dashboard/database permissions only
 fusebase app update feat_abc123 --permissions="dashboardView.dash_1:view_1.read;database.id:db_1.write"
 
+# Grant an app API capability to a caller app (added to the Gate set, nothing is dropped)
+fusebase app update feat_abc123 --permissions="app_api.analytics.vse_usage.read"
+
 # Sync Gate permissions only
 fusebase app update feat_abc123 --sync-gate-permissions
 
@@ -475,7 +486,7 @@ Create and configure an app for development.
 | `--build-command <command>` | **(Required)** Build command (e.g., `npm run build`) |
 | `--output-dir <dir>` | **(Required)** Build output directory (e.g., `dist`) |
 | `--access <principals>` | Set access principals on creation (e.g., `visitor`, `orgRole:member`) |
-| `--permissions <permissions>` | Set manual `dashboardView/database` permissions |
+| `--permissions <permissions>` | Set manual `dashboardView/database` permissions and/or Gate privileges (e.g. `app_api.<ns>.<cap>.<action>`) |
 
 **Example:**
 

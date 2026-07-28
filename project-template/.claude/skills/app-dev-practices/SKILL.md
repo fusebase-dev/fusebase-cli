@@ -117,6 +117,7 @@ For security-sensitive operations, prefer contract-level app API policy:
 - `x-fusebase-allowed-callers` restricts the caller identity, e.g. `client:<clientId>`.
 - `x-fusebase-required-permissions` restricts caller capability and must use the app API namespace `app_api.<namespace>.<capability>.<action>`, e.g. `app_api.client_portal.provision.write`.
 - Do not use built-in Gate permissions such as `isolated_store.read` for app-to-app operation authorization.
+- **Both extensions are currently ignored at runtime.** The publish path does not propagate them yet, so `listAppApiOperations` reports an empty policy and `callAppApi` enforces nothing. Declare them now and grant the matching capability to caller apps with `fusebase app update <callerAppId> --permissions "app_api.<namespace>.<capability>.<action>"`, so the grants are in place when enforcement ships. Never rely on them as your only authorization check today.
 <!-- CUSTOM:SKILL:END -->
 
 ## Authentication

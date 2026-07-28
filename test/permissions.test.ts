@@ -267,6 +267,48 @@ describe("parsePermissions", () => {
       );
     });
   });
+
+  describe("gate privileges (NIM-42737)", () => {
+    it("parses a 4-segment app API capability", () => {
+      expect(parsePermissions("app_api.analytics.vse_usage.read")).toEqual({
+        items: [{ type: "gate", privileges: ["app_api.analytics.vse_usage.read"] }],
+      });
+    });
+
+    it("parses a built-in 2-segment gate privilege", () => {
+      expect(parsePermissions("app_magic_link.write")).toEqual({
+        items: [{ type: "gate", privileges: ["app_magic_link.write"] }],
+      });
+    });
+
+    it("collects gate privileges into a single item alongside resource permissions", () => {
+      const result = parsePermissions(
+        "dashboardView.dash1:view1.read;app_api.tenancy.invite_claim.write;org.members.read",
+      );
+
+      expect(result.items).toEqual([
+        {
+          type: "dashboardView",
+          resource: { dashboardId: "dash1", viewId: "view1" },
+          privileges: ["read"],
+        },
+        {
+          type: "gate",
+          privileges: ["app_api.tenancy.invite_claim.write", "org.members.read"],
+        },
+      ]);
+    });
+
+    it("rejects a gate privilege with an unmintable action", () => {
+      expect(() => parsePermissions("app_api.analytics.vse_usage.audit")).toThrow(
+        /Invalid permission type/
+      );
+    });
+
+    it("rejects a gate privilege with no action segment", () => {
+      expect(() => parsePermissions("app_api")).toThrow(/Invalid permission type/);
+    });
+  });
 });
 
 describe("mergeFeaturePermissions", () => {
@@ -608,6 +650,99 @@ describe("buildSyncedBackendOnlyGatePermissions validation", () => {
         fromRemoteManifest: [],
       }),
     ).toEqual(["org.members.read", "portals.read"]);
+  });
+});
+
+describe("mergeFeaturePermissions with hand-granted gate privileges (NIM-42737)", () => {
+  it("unions manual gate privileges into the analyzed gate set", () => {
+    const result = mergeFeaturePermissions({
+      manualPermissions: parsePermissions("app_api.analytics.vse_usage.read"),
+      gatePermissions: ["token.read"],
+    });
+
+    expect(result).toEqual({
+      items: [
+        { type: "gate", privileges: ["app_api.analytics.vse_usage.read", "token.read"] },
+      ],
+    });
+  });
+
+  it("unions manual gate privileges into existing remote gate privileges", () => {
+    const result = mergeFeaturePermissions({
+      manualPermissions: parsePermissions(
+        "dashboardView.dash1:view1.read;app_api.tenancy.invite_claim.write",
+      ),
+      existingPermissions: {
+        items: [{ type: "gate", privileges: ["token.read"] }],
+      },
+    });
+
+    expect(result).toEqual({
+      items: [
+        {
+          type: "dashboardView",
+          resource: { dashboardId: "dash1", viewId: "view1" },
+          privileges: ["read"],
+        },
+        {
+          type: "gate",
+          privileges: ["app_api.tenancy.invite_claim.write", "token.read"],
+        },
+      ],
+    });
+  });
+
+  it("keeps existing resource permissions when only gate privileges are granted", () => {
+    const result = mergeFeaturePermissions({
+      manualPermissions: parsePermissions("app_api.analytics.vse_usage.read"),
+      existingPermissions: {
+        items: [
+          { type: "database", resource: { databaseId: "db1" }, privileges: ["read"] },
+          { type: "gate", privileges: ["token.read"] },
+        ],
+      },
+    });
+
+    expect(result).toEqual({
+      items: [
+        { type: "database", resource: { databaseId: "db1" }, privileges: ["read"] },
+        { type: "gate", privileges: ["app_api.analytics.vse_usage.read", "token.read"] },
+      ],
+    });
+  });
+
+  it("still clears resource permissions on an empty --permissions string", () => {
+    const result = mergeFeaturePermissions({
+      manualPermissions: parsePermissions(""),
+      existingPermissions: {
+        items: [
+          { type: "database", resource: { databaseId: "db1" }, privileges: ["read"] },
+          { type: "gate", privileges: ["token.read"] },
+        ],
+      },
+    });
+
+    expect(result).toEqual({
+      items: [{ type: "gate", privileges: ["token.read"] }],
+    });
+  });
+
+  it("keeps resource-scoped gate items untouched", () => {
+    const result = mergeFeaturePermissions({
+      manualPermissions: parsePermissions("app_api.analytics.vse_usage.read"),
+      existingPermissions: {
+        items: [
+          { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
+        ],
+      },
+    });
+
+    expect(result).toEqual({
+      items: [
+        { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
+        { type: "gate", privileges: ["app_api.analytics.vse_usage.read"] },
+      ],
+    });
   });
 });
 

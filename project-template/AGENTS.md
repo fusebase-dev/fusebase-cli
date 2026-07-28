@@ -94,6 +94,7 @@ If the task references **another Fusebase app in the same organization** and ask
 - Use `x-fusebase-allowed-callers` to restrict which caller app/client may invoke the operation.
 - Use `x-fusebase-required-permissions` only with the `app_api.<namespace>.<capability>.<action>` format, for example `app_api.client_portal.provision.write`.
 - Treat `allowedCallers` as caller identity and `requiredPermissions` as caller capability; do not mix these concerns.
+- **Both extensions are currently ignored at runtime** — the publish path does not propagate them yet, so `callAppApi` enforces nothing. Declare them and grant the capability to caller apps now (`fusebase app update <callerAppId> --permissions "app_api.<namespace>.<capability>.<action>"`), but never make them your only authorization check.
 
 **Anti-patterns:**
 
