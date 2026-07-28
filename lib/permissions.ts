@@ -290,12 +290,30 @@ export function findUnknownGatePermissions(permissions: string[]): string[] {
 const APP_API_PRIVILEGE_PREFIX = "app_api.";
 
 /**
+ * Real Gate permissions (`GatePermission` in fusebase-gate) that the sets above omit
+ * because those feed the MCP token policy — adding to them would bump the token
+ * fingerprint. They are grantable, so they belong in the `--permissions` vocabulary.
+ * `app_magic_link.client_invite` is deliberately absent: its action is not one Gate can
+ * mint into an app token.
+ */
+const GATE_PERMISSIONS_EXTRA_GRANTABLE = [
+  "auth.restore_key.write",
+  "automation.execute",
+  "mcp_manager.auth.write",
+  "mcp_manager.servers.write",
+  "mcp_manager.templates.read",
+  "mcp_manager.tools.execute",
+  "mcp_manager.tools.read",
+] as const;
+
+/**
  * Grantable via `--permissions`: the known vocabulary plus magic links (a real grant
  * that KNOWN_GATE_PERMISSIONS omits because it is not in the legacy MCP fingerprint).
  */
 const GRANTABLE_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   ...KNOWN_GATE_PERMISSIONS,
   ...GATE_PERMISSIONS_MAGIC_LINKS,
+  ...GATE_PERMISSIONS_EXTRA_GRANTABLE,
 ]);
 
 const BACKEND_ONLY_GATE_PERMISSION_SET = new Set<string>(BACKEND_ONLY_GATE_PERMISSIONS);

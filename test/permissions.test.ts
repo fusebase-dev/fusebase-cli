@@ -335,6 +335,17 @@ describe("parsePermissions", () => {
       }
     });
 
+    it("accepts gate permissions that are not part of the MCP token policy", () => {
+      expect(parsePermissions("auth.restore_key.write;mcp_manager.tools.execute")).toEqual({
+        items: [
+          {
+            type: "gate",
+            privileges: ["auth.restore_key.write", "mcp_manager.tools.execute"],
+          },
+        ],
+      });
+    });
+
     it("still accepts app API capabilities in unknown namespaces", () => {
       expect(parsePermissions("app_api.whatever.some_cap.read")).toEqual({
         items: [{ type: "gate", privileges: ["app_api.whatever.some_cap.read"] }],
