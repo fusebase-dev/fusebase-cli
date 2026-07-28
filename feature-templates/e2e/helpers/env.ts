@@ -17,13 +17,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
-/**
- * Deadline for the harness's own `fetch` calls. App backends scale to zero
- * (`backend.minReplicas` defaults to 0), so the first call after a deploy is
- * always cold (~10s). Under CloudFront's 30s origin-response ceiling, so a
- * request that would never be answered still fails fast with a clear message
- * instead of hanging until the test timeout.
- */
+// Deadline for the harness's own fetches: clears a ~10s cold start, stays
+// under CloudFront's 30s ceiling, so a hung call fails with a clear message.
 const FETCH_TIMEOUT_MS = 20_000;
 
 export interface EnvFixtureUser {
