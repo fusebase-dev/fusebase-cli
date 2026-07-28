@@ -252,6 +252,15 @@ Accepted shape: lowercase dot-separated segments ending in `read`, `write`, `del
 platform stores and what Gate can mint into a token, so a privilege that would be silently
 dropped at mint is rejected by the CLI instead.
 
+Validation beyond the shape:
+
+- `app_api.*` capabilities are app-defined, so only the shape is checked.
+- every other privilege must be a **known** Gate permission. A typo (`org.member.read`)
+  is rejected instead of stored — the platform validates the shape only, so a bogus grant
+  would otherwise be reported as successful and grant nothing.
+- `isolated_store.rls.delegate` / `.bypass` are rejected: they are backend-only (they would
+  ride in the browser token) and belong in `apps[].backendOnlyGatePermissions`.
+
 Merge semantics differ per section:
 
 - resource permissions (`dashboardView`/`database`) **replace** the remote resource set (unchanged)

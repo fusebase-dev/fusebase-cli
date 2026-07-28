@@ -110,6 +110,7 @@ export function parsePermissions(permissionsStr: string): AppPermissions {
             `or a Gate privilege such as "org.members.read" / "app_api.<namespace>.<capability>.<action>".`,
         );
       }
+      assertGrantableGatePrivilege(part);
       gatePrivileges.push(part);
       continue;
     }
@@ -283,6 +284,46 @@ export const KNOWN_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
 /** Return the entries that are not part of the known Gate permission vocabulary. */
 export function findUnknownGatePermissions(permissions: string[]): string[] {
   return permissions.filter((permission) => !KNOWN_GATE_PERMISSIONS.has(permission));
+}
+
+/** App API capabilities are app-defined, so only their shape can be validated. */
+const APP_API_PRIVILEGE_PREFIX = "app_api.";
+
+/**
+ * Grantable via `--permissions`: the known vocabulary plus magic links (a real grant
+ * that KNOWN_GATE_PERMISSIONS omits because it is not in the legacy MCP fingerprint).
+ */
+const GRANTABLE_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
+  ...KNOWN_GATE_PERMISSIONS,
+  ...GATE_PERMISSIONS_MAGIC_LINKS,
+]);
+
+const BACKEND_ONLY_GATE_PERMISSION_SET = new Set<string>(BACKEND_ONLY_GATE_PERMISSIONS);
+
+/**
+ * Validate a hand-granted Gate privilege (NIM-42737). Without this a typo such as
+ * `org.member.read` passes the shape check, is stored by nimbus-ai (which also checks
+ * shape only) and grants nothing — the CLI reporting success for a dead grant.
+ */
+export function assertGrantableGatePrivilege(privilege: string): void {
+  if (privilege.startsWith(APP_API_PRIVILEGE_PREFIX)) {
+    return;
+  }
+
+  if (BACKEND_ONLY_GATE_PERMISSION_SET.has(privilege)) {
+    throw new Error(
+      `Gate privilege "${privilege}" is backend-only and cannot be granted with --permissions ` +
+        `(the platform rejects it in app permissions because it would ride in the browser token). ` +
+        `Declare it in apps[].backendOnlyGatePermissions in fusebase.json instead.`,
+    );
+  }
+
+  if (!GRANTABLE_GATE_PERMISSIONS.has(privilege)) {
+    throw new Error(
+      `Unknown Gate privilege "${privilege}". Use a known privilege (e.g. "org.members.read") ` +
+        `or an app API capability "app_api.<namespace>.<capability>.<action>".`,
+    );
+  }
 }
 
 export const TRUSTED_RUNTIME_CONTEXT_DELEGATE_PERMISSION =

@@ -308,6 +308,38 @@ describe("parsePermissions", () => {
     it("rejects a gate privilege with no action segment", () => {
       expect(() => parsePermissions("app_api")).toThrow(/Invalid permission type/);
     });
+
+    it("rejects a typo of a known gate privilege", () => {
+      expect(() => parsePermissions("org.member.read")).toThrow(
+        /Unknown Gate privilege "org\.member\.read"/
+      );
+    });
+
+    it("rejects a made-up gate privilege", () => {
+      expect(() => parsePermissions("totally.made.up.write")).toThrow(
+        /Unknown Gate privilege/
+      );
+    });
+
+    it("rejects a mistyped resource permission instead of granting it", () => {
+      expect(() => parsePermissions("dashboardview.dash1.read")).toThrow(
+        /Unknown Gate privilege/
+      );
+    });
+
+    it("rejects backend-only privileges and points at backendOnlyGatePermissions", () => {
+      for (const privilege of ["isolated_store.rls.delegate", "isolated_store.rls.bypass"]) {
+        expect(() => parsePermissions(privilege)).toThrow(
+          /backend-only and cannot be granted with --permissions/
+        );
+      }
+    });
+
+    it("still accepts app API capabilities in unknown namespaces", () => {
+      expect(parsePermissions("app_api.whatever.some_cap.read")).toEqual({
+        items: [{ type: "gate", privileges: ["app_api.whatever.some_cap.read"] }],
+      });
+    });
   });
 });
 
