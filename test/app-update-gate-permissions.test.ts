@@ -13,9 +13,11 @@ let localApp: Record<string, unknown> = {
   backendOnlyGatePermissions: ["portals.read", "org.members.read"],
 };
 
+let remotePermissions: AppPermissions | undefined;
+
 mock.module("../lib/api.ts", () => ({
   fetchApps: async () => ({
-    apps: [{ id: "app-1", title: "App 1", permissions: undefined, manifest: {} }],
+    apps: [{ id: "app-1", title: "App 1", permissions: remotePermissions, manifest: {} }],
   }),
   updateApp: async (
     _apiKey: string,
@@ -92,6 +94,26 @@ describe("runAppUpdate --permissions persists the grant into fusebase.json", () 
       "app_api.tenancy.invite_claim.write",
       "org.members.read",
     ]);
+  });
+
+  it("keeps remote-only permissions so the next deploy cannot narrow the app", async () => {
+    localApp = { id: "app-1", path: "apps/x" };
+    remotePermissions = {
+      items: [
+        {
+          type: "dashboardView",
+          resource: { dashboardId: "d1", viewId: "v1" },
+          privileges: ["read"],
+        },
+      ],
+    };
+    await runAppUpdate("app-1", { permissions: "app_api.analytics.vse_usage.read" });
+    remotePermissions = undefined;
+
+    // Writing only the hand-granted item would make deploy PATCH the dashboard grant away:
+    // reconcile sends the local set verbatim and the remote entry is not mirrored anywhere.
+    const written = permissionsWriteBacks.at(-1)!.permissions;
+    expect(written.items.map((item) => item.type).sort()).toEqual(["dashboardView", "gate"]);
   });
 
   it("does not write when the app is not declared in this project", async () => {
