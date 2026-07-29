@@ -976,6 +976,19 @@ Project-specific configuration in your app root:
 }
 ```
 
+#### Backend replicas and cold starts (`backend.minReplicas`)
+
+`apps[].backend.minReplicas` (`0..3`, default **`0`**) is the minimum number of backend
+replicas the platform keeps running. With the default the backend **scales to zero when
+idle**, so the first request afterwards pays a **cold start of up to ~10s** — and there is no
+post-deploy warm-up, so the first request after every `fusebase deploy` is cold too.
+
+- Client request timeouts must be **at least 15s**; the platform ceiling is **30s**
+  (CloudFront origin-response), so a longer timeout can never succeed.
+- Set `minReplicas: 1` for webhook / always-on inbound integrations, where a cold start would
+  exceed the provider's timeout. Each warm replica runs 24/7, so prefer `1` over `2`–`3`.
+- `backend.maxReplicas` is **not supported** — deploy ignores it silently.
+
 #### Declarative `fusebase.json`
 
 `apps[]` is a **declarative manifest**. An app entry describes the app

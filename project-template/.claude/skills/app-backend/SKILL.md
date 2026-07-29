@@ -341,6 +341,26 @@ When an app has a backend, the `/api` path prefix is **reserved for the backend*
 - Backend routes: `/api/*` (REST endpoints, WebSocket upgrades)
 - SPA routes: everything else (`/`, `/items/:id`, `/settings`, etc.)
 
+## Cold Starts (Scale-to-Zero)
+
+`backend.minReplicas` defaults to **`0`**, so the backend **scales to zero when idle** and the
+first request afterwards pays a **cold start of up to ~10s**. There is no post-deploy warm-up
+either — the first request after every `fusebase deploy` is cold too.
+
+**Rules for client code:**
+
+- Give app → backend requests a timeout of **at least 15s**. The platform ceiling is **30s**
+  (CloudFront origin-response), so anything above 30s can never succeed — never recommend 60s.
+- The vendored Gate SDK already defaults to **30000ms**. **Do not lower it.** Its single
+  `AbortController` spans all `fetchWithRetry` attempts, so an abort kills the whole call —
+  retries do **not** get a fresh deadline.
+- A slow first response is **not** an error and **not** a session problem. It must never clear
+  the session or force login — retry once with the full deadline, then surface "Can't reach
+  server" (skill **handling-authentication-errors**).
+
+If the first request must be fast (webhooks, always-on integrations), keep a replica warm
+instead — see [Keep a replica warm](#keep-a-replica-warm-for-webhook-apps-backendminreplicas-1).
+
 ## Webhooks and External WebSocket Callbacks (Inbound)
 
 Inbound integrations from external services (for example, Monday.com, GitHub, Stripe) can use regular HTTP webhooks and, when needed, WebSocket upgrades (for example, Twilio media streams). These requests typically do not carry a `fbsfeaturetoken` cookie or `x-app-feature-token` header.
@@ -355,7 +375,8 @@ starts slower than the provider's timeout and is silently dropped.
 **Rule:** if the app receives webhooks (or any always-on inbound integration), set
 `backend.minReplicas: 1` in `fusebase.json` to keep one replica warm — see
 [fusebase.json Backend Config](#fusebasejson-backend-config). Cap `3`; each warm replica
-runs 24/7, so prefer `1`. Apps without webhooks omit it (or `0`) to keep scale-to-zero.
+runs 24/7, so prefer `1`. Apps without webhooks omit it (or `0`) to keep scale-to-zero — and
+must then follow [Cold Starts (Scale-to-Zero)](#cold-starts-scale-to-zero) for client timeouts.
 
 ### Register external webhooks yourself
 
@@ -524,7 +545,7 @@ Backend commands (`dev`, `build`, `start`) run from the `backend/` subdirectory 
 
 ### `backend.minReplicas` (keep the backend warm)
 
-Optional integer `0..3`. Minimum replicas the platform keeps running. **`0` (default)** = scale to zero when idle (cold starts on next request).
+Optional integer `0..3`. Minimum replicas the platform keeps running. **`0` (default)** = scale to zero when idle — the next request pays a cold start of up to ~10s, so client timeouts must be ≥15s (see [Cold Starts (Scale-to-Zero)](#cold-starts-scale-to-zero)).
 
 | `minReplicas` | Platform behavior (today) |
 | ------------- | ------------------------- |
