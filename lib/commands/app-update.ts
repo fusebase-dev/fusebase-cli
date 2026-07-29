@@ -8,9 +8,13 @@ import {
   mergeFeaturePermissions,
   parsePermissions,
   parsePrincipals,
+  seedPermissionsFromRemote,
 } from "../permissions.ts";
 import { resolveGateSyncPermissions } from "../sync-app-gate-permissions.ts";
-import { writeBackendOnlyGatePermissionsToFusebaseJson } from "../config.ts";
+import {
+  writeAppPermissionsToFusebaseJson,
+  writeBackendOnlyGatePermissionsToFusebaseJson,
+} from "../config.ts";
 
 export interface AppUpdateOptions {
   access?: string;
@@ -159,6 +163,41 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       }
     }
 
+    // Deploy reconcile rebuilds the permission set from fusebase.json alone, so a grant that
+    // only reached the remote record is reverted by the next `fusebase deploy` (NIM-42737).
+    if (permissions !== undefined) {
+      const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
+      // Writing this entry makes reconcile PATCH the app to match it, so seed it from the remote
+      // record when nothing is declared locally — otherwise the first grant would narrow the app
+      // to a subset. Gate privileges are seeded minus the ones fusebaseGateMeta already
+      // republishes, so --sync-gate-permissions can still prune the analyzed set.
+      const localPermissions = featureConfig
+        ? mergeFeaturePermissions({
+            manualPermissions: permissions,
+            existingPermissions:
+              featureConfig.permissions ??
+              seedPermissionsFromRemote(app.permissions, featureConfig.fusebaseGateMeta?.permissions),
+          })
+        : undefined;
+
+      if (localPermissions) {
+        try {
+          writeAppPermissionsToFusebaseJson(resolve(process.cwd()), appIdArg, localPermissions);
+          console.log("  fusebase.json: apps[].permissions updated");
+        } catch (error) {
+          console.warn(
+            `  Warning: could not persist permissions to fusebase.json (${error instanceof Error ? error.message : String(error)}). ` +
+              "The grant is on the app record but `fusebase deploy` will revert it.",
+          );
+        }
+      } else {
+        console.warn(
+          `  Warning: app '${appIdArg}' is not in fusebase.json, so the grant was not persisted locally. ` +
+            "`fusebase deploy` from a project that declares this app will revert it.",
+        );
+      }
+    }
+
     if (backendOnlyGatePermissions !== undefined) {
       if (backendOnlyGatePermissions.length > 0) {
         console.log(
@@ -195,7 +234,7 @@ export const appUpdateCommand = new Command("update")
   .description("Update an app's settings")
   .argument("<appId>", "App ID to update")
   .option("--access <principals>", "Set access principals, comma-separated (e.g., visitor, org roles like orgRole:member, or portal principals portalClient/portalManager/portalMember)")
-  .option("--permissions <permissions>", "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read)")
+  .option("--permissions <permissions>", "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read;app_api.namespace.capability.read). Resource permissions replace the remote set; Gate privileges are added to it.")
   .option("--sync-gate-permissions", "Analyze this app path and sync generated Gate permissions")
   .option(
     "--declare-backend-only-gate-permissions",

@@ -232,9 +232,76 @@ or
 
 ### `gate`
 
-`gate` permissions are not entered through the `--permissions` DSL today.
+`gate` permissions have two sources.
 
-They are derived from Gate SDK usage analysis:
+**1. Hand-granted through `--permissions` (NIM-42737)**
+
+Any `--permissions` entry that is not a `dashboardView.`/`database.` resource permission is
+read as a Gate privilege string and granted as-is:
+
+```bash
+fusebase app update <appId> --permissions "app_api.analytics.vse_usage.read"
+fusebase app update <appId> --permissions "dashboardView.dash1:view1.read;app_api.tenancy.invite_claim.write"
+```
+
+This covers app API capabilities (`app_api.<namespace>.<capability>.<action>`) as well as
+built-in Gate privileges (`org.members.read`, `app_magic_link.write`).
+
+Accepted shape: lowercase dot-separated segments ending in `read`, `write`, `delete`,
+`execute`, `create`, `manage`, `delegate`, or `bypass` — the intersection of what the
+platform stores and what Gate can mint into a token, so a privilege that would be silently
+dropped at mint is rejected by the CLI instead.
+
+Validation beyond the shape:
+
+- `app_api.*` capabilities are app-defined, so only the shape is checked.
+- every other privilege must be a **known** Gate permission. A typo (`org.member.read`)
+  is rejected instead of stored — the platform validates the shape only, so a bogus grant
+  would otherwise be reported as successful and grant nothing.
+- `isolated_store.rls.delegate` / `.bypass` are rejected: they are backend-only (they would
+  ride in the browser token) and belong in `apps[].backendOnlyGatePermissions`.
+
+Merge semantics differ per section:
+
+- resource permissions (`dashboardView`/`database`) **replace** the remote resource set (unchanged)
+- Gate privileges are **added** to the gate set (analyzed or existing remote) — nothing is dropped
+- a **Gate-only** `--permissions` string leaves the remote resource set untouched, so granting a
+  capability never silently drops dashboard/database access. `--permissions=""` still clears it.
+
+**Durability.** `app update --permissions` writes the resulting permission set back into the
+app's `apps[].permissions` entry in `fusebase.json`, and prints
+`fusebase.json: apps[].permissions updated`. That entry is the durable record: deploy reconcile
+rebuilds the app's permissions from `fusebase.json` alone, so a grant that exists only on the
+remote record is silently reverted by the next `fusebase deploy`. Commit the change. If the app
+is not declared in this project's `fusebase.json` the CLI warns and grants remotely only.
+
+When the app has no `apps[].permissions` yet, the first grant **seeds** the entry from the remote
+record — otherwise writing it would narrow the app to just the new grant on the next deploy. Gate
+privileges already listed in `apps[].fusebaseGateMeta.permissions` are left out of the seed:
+reconcile republishes those from the snapshot, and copying them into the manual set would leave
+`--sync-gate-permissions` unable to ever prune them.
+
+Three paths rebuild the gate set from static analysis and therefore drop a grant that is
+*not* in `fusebase.json`:
+
+- `fusebase app update <appId> --sync-gate-permissions`
+- the `fusebase update` prompt *"Sync Gate permissions for N app(s) now?"*, which **defaults
+  to yes** — this is the one users hit by accident
+- `fusebase deploy` — reconcile PATCHes the app back to `apps[].permissions` +
+  `apps[].fusebaseGateMeta.permissions`, with no prompt and no output
+
+Merge-by-default (and a revoke path) is NIM-42739 / B4.
+
+`app_magic_link.client_invite` cannot be granted this way: its action segment is outside the
+set the platform can mint into a token, so it fails the shape check.
+
+> **App API policy extensions are not enforced yet.** `x-fusebase-required-permissions` and
+> `x-fusebase-allowed-callers` in an app's `openapi.json` are validated by `fusebase api validate`
+> but are **currently ignored at runtime** — the publish path does not propagate them, so
+> `listAppApiOperations` reports an empty policy and `callAppApi` enforces nothing.
+> Granting `app_api.*` today makes the grant durable ahead of enforcement (NIM-42740 / B1).
+
+**2. Derived from Gate SDK usage analysis**
 
 1. `fusebase analyze gate`
 2. CLI resolves used operation ids into permission strings via `POST /v1/gate/resolve-operation-permissions`
@@ -280,10 +347,13 @@ It supports three independent inputs:
 
 ### `--permissions`
 
-`--permissions` updates only the manual resource permissions:
+`--permissions` replaces the manual resource permissions:
 
 - `dashboardView`
 - `database`
+
+Gate privilege entries in the same string (e.g. `app_api.analytics.vse_usage.read`) are
+**added** to the gate set instead of replacing it.
 
 If `--sync-gate-permissions` is not passed, existing remote `gate` permissions are preserved.
 
@@ -388,6 +458,7 @@ That means:
 | Command | Result |
 |--------|--------|
 | `app update <id> --permissions="..."` | Replace `dashboardView/database`, keep current remote `gate` |
+| `app update <id> --permissions="app_api.<ns>.<cap>.<action>"` | Add the Gate privilege to the remote `gate` set and leave `dashboardView/database` untouched (NIM-42737); resource entries in the same string still replace |
 | `app update <id> --sync-gate-permissions` | Replace `gate`, keep current remote `dashboardView/database` |
 | `app update <id> --permissions="..." --sync-gate-permissions` | Replace both sections in one request |
 | `app update <id> --access="..."` | Change access only; permissions untouched |

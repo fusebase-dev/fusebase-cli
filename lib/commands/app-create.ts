@@ -272,7 +272,7 @@ export const appCreateCommand = new Command("create")
   )
   .option(
     "--permissions <permissions>",
-    "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read)",
+    "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read;app_api.namespace.capability.read)",
   )
   .option(
     "--backend-dev-command <command>",

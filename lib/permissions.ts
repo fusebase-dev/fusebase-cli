@@ -10,6 +10,18 @@ import type {
 const VALID_ORG_ROLES = ['guest', 'client', 'member', 'manager', 'owner'];
 const VALID_RESOURCE_PRIVILEGES: AppResourcePermissionPrivilege[] = ["read", "write"];
 
+const RESOURCE_PERMISSION_TYPES = ["dashboardView", "database"];
+
+/**
+ * Gate privilege string accepted by `--permissions` (NIM-42737). Deliberately the
+ * intersection of what nimbus-ai stores and what Gate can mint into a token, so a
+ * grant that would be silently dropped at mint is rejected here instead.
+ * Covers both 2-segment built-ins (`notes.read`) and app API capabilities
+ * (`app_api.<namespace>.<capability>.<action>`).
+ */
+const GATE_PRIVILEGE_PATTERN =
+  /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*\.(?:read|write|delete|execute|create|manage|delegate|bypass)$/;
+
 // Portal-scoped, context-relative principals. They match against the portal the
 // app is embedded in (the platform resolves them from the verified portal context),
 // so they take no id. Outside a portal they never match.
@@ -75,17 +87,35 @@ export function parsePrincipals(input: string): AppAccessPrincipal[] {
  *   "dashboardView.dashboardId:viewId.read,write"
  *   "database.id:databaseId.read,write"
  *   "database.alias:databaseAlias.read"
+ *   "app_api.analytics.vse_usage.read"   (Gate privilege, incl. app API capabilities)
  * Multiple permission items are separated by semicolons.
  * Each permission item is separated by semicolon.
  * Each item format: type.resource.privileges (privileges comma-separated)
  */
 export function parsePermissions(permissionsStr: string): AppPermissions {
   const items: AppPermissionItem[] = [];
+  const gatePrivileges: string[] = [];
 
   const parts = permissionsStr.split(';').map(p => p.trim()).filter(p => p);
 
   for (const part of parts) {
     const segments = part.split('.');
+
+    // Anything that is not a dashboardView/database resource permission is read as a
+    // Gate privilege string (NIM-42737) — additive, the resource DSL is unchanged.
+    if (!RESOURCE_PERMISSION_TYPES.includes(segments[0]?.trim() ?? "")) {
+      if (!GATE_PRIVILEGE_PATTERN.test(part)) {
+        throw new Error(
+          `Invalid permission "${part}". Expected a ${RESOURCE_PERMISSION_TYPES.join('/')} resource permission, ` +
+            `or a Gate privilege such as "org.members.read" / "app_api.<namespace>.<capability>.<action>" ` +
+            `ending in one of: read, write, delete, execute, create, manage, delegate, bypass.`,
+        );
+      }
+      assertGrantableGatePrivilege(part);
+      gatePrivileges.push(part);
+      continue;
+    }
+
     if (segments.length < 3) {
       throw new Error(
         `Invalid permission format: "${part}". Expected "dashboardView.dashboardId:viewId.privileges" or "database.id:databaseId.privileges"`,
@@ -174,11 +204,9 @@ export function parsePermissions(permissionsStr: string): AppPermissions {
 
       throw new Error(`Invalid database resource selector "${resourceKey}". Allowed values: id, alias`);
     }
-
-    throw new Error(`Invalid permission type "${permissionType}". Allowed values: dashboardView, database`);
   }
 
-  return { items };
+  return { items: [...items, ...buildGatePermissionItems(gatePrivileges)] };
 }
 
 export const BACKEND_ONLY_GATE_PERMISSIONS = [
@@ -257,6 +285,64 @@ export const KNOWN_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
 /** Return the entries that are not part of the known Gate permission vocabulary. */
 export function findUnknownGatePermissions(permissions: string[]): string[] {
   return permissions.filter((permission) => !KNOWN_GATE_PERMISSIONS.has(permission));
+}
+
+/** App API capabilities are app-defined, so only their shape can be validated. */
+const APP_API_PRIVILEGE_PREFIX = "app_api.";
+
+/**
+ * Real Gate permissions (`GatePermission` in fusebase-gate) that the sets above omit
+ * because those feed the MCP token policy — adding to them would bump the token
+ * fingerprint. They are grantable, so they belong in the `--permissions` vocabulary.
+ * `app_magic_link.client_invite` is deliberately absent: its action is not one Gate can
+ * mint into an app token.
+ */
+const GATE_PERMISSIONS_EXTRA_GRANTABLE = [
+  "auth.restore_key.write",
+  "automation.execute",
+  "mcp_manager.auth.write",
+  "mcp_manager.servers.write",
+  "mcp_manager.templates.read",
+  "mcp_manager.tools.execute",
+  "mcp_manager.tools.read",
+] as const;
+
+/**
+ * Grantable via `--permissions`: the known vocabulary plus magic links (a real grant
+ * that KNOWN_GATE_PERMISSIONS omits because it is not in the legacy MCP fingerprint).
+ */
+const GRANTABLE_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
+  ...KNOWN_GATE_PERMISSIONS,
+  ...GATE_PERMISSIONS_MAGIC_LINKS,
+  ...GATE_PERMISSIONS_EXTRA_GRANTABLE,
+]);
+
+const BACKEND_ONLY_GATE_PERMISSION_SET = new Set<string>(BACKEND_ONLY_GATE_PERMISSIONS);
+
+/**
+ * Validate a hand-granted Gate privilege (NIM-42737). Without this a typo such as
+ * `org.member.read` passes the shape check, is stored by nimbus-ai (which also checks
+ * shape only) and grants nothing — the CLI reporting success for a dead grant.
+ */
+export function assertGrantableGatePrivilege(privilege: string): void {
+  if (privilege.startsWith(APP_API_PRIVILEGE_PREFIX)) {
+    return;
+  }
+
+  if (BACKEND_ONLY_GATE_PERMISSION_SET.has(privilege)) {
+    throw new Error(
+      `Gate privilege "${privilege}" is backend-only and cannot be granted with --permissions ` +
+        `(the platform rejects it in app permissions because it would ride in the browser token). ` +
+        `Declare it in apps[].backendOnlyGatePermissions in fusebase.json instead.`,
+    );
+  }
+
+  if (!GRANTABLE_GATE_PERMISSIONS.has(privilege)) {
+    throw new Error(
+      `Unknown Gate privilege "${privilege}". Use a known privilege (e.g. "org.members.read") ` +
+        `or an app API capability "app_api.<namespace>.<capability>.<action>".`,
+    );
+  }
 }
 
 export const TRUSTED_RUNTIME_CONTEXT_DELEGATE_PERMISSION =
@@ -464,10 +550,27 @@ export function mergeFeaturePermissions(args: {
   }
 
   const existingItems = existingPermissions?.items ?? [];
-  const resourceItems =
-    manualPermissions !== undefined
-      ? manualPermissions.items
-      : existingItems.filter((item) => item.type !== "gate");
+  const manualItems = manualPermissions?.items ?? [];
+  const manualResourceItems = manualItems.filter((item) => item.type !== "gate");
+  const manualGateItems = manualItems.filter(
+    (item): item is AppGatePermissionItem => item.type === "gate",
+  );
+  // Only unscoped gate items are flattened. A scoped item passes through whole: dropping its
+  // `resource` widens the minted token's resource_scope from that resource to the whole org.
+  const manualScopedGateItems = manualGateItems.filter((item) => item.resource);
+  const manualGatePrivileges = manualGateItems
+    .filter((item) => !item.resource)
+    .flatMap((item) => item.privileges);
+
+  // A Gate-only `--permissions` grant leaves the resource section untouched so it never
+  // silently drops dashboardView/database grants. An empty `--permissions=""` still clears.
+  const replacesResources =
+    manualPermissions !== undefined &&
+    !(manualResourceItems.length === 0 && manualGatePrivileges.length > 0);
+  const resourceItems = replacesResources
+    ? manualResourceItems
+    : existingItems.filter((item) => item.type !== "gate");
+
   const gateItems =
     gatePermissions === undefined
       ? existingItems.filter(
@@ -476,8 +579,67 @@ export function mergeFeaturePermissions(args: {
       : buildGatePermissionItems(gatePermissions);
 
   return {
-    items: [...resourceItems, ...gateItems],
+    items: [
+      ...resourceItems,
+      ...manualScopedGateItems,
+      ...addGatePrivileges(gateItems, manualGatePrivileges),
+    ],
   };
+}
+
+/**
+ * Union hand-granted Gate privileges (`--permissions "app_api.…"`) into the unscoped
+ * gate item. They are additive: analyzed/remote gate privileges are never dropped.
+ */
+function addGatePrivileges(
+  gateItems: AppGatePermissionItem[],
+  privileges: string[],
+): AppGatePermissionItem[] {
+  if (privileges.length === 0) {
+    return gateItems;
+  }
+
+  const unscoped = gateItems.find((item) => !item.resource);
+  if (!unscoped) {
+    return [...gateItems, ...buildGatePermissionItems(privileges)];
+  }
+
+  return gateItems.map((item) =>
+    item === unscoped
+      ? {
+          ...item,
+          privileges: normalizeGatePermissionStrings([...item.privileges, ...privileges]),
+        }
+      : item,
+  );
+}
+
+/**
+ * Seed `apps[].permissions` from the remote app record for an app that declares none locally
+ * (NIM-42737). Writing the entry makes deploy reconcile PATCH the app to match it, so anything
+ * the remote holds and the local project cannot rebuild has to be carried over. Gate privileges
+ * already in the analyze snapshot are dropped: reconcile republishes those from
+ * `fusebaseGateMeta`, and keeping them here would make `--sync-gate-permissions` unable to prune.
+ */
+export function seedPermissionsFromRemote(
+  remotePermissions: AppPermissions | undefined,
+  analyzedGatePrivileges: string[] | undefined,
+): AppPermissions {
+  const remoteItems = remotePermissions?.items ?? [];
+  const analyzed = new Set(analyzedGatePrivileges ?? []);
+
+  const items = remoteItems.flatMap((item): AppPermissionItem[] => {
+    // Scoped items are kept whole: the meta only republishes privileges unscoped, so
+    // subtracting them here would drop the scope and bring the privilege back org-wide.
+    if (item.type !== "gate" || item.resource) {
+      return [item];
+    }
+
+    const privileges = item.privileges.filter((privilege) => !analyzed.has(privilege));
+    return privileges.length > 0 ? [{ ...item, privileges }] : [];
+  });
+
+  return { items };
 }
 
 export function formatPermissionItem(item: AppPermissionItem): string {
