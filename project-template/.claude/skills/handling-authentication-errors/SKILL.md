@@ -24,11 +24,9 @@ Any SPA that boots auth from **`GET /api/account/me`** (or similar) **MUST** fol
 | **`403`** with known business code (`membership_revoked`, `tenant_suspended`, …) | Authenticated but blocked | Dedicated blocked screen |
 | **Everything else** (502/503/504, 5xx, network error, timeout, aborted) | **No verdict** — server may be down | **Retry** (see below), then “Can't reach server” + Try again. **Do not** clear session cookie or force login |
 
-**Timeout on the *first* call after idle or deploy = cold start, not logout.** The backend
-scales to zero (`minReplicas: 0`), so that request can take up to ~10s. Use a timeout of at
-least 15s (ceiling 30s — CloudFront), **retry once with the full deadline**, and only then
-report "Can't reach server". Never clear the session on it. See skill **app-backend** §
-Cold Starts (Scale-to-Zero).
+**A timeout on the *first* call after idle or deploy is a cold start, not a logout.** Retry once
+with the full deadline, then report "Can't reach server" — never clear the session. Timeout
+sizing: skill **app-backend** § Cold Starts (Scale-to-Zero).
 
 ### Anti-pattern (never ship)
 
