@@ -3,6 +3,7 @@ import { resolveGateOperationPermissions } from "./api.ts";
 import {
   applyResolvedPermissionsToGateSnapshot,
   buildGateSdkOperationsSnapshot,
+  readGateSdkOperationsFromFusebaseJson,
   requireAppId,
   updateGateSdkPermissionsInFusebaseJson,
   writeGateSdkOperationsToFusebaseJson,
@@ -84,7 +85,10 @@ export async function analyzeFeatureGatePermissions(args: {
         snapshotBuildOptions,
       )
     : buildGateSdkOperationsSnapshot(
-        feature.fusebaseGateMeta,
+        // Legacy project-level meta is not migrated onto the app entry at load,
+        // so fall back to the file lookup the writeback path uses.
+        feature.fusebaseGateMeta ??
+          readGateSdkOperationsFromFusebaseJson(projectRoot, featureId),
         writeInput,
         snapshotBuildOptions,
       );

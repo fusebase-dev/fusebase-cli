@@ -87,7 +87,7 @@ Typical sequence for a new app:
 
 1. `fusebase app create ...`
 2. add app code
-3. if the app uses Gate SDK, run `fusebase analyze gate --feature <featureId>`
+3. if the app uses Gate SDK, run `fusebase analyze gate --feature <featureId>` to review the detected operations (read-only; `--sync-gate-permissions` below refreshes the snapshot itself)
 4. push permissions with `fusebase app update <appId> --permissions="..." --sync-gate-permissions`
 
 At creation time, the app may still have no permissions. That is normal. The canonical permission state appears only after create/update requests reach the platform.
@@ -323,7 +323,8 @@ When synced to the app, the CLI sends them as:
 Purpose:
 
 - scans an app path for Gate SDK API calls
-- writes `usedOps` and resolved `permissions` into `apps[].fusebaseGateMeta`
+- reports `usedOps` and resolved `permissions` for `apps[].fusebaseGateMeta`
+- **read-only by default** — `--write` saves the snapshot into `fusebase.json`
 
 Current behavior:
 
@@ -333,7 +334,9 @@ Current behavior:
 - detects calls on full `*Api` instances **and** narrowed clients such as `Pick<AccessApi, "getMe">` (supported for analysis only — **do not use `Pick<>` in app production code**; use full API factories so grants stay aligned)
 - warns when a resolve/sync would **remove** permissions that were previously in `fusebaseGateMeta.permissions`
 
-This command only updates local `fusebase.json`. It does **not** update remote app permissions by itself.
+Without `--write` it changes nothing at all. A write **replaces** the snapshot from static analysis, which cannot see hand-declared capabilities such as `app_api.<ns>.<cap>.<action>` — keep those in `manualPermissions` or in `apps[].permissions` (see `app update --permissions`).
+
+Even with `--write` this command only updates local `fusebase.json`. It does **not** update remote app permissions by itself.
 
 ## `fusebase app update <appId>`
 

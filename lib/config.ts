@@ -1599,6 +1599,32 @@ export function upsertManualAppApiDependencyInFusebaseJson(
 }
 
 /**
+ * Read the stored Gate analyze snapshot for one app straight from fusebase.json,
+ * using the same lookup as the writeback (so legacy project-level `fusebaseGateMeta`
+ * and nested `gateSdkOperations` are still found). Returns undefined when the file
+ * is missing/unparsable or the app has no snapshot.
+ */
+export function readGateSdkOperationsFromFusebaseJson(
+  projectRoot: string,
+  featureId: string,
+): GateSdkOperationsSnapshot | undefined {
+  const fuseJsonPath = join(projectRoot, "fusebase.json");
+  if (!existsSync(fuseJsonPath)) return undefined;
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+  } catch {
+    return undefined;
+  }
+  normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
+  return readPreviousGateSnapshotForFeature(raw, featureId);
+}
+
+/**
  * Set `features[].fusebaseGateMeta.permissions` in fusebase.json (keeps other snapshot fields).
  * Bumps `permissionsChangedAt` only when the sorted permission set differs from the previous snapshot.
  */

@@ -259,7 +259,7 @@ You can access the public API using the API key. The API spec is here https://pu
 
 ## Fusebase Gate analyze snapshot
 
-The hidden command `fusebase analyze gate` writes **`fusebaseGateMeta`** into `fusebase.json` (used Gate SDK operations + resolved permissions). See **`docs/FUSEBASE_GATE_META.md`** for the full mechanism.
+The hidden command `fusebase analyze gate` reports **`fusebaseGateMeta`** (used Gate SDK operations + resolved permissions). It is **read-only** — pass `--write` to save the snapshot into `fusebase.json`. See **`docs/FUSEBASE_GATE_META.md`** for the full mechanism.
 
 ## App API dependency analyze snapshot (PoC)
 
