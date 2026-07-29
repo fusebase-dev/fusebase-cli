@@ -115,6 +115,35 @@ describe("analyze gate is read-only by default", () => {
     expect(readFileSync(fuseJsonPath, "utf-8")).not.toBe(before);
   });
 
+  it("reports permissions from an app snapshot stored under the legacy keys", () => {
+    const { root, fuseJsonPath } = createProject();
+    // loadFuseConfig hands these over verbatim; only the writeback path translated them.
+    const legacyMeta = {
+      changedAt: "2026-01-01T00:00:00.000Z",
+      used: [],
+      requiredPermissions: [HAND_DECLARED, "token.read"],
+    };
+    writeFileSync(
+      fuseJsonPath,
+      JSON.stringify(
+        { orgId: "o1", productId: "p1", apps: [{ id: "app1", path: "apps/a", fusebaseGateMeta: legacyMeta }] },
+        null,
+        2,
+      ) + "\n",
+    );
+    const before = readFileSync(fuseJsonPath, "utf-8");
+
+    const res = spawnSync(
+      process.execPath,
+      [join(import.meta.dir, "..", "index.ts"), "analyze", "gate", "--feature", "app1", "--json"],
+      { cwd: root, encoding: "utf-8" },
+    );
+
+    expect(res.status).toBe(0);
+    expect(JSON.parse(res.stdout).permissions).toEqual([HAND_DECLARED, "token.read"]);
+    expect(readFileSync(fuseJsonPath, "utf-8")).toBe(before);
+  });
+
   it("reads the legacy project-level snapshot that loadFuseConfig does not migrate onto the app", () => {
     const { root, fuseJsonPath } = createProject();
     writeFileSync(

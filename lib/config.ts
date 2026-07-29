@@ -1046,7 +1046,7 @@ function readFeatureAppApiDependenciesMetaFromFeatureRaw(
 }
 
 /** Read one Gate snapshot object from parsed JSON; supports legacy `changedAt`, `used`, `requiredPermissions`. */
-function readGateSdkSnapshotFromRaw(
+export function readGateSdkSnapshotFromRaw(
   raw: unknown,
 ): GateSdkOperationsSnapshot | undefined {
   if (!raw || typeof raw !== "object") return undefined;

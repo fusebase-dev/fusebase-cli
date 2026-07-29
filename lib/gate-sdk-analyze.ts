@@ -4,6 +4,7 @@ import {
   applyResolvedPermissionsToGateSnapshot,
   buildGateSdkOperationsSnapshot,
   readGateSdkOperationsFromFusebaseJson,
+  readGateSdkSnapshotFromRaw,
   requireAppId,
   updateGateSdkPermissionsInFusebaseJson,
   writeGateSdkOperationsToFusebaseJson,
@@ -85,9 +86,9 @@ export async function analyzeFeatureGatePermissions(args: {
         snapshotBuildOptions,
       )
     : buildGateSdkOperationsSnapshot(
-        // Legacy project-level meta is not migrated onto the app entry at load,
-        // so fall back to the file lookup the writeback path uses.
-        feature.fusebaseGateMeta ??
+        // loadFuseConfig neither normalizes legacy snapshot keys nor migrates a
+        // project-level meta onto the app entry; the writeback path does both.
+        readGateSdkSnapshotFromRaw(feature.fusebaseGateMeta) ??
           readGateSdkOperationsFromFusebaseJson(projectRoot, featureId),
         writeInput,
         snapshotBuildOptions,

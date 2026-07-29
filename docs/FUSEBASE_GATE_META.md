@@ -25,7 +25,7 @@ Options:
 | Option | Default | Meaning |
 |--------|---------|--------|
 | `--operations` | `true` | Run the Gate SDK scan (only mode implemented today). |
-| `--json` | off | Print machine-readable JSON (includes `fusebaseGateMeta` fields when saved). |
+| `--json` | off | Print machine-readable JSON (always includes the `fusebaseGateMeta` fields, plus `fusebaseSaved`). |
 | `--feature <featureId>` | off | Analyze only one app; otherwise analyze all configured apps with `path`. |
 | `--write` | off | Save the snapshot into `fusebase.json`. **Without it the command is read-only.** |
 
