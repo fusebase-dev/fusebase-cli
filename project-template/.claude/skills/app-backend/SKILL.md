@@ -343,23 +343,14 @@ When an app has a backend, the `/api` path prefix is **reserved for the backend*
 
 ## Cold Starts (Scale-to-Zero)
 
-`backend.minReplicas` defaults to **`0`**, so the backend **scales to zero when idle** and the
-first request afterwards pays a **cold start of up to ~10s**. There is no post-deploy warm-up
-either — the first request after every `fusebase deploy` is cold too.
+`backend.minReplicas` defaults to **`0`**: the backend scales to zero when idle and there is no
+post-deploy warm-up, so the first request after idle *or* deploy pays a **~10s** cold start.
 
-**Rules for client code:**
-
-- Give app → backend requests a timeout of **at least 15s**. The platform ceiling is **30s**
-  (CloudFront origin-response), so anything above 30s can never succeed — never recommend 60s.
-- The vendored Gate SDK already defaults to **30000ms**. **Do not lower it.** Its single
-  `AbortController` spans all `fetchWithRetry` attempts, so an abort kills the whole call —
-  retries do **not** get a fresh deadline.
-- A slow first response is **not** an error and **not** a session problem. It must never clear
-  the session or force login — retry once with the full deadline, then surface "Can't reach
-  server" (skill **handling-authentication-errors**).
-
-If the first request must be fast (webhooks, always-on integrations), keep a replica warm
-instead — see [Keep a replica warm](#keep-a-replica-warm-for-webhook-apps-backendminreplicas-1).
+- Time out app → backend requests at **≥15s**; the platform ceiling is **30s** (CloudFront).
+- Leave the SDKs' **30000ms** default alone — one `AbortController` spans all `fetchWithRetry`
+  attempts, so retries do not get a fresh deadline.
+- A slow first response is not a session error — never clear the session or force login.
+- Need a fast first request? [Keep a replica warm](#keep-a-replica-warm-for-webhook-apps-backendminreplicas-1).
 
 ## Webhooks and External WebSocket Callbacks (Inbound)
 
@@ -545,7 +536,7 @@ Backend commands (`dev`, `build`, `start`) run from the `backend/` subdirectory 
 
 ### `backend.minReplicas` (keep the backend warm)
 
-Optional integer `0..3`. Minimum replicas the platform keeps running. **`0` (default)** = scale to zero when idle — the next request pays a cold start of up to ~10s, so client timeouts must be ≥15s (see [Cold Starts (Scale-to-Zero)](#cold-starts-scale-to-zero)).
+Optional integer `0..3`. Minimum replicas the platform keeps running. **`0` (default)** = scale to zero when idle — see [Cold Starts (Scale-to-Zero)](#cold-starts-scale-to-zero).
 
 | `minReplicas` | Platform behavior (today) |
 | ------------- | ------------------------- |

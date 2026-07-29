@@ -374,8 +374,7 @@ const BASE_URL =
   "https://app-api.{FUSEBASE_HOST}/v4/api/proxy/dashboard-service/v1";
 
 export function createSdkClient(appToken: string) {
-  // Do not pass a lower `timeout`: the SDK default of 30000ms is intentional —
-  // a scale-to-zero backend cold start can take ~10s and 30s is the platform ceiling.
+  // Leave the SDK's 30000ms `timeout` default alone — skill app-backend § Cold Starts.
   return createClient({
     baseUrl: BASE_URL,
     defaultHeaders: { "x-app-feature-token": appToken },
@@ -429,8 +428,7 @@ const GATE_BASE_URL =
   "https://app-api.{FUSEBASE_HOST}/v4/api/proxy/gate-service/v1";
 
 export function createGateSdkClient(appToken: string) {
-  // Do not pass a lower `timeout`: the SDK default of 30000ms is intentional —
-  // a scale-to-zero backend cold start can take ~10s and 30s is the platform ceiling.
+  // Leave the SDK's 30000ms `timeout` default alone — skill app-backend § Cold Starts.
   return createClient({
     baseUrl: GATE_BASE_URL,
     defaultHeaders: { "x-app-feature-token": appToken },
@@ -576,7 +574,7 @@ When `git-debug-commits` is enabled, these rules are mandatory:
 
 ### ✅ app-backend
 
-**Load when an app needs a backend API** (REST endpoints, WebSockets, custom logic). Covers when to add a backend, `backend/` folder structure, Hono setup, `/api` route reservation, and `fusebase.json` backend config (`backend.minReplicas` only — **`maxReplicas` is not supported**; platform may scale to 3 replicas). Set `minReplicas: 1` for webhook/always-on apps. **Cold starts:** with the default `minReplicas: 0` the backend scales to zero, so the first request after idle or deploy can take up to ~10s — client timeouts must be ≥15s (platform ceiling 30s) and a slow first response must never clear the session. Session bootstrap during deploy: skill **handling-authentication-errors**. **The backend is optional** — only add when the app genuinely needs backend logic beyond dashboard SDK calls. **No code is shared between SPA and backend** — each side defines its own types independently. **Backends are not shared among apps** — only the app that owns the `backend/` folder can access it.
+**Load when an app needs a backend API** (REST endpoints, WebSockets, custom logic). Covers when to add a backend, `backend/` folder structure, Hono setup, `/api` route reservation, and `fusebase.json` backend config (`backend.minReplicas` only — **`maxReplicas` is not supported**; platform may scale to 3 replicas). Set `minReplicas: 1` for webhook/always-on apps. Also covers **cold starts under scale-to-zero** (client timeout floor, session handling). Session bootstrap during deploy: skill **handling-authentication-errors**. **The backend is optional** — only add when the app genuinely needs backend logic beyond dashboard SDK calls. **No code is shared between SPA and backend** — each side defines its own types independently. **Backends are not shared among apps** — only the app that owns the `backend/` folder can access it.
 
 ### ✅ app-secrets
 
