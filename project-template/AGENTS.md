@@ -374,6 +374,8 @@ const BASE_URL =
   "https://app-api.{FUSEBASE_HOST}/v4/api/proxy/dashboard-service/v1";
 
 export function createSdkClient(appToken: string) {
+  // Do not pass a lower `timeout`: the SDK default of 30000ms is intentional —
+  // a scale-to-zero backend cold start can take ~10s and 30s is the platform ceiling.
   return createClient({
     baseUrl: BASE_URL,
     defaultHeaders: { "x-app-feature-token": appToken },
@@ -427,6 +429,8 @@ const GATE_BASE_URL =
   "https://app-api.{FUSEBASE_HOST}/v4/api/proxy/gate-service/v1";
 
 export function createGateSdkClient(appToken: string) {
+  // Do not pass a lower `timeout`: the SDK default of 30000ms is intentional —
+  // a scale-to-zero backend cold start can take ~10s and 30s is the platform ceiling.
   return createClient({
     baseUrl: GATE_BASE_URL,
     defaultHeaders: { "x-app-feature-token": appToken },
