@@ -121,6 +121,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `cross-app-api-calls-analysis` | Enables the hidden `fusebase analyze app-apis` and `fusebase app-api-contracts` commands and cross-app API dependency guidance in generated prompts/skills. |
 | `environments` | Enables named app environments (`environments/<name>.json` + `.env.<name>`, `fusebase env` command group, `--env <name>` everywhere, per-backend auth map). See `docs/proposals/APP-ENVIRONMENTS.md`. |
 | `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
+| `password-invite` | Includes the `invite-with-password` skill (`needsInitialPassword` + `setFusebaseInitialPassword`) in generated projects. Requires the platform flag `password_invite` on the target backend — dev only today. |
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 

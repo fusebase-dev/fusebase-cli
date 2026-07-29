@@ -1,7 +1,7 @@
 ---
-version: "1.8.0"
+version: "1.8.1"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-07-26"
+last_synced: "2026-07-28"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -44,6 +44,7 @@ These operations help AI Apps add Fusebase account registration, login, logout, 
 
 - `registerFusebaseUser` — visitor-safe email/password registration. Creates a Fusebase account through auth-form and returns a `sessionId` plus `userId` when registration succeeds. It does not add org membership. For AI App signup, send `autoConfirmEmail: true` unless product requirements explicitly need platform email confirmation.
 - `registerFusebaseOrgMember` — protected registration plus org provisioning. Creates the Fusebase account, then adds the new user to the path `orgId`. Requires `org.members.write` and org access. Use this only on registration, not on login. **Does not add the user to any App's `accessPrincipals`** — org membership and app access are separate (see below). For AI App signup, send `autoConfirmEmail: true` regardless of the org role being granted.
+- `setFusebaseInitialPassword` — sets the password of the **currently signed-in user**, once, with no password-restore email. Needed for an invitee whose account was pre-provisioned by an invite or an app magic link and holds a random password they never learn; `/auth/context` reports `needsInitialPassword: true` for exactly those accounts. Limits: the body is `{ password }` only, so you cannot target another account; the caller must be a user context (`fbsfeaturetoken` / session — `FBS_FEATURE_TOKEN` gets `403`); `409` once a password has been set; it mints no session and drops the account's existing ones, so follow it with `loginFusebaseUser`.
 - `loginFusebaseUser` — visitor-safe email/password login. Returns `sessionId` plus `userId`, or a challenge. Never provisions org membership.
 - `completeFusebaseAuthChallenge` — completes auth-form challenges such as CAPTCHA, OTP, mail OTP, two-factor, and MFA states returned by register/login.
 - `requestFusebasePasswordRestore` — sends restore email through auth-form. It returns a generic `{ ok: true }` and must not be used for account enumeration.
@@ -89,6 +90,7 @@ Use the **smallest** token that satisfies the op contract. Wrong subject → `40
 | `registerFusebaseOrgMember`, `addOrgUser` | App backend only | `process.env.FBS_FEATURE_TOKEN` (service token with `org.members.write`) |
 | `logoutFusebaseUser` | App backend on behalf of signed-in user | User-context token (`fbsfeaturetoken` / session), not the service token |
 | `getMyOrgAccess` (user identity) | App backend from browser request | Request `fbsfeaturetoken` cookie — **not** `FBS_FEATURE_TOKEN` |
+| `setFusebaseInitialPassword` (acts on the caller) | Browser → app backend, forwarding the invitee's request context | Request `fbsfeaturetoken` cookie / session — `FBS_FEATURE_TOKEN` gets `403` |
 
 Never call `registerFusebaseOrgMember` / `addOrgUser` from the SPA with a visitor cookie. Never use `FBS_FEATURE_TOKEN` to answer "who is the current user?".
 
@@ -228,7 +230,7 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 
 ## Version
 
-- **Version**: 1.8.0
+- **Version**: 1.8.1
 - **Category**: specialized
-- **Last synced**: 2026-07-26
+- **Last synced**: 2026-07-28
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

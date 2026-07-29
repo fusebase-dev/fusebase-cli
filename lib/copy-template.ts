@@ -211,6 +211,7 @@ const FLAG_GATED_SKILLS: Record<string, string> = {
   "fusebase-portal-specific-apps": "portal-specific-apps",
   "managed-integrations": "managed-integrations",
   "app-api-contract-testing": "cross-app-api-calls-analysis",
+  "invite-with-password": "password-invite",
 };
 
 /** Template paths that require a specific flag to be included. */
