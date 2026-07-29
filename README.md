@@ -880,6 +880,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `cross-app-api-calls-analysis` | Enables hidden `fusebase analyze app-apis` command and cross-app API dependency guidance in generated prompts/skills. |
 | `environments` | Enables named app environments: `environments/<name>.json` + `.env.<name>`, the `fusebase env` command group, `--env <name>` on every command, per-backend auth. See [docs/proposals/APP-ENVIRONMENTS.md](docs/proposals/APP-ENVIRONMENTS.md). |
 | `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
+| `password-invite` | Includes the `invite-with-password` skill (`needsInitialPassword` from `/auth/context` + Gate `setFusebaseInitialPassword`). Requires the platform flag `password_invite` on the target backend — dev only today. |
 
 Enable a flag globally, then refresh the project template:
 
