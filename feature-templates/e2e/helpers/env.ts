@@ -17,6 +17,10 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
+// Deadline for the harness's own fetches: clears a ~10s cold start, stays
+// under CloudFront's 30s ceiling, so a hung call fails with a clear message.
+const FETCH_TIMEOUT_MS = 20_000;
+
 export interface EnvFixtureUser {
   key: string;
   email: string;
@@ -266,6 +270,7 @@ export async function createSignInMagicLink(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ email: user.email }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     },
   );
   if (!res.ok) {
@@ -301,10 +306,19 @@ export async function fetchDeployedEnvInfo(
   try {
     const res = await fetch(`${baseUrl}/fusebase-env.json`, {
       redirect: "manual",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     return (await res.json()) as DeployedEnvInfo;
-  } catch {
+  } catch (err) {
+    // A timeout is NOT "no env info" — report it, otherwise a cold/hung
+    // backend is misread as a bundle deployed without environment mode.
+    if (err instanceof Error && err.name === "TimeoutError") {
+      throw new Error(
+        `${baseUrl}/fusebase-env.json did not answer within ${FETCH_TIMEOUT_MS}ms ` +
+          `— cold backend beyond the expected start-up, or the app is down`,
+      );
+    }
     return null;
   }
 }

@@ -40,7 +40,7 @@ for (const roleKey of ROLES) {
       const { magicLinkUrl } = await createSignInMagicLink(env, roleKey);
       await page.goto(magicLinkUrl, { waitUntil: "domcontentloaded" });
       // Activation sets session cookies and redirects into the app.
-      await page.waitForURL((url) => url.host === appHost, { timeout: 20000 });
+      await page.waitForURL((url) => url.host === appHost);
       await expect(page.locator("#root")).toBeAttached();
 
       // TODO: assert what THIS role must and must not see. Keep assertions

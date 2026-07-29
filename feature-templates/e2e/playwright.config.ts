@@ -32,6 +32,10 @@ const hasIntegration = existsSync(join(__dirname, "specs", "integration"));
 
 const sharedUse = {
   trace: "retain-on-failure" as const,
+  // Covers a ~10s backend cold start, under CloudFront's 30s ceiling.
+  actionTimeout: 15_000,
+  // A navigation is a redirect chain, not one request — full 30s ceiling.
+  navigationTimeout: 30_000,
   // "New headless" (real Chrome) + hide the automation marker — the classic
   // headless shell and the visible marker trip the platform's bot heuristics
   // on session handoffs (magic-link activation loops on ERR_TOO_MANY_REDIRECTS).
@@ -41,6 +45,10 @@ const sharedUse = {
 
 export default defineConfig({
   fullyParallel: true,
+  // Playwright's 5s expect default assumes a warm target; a ~10s cold start
+  // turns the first spec into a "passes on retry" flake. Sized to pass first.
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
   // Real platform (auth handoffs, magic-link activation) is legitimately
   // sensitive to concurrent auth-host traffic — retry once everywhere, twice
   // in CI. A genuine break fails all attempts; a flaky handoff recovers.

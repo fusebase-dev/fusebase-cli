@@ -66,6 +66,13 @@ which is exactly what these flows assert.)
    `.env.<name>` locally / CI variables in pipelines. Reports and traces are
    gitignored.
 
+## The first run after a deploy hits a cold backend
+
+This suite runs when the backend is cold — see skill **app-backend**, "Cold
+Starts (Scale-to-Zero)". A first-request timeout is therefore not flakiness:
+`playwright.config.ts` is already sized for it, so do not paper it over with
+`retries` or per-call `timeout:` overrides.
+
 ## Before minting magic links: pin the app's access principals
 
 `createAppMagicLink` appends a **user principal** to the app

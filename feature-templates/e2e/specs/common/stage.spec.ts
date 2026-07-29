@@ -39,7 +39,7 @@ test.describe("stage guard", () => {
     // (session mint / sign-in). Give the bounce time to come back.
     const appHost = new URL(baseURL!).host;
     const returned = await page
-      .waitForURL((url) => url.host === appHost, { timeout: 15000 })
+      .waitForURL((url) => url.host === appHost)
       .then(() => true)
       .catch(() => false);
     test.skip(

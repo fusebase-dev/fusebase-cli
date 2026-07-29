@@ -30,7 +30,7 @@ const env = resolveTargetEnvironment();
 const APP_A = "app-a";
 const APP_B = "app-b";
 
-async function host(appKey: string): Promise<string> {
+function host(appKey: string): string {
   return new URL(appBaseUrl(env, appKey)).host;
 }
 
@@ -47,17 +47,13 @@ test.describe("cross-app access propagation (one org)", () => {
     // one org → one shared session across app subdomains.
     const { magicLinkUrl } = await createSignInMagicLink(env, "client");
     await page.goto(magicLinkUrl, { waitUntil: "domcontentloaded" });
-    await page.waitForURL(async (u) => u.host === (await host(APP_A)), {
-      timeout: 20000,
-    });
+    await page.waitForURL((u) => u.host === host(APP_A));
     await expect(page.locator("#root")).toBeAttached();
 
     // Now the OTHER app — no second sign-in. The platform must keep us on the
     // app (authed), not bounce back to the auth host.
     await page.goto(appBaseUrl(env, APP_B), { waitUntil: "domcontentloaded" });
-    await page.waitForURL(async (u) => u.host === (await host(APP_B)), {
-      timeout: 15000,
-    });
+    await page.waitForURL((u) => u.host === host(APP_B));
     await expect(page.locator("#root")).toBeAttached();
   });
 
@@ -66,15 +62,11 @@ test.describe("cross-app access propagation (one org)", () => {
     await page.goto(magicLinkUrl, { waitUntil: "domcontentloaded" });
     // Land anywhere in the product, then drive from B → A.
     await page.goto(appBaseUrl(env, APP_B), { waitUntil: "domcontentloaded" });
-    await page.waitForURL(async (u) => u.host === (await host(APP_B)), {
-      timeout: 20000,
-    });
+    await page.waitForURL((u) => u.host === host(APP_B));
     await expect(page.locator("#root")).toBeAttached();
 
     await page.goto(appBaseUrl(env, APP_A), { waitUntil: "domcontentloaded" });
-    await page.waitForURL(async (u) => u.host === (await host(APP_A)), {
-      timeout: 15000,
-    });
+    await page.waitForURL((u) => u.host === host(APP_A));
     await expect(page.locator("#root")).toBeAttached();
   });
 });
