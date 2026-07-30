@@ -116,7 +116,13 @@ Pipeline jobs that run this suite (defined in `.gitlab-ci.yml`):
   (`main`). Gates `upload:dev` via `needs`, so a failing smoke blocks the
   dev artifact upload.
 - `e2e:prod` — runs on tag pipelines. Gates `upload:prod` via `needs`, so
-  a failing smoke blocks the release upload.
+  a failing smoke blocks the release upload. Also runs on **scheduled**
+  pipelines as the prod synthetic monitor — see below.
+
+Scheduled pipelines run `e2e:prod` and nothing else: `validate-skills`,
+`build`, `e2e:dev` and `upload:dev` all carry the `.not-on-schedule` guard, and
+`e2e:prod`'s `needs: build` is `optional: true` so the pipeline stays valid
+without it.
 
 Each job sets the test env vars (`FUSEBASE_API_KEY`, `FUSEBASE_ENV`,
 `FUSEBASE_TEST_ORG_ID`) from per-environment masked + protected GitLab CI
@@ -137,6 +143,77 @@ protected branches/tags and are scrubbed from logs.
 If any required variable is missing on a runner, the suite logs the missing
 names and SKIPs cleanly — the job exits 0 rather than failing the pipeline.
 
+## Prod synthetic monitor (every 3 hours)
+
+`e2e:prod` doubles as a **synthetic monitor of production app deploys**. A
+GitLab *pipeline schedule* re-runs the same suite every 3 hours, so a prod
+regression — the deploy pipeline, Azure Container Apps provisioning, the app
+gateway, or the delete cascade — surfaces within ~3 hours instead of at the
+next release tag.
+
+Why a GitLab schedule and not a CloudWatch Synthetics canary in
+`synthetic-monitoring`: canaries are Lambda-based Puppeteer scripts with a hard
+**14-minute** timeout and no bun/node/npm on the runtime. A full
+`init → scaffold → deploy → verify → teardown` cycle needs the real CLI and
+runs 10–20 minutes, so it does not fit that substrate. The scheduled pipeline
+reuses the runner image, the harness, and the prod CI variables that already
+exist here.
+
+Set it up once — left sidebar **Build → Pipeline schedules → New schedule**
+(`https://gl.nimbusweb.co/cli/apps-cli/-/pipeline_schedules`). Note this is
+*not* under Settings → CI/CD, where the `FUSEBASE_*` variables live:
+
+| Field           | Value                                             |
+| --------------- | ------------------------------------------------- |
+| Description     | `prod synthetic — CLI app deploy lifecycle`       |
+| Interval        | Custom cron `0 */3 * * *`                          |
+| Cron timezone   | UTC                                                |
+| Target branch   | `main`                                             |
+| Variables       | *(none — the job reads the same `FUSEBASE_*` CI variables as the tag run)* |
+| Activated       | ✅                                                  |
+
+The schedule **owner** must have access to the protected `FUSEBASE_PROD_*`
+variables, otherwise the suite SKIPs (green pipeline, no signal). Verify the
+first run manually with the ▶ button on the schedule row.
+
+If *Pipeline schedules* is missing from the sidebar, CI/CD is disabled for the
+project or your role is below Developer — check Settings → General →
+Visibility → *CI/CD* and your project membership.
+
+### Alerting
+
+A failed scheduled pipeline is the alert: the pipeline runs as the schedule
+owner, and GitLab emails that user on every failure. Notification level *Watch*
+on the project fans it out further. There is no CloudWatch/SNS wiring — this
+monitor does not page on-call through the same path as the
+`synthetic-monitoring` canaries.
+
+### Triage
+
+1. Open the failed `e2e:prod` job log. The smoke test prints the last 60 lines
+   of `fusebase deploy` output plus, on an HTTP failure, the last status /
+   content-type / body it saw from `/api/healthz`.
+2. `[e2e teardown] Deleted app <id>` at the end means cleanup ran. If it is
+   missing or reports a failure, check for a leaked product (see *Orphan
+   resource cleanup* below).
+3. A failure in *deploy* points at nimbus-ai / ACR / Container Apps; a failure
+   in the `/api/healthz` poll with a deployed app points at the app gateway or
+   the visitor-access path.
+
+### What the scheduled run does **not** assert
+
+Kept deliberately identical to the release-gating run, so the two never
+diverge:
+
+- **Cron execution is not verified at runtime** — the test asserts
+  `fusebase job create` succeeded and the deploy completed with the job
+  present, not that a tick actually fired (see step 12 in
+  `smoke-deploy.e2e.ts` for why).
+- **Azure resource removal is not verified** — teardown calls
+  `DELETE /v1/orgs/{orgId}/products/{productId}` and trusts the nimbus-ai
+  cascade to remove the Container App and Container Apps Job. A silently
+  broken cascade would leak resources without failing this monitor.
+
 ## Orphan resource cleanup
 
 The cascade in `nimbus-ai` (NIM-40898) deletes the Azure Container App and
@@ -147,18 +224,46 @@ of test outcome, so the happy path leaves no orphans.
 There is **no nightly orphan-cleanup job**. If a CI runner crashes between
 "app created" and "app deleted" — for example, a SIGKILL from the runner host
 or a network partition that prevents the teardown call — the Azure resources
-will leak. This is an accepted risk per the parent-story decision: the smoke
-runs ~per pipeline, the blast radius is one Container App + jobs, and the
-cost of a sweeper job is not warranted at this volume.
+will leak. This was an accepted risk per the parent-story decision: the blast
+radius is one Container App + jobs, and the cost of a sweeper job was not
+warranted at the original volume.
 
-If you suspect leaks, list test apps in the test org via the public-api and
-delete the stale ones manually:
+**The 3-hourly prod schedule raises that volume** from ~per release to 8 prod
+runs a day, so leaks now accumulate 8× faster on the prod test org. Nothing
+prunes them automatically — check the org periodically, or add a sweeper if
+leaks show up in practice.
+
+Listing and deleting leaked products (`main` uses `sub` for the generated
+product slug and `title` for the `e2e-cli-…` name the test passes to
+`fusebase init`; there is no `subdomain` field, and the list response is
+wrapped in `products`):
 
 ```bash
-curl -H "Authorization: Bearer $FUSEBASE_API_KEY" \
-  "https://public-api.dev-thefusebase.com/v1/orgs/$FUSEBASE_TEST_ORG_ID/products" \
-  | jq '.[] | select(.subdomain | startswith("e2e-cli-")) | {id, subdomain}'
+# prod: public-api.thefusebase.com · dev: public-api.dev-thefusebase.com
+API=https://public-api.thefusebase.com
 
-curl -X DELETE -H "Authorization: Bearer $FUSEBASE_API_KEY" \
-  "https://public-api.dev-thefusebase.com/v1/orgs/$FUSEBASE_TEST_ORG_ID/products/$APP_ID"
+curl -s -H "Authorization: Bearer $FUSEBASE_API_KEY" \
+  "$API/v1/orgs/$FUSEBASE_TEST_ORG_ID/products" \
+  | jq '.products[] | select(.title | startswith("e2e-cli-")) | {id, title, createdAt}'
+
+curl -s -X DELETE -H "Authorization: Bearer $FUSEBASE_API_KEY" \
+  "$API/v1/orgs/$FUSEBASE_TEST_ORG_ID/products/$PRODUCT_ID"
 ```
+
+Deleting the product is enough — the `nimbus-ai` cascade removes the Container
+App and Container Apps Jobs. To confirm directly in Azure, the names are
+derivable: resource group `nimbus-org-<orgId>` (`-dev` suffix on dev),
+backend Container App `nimbus-app-<appId>`, cron job
+`j-<appId>-<sha1(orgId+appId+jobName)[0:13]>`.
+
+```bash
+az containerapp list     -g nimbus-org-$FUSEBASE_TEST_ORG_ID --query "[].name" -o tsv
+az containerapp job list -g nimbus-org-$FUSEBASE_TEST_ORG_ID --query "[].name" -o tsv
+```
+
+Both should come back **empty** between runs. What legitimately stays behind is
+the per-org shared infrastructure the first deploy provisions — the resource
+group, the Log Analytics workspace `nimbus-law-<orgId>`, and the Container Apps
+managed environment `nimbus-env-<orgId>`. These are not per-app and are not
+removed by the cascade; leave them in place (re-creating the managed
+environment costs ~2 minutes on the next run).
