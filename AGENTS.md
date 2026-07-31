@@ -123,6 +123,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
 | `password-invite` | Includes the `invite-with-password` skill (`needsInitialPassword` + `setFusebaseInitialPassword`) in generated projects. Requires the platform flag `password_invite` on the target backend — dev only today. |
 | `notes-markdown` | Adds markdown (v3) note permissions to generated Gate MCP tokens. Requires the platform flag `notes_markdown` on the target backend. |
+| `direct-openid-login` | Includes the "Google / Microsoft direct login (app-wrapper OpenID routes)" section in `fusebase-gate/references/fusebase-auth.md`. Off (default): the section is omitted from generated projects. |
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 

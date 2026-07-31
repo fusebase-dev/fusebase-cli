@@ -449,6 +449,7 @@ export const KNOWN_FLAGS = [
   "dev-backend",
   "password-invite",
   "notes-markdown",
+  "direct-openid-login",
   MANAGED_INTEGRATIONS_FLAG,
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
@@ -476,6 +477,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include the `invite-with-password` skill (`setFusebaseInitialPassword` + `needsInitialPassword`) in generated projects. Requires the platform flag `password_invite` on the target backend.",
   "notes-markdown":
     "Include markdown (v3) note Gate permissions in generated MCP tokens. Requires the platform flag `notes_markdown` on the target backend.",
+  "direct-openid-login":
+    "Include the direct Google/Microsoft login guidance (app-wrapper `/_auth/openid/*` routes) in the `fusebase-gate` auth reference.",
   [MANAGED_INTEGRATIONS_FLAG]:
     "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
   // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
