@@ -1,4 +1,4 @@
-import type { App, AppPermissionItem } from "../../api.ts";
+import type { App, AppAccessPrincipal, AppPermissionItem } from "../../api.ts";
 import type { AppPermissionItemEnriched } from "./get-feature-resources-info.ts";
 
 interface PrintFeatureOptions {
@@ -95,6 +95,29 @@ function printPermissionTable(rows: PermissionRow[]): void {
   }
 }
 
+/**
+ * Render a principal in the same syntax `--access` accepts, so the output of
+ * `app get` can be pasted straight back into `app update --access` without
+ * having to guess the current grants.
+ */
+export function formatAccessPrincipal(principal: AppAccessPrincipal): string {
+  // `visitor` is stored with the sentinel id "0"; portal principals are
+  // context-relative and carry no id. Both are written bare.
+  if (!principal.id || (principal.type === "visitor" && principal.id === "0")) {
+    return principal.type;
+  }
+
+  return `${principal.type}:${principal.id}`;
+}
+
+export function formatAccessPrincipals(principals?: AppAccessPrincipal[]): string {
+  if (!principals || principals.length === 0) {
+    return "none";
+  }
+
+  return principals.map(formatAccessPrincipal).join(", ");
+}
+
 export function printFeature(
   feature: App,
   options: PrintFeatureOptions = {},
@@ -103,6 +126,7 @@ export function printFeature(
   console.log(`  ${feature.title}`);
   console.log(`    ID:   ${feature.id}`);
   console.log(`    URL:  ${feature.url}`);
+  console.log(`    Access: ${formatAccessPrincipals(feature.accessPrincipals)}`);
 
   if (options.includeResourceAccess) {
     printPermissionTable(getPermissionRows(feature, helpData.featurePermissionsData));

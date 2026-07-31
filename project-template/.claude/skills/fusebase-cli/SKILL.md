@@ -278,7 +278,20 @@ Update settings for an existing app.
 
 **Access Principals:**
 
-The `--access` option replaces the entire access principal list. Principals are comma-separated entries of the form `type` or `type:id`:
+The `--access` option replaces the entire access principal list. **Always run
+`fusebase app get <appId>` first** — it is read-only and prints the current
+principals in the same syntax, so you can see what the overwrite would drop
+instead of silently locking people (or production) out.
+
+```bash
+fusebase app get аgjg851jguanadi41
+#   My App
+#     ID:   аgjg851jguanadi41
+#     URL:  https://.../my-app
+#     Access: visitor, orgRole:member
+```
+
+Principals are comma-separated entries of the form `type` or `type:id`:
 
 | Principal      | Example          | Description                                                                                  |
 | -------------- | ---------------- | -------------------------------------------------------------------------------------------- |

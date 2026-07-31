@@ -197,7 +197,7 @@ fusebase git sync --git-tag-managed
 
 ### `fusebase app list`
 
-List all apps for the current app with their URLs.
+List all apps for the current app with their URLs and access principals.
 
 **Arguments:** None
 
@@ -222,6 +222,7 @@ Apps:
   My App
     ID:   app-id-123
     URL:  https://your-app-id.thefusebase.app/my-app
+    Access: visitor, orgRole:member
     Permissions:
       ID               Title             Type
       ---------------  ----------------  --------
@@ -229,6 +230,46 @@ Apps:
       database-id-456  Customer Database Database
 
 Total: 1 app(s)
+```
+
+---
+
+### `fusebase app get <appId>`
+
+Read-only view of a single app: id, URL, and the access principals currently
+granted to it. Nothing is mutated, so it is safe to run before
+`fusebase app update --access ...` to see what the overwrite would replace.
+
+`Access:` is printed in the same syntax `--access` accepts, so the line can be
+pasted back into `app update` unchanged. `Access: none` means the app has no
+access principals — only the org members who can manage the product reach it.
+Principals the CLI cannot author itself (`user:<id>`, `orgGroup:<id>`, granted
+from the UI) are shown too.
+
+**Arguments:** `<appId>` — platform app id (from `fusebase app list`)
+
+**Options:** None
+
+**Prerequisites:**
+
+- App must be initialized (`fusebase init`)
+- API key must be configured (`fusebase auth`)
+
+**Example:**
+
+```bash
+fusebase app get app-id-123
+```
+
+**Output:**
+
+```
+App:
+
+  My App
+    ID:   app-id-123
+    URL:  https://your-app-id.thefusebase.app/my-app
+    Access: visitor, orgRole:member, portalClient
 ```
 
 ---
