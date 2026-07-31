@@ -20,7 +20,7 @@ fusebase secret create --app <appPath> --secret "KEY:description" [--secret ...]
 - `appPath` — the app's `apps[].path` from `fusebase.json`; `--feature` is accepted as a deprecated alias for `--app`
 - Each `--secret` is `KEY` or `KEY:human-readable description`
 - Pass multiple `--secret` flags to create several secrets at once
-- After running, the CLI prints the URL where you can fill in the actual values
+- This command only edits `fusebase.json` (it makes no network call and prints no URL). The keys are registered on the platform — with empty values — on the next `fusebase deploy` / `fusebase dev start`, and *that* command prints the URL where you fill in the actual values
 
 **Examples:**
 
@@ -35,7 +35,15 @@ fusebase secret create --app apps/my-app \
   --secret "WEBHOOK_SECRET:Webhook signing secret"
 ```
 
-After running, open the printed URL and fill in the secret values.
+Then run `fusebase deploy` (or `fusebase dev start`) to register the keys on the platform. That run prints the secrets URL:
+
+```
+   Registered 3 new secret key(s) for apps/my-app: STRIPE_SECRET_KEY, DB_PASSWORD, WEBHOOK_SECRET
+   Set their values in the FuseBase UI:
+     https://{org-domain}/dashboard/{orgId}/apps/features/{appId}/secrets
+```
+
+Open that URL and fill in the secret values. The URL is printed only when new keys are registered — if the keys already exist on the platform, nothing is printed and you can reach the same page from the app's Secrets tab in the FuseBase UI.
 
 ## Accessing Secrets at Runtime
 
@@ -72,7 +80,7 @@ export const config = {
 - ❌ Do NOT create a `backend/.env` file for secrets
 - ❌ Do NOT add `dotenv` as a dependency
 - ❌ Do NOT use `import 'dotenv/config'` in backend code
-- ✅ Use `fusebase secret create` to register secrets, set values via the printed URL, and they will be available via `process.env` in both dev and production
+- ✅ Use `fusebase secret create` to declare secrets, set values in the FuseBase UI (URL printed by `fusebase deploy` / `fusebase dev start`), and they will be available via `process.env` in both dev and production
 
 ## Runtime Persistence
 

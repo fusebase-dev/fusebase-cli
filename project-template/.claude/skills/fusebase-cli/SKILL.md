@@ -437,7 +437,7 @@ During `fusebase init`, only **required** MCP servers (per the catalog, respecti
 fusebase secret create --app <appPath> --secret <KEY:description> [--secret ...]
 ```
 
-Creates secrets (with empty values) for an app and prints the URL where you can set the actual values.
+Declares secret keys for an app in `fusebase.json`. This is a local file edit only — no network call, and no URL is printed. The keys are created on the platform (with empty values) by the next `fusebase deploy` / `fusebase dev start`, which prints the URL where you set the actual values.
 
 **Required Options:**
 
@@ -457,7 +457,7 @@ fusebase secret create --app apps/my-app \
   --secret "WEBHOOK_SECRET"
 ```
 
-After creating the secrets, the CLI prints `https://{org-domain}/dashboard/{orgId}/apps/apps/{appId}/secrets` — open that URL to fill in the actual secret values.
+After declaring the secrets, run `fusebase deploy` (or `fusebase dev start`). When it registers new keys it prints `https://{org-domain}/dashboard/{orgId}/apps/features/{appId}/secrets` — open that URL to fill in the actual secret values. Nothing is printed if the keys already exist on the platform.
 
 ### Scaffold an App
 

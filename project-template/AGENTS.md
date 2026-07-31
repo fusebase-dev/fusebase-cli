@@ -642,7 +642,7 @@ Key commands:
 - `fusebase isolated-store sql bundle --app <appPath> [--alias <alias>] [--stage dev|prod] [--status|--rls-status|--dry-run|--apply --yes|--json]` - Build the SQL migration bundle from `postgres/migrations/` plus `apps[].isolatedStores.sql[]`; use before/apply through Gate instead of hand-building JSON. Optional RLS manifest forwarding requires `fusebase config set-flag postgres-rls`.
 - `fusebase update` - Single smart update command: in app directory runs full update flow (CLI self-update + agent assets + MCP/IDE + managed SDK deps/install), outside app directory runs CLI update only; use `--skip-product` for CLI-only mode even inside app
 - `fusebase env create` - Create or overwrite `.env` with Dashboards/Gate MCP tokens; in TTY offers immediate `fusebase config ide --force` refresh for all IDE MCP configs (or prints it as next step when declined)
-- `fusebase secret create --app <appPath> --secret "KEY:description"` - Create app secrets (empty values), prints URL to set values (`--feature` is a deprecated alias for `--app`)
+- `fusebase secret create --app <appPath> --secret "KEY:description"` - Declare app secret keys in `fusebase.json` (local edit, no URL printed); deploy/dev start registers them with empty values and prints the UI URL to set the values (`--feature` is a deprecated alias for `--app`)
 
 Lint: run `npm run lint` from project root (or from an app directory). The project template includes ESLint (TypeScript/JavaScript plus `@eslint/json` for `*.json`). Invalid JSON — including a raw line break inside a quoted string — is reported as a parse error. Deploy runs lint automatically before build for each app that has a `lint` script.
 

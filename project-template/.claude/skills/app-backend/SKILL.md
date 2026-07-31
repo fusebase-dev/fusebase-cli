@@ -823,7 +823,7 @@ config.refreshToken = tokens.refresh_token; // lost on restart
 ## Dev Workflow
 
 1. `cd apps/my-app/backend && npm install` — install backend deps
-2. `fusebase secret create --app <appPath> --secret "KEY:description"` — register secrets (if needed), set values via the printed URL
+2. `fusebase secret create --app <appPath> --secret "KEY:description"` — declare secrets in `fusebase.json` (if needed); deploy/dev start registers them and prints the UI URL where you set the values
 3. `fusebase dev start` — starts both SPA and backend; secrets are injected automatically as env vars
 
 **No `.env` files or `dotenv` needed** — `fusebase dev start` injects secrets into the backend process.

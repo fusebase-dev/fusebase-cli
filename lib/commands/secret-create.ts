@@ -123,7 +123,8 @@ function runDeclarative(appPath: string, secrets: AppSecretDeclaration[]): void 
   console.log(`✓ Secret keys for app "${appPath}" in ${FUSE_JSON}: ${summary}`);
   console.log(
     "  Keys are registered on the platform on the next `fusebase deploy` / " +
-      "`fusebase dev start`. Set their values in the FuseBase UI.",
+      "`fusebase dev start`, which prints the FuseBase UI URL where you set " +
+      "their values.",
   );
 }
 
