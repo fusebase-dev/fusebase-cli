@@ -466,6 +466,14 @@ The app must be registered before it can run. Never leave these for the user to 
 - Don't hand-build URLs for operations the SDK already covers
 - Use MCP tools during development; in runtime, use the SDK for everything it covers
 
+This rule is scoped to **Fusebase APIs**. It does not forbid documented
+server-side API or official SDK calls to third-party services that the app owns,
+such as Stripe. If an app has its own Stripe account and server-side secret, the
+agent may implement or execute an authorized Stripe operation (for example,
+creating a webhook endpoint) from trusted backend code without exposing the
+secret. Load the `fusebase-gate` Stripe references to decide whether a billing
+object is Gate-managed or app-owned.
+
 **Allowed exception:** a few operations have no SDK method — runtime code may call the **documented** endpoint directly with `fetch`, as shown in the relevant skill or the scaffold. Calling a documented endpoint is fine; inventing one is not.
 
 ### ❌ Hand-written app `id` in `fusebase.json`

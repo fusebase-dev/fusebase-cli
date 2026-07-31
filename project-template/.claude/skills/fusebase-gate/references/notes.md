@@ -1,7 +1,7 @@
 ---
 version: "1.5.0"
 mcp_prompt: notes
-last_synced: "2026-07-21"
+last_synced: "2026-07-30"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -77,8 +77,12 @@ These operations manage workspace note folders, workspace notes, note reads, not
 
 ## Access Model
 
-- Note reads require `notes.read` and org access.
-- Note creation, content append, and attachment writes require `notes.write` and org access.
+- Classic (v2) note reads require `notes.read` and org access.
+- Classic (v2) note creation, content append, and attachment writes require `notes.write` and org access.
+- Markdown (v3) note reads require `notes.markdown.read` and org access.
+- Markdown (v3) note creation, content replacement, content append, and attachment writes require `notes.markdown.write` and org access.
+- Markdown (v3) note operations also require the Gate env feature flag `notes_markdown`; when it is off, the operations fail closed.
+- Tokens that only have `notes.read`/`notes.write` must use the classic (v2) note operations.
 - If note-service or editor-server writes fail, verify caller permissions and workspace scope before assuming a schema mismatch.
 
 ## Markdown (v3) Note Rules
@@ -103,5 +107,5 @@ These operations manage workspace note folders, workspace notes, note reads, not
 
 - **Version**: 1.5.0
 - **Category**: specialized
-- **Last synced**: 2026-07-21
+- **Last synced**: 2026-07-30
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
