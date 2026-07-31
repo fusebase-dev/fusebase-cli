@@ -291,6 +291,10 @@ fusebase app get аgjg851jguanadi41
 #     Access: visitor, orgRole:member
 ```
 
+If that output carries a `!` line, the app has principals `--access` cannot
+express (`user:<id>`, `orgGroup:<id>`, granted from the UI). Running
+`app update --access` at all would revoke them — change those grants in the UI.
+
 Principals are comma-separated entries of the form `type` or `type:id`:
 
 | Principal      | Example          | Description                                                                                  |

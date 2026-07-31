@@ -241,10 +241,13 @@ granted to it. Nothing is mutated, so it is safe to run before
 `fusebase app update --access ...` to see what the overwrite would replace.
 
 `Access:` is printed in the same syntax `--access` accepts, so the line can be
-pasted back into `app update` unchanged. `Access: none` means the app has no
-access principals — only the org members who can manage the product reach it.
+pasted back into `app update`. `Access: none` means the app has no access
+principals — every role in the organization can reach it, but visitors cannot.
+
 Principals the CLI cannot author itself (`user:<id>`, `orgGroup:<id>`, granted
-from the UI) are shown too.
+from the UI) are shown too, followed by a `!` warning line: `--access` cannot
+express them, so re-applying the rest of the line would silently revoke them.
+Change those grants in the UI instead.
 
 **Arguments:** `<appId>` — platform app id (from `fusebase app list`)
 
