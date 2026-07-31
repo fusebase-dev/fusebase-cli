@@ -337,11 +337,19 @@ describe("parsePermissions", () => {
     });
 
     it("accepts gate permissions that are not part of the MCP token policy", () => {
-      expect(parsePermissions("auth.restore_key.write;mcp_manager.tools.execute")).toEqual({
+      expect(
+        parsePermissions(
+          "auth.restore_key.write;mcp_manager.tools.execute;notes.markdown.write",
+        ),
+      ).toEqual({
         items: [
           {
             type: "gate",
-            privileges: ["auth.restore_key.write", "mcp_manager.tools.execute"],
+            privileges: [
+              "auth.restore_key.write",
+              "mcp_manager.tools.execute",
+              "notes.markdown.write",
+            ],
           },
         ],
       });

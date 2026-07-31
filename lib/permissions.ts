@@ -273,12 +273,18 @@ export const GATE_PERMISSIONS_PORTALS = [
   "portals.manage",
 ] as const;
 
+export const GATE_PERMISSIONS_NOTES_MARKDOWN = [
+  "notes.markdown.read",
+  "notes.markdown.write",
+] as const;
+
 /** Every Gate permission the platform recognizes (superset of MCP-token + backend-only). */
 export const KNOWN_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   ...GATE_PERMISSIONS_BASE,
   ...FILE_GATE_PERMISSIONS,
   ...GATE_PERMISSIONS_ISOLATED,
   ...GATE_PERMISSIONS_PORTALS,
+  ...GATE_PERMISSIONS_NOTES_MARKDOWN,
   ...BACKEND_ONLY_GATE_PERMISSIONS,
 ]);
 

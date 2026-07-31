@@ -6,6 +6,7 @@ import {
   GATE_PERMISSIONS_BASE,
   GATE_PERMISSIONS_ISOLATED,
   GATE_PERMISSIONS_MAGIC_LINKS,
+  GATE_PERMISSIONS_NOTES_MARKDOWN,
   GATE_PERMISSIONS_PORTALS,
 } from "./permissions";
 
@@ -61,6 +62,22 @@ function getDashboardsPermissions(): string[] {
   return [...permissions].sort((a, b) => a.localeCompare(b));
 }
 
+function notesMarkdownEnabled(): boolean {
+  return hasFlag("notes-markdown");
+}
+
+function getGateMcpPermissions(): string[] {
+  const permissions = [
+    ...GATE_PERMISSIONS_BASE,
+    ...FILE_GATE_PERMISSIONS,
+    ...GATE_PERMISSIONS_ISOLATED,
+    ...GATE_PERMISSIONS_PORTALS,
+    ...GATE_PERMISSIONS_MAGIC_LINKS,
+    ...(notesMarkdownEnabled() ? GATE_PERMISSIONS_NOTES_MARKDOWN : []),
+  ];
+  return permissions.sort((a, b) => a.localeCompare(b));
+}
+
 /**
  * Baseline permission-only fingerprints accepted for old projects with no FP keys in `.env`.
  * Generated from the permission lists that shipped before FP markers existed.
@@ -109,13 +126,7 @@ export function dashboardsMcpPolicyDescriptor(): Record<string, unknown> {
 
 /** Serializable policy shape for Gate MCP token. PostgreSQL DB permissions are part of the default baseline. */
 export function gateMcpPolicyDescriptor(): Record<string, unknown> {
-  const permissions = [
-    ...GATE_PERMISSIONS_BASE,
-    ...FILE_GATE_PERMISSIONS,
-    ...GATE_PERMISSIONS_ISOLATED,
-    ...GATE_PERMISSIONS_PORTALS,
-    ...GATE_PERMISSIONS_MAGIC_LINKS,
-  ].sort((a, b) => a.localeCompare(b));
+  const permissions = getGateMcpPermissions();
   return {
     schema: MCP_POLICY_SCHEMA_VERSION,
     product: "gate-mcp",
@@ -188,6 +199,12 @@ export function matchesCurrentOrLegacyFallback(stored: {
     return d === expected.dashboards && g === expected.gate;
   }
 
+  // Old projects without policy FP markers are accepted only for the legacy
+  // token policy. Opt-in Gate MCP expansions must force token refresh.
+  if (notesMarkdownEnabled()) {
+    return false;
+  }
+
   const legacy = getLegacyPermissionsOnlyFingerprints();
   return (
     legacy.dashboards === LEGACY_PERMISSIONS_ONLY_BASELINE.dashboards &&
@@ -216,13 +233,7 @@ export function buildDashboardsMcpTokenRequest(orgId: string): CreateTokenReques
 
 /** Full API request for Gate MCP token (org + client scopes). */
 export function buildGateMcpTokenRequest(orgId: string, appId: string): CreateTokenRequest {
-  const permissions = [
-    ...GATE_PERMISSIONS_BASE,
-    ...FILE_GATE_PERMISSIONS,
-    ...GATE_PERMISSIONS_ISOLATED,
-    ...GATE_PERMISSIONS_PORTALS,
-    ...GATE_PERMISSIONS_MAGIC_LINKS,
-  ];
+  const permissions = getGateMcpPermissions();
   return {
     scopes: [
       { scope_type: "org", scope_id: orgId },
