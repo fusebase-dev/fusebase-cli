@@ -278,10 +278,11 @@ Update settings for an existing app.
 
 **Access Principals:**
 
-The `--access` option replaces the entire access principal list. **Always run
+The `--access` option **replaces the entire access principal list**. **Always run
 `fusebase app get <appId>` first** — it is read-only and prints the current
 principals in the same syntax, so you can see what the overwrite would drop
-instead of silently locking people (or production) out.
+instead of silently locking people (or production) out. Add `--json` for the
+raw payload when you want to snapshot the grants first.
 
 ```bash
 fusebase app get аgjg851jguanadi41

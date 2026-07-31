@@ -3,7 +3,11 @@ import { fetchApp } from "../api.ts";
 import { getConfig, loadFuseConfig } from "../config.ts";
 import { printFeature } from "./utils/feature-output.ts";
 
-export async function runAppGet(appIdArg: string): Promise<void> {
+interface AppGetOptions {
+  json?: boolean;
+}
+
+export async function runAppGet(appIdArg: string, options: AppGetOptions = {}): Promise<void> {
   const config = getConfig();
   const fuseConfig = loadFuseConfig();
 
@@ -27,6 +31,11 @@ export async function runAppGet(appIdArg: string): Promise<void> {
   try {
     const app = await fetchApp(config.apiKey, orgId, productId, appIdArg);
 
+    if (options.json) {
+      console.log(JSON.stringify(app, null, 2));
+      return;
+    }
+
     console.log("\nApp:\n");
     printFeature(app);
   } catch (error) {
@@ -36,6 +45,7 @@ export async function runAppGet(appIdArg: string): Promise<void> {
 }
 
 export const appGetCommand = new Command("get")
-  .description("Get an app by ID")
+  .description("Get an app by ID, including its current access principals (read-only)")
   .argument("<appId>", "App ID to get")
+  .option("--json", "Print the raw app payload as JSON (includes accessPrincipals)")
   .action(runAppGet);

@@ -251,7 +251,9 @@ Change those grants in the UI instead.
 
 **Arguments:** `<appId>` — platform app id (from `fusebase app list`)
 
-**Options:** None
+**Options:**
+
+- `--json` - Print the raw app payload as JSON (includes `accessPrincipals`), for scripts and diffing before/after an update
 
 **Prerequisites:**
 
@@ -262,6 +264,9 @@ Change those grants in the UI instead.
 
 ```bash
 fusebase app get app-id-123
+
+# Machine-readable, e.g. to snapshot the grants before changing them
+fusebase app get app-id-123 --json | jq .accessPrincipals
 ```
 
 **Output:**
