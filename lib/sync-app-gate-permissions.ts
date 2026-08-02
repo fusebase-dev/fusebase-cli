@@ -17,6 +17,7 @@ import {
   readBackendOnlyGatePermissionsFromManifest,
   splitGatePermissionStrings,
   subtractBackendOnlyFromRuntime,
+  unionStoredPermissions,
 } from "./permissions.ts";
 
 export interface SyncAppGatePermissionsOptions {
@@ -164,7 +165,7 @@ export async function syncAppGatePermissions(
   // prompt, where a replace silently revokes hand-granted privileges (NIM-42739).
   const { gatePermissions: syncedGatePermissions } = mergeSyncedGatePermissions({
     analyzedGatePermissions: gatePermissions,
-    storedPermissions: app.permissions,
+    storedPermissions: unionStoredPermissions(app.permissions, featureConfig.permissions),
     backendOnlyGatePermissions,
   });
 

@@ -553,6 +553,19 @@ export function readGatePrivilegesFromPermissions(
 }
 
 /**
+ * The stored grant set every sync merges into. A grant is written to both the app record and
+ * `apps[].permissions`, but either copy can exist alone — a fresh checkout has the local one
+ * before its first deploy. Hand-building this union drifted apart across three call sites
+ * (NIM-42739): the drift check predicted a union while one sync still read the remote alone,
+ * so the default-yes sync prompt returned on every Gate-SDK bump.
+ */
+export function unionStoredPermissions(
+  ...sources: (AppPermissions | undefined)[]
+): AppPermissions {
+  return { items: sources.flatMap((source) => source?.items ?? []) };
+}
+
+/**
  * Merge-by-default for `--sync-gate-permissions` (NIM-42739). Static analysis only
  * returns privileges it can infer from Gate SDK usage, so replacing the stored set
  * silently deletes every hand-granted one — prod lost `app_magic_link.write` and

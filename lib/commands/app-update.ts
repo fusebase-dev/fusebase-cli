@@ -11,6 +11,7 @@ import {
   parsePrincipals,
   removeGatePrivilegesFromPermissions,
   seedPermissionsFromRemote,
+  unionStoredPermissions,
 } from "../permissions.ts";
 import { resolveGateSyncPermissions } from "../sync-app-gate-permissions.ts";
 import {
@@ -125,12 +126,12 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         declareBackendOnlyGatePermissions: options.declareBackendOnlyGatePermissions,
         pruneGatePermissions: options.pruneGatePermissions,
       });
-      // A grant is written to both the app record and apps[].permissions, but either copy can
-      // exist alone — prune must see the union or it leaves one behind while reporting success,
-      // and deploy re-grants from the one it missed.
-      const storedPermissions: AppPermissions = {
-        items: [...(app.permissions?.items ?? []), ...(featureConfig.permissions?.items ?? [])],
-      };
+      // Prune must see both copies or it leaves one behind while reporting success, and
+      // deploy re-grants from the one it missed.
+      const storedPermissions = unionStoredPermissions(
+        app.permissions,
+        featureConfig.permissions,
+      );
       // Static analysis cannot see a hand-granted privilege, so the synced set is the
       // union of both unless the caller explicitly prunes (NIM-42739).
       const merged = mergeSyncedGatePermissions({

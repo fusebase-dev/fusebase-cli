@@ -6,6 +6,7 @@ import { analyzeFeatureGatePermissions } from "./gate-sdk-analyze.ts";
 import {
   mergeSyncedGatePermissions,
   splitGatePermissionStrings,
+  unionStoredPermissions,
 } from "./permissions.ts";
 
 export const GATE_SDK_PACKAGE = "@fusebase/fusebase-gate-sdk";
@@ -80,13 +81,7 @@ export function comparePlatformGatePermissions(args: {
     splitGatePermissionStrings(
       mergeSyncedGatePermissions({
         analyzedGatePermissions,
-        // Same union the sync reads: a grant can sit in either copy alone.
-        storedPermissions: {
-          items: [
-            ...(remoteApp?.permissions?.items ?? []),
-            ...(localPermissions?.items ?? []),
-          ],
-        },
+        storedPermissions: unionStoredPermissions(remoteApp?.permissions, localPermissions),
       }).gatePermissions,
     ).runtimePermissions,
   );

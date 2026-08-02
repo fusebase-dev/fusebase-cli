@@ -29,3 +29,32 @@ describe("gate permission sync has a single path", () => {
     }
   });
 });
+
+// NIM-42739: a grant can sit in the app record or in local apps[].permissions alone, so every
+// reader of "what a sync publishes" must take the union. Hand-built in three places, it drifted
+// twice — the drift check predicted a union while syncAppGatePermissions still read the remote
+// alone, and the default-yes sync prompt then returned on every Gate-SDK bump.
+// ponytail: source-level guard for the same reason as above — the sync path needs the network.
+describe("stored gate permissions are read through one union helper", () => {
+  const files = [
+    join("lib", "commands", "app-update.ts"),
+    join("lib", "gate-permissions-drift.ts"),
+    join("lib", "sync-app-gate-permissions.ts"),
+  ];
+
+  for (const file of files) {
+    const source = readFileSync(join(import.meta.dir, "..", file), "utf-8");
+
+    it(`${file} merges against unionStoredPermissions`, () => {
+      expect(source).toContain("unionStoredPermissions(");
+    });
+
+    it(`${file} does not read one copy alone`, () => {
+      // Both the argument form (`storedPermissions: x`) and the local (`const storedPermissions = x`)
+      // — matching only one leaves that file's assertion vacuous.
+      for (const [, argument] of source.matchAll(/storedPermissions(?::|\s*=)\s*([^,\n]+)/g)) {
+        expect(argument).toContain("unionStoredPermissions(");
+      }
+    });
+  }
+});
