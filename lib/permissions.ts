@@ -571,9 +571,14 @@ export function mergeSyncedGatePermissions(params: {
     prune = false,
   } = params;
   const analyzed = new Set(analyzedGatePermissions);
-  const backendOnly = new Set(backendOnlyGatePermissions);
-  // Backend-only privileges move to the remote manifest rather than being revoked,
-  // so they are never merged back into the browser set nor reported as removals.
+  // Backend-only privileges move to the remote manifest rather than being revoked, so they
+  // are never merged back into the browser set nor reported as removals. The platform-fixed
+  // ones are subtracted unconditionally: a set stored by an older CLI can still hold
+  // `isolated_store.rls.bypass`, and merging would re-publish it into the browser gst.
+  const backendOnly = new Set([
+    ...backendOnlyGatePermissions,
+    ...BACKEND_ONLY_GATE_PERMISSIONS,
+  ]);
   const extras = readGatePrivilegesFromPermissions(storedPermissions).filter(
     (privilege) => !analyzed.has(privilege) && !backendOnly.has(privilege),
   );

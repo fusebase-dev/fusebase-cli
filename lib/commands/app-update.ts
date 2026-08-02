@@ -199,6 +199,17 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         // The same privileges live in fusebase.json once granted, and deploy reconcile
         // republishes from there — leaving them would re-grant on the next deploy.
         const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
+        // manualPermissions is hand-authored, so the CLI does not edit it; it is re-unioned
+        // into the snapshot on every analyze and would re-grant silently.
+        const stillDeclared = (featureConfig?.fusebaseGateMeta?.manualPermissions ?? []).filter(
+          (privilege) => prunedGatePrivileges.includes(privilege),
+        );
+        if (stillDeclared.length > 0) {
+          console.warn(
+            `  Warning: ${stillDeclared.join(", ")} still listed in apps[].fusebaseGateMeta.manualPermissions. ` +
+              "Remove them there or the next `fusebase deploy` grants them again.",
+          );
+        }
         if (featureConfig?.permissions) {
           try {
             writeAppPermissionsToFusebaseJson(
