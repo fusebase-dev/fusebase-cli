@@ -5,6 +5,7 @@ import type { FeatureConfig } from "./config.ts";
 import { analyzeFeatureGatePermissions } from "./gate-sdk-analyze.ts";
 import {
   mergeSyncedGatePermissions,
+  readGatePrivilegesFromPermissions,
   splitGatePermissionStrings,
   unionStoredPermissions,
 } from "./permissions.ts";
@@ -58,9 +59,13 @@ export function sortedUniqueStrings(values: string[]): string[] {
   ).sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * The published set is read through the same reader the merge uses. Picking the first gate item
+ * instead read a *scoped* one once `mergeFeaturePermissions` started emitting those first, so the
+ * two operands counted different items and the drift never cleared (NIM-42739).
+ */
 export function extractPublishedGateRuntimePermissions(app: App): string[] {
-  const gateItem = app.permissions?.items?.find((item) => item.type === "gate");
-  return sortedUniqueStrings(gateItem?.privileges ?? []);
+  return readGatePrivilegesFromPermissions(app.permissions);
 }
 
 /**

@@ -19,11 +19,13 @@ describe("gate-permissions-drift", () => {
     });
   });
 
-  it("extractPublishedGateRuntimePermissions reads gate privileges", () => {
+  it("extractPublishedGateRuntimePermissions skips a leading scoped gate item", () => {
     const app = {
       id: "app1",
       permissions: {
         items: [
+          // mergeFeaturePermissions emits scoped items before the unscoped one.
+          { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.write"] },
           { type: "gate", privileges: ["portals.read", "org.read"] },
           { type: "dashboardView", resource: { dashboardId: "d", viewId: "v" }, privileges: ["read"] },
         ],
@@ -89,6 +91,24 @@ describe("gate-permissions-drift", () => {
       "app_api.tenancy.membership.read",
       "org.read",
     ]);
+  });
+
+  it("reports no drift when a scoped gate item sits before the unscoped one", () => {
+    const result = comparePlatformGatePermissions({
+      analyzedGatePermissions: ["org.read"],
+      remoteApp: {
+        id: "app1",
+        permissions: {
+          items: [
+            { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
+            { type: "gate", privileges: ["org.read"] },
+          ],
+        },
+      } as App,
+    });
+
+    expect(result.drift).toBe(false);
+    expect(result.published).toEqual(["org.read"]);
   });
 
   it("still reports platform drift for a newly analyzed operation", () => {
