@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { App, AppPermissions } from "./api.ts";
 import type { FeatureConfig } from "./config.ts";
-import { analyzeFeatureGatePermissions } from "./gate-sdk-analyze.ts";
+import {
+  analyzeFeatureGatePermissions,
+  type FeatureGateAnalysisOutput,
+} from "./gate-sdk-analyze.ts";
 import {
   mergeSyncedGatePermissions,
   readGatePrivilegesFromPermissions,
@@ -26,7 +29,7 @@ export interface GatePermissionsDrift {
   sources: GatePermissionsDriftSource[];
   remoteAppMissing: boolean;
   publishedPermissions: string[];
-  /** Baseline for the local-meta comparison only: `fusebaseGateMeta` ∪ resolver. */
+  /** Baseline for the local-meta comparison only: the snapshot a refresh would store. */
   expectedPermissions: string[];
   /** Platform permission delta (published → what a sync would publish). */
   platformAddedPermissions: string[];
@@ -96,6 +99,27 @@ export function comparePlatformGatePermissions(args: {
     published,
     syncWouldPublish,
     diff: diffSortedStringSets(published, syncWouldPublish),
+  };
+}
+
+/**
+ * The local-meta baseline is what the `Refresh fusebaseGateMeta` write *stores*, not what the
+ * analysis *publishes*. The two differ when the analyzer finds no `usedOps`: `gate-sdk-analyze.ts`
+ * forces the published set to `[]` while the snapshot carries the stored permissions forward under
+ * merge semantics — so the refresh rewrites the same set and the default-yes prompt returns on
+ * every SDK bump (NIM-42739). No `runtimePermissions` filter here: the meta stores the raw set.
+ */
+export function compareLocalMetaGatePermissions(args: {
+  analysis: Pick<FeatureGateAnalysisOutput, "fusebaseSnapshot">;
+  localMetaPermissions: string[];
+}): { drift: boolean; expected: string[]; diff: StringSetDiff } {
+  const { analysis, localMetaPermissions } = args;
+  const expected = sortedUniqueStrings(analysis.fusebaseSnapshot.permissions ?? []);
+
+  return {
+    drift: !gatePermissionSetsEqual(localMetaPermissions, expected),
+    expected,
+    diff: diffSortedStringSets(localMetaPermissions, expected),
   };
 }
 
@@ -210,42 +234,34 @@ export async function detectFeatureGatePermissionsDrift(args: {
     throwOnResolveFailure: true,
   });
 
-  const expectedPermissions = sortedUniqueStrings(
-    splitGatePermissionStrings(analysis.gatePermissions).runtimePermissions,
-  );
   const expectedUsedOps = sortedUniqueStrings(analysis.result.usedOps);
   const localMetaPermissions = sortedUniqueStrings(
     feature.fusebaseGateMeta?.permissions ?? [],
   );
   const metaUsedOps = sortedUniqueStrings(feature.fusebaseGateMeta?.usedOps ?? []);
 
-  // Platform and local-meta need different baselines: the sync merges, the fusebaseGateMeta
-  // refresh still replaces. Using the merged baseline for local-meta too would copy
-  // remote-only grants into the snapshot on the `Refresh fusebaseGateMeta` prompt.
+  // Platform and local-meta need different baselines: a merged-with-remote baseline for
+  // local-meta would copy remote-only grants into the snapshot on the `Refresh fusebaseGateMeta`
+  // prompt.
   const platform = comparePlatformGatePermissions({
     analyzedGatePermissions: analysis.gatePermissions,
     remoteApp,
     localPermissions: feature.permissions,
   });
   const publishedPermissions = platform.published;
+  const localMeta = compareLocalMetaGatePermissions({ analysis, localMetaPermissions });
+  const expectedPermissions = localMeta.expected;
 
   const platformDrift = platform.drift;
-  const localMetaPermissionsDrift = !gatePermissionSetsEqual(
-    localMetaPermissions,
-    expectedPermissions,
-  );
   const localMetaUsedOpsDrift = !gatePermissionSetsEqual(metaUsedOps, expectedUsedOps);
-  const localMetaDrift = localMetaPermissionsDrift || localMetaUsedOpsDrift;
+  const localMetaDrift = localMeta.drift || localMetaUsedOpsDrift;
 
   if (!platformDrift && !localMetaDrift) {
     return null;
   }
 
   const platformPermissionDiff = platform.diff;
-  const localMetaPermissionDiff = diffSortedStringSets(
-    localMetaPermissions,
-    expectedPermissions,
-  );
+  const localMetaPermissionDiff = localMeta.diff;
 
   const sources: GatePermissionsDriftSource[] = [];
   if (platformDrift) sources.push("platform");

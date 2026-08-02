@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { buildGateSdkOperationsSnapshot } from "../lib/config.ts";
 import {
+  compareLocalMetaGatePermissions,
   comparePlatformGatePermissions,
   diffSortedStringSets,
   extractPublishedGateRuntimePermissions,
@@ -10,6 +11,7 @@ import {
   type GatePermissionsDrift,
 } from "../lib/gate-permissions-drift.ts";
 import type { App } from "../lib/api.ts";
+import type { FeatureGateAnalysisOutput } from "../lib/gate-sdk-analyze.ts";
 
 describe("gate-permissions-drift", () => {
   it("diffSortedStringSets reports added and removed values", () => {
@@ -138,6 +140,41 @@ describe("gate-permissions-drift", () => {
     // to do while the sync would publish one more privilege.
     expect(result.drift).toBe(true);
     expect(result.diff.added).toEqual(["app_magic_link.write"]);
+  });
+
+  it("reports no local-meta drift when the analyzer finds no usedOps but the meta carries permissions", () => {
+    // The refresh merges now, so it writes the snapshot back unchanged. Baselining on the
+    // published set (forced to [] with zero usedOps) reports a removal that never happens and
+    // the default-yes `Refresh fusebaseGateMeta` prompt returns forever (NIM-42739).
+    const result = compareLocalMetaGatePermissions({
+      analysis: {
+        gatePermissions: [],
+        fusebaseSnapshot: {
+          usedOps: [],
+          permissions: ["app_api.tenancy.membership.read", "org.read"],
+        },
+      } as unknown as FeatureGateAnalysisOutput,
+      localMetaPermissions: ["app_api.tenancy.membership.read", "org.read"],
+    });
+
+    expect(result.drift).toBe(false);
+    expect(result.diff.removed).toEqual([]);
+  });
+
+  it("still reports local-meta drift for a newly resolved operation", () => {
+    const result = compareLocalMetaGatePermissions({
+      analysis: {
+        gatePermissions: ["org.members.read", "org.read"],
+        fusebaseSnapshot: {
+          usedOps: ["getMyOrgAccess", "listOrgUsers"],
+          permissions: ["org.members.read", "org.read"],
+        },
+      } as unknown as FeatureGateAnalysisOutput,
+      localMetaPermissions: ["org.read"],
+    });
+
+    expect(result.drift).toBe(true);
+    expect(result.diff.added).toEqual(["org.members.read"]);
   });
 
   it("reports no drift when the app is not on the platform", () => {

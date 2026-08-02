@@ -151,6 +151,9 @@ export async function analyzeFeatureGatePermissions(args: {
     }
   }
 
+  // The zero-usedOps guard is the only place the published set and the stored snapshot disagree:
+  // the snapshot carries stored permissions forward (merge, NIM-42739), this does not. Anything
+  // comparing against a fusebaseGateMeta write must read `fusebaseSnapshot.permissions`.
   const gatePermissions = withTrustedRuntimeContextDelegatePermission(
     result.usedOps.length === 0 ? [] : (fusebaseSnapshot.permissions ?? []),
     result.usesTrustedRuntimeContext,
