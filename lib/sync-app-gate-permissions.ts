@@ -12,6 +12,7 @@ import {
   isBackendOnlyGatePermissionsDeclared,
   isStoreGatePermission,
   mergeFeaturePermissions,
+  mergeSyncedGatePermissions,
   readBackendOnlyGatePermissionsFromFeature,
   readBackendOnlyGatePermissionsFromManifest,
   splitGatePermissionStrings,
@@ -40,6 +41,8 @@ export interface ResolveGateSyncPermissionsOptions {
   featureConfig: FeatureConfig;
   appManifest?: unknown;
   declareBackendOnlyGatePermissions?: boolean;
+  /** Explicit prune: also rebuild the local fusebaseGateMeta snapshot from static analysis. */
+  pruneGatePermissions?: boolean;
   quiet?: boolean;
 }
 
@@ -65,6 +68,8 @@ export async function resolveGateSyncPermissions(
     apiKey: options.apiKey,
     alwaysResolvePermissions: true,
     throwOnResolveFailure: true,
+    // Otherwise the pruned privilege stays in fusebaseGateMeta and deploy re-grants it.
+    prunePermissions: options.pruneGatePermissions,
   });
   const split = splitGatePermissionStrings(gateAnalysis.gatePermissions);
   let gatePermissions = split.runtimePermissions;
@@ -155,6 +160,14 @@ export async function syncAppGatePermissions(
       quiet: options.quiet,
     });
 
+  // Merge, never replace: this helper also runs behind the default-yes `fusebase update`
+  // prompt, where a replace silently revokes hand-granted privileges (NIM-42739).
+  const { gatePermissions: syncedGatePermissions } = mergeSyncedGatePermissions({
+    analyzedGatePermissions: gatePermissions,
+    storedPermissions: app.permissions,
+    backendOnlyGatePermissions,
+  });
+
   const updateRequest: {
     accessPrincipals?: AppAccessPrincipal[];
     permissions?: AppPermissions;
@@ -162,7 +175,7 @@ export async function syncAppGatePermissions(
   } = {
     permissions: mergeFeaturePermissions({
       existingPermissions: app.permissions,
-      gatePermissions,
+      gatePermissions: syncedGatePermissions,
     }),
   };
 
@@ -222,7 +235,7 @@ export async function syncAppGatePermissions(
 
   return {
     app: updatedApp,
-    gatePermissions,
+    gatePermissions: syncedGatePermissions,
     backendOnlyGatePermissions,
   };
 }

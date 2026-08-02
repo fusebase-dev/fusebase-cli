@@ -281,16 +281,19 @@ privileges already listed in `apps[].fusebaseGateMeta.permissions` are left out 
 reconcile republishes those from the snapshot, and copying them into the manual set would leave
 `--sync-gate-permissions` unable to ever prune them.
 
-Three paths rebuild the gate set from static analysis and therefore drop a grant that is
-*not* in `fusebase.json`:
+Since NIM-42739 none of the sync paths drop a stored grant on their own:
 
-- `fusebase app update <appId> --sync-gate-permissions`
-- the `fusebase update` prompt *"Sync Gate permissions for N app(s) now?"*, which **defaults
-  to yes** — this is the one users hit by accident
-- `fusebase deploy` — reconcile PATCHes the app back to `apps[].permissions` +
-  `apps[].fusebaseGateMeta.permissions`, with no prompt and no output
+- `fusebase app update <appId> --sync-gate-permissions` **merges** the analyzed set into the
+  privileges already on the app record
+- the `fusebase update` prompt *"Sync Gate permissions for N app(s) now?"* (**defaults to yes**)
+  goes through the same merge
+- `fusebase deploy` reconcile passes the platform's own permission set as the base, so a
+  resource permission or resource-scoped gate item it cannot rebuild locally is left alone
 
-Merge-by-default (and a revoke path) is NIM-42739 / B4.
+One gap remains: reconcile publishes `apps[].permissions` + `apps[].fusebaseGateMeta.permissions`
+as the app's **unscoped** gate set, so a privilege granted outside this project (platform UI, API)
+and recorded nowhere in `fusebase.json` is still replaced by the next `fusebase deploy`. Grant it
+with `app update --permissions` — that writes it into `apps[].permissions` and makes it durable.
 
 `app_magic_link.client_invite` cannot be granted this way: its action segment is outside the
 set the platform can mint into a token, so it fails the shape check.
@@ -334,7 +337,7 @@ Current behavior:
 - detects calls on full `*Api` instances **and** narrowed clients such as `Pick<AccessApi, "getMe">` (supported for analysis only — **do not use `Pick<>` in app production code**; use full API factories so grants stay aligned)
 - warns when a resolve/sync would **remove** permissions that were previously in `fusebaseGateMeta.permissions`
 
-Without `--write` it changes nothing at all. A write **replaces** the snapshot from static analysis, which cannot see hand-declared capabilities such as `app_api.<ns>.<cap>.<action>` — keep those in `manualPermissions` or in `apps[].permissions` (see `app update --permissions`).
+Without `--write` it changes nothing at all. A write replaces `usedOps` but **merges** `permissions` into the stored set, so a hand-declared capability such as `app_api.<ns>.<cap>.<action>` survives it. Pass `--prune-gate-permissions` with `--write` to rebuild `permissions` from static analysis alone.
 
 Even with `--write` this command only updates local `fusebase.json`. It does **not** update remote app permissions by itself.
 
@@ -367,11 +370,32 @@ If `--sync-gate-permissions` is not passed, existing remote `gate` permissions a
 1. runs Gate analysis for `app.path`
 2. updates `apps[].fusebaseGateMeta`
 3. resolves Gate operations into permission strings
-4. replaces remote `gate` permissions with the analyzed set
-
-If no Gate SDK calls remain in the app, the synced `gate` set becomes empty, so remote `gate` permissions are cleared.
+4. **merges** the analyzed set into the remote `gate` permissions
 
 If `--permissions` is not passed, existing remote `dashboardView/database` permissions are preserved.
+
+### Merge by default, prune on request
+
+Static analysis only sees privileges it can infer from Gate SDK calls, so replacing the remote
+set deleted every hand-granted one — that is how prod lost `app_magic_link.write` and
+`app_api.tenancy.membership.read` on an exit-0 sync. The sync now takes the union, and an
+empty analyzed set no longer clears anything.
+
+To actually revoke a privilege, ask for it:
+
+```bash
+fusebase app update <appId> --sync-gate-permissions --prune-gate-permissions
+```
+
+This rebuilds the gate set from the analyzed set alone, prints every removal
+(`Removed 1 Gate privilege(s): app_api.tenancy.membership.read`), and strips the same
+privileges from `apps[].permissions` and `apps[].fusebaseGateMeta` so the next
+`fusebase deploy` does not re-grant them. It cannot be combined with `--permissions` —
+one grants, the other revokes; run them separately.
+
+Two things prune does **not** touch: resource-scoped gate items (the CLI cannot rebuild a
+`resource` scope, so dropping it would widen the token to the whole org) and privileges that
+moved to `manifest.backendOnlyGatePermissions`, which are relocated rather than revoked.
 
 ### Backend-only Gate permissions
 

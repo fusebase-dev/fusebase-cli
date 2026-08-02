@@ -238,6 +238,9 @@ async function applyAppUpdates(params: {
   const desiredAccess = appConfig.access;
   const desiredPermissions = mergeFeaturePermissions({
     manualPermissions: appConfig.permissions,
+    // Without the platform's own set, a grant that only exists on the app record is
+    // deleted the moment the local entry exists at all (NIM-42739).
+    existingPermissions: platformApp?.permissions,
     gatePermissions: appConfig.fusebaseGateMeta?.permissions,
   });
 

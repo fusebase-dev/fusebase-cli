@@ -44,7 +44,7 @@ describe("gate-permissions-drift", () => {
     expect(sortedUniqueStrings([" b ", "a", "b", ""])).toEqual(["a", "b"]);
   });
 
-  it("buildGateSdkOperationsSnapshot can skip copying stale permissions for drift checks", () => {
+  it("buildGateSdkOperationsSnapshot drops stale permissions only when pruning", () => {
     const prev = {
       sdkVersion: "2.3.28-sdk.3",
       analyzedAt: "2026-01-01T00:00:00.000Z",
@@ -52,16 +52,18 @@ describe("gate-permissions-drift", () => {
       usedOps: ["listOrgUsers"],
       permissions: ["org.read"],
     };
-    const snapshot = buildGateSdkOperationsSnapshot(
-      prev,
-      {
-        analyzedAt: "2026-06-01T00:00:00.000Z",
-        usedOps: ["listOrgUsers"],
-        sdkVersion: "2.3.28-sdk.3",
-      },
-      { preservePermissionsWhenUsedOpsUnchanged: false },
-    );
-    expect(snapshot.permissions).toBeUndefined();
+    const input = {
+      analyzedAt: "2026-06-01T00:00:00.000Z",
+      usedOps: ["listOrgUsers"],
+      sdkVersion: "2.3.28-sdk.3",
+    };
+
+    expect(
+      buildGateSdkOperationsSnapshot(prev, input, { prunePermissions: true }).permissions,
+    ).toBeUndefined();
+    // Default is merge (NIM-42739): the drift check re-resolves on top of the stored set
+    // instead of expecting a set that would delete hand-declared grants once synced.
+    expect(buildGateSdkOperationsSnapshot(prev, input).permissions).toEqual(["org.read"]);
   });
 
   it("formatGatePermissionsDriftLines includes platform and local meta deltas", () => {

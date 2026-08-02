@@ -48,6 +48,11 @@ export async function analyzeFeatureGatePermissions(args: {
    * reusing fusebaseGateMeta.permissions when usedOps are unchanged.
    */
   alwaysResolvePermissions?: boolean;
+  /**
+   * Explicit prune: rebuild `fusebaseGateMeta.permissions` from static analysis alone.
+   * Default false — the snapshot is merged so hand-declared grants survive (NIM-42739).
+   */
+  prunePermissions?: boolean;
 }): Promise<FeatureGateAnalysisOutput> {
   const {
     projectRoot,
@@ -57,6 +62,7 @@ export async function analyzeFeatureGatePermissions(args: {
     throwOnResolveFailure,
     persistFusebaseJson = true,
     alwaysResolvePermissions = false,
+    prunePermissions = false,
   } = args;
 
   if (!feature.path) {
@@ -75,9 +81,7 @@ export async function analyzeFeatureGatePermissions(args: {
     usedOps: result.usedOps,
     sdkVersion: result.sdkVersion,
   };
-  const snapshotBuildOptions = alwaysResolvePermissions
-    ? { preservePermissionsWhenUsedOpsUnchanged: false as const }
-    : undefined;
+  const snapshotBuildOptions = { prunePermissions };
   let fusebaseSnapshot = persistFusebaseJson
     ? writeGateSdkOperationsToFusebaseJson(
         projectRoot,
@@ -94,9 +98,12 @@ export async function analyzeFeatureGatePermissions(args: {
         snapshotBuildOptions,
       );
 
-  const needsPermissionResolve = alwaysResolvePermissions
-    ? fusebaseSnapshot.usedOps.length > 0
-    : shouldResolveGatePermissions(fusebaseSnapshot);
+  // A prune drops the stored set, so it must re-resolve or the snapshot loses the
+  // analyzed permissions too.
+  const needsPermissionResolve =
+    alwaysResolvePermissions || prunePermissions
+      ? fusebaseSnapshot.usedOps.length > 0
+      : shouldResolveGatePermissions(fusebaseSnapshot);
 
   if (needsPermissionResolve) {
     if (!apiKey) {

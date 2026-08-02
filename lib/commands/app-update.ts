@@ -6,8 +6,10 @@ import { getConfig, loadFuseConfig } from "../config.ts";
 import {
   formatPermissionItem,
   mergeFeaturePermissions,
+  mergeSyncedGatePermissions,
   parsePermissions,
   parsePrincipals,
+  removeGatePrivilegesFromPermissions,
   seedPermissionsFromRemote,
 } from "../permissions.ts";
 import { resolveGateSyncPermissions } from "../sync-app-gate-permissions.ts";
@@ -21,6 +23,7 @@ export interface AppUpdateOptions {
   permissions?: string;
   syncGatePermissions?: boolean;
   declareBackendOnlyGatePermissions?: boolean;
+  pruneGatePermissions?: boolean;
 }
 
 export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions): Promise<void> {
@@ -58,6 +61,18 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     process.exit(1);
   }
 
+  if (options.pruneGatePermissions && !options.syncGatePermissions) {
+    console.error("Error: --prune-gate-permissions requires --sync-gate-permissions.");
+    process.exit(1);
+  }
+
+  if (options.pruneGatePermissions && options.permissions !== undefined) {
+    console.error(
+      "Error: --prune-gate-permissions cannot be combined with --permissions (one grants, the other revokes). Run them separately.",
+    );
+    process.exit(1);
+  }
+
   let accessPrincipals: AppAccessPrincipal[] | undefined;
   if (options.access !== undefined) {
     try {
@@ -88,6 +103,7 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     }
 
     let gatePermissions: string[] | undefined;
+    let prunedGatePrivileges: string[] = [];
     let backendOnlyGatePermissions: string[] | undefined;
     let backendOnlyDeclaredInFusebaseJson = false;
     if (options.syncGatePermissions) {
@@ -107,8 +123,18 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         featureConfig,
         appManifest: app.manifest,
         declareBackendOnlyGatePermissions: options.declareBackendOnlyGatePermissions,
+        pruneGatePermissions: options.pruneGatePermissions,
       });
-      gatePermissions = resolved.gatePermissions;
+      // Static analysis cannot see a hand-granted privilege, so the synced set is the
+      // union of both unless the caller explicitly prunes (NIM-42739).
+      const merged = mergeSyncedGatePermissions({
+        analyzedGatePermissions: resolved.gatePermissions,
+        storedPermissions: app.permissions,
+        backendOnlyGatePermissions: resolved.backendOnlyGatePermissions,
+        prune: options.pruneGatePermissions,
+      });
+      gatePermissions = merged.gatePermissions;
+      prunedGatePrivileges = merged.removed;
       backendOnlyGatePermissions = resolved.backendOnlyGatePermissions;
       backendOnlyDeclaredInFusebaseJson = resolved.backendOnlyDeclaredInFusebaseJson;
     }
@@ -160,6 +186,34 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       console.log(`  Permissions: ${updateRequest.permissions.items.length} item(s) configured`);
       for (const item of updateRequest.permissions.items) {
         console.log(`    - ${formatPermissionItem(item)}`);
+      }
+    }
+
+    if (options.pruneGatePermissions) {
+      if (prunedGatePrivileges.length === 0) {
+        console.log("  Prune: no Gate privileges outside the analyzed set.");
+      } else {
+        console.log(
+          `  Removed ${prunedGatePrivileges.length} Gate privilege(s): ${prunedGatePrivileges.join(", ")}`,
+        );
+        // The same privileges live in fusebase.json once granted, and deploy reconcile
+        // republishes from there — leaving them would re-grant on the next deploy.
+        const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
+        if (featureConfig?.permissions) {
+          try {
+            writeAppPermissionsToFusebaseJson(
+              resolve(process.cwd()),
+              appIdArg,
+              removeGatePrivilegesFromPermissions(featureConfig.permissions, prunedGatePrivileges),
+            );
+            console.log("  fusebase.json: apps[].permissions pruned");
+          } catch (error) {
+            console.warn(
+              `  Warning: could not prune permissions in fusebase.json (${error instanceof Error ? error.message : String(error)}). ` +
+                "`fusebase deploy` will re-grant them.",
+            );
+          }
+        }
       }
     }
 
@@ -235,7 +289,11 @@ export const appUpdateCommand = new Command("update")
   .argument("<appId>", "App ID to update")
   .option("--access <principals>", "Set access principals, comma-separated (e.g., visitor, org roles like orgRole:member, or portal principals portalClient/portalManager/portalMember)")
   .option("--permissions <permissions>", "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read;app_api.namespace.capability.read). Resource permissions replace the remote set; Gate privileges are added to it.")
-  .option("--sync-gate-permissions", "Analyze this app path and sync generated Gate permissions")
+  .option("--sync-gate-permissions", "Analyze this app path and sync generated Gate permissions. Merges with the privileges already granted on the app — nothing is removed without --prune-gate-permissions.")
+  .option(
+    "--prune-gate-permissions",
+    "Revoke Gate privileges that the analyzed set does not contain (e.g. a hand-granted app_api.* capability), listing every removal. Requires --sync-gate-permissions.",
+  )
   .option(
     "--declare-backend-only-gate-permissions",
     "Opt-in: declare app store permissions (isolated_store.*) as backend-only in manifest.backendOnlyGatePermissions instead of embedding them in the browser gst (gateway apps). Requires --sync-gate-permissions.",

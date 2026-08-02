@@ -1280,9 +1280,10 @@ function mergeGatePermissionStrings(
     return undefined;
   }
 
+  // Deduped: the same privilege can arrive from more than one source once the stored
+  // set is carried forward (NIM-42739).
   return sortGateUsedOps([
-    ...(resolvedPermissions ?? []),
-    ...(manualPermissions ?? []),
+    ...new Set([...(resolvedPermissions ?? []), ...(manualPermissions ?? [])]),
   ]);
 }
 
@@ -1309,16 +1310,20 @@ export interface GateSdkOperationsWriteInput {
   sdkVersion: string | null;
 }
 
+export interface GateSdkSnapshotBuildOptions {
+  /** Explicit prune: rebuild `permissions` from static analysis, dropping stored grants. */
+  prunePermissions?: boolean;
+}
+
 /**
  * Build a Gate SDK analyze snapshot in memory (same rules as fusebase.json writeback).
  */
 export function buildGateSdkOperationsSnapshot(
   prev: GateSdkOperationsSnapshot | undefined,
   input: GateSdkOperationsWriteInput,
-  options?: { preservePermissionsWhenUsedOpsUnchanged?: boolean },
+  options?: GateSdkSnapshotBuildOptions,
 ): GateSdkOperationsSnapshot {
-  const preservePermissionsWhenUsedOpsUnchanged =
-    options?.preservePermissionsWhenUsedOpsUnchanged !== false;
+  const prunePermissions = options?.prunePermissions === true;
   const usedSorted = sortGateUsedOps(input.usedOps);
 
   let usedOpsChangedAt: string;
@@ -1339,12 +1344,10 @@ export function buildGateSdkOperationsSnapshot(
   };
   const manualPermissions = prev?.manualPermissions;
 
-  if (
-    preservePermissionsWhenUsedOpsUnchanged &&
-    prev &&
-    gateUsedOpsEqual(prev.usedOps, usedSorted) &&
-    prev.permissions !== undefined
-  ) {
+  // The resolver only returns privileges inferable from `usedOps`, so clearing the stored
+  // set deletes every hand-declared grant with it. Carry it forward unless the caller
+  // explicitly prunes; resolved permissions are unioned on top (NIM-42739).
+  if (prev?.permissions !== undefined && !prunePermissions) {
     snapshot = {
       ...snapshot,
       permissions: mergeGatePermissionStrings(
@@ -1379,10 +1382,13 @@ export function applyResolvedPermissionsToGateSnapshot(
   permissions: string[],
   resolvedAt: string,
 ): GateSdkOperationsSnapshot {
-  const sorted = mergeGatePermissionStrings(
-    permissions,
-    snapshot.manualPermissions,
-  )!;
+  // `snapshot.permissions` is whatever buildGateSdkOperationsSnapshot carried forward:
+  // the previous set on a merge, nothing on an explicit prune. Resolved permissions are
+  // additive on top of it, so a hand-declared grant survives a re-resolve (NIM-42739).
+  const sorted = mergeGatePermissionStrings(permissions, [
+    ...(snapshot.manualPermissions ?? []),
+    ...(snapshot.permissions ?? []),
+  ])!;
   const permsChanged = !gatePermissionSetsEqual(snapshot.permissions, sorted);
   const nextPermissionsChangedAt = permsChanged
     ? resolvedAt
@@ -1411,7 +1417,7 @@ export function writeGateSdkOperationsToFusebaseJson(
   projectRoot: string,
   featureId: string,
   input: GateSdkOperationsWriteInput,
-  options?: { preservePermissionsWhenUsedOpsUnchanged?: boolean },
+  options?: GateSdkSnapshotBuildOptions,
 ): GateSdkOperationsSnapshot {
   const fuseJsonPath = join(projectRoot, "fusebase.json");
   if (!existsSync(fuseJsonPath)) {
