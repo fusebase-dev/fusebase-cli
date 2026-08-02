@@ -175,7 +175,7 @@ analyzeCommand
   )
   .option(
     "--prune-gate-permissions",
-    "With --write: rebuild permissions from static analysis alone, dropping stored grants it cannot infer (e.g. hand-declared app_api.*)",
+    "Requires --write: rebuild permissions from static analysis alone, dropping stored grants it cannot infer (e.g. hand-declared app_api.*)",
   )
   .action(
     async (opts: {
@@ -189,6 +189,11 @@ analyzeCommand
         console.error(
           "Error: No analysis mode selected. Use --operations (default: on).",
         );
+        process.exit(1);
+      }
+
+      if (opts.pruneGatePermissions === true && opts.write !== true) {
+        console.error("Error: --prune-gate-permissions requires --write.");
         process.exit(1);
       }
 

@@ -9,7 +9,7 @@ import {
 } from "./config";
 import assert from "assert";
 import { reconcileAppSecrets } from "./reconcile-secrets";
-import { mergeFeaturePermissions, mergeSyncedGatePermissions } from "./permissions";
+import { buildDeployPermissions } from "./permissions";
 
 export type AppPlatformState = Pick<App, "title" | "accessPrincipals" | "permissions" | "path" | "id" | "sub">;
 
@@ -236,19 +236,10 @@ async function applyAppUpdates(params: {
 
   const desiredTitle = appConfig.name;
   const desiredAccess = appConfig.access;
-  // Deploy publishes what fusebase.json can rebuild, which is never the whole picture: a
-  // privilege granted outside this project lives only on the app record. Merge the
-  // platform's own set in — an explicit `--prune-gate-permissions` has already removed it
-  // there, so a real revoke still sticks (NIM-42739).
-  const desiredPermissions = mergeFeaturePermissions({
+  const desiredPermissions = buildDeployPermissions({
     manualPermissions: appConfig.permissions,
-    existingPermissions: platformApp?.permissions,
-    gatePermissions: appConfig.fusebaseGateMeta?.permissions
-      ? mergeSyncedGatePermissions({
-          analyzedGatePermissions: appConfig.fusebaseGateMeta.permissions,
-          storedPermissions: platformApp?.permissions,
-        }).gatePermissions
-      : undefined,
+    gateMetaPermissions: appConfig.fusebaseGateMeta?.permissions,
+    platformPermissions: platformApp?.permissions,
   });
 
   const updateRequest: UpdateAppRequest = {};

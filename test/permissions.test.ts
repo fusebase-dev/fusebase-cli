@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import {
+  buildDeployPermissions,
   buildSyncedBackendOnlyGatePermissions,
   declareStorePermissionsBackendOnly,
   findUnknownGatePermissions,
@@ -891,5 +892,74 @@ describe("withTrustedRuntimeContextDelegatePermission", () => {
         false,
       ),
     ).toEqual(["isolated_store.read"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildDeployPermissions — what `fusebase deploy` publishes (NIM-42739)
+// ---------------------------------------------------------------------------
+
+describe("buildDeployPermissions", () => {
+  it("keeps a remote-only gate privilege when a local apps[] entry exists", () => {
+    const result = buildDeployPermissions({
+      manualPermissions: { items: [{ type: "gate", privileges: ["org.read"] }] },
+      gateMetaPermissions: ["org.read"],
+      platformPermissions: {
+        items: [
+          { type: "gate", privileges: ["app_api.tenancy.membership.read", "org.read"] },
+        ],
+      },
+    });
+
+    expect(result?.items).toEqual([
+      { type: "gate", privileges: ["app_api.tenancy.membership.read", "org.read"] },
+    ]);
+  });
+
+  it("replaces resource permissions from the local entry but keeps remote gate privileges", () => {
+    const result = buildDeployPermissions({
+      manualPermissions: {
+        items: [
+          { type: "dashboardView", resource: { dashboardId: "d2", viewId: "v2" }, privileges: ["read"] },
+        ],
+      },
+      gateMetaPermissions: ["org.read"],
+      platformPermissions: {
+        items: [
+          { type: "dashboardView", resource: { dashboardId: "d1", viewId: "v1" }, privileges: ["read"] },
+          { type: "gate", privileges: ["app_magic_link.write", "org.read"] },
+        ],
+      },
+    });
+
+    expect(result?.items).toEqual([
+      { type: "dashboardView", resource: { dashboardId: "d2", viewId: "v2" }, privileges: ["read"] },
+      { type: "gate", privileges: ["app_magic_link.write", "org.read"] },
+    ]);
+  });
+
+  it("keeps a remote resource-scoped gate item", () => {
+    const result = buildDeployPermissions({
+      gateMetaPermissions: ["org.read"],
+      platformPermissions: {
+        items: [
+          { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
+          { type: "gate", privileges: ["org.read"] },
+        ],
+      },
+    });
+
+    expect(result?.items).toEqual([
+      { type: "gate", resource: { kind: "portal", ids: ["p1"] }, privileges: ["portals.read"] },
+      { type: "gate", privileges: ["org.read"] },
+    ]);
+  });
+
+  it("leaves an app with no local permissions and no snapshot untouched", () => {
+    expect(
+      buildDeployPermissions({
+        platformPermissions: { items: [{ type: "gate", privileges: ["org.read"] }] },
+      }),
+    ).toBeUndefined();
   });
 });

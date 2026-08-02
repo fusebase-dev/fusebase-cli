@@ -270,10 +270,10 @@ Merge semantics differ per section:
 
 **Durability.** `app update --permissions` writes the resulting permission set back into the
 app's `apps[].permissions` entry in `fusebase.json`, and prints
-`fusebase.json: apps[].permissions updated`. That entry is the durable record: deploy reconcile
-rebuilds the app's permissions from `fusebase.json` alone, so a grant that exists only on the
-remote record is silently reverted by the next `fusebase deploy`. Commit the change. If the app
-is not declared in this project's `fusebase.json` the CLI warns and grants remotely only.
+`fusebase.json: apps[].permissions updated`. That entry is the durable record — the one thing that
+survives a checkout on another machine, where the remote record is the only other copy. Commit the
+change. If the app is not declared in this project's `fusebase.json` the CLI warns and grants
+remotely only.
 
 When the app has no `apps[].permissions` yet, the first grant **seeds** the entry from the remote
 record — otherwise writing it would narrow the app to just the new grant on the next deploy. Gate
@@ -290,10 +290,11 @@ Since NIM-42739 none of the sync paths drop a stored grant on their own:
 - `fusebase deploy` reconcile passes the platform's own permission set as the base, so a
   resource permission or resource-scoped gate item it cannot rebuild locally is left alone
 
-One gap remains: reconcile publishes `apps[].permissions` + `apps[].fusebaseGateMeta.permissions`
-as the app's **unscoped** gate set, so a privilege granted outside this project (platform UI, API)
-and recorded nowhere in `fusebase.json` is still replaced by the next `fusebase deploy`. Grant it
-with `app update --permissions` — that writes it into `apps[].permissions` and makes it durable.
+A Gate privilege granted outside this project (platform UI, API) and recorded nowhere in
+`fusebase.json` therefore survives a deploy too. What reconcile still **replaces** is the
+*resource* permissions (`dashboardView`, `database`): when `apps[].permissions` declares any, they
+win over the remote ones. And since nothing shrinks the gate set by itself,
+`--prune-gate-permissions` is the only revoke path.
 
 `app_magic_link.client_invite` cannot be granted this way: its action segment is outside the
 set the platform can mint into a token, so it fails the shape check.

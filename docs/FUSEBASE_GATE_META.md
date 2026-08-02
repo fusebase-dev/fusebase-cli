@@ -28,7 +28,7 @@ Options:
 | `--json` | off | Print machine-readable JSON (always includes the `fusebaseGateMeta` fields, plus `fusebaseSaved`). |
 | `--feature <featureId>` | off | Analyze only one app; otherwise analyze all configured apps with `path`. |
 | `--write` | off | Save the snapshot into `fusebase.json`. **Without it the command is read-only.** |
-| `--prune-gate-permissions` | off | With `--write`: rebuild `permissions` from static analysis alone, dropping stored grants it cannot infer. |
+| `--prune-gate-permissions` | off | Requires `--write`: rebuild `permissions` from static analysis alone, dropping stored grants it cannot infer. |
 
 ### Read-only by default
 

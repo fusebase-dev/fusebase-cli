@@ -597,6 +597,31 @@ export function mergeSyncedGatePermissions(params: {
       };
 }
 
+/**
+ * The permission set `fusebase deploy` publishes for one app. Deploy can only rebuild what
+ * `fusebase.json` records, so the platform's own set is merged in instead of replacing it —
+ * otherwise a privilege granted outside this project is revoked with no prompt and no output.
+ * A real revoke still sticks: `--prune-gate-permissions` already removed it from the app record.
+ */
+export function buildDeployPermissions(args: {
+  manualPermissions?: AppPermissions;
+  gateMetaPermissions?: string[];
+  platformPermissions?: AppPermissions;
+}): AppPermissions | undefined {
+  const { manualPermissions, gateMetaPermissions, platformPermissions } = args;
+
+  return mergeFeaturePermissions({
+    manualPermissions,
+    existingPermissions: platformPermissions,
+    gatePermissions: gateMetaPermissions
+      ? mergeSyncedGatePermissions({
+          analyzedGatePermissions: gateMetaPermissions,
+          storedPermissions: platformPermissions,
+        }).gatePermissions
+      : undefined,
+  });
+}
+
 /** Drop unscoped Gate privileges from a permission set (the explicit revoke path). */
 export function removeGatePrivilegesFromPermissions(
   permissions: AppPermissions,

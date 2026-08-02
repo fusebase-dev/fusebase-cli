@@ -125,11 +125,17 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         declareBackendOnlyGatePermissions: options.declareBackendOnlyGatePermissions,
         pruneGatePermissions: options.pruneGatePermissions,
       });
+      // A grant is written to both the app record and apps[].permissions, but either copy can
+      // exist alone — prune must see the union or it leaves one behind while reporting success,
+      // and deploy re-grants from the one it missed.
+      const storedPermissions: AppPermissions = {
+        items: [...(app.permissions?.items ?? []), ...(featureConfig.permissions?.items ?? [])],
+      };
       // Static analysis cannot see a hand-granted privilege, so the synced set is the
       // union of both unless the caller explicitly prunes (NIM-42739).
       const merged = mergeSyncedGatePermissions({
         analyzedGatePermissions: resolved.gatePermissions,
-        storedPermissions: app.permissions,
+        storedPermissions,
         backendOnlyGatePermissions: resolved.backendOnlyGatePermissions,
         prune: options.pruneGatePermissions,
       });
@@ -228,8 +234,8 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       }
     }
 
-    // Deploy reconcile rebuilds the permission set from fusebase.json alone, so a grant that
-    // only reached the remote record is reverted by the next `fusebase deploy` (NIM-42737).
+    // apps[].permissions is the durable record — the copy that survives a checkout elsewhere,
+    // where the remote record is the only other one (NIM-42737).
     if (permissions !== undefined) {
       const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
       // Writing this entry makes reconcile PATCH the app to match it, so seed it from the remote

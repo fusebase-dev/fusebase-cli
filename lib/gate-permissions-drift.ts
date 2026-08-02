@@ -3,7 +3,10 @@ import { join, resolve } from "node:path";
 import type { App } from "./api.ts";
 import type { FeatureConfig } from "./config.ts";
 import { analyzeFeatureGatePermissions } from "./gate-sdk-analyze.ts";
-import { splitGatePermissionStrings } from "./permissions.ts";
+import {
+  mergeSyncedGatePermissions,
+  splitGatePermissionStrings,
+} from "./permissions.ts";
 
 export const GATE_SDK_PACKAGE = "@fusebase/fusebase-gate-sdk";
 
@@ -21,8 +24,9 @@ export interface GatePermissionsDrift {
   sources: GatePermissionsDriftSource[];
   remoteAppMissing: boolean;
   publishedPermissions: string[];
+  /** Baseline for the local-meta comparison only: `fusebaseGateMeta` ∪ resolver. */
   expectedPermissions: string[];
-  /** Platform permission delta (published → expected). */
+  /** Platform permission delta (published → what a sync would publish). */
   platformAddedPermissions: string[];
   platformRemovedPermissions: string[];
   localMetaPermissions: string[];
@@ -56,6 +60,36 @@ export function sortedUniqueStrings(values: string[]): string[] {
 export function extractPublishedGateRuntimePermissions(app: App): string[] {
   const gateItem = app.permissions?.items?.find((item) => item.type === "gate");
   return sortedUniqueStrings(gateItem?.privileges ?? []);
+}
+
+/**
+ * Compare the app record against what `--sync-gate-permissions` would actually publish — not
+ * against the analyzed set. A hand-granted privilege lives on the app record and never in
+ * `fusebaseGateMeta`, so under merge semantics the sync keeps it; comparing against the analyzed
+ * set reports a removal that never happens and the default-yes sync prompt returns forever
+ * (NIM-42739).
+ */
+export function comparePlatformGatePermissions(args: {
+  analyzedGatePermissions: string[];
+  remoteApp?: App;
+}): { drift: boolean; published: string[]; syncWouldPublish: string[]; diff: StringSetDiff } {
+  const { analyzedGatePermissions, remoteApp } = args;
+  const published = remoteApp ? extractPublishedGateRuntimePermissions(remoteApp) : [];
+  const syncWouldPublish = sortedUniqueStrings(
+    splitGatePermissionStrings(
+      mergeSyncedGatePermissions({
+        analyzedGatePermissions,
+        storedPermissions: remoteApp?.permissions,
+      }).gatePermissions,
+    ).runtimePermissions,
+  );
+
+  return {
+    drift: remoteApp !== undefined && !gatePermissionSetsEqual(published, syncWouldPublish),
+    published,
+    syncWouldPublish,
+    diff: diffSortedStringSets(published, syncWouldPublish),
+  };
 }
 
 export function gatePermissionSetsEqual(a: string[], b: string[]): boolean {
@@ -178,13 +212,16 @@ export async function detectFeatureGatePermissionsDrift(args: {
   );
   const metaUsedOps = sortedUniqueStrings(feature.fusebaseGateMeta?.usedOps ?? []);
 
-  const publishedPermissions = remoteApp
-    ? extractPublishedGateRuntimePermissions(remoteApp)
-    : [];
+  // Platform and local-meta need different baselines: the sync merges, the fusebaseGateMeta
+  // refresh still replaces. Using the merged baseline for local-meta too would copy
+  // remote-only grants into the snapshot on the `Refresh fusebaseGateMeta` prompt.
+  const platform = comparePlatformGatePermissions({
+    analyzedGatePermissions: analysis.gatePermissions,
+    remoteApp,
+  });
+  const publishedPermissions = platform.published;
 
-  const platformDrift =
-    remoteApp !== undefined &&
-    !gatePermissionSetsEqual(publishedPermissions, expectedPermissions);
+  const platformDrift = platform.drift;
   const localMetaPermissionsDrift = !gatePermissionSetsEqual(
     localMetaPermissions,
     expectedPermissions,
@@ -196,10 +233,7 @@ export async function detectFeatureGatePermissionsDrift(args: {
     return null;
   }
 
-  const platformPermissionDiff = diffSortedStringSets(
-    publishedPermissions,
-    expectedPermissions,
-  );
+  const platformPermissionDiff = platform.diff;
   const localMetaPermissionDiff = diffSortedStringSets(
     localMetaPermissions,
     expectedPermissions,

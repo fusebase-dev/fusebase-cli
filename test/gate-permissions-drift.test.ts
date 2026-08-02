@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { buildGateSdkOperationsSnapshot } from "../lib/config.ts";
 import {
+  comparePlatformGatePermissions,
   diffSortedStringSets,
   extractPublishedGateRuntimePermissions,
   formatGatePermissionsDriftLines,
@@ -64,6 +65,49 @@ describe("gate-permissions-drift", () => {
     // Default is merge (NIM-42739): the drift check re-resolves on top of the stored set
     // instead of expecting a set that would delete hand-declared grants once synced.
     expect(buildGateSdkOperationsSnapshot(prev, input).permissions).toEqual(["org.read"]);
+  });
+
+  it("reports no platform drift once a merge-sync has published a hand-granted privilege", () => {
+    // The state a merge-sync leaves behind: the grant is on the app record, never in the meta.
+    // Comparing against the analyzed set alone reports a removal the sync never makes, so the
+    // default-yes sync prompt would come back on every SDK bump (NIM-42739).
+    const result = comparePlatformGatePermissions({
+      analyzedGatePermissions: ["org.read"],
+      remoteApp: {
+        id: "app1",
+        permissions: {
+          items: [
+            { type: "gate", privileges: ["app_api.tenancy.membership.read", "org.read"] },
+          ],
+        },
+      } as App,
+    });
+
+    expect(result.drift).toBe(false);
+    expect(result.diff.removed).toEqual([]);
+    expect(result.syncWouldPublish).toEqual([
+      "app_api.tenancy.membership.read",
+      "org.read",
+    ]);
+  });
+
+  it("still reports platform drift for a newly analyzed operation", () => {
+    const result = comparePlatformGatePermissions({
+      analyzedGatePermissions: ["org.members.read", "org.read"],
+      remoteApp: {
+        id: "app1",
+        permissions: { items: [{ type: "gate", privileges: ["org.read"] }] },
+      } as App,
+    });
+
+    expect(result.drift).toBe(true);
+    expect(result.diff.added).toEqual(["org.members.read"]);
+  });
+
+  it("reports no drift when the app is not on the platform", () => {
+    expect(
+      comparePlatformGatePermissions({ analyzedGatePermissions: ["org.read"] }).drift,
+    ).toBe(false);
   });
 
   it("formatGatePermissionsDriftLines includes platform and local meta deltas", () => {
