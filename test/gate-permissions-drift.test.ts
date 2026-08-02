@@ -104,6 +104,22 @@ describe("gate-permissions-drift", () => {
     expect(result.diff.added).toEqual(["org.members.read"]);
   });
 
+  it("counts a grant that only reached the local apps[] entry", () => {
+    const result = comparePlatformGatePermissions({
+      analyzedGatePermissions: ["org.read"],
+      remoteApp: {
+        id: "app1",
+        permissions: { items: [{ type: "gate", privileges: ["org.read"] }] },
+      } as App,
+      localPermissions: { items: [{ type: "gate", privileges: ["app_magic_link.write"] }] },
+    });
+
+    // The sync reads both copies, so the drift check has to as well or it reports nothing
+    // to do while the sync would publish one more privilege.
+    expect(result.drift).toBe(true);
+    expect(result.diff.added).toEqual(["app_magic_link.write"]);
+  });
+
   it("reports no drift when the app is not on the platform", () => {
     expect(
       comparePlatformGatePermissions({ analyzedGatePermissions: ["org.read"] }).drift,

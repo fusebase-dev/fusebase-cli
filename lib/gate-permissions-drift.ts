@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { App } from "./api.ts";
+import type { App, AppPermissions } from "./api.ts";
 import type { FeatureConfig } from "./config.ts";
 import { analyzeFeatureGatePermissions } from "./gate-sdk-analyze.ts";
 import {
@@ -72,14 +72,21 @@ export function extractPublishedGateRuntimePermissions(app: App): string[] {
 export function comparePlatformGatePermissions(args: {
   analyzedGatePermissions: string[];
   remoteApp?: App;
+  localPermissions?: AppPermissions;
 }): { drift: boolean; published: string[]; syncWouldPublish: string[]; diff: StringSetDiff } {
-  const { analyzedGatePermissions, remoteApp } = args;
+  const { analyzedGatePermissions, remoteApp, localPermissions } = args;
   const published = remoteApp ? extractPublishedGateRuntimePermissions(remoteApp) : [];
   const syncWouldPublish = sortedUniqueStrings(
     splitGatePermissionStrings(
       mergeSyncedGatePermissions({
         analyzedGatePermissions,
-        storedPermissions: remoteApp?.permissions,
+        // Same union the sync reads: a grant can sit in either copy alone.
+        storedPermissions: {
+          items: [
+            ...(remoteApp?.permissions?.items ?? []),
+            ...(localPermissions?.items ?? []),
+          ],
+        },
       }).gatePermissions,
     ).runtimePermissions,
   );
@@ -218,6 +225,7 @@ export async function detectFeatureGatePermissionsDrift(args: {
   const platform = comparePlatformGatePermissions({
     analyzedGatePermissions: analysis.gatePermissions,
     remoteApp,
+    localPermissions: feature.permissions,
   });
   const publishedPermissions = platform.published;
 

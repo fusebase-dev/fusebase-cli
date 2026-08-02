@@ -263,4 +263,25 @@ describe("--prune-gate-permissions is the explicit revoke path", () => {
     expect(permissionsWriteBacks.at(-1)!.permissions.items).toEqual([]);
     expect(analyzeCalls.at(-1)!.prunePermissions).toBe(true);
   });
+
+  it("prunes a privilege that exists only in the local apps[] entry", async () => {
+    reset();
+    remotePermissions = { items: [{ type: "gate", privileges: ["org.read"] }] };
+    localApp = {
+      id: "app-1",
+      path: "apps/x",
+      permissions: {
+        items: [{ type: "gate", privileges: ["app_magic_link.write"] }],
+      },
+    };
+
+    await runAppUpdate("app-1", {
+      syncGatePermissions: true,
+      pruneGatePermissions: true,
+    });
+
+    // Reading only the remote record reported "nothing to prune" and left this behind,
+    // so the next deploy re-granted it from fusebase.json.
+    expect(permissionsWriteBacks.at(-1)!.permissions.items).toEqual([]);
+  });
 });
