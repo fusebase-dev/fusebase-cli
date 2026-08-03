@@ -17,6 +17,7 @@ import { downloadToBytes } from "../lib/download-progress";
 import {
   fetchManifest,
   getBinaryUrl,
+  isDevVersion,
   resolveLatestVersion,
 } from "../lib/remote-version";
 import { LAUNCHER_VERSION } from "../lib/launcher-version";
@@ -100,7 +101,11 @@ async function runPreviousVersion(root: string, args: string[]): Promise<never> 
   const active = current?.version ?? (await enumerateVersions(root))[0];
   const previous = active ? await findPreviousVersion(root, active) : null;
   if (!previous) {
-    console.error("No previous version available.");
+    console.error(
+      active
+        ? `No previous CLI version is downloaded for the ${isDevVersion(active) ? "dev" : "prod"} channel.`
+        : "No CLI version is downloaded yet.",
+    );
     process.exit(1);
   }
   await log(root, `--previous-version: running ${previous}`);
@@ -182,6 +187,9 @@ async function main(): Promise<never> {
     }
 
     // Active binary missing or won't start → fall back to the previous version.
+    // Deliberately not channel-scoped, unlike `--previous-version`: this is the
+    // last resort before the CLI is unusable, so running the other channel's
+    // build beats running nothing. It is announced rather than silent.
     const fallback = selectFallbackVersion(await enumerateVersions(root), version);
     if (!fallback) {
       console.error(
@@ -189,6 +197,9 @@ async function main(): Promise<never> {
       );
       process.exit(1);
     }
+    console.error(
+      `The active CLI ${version} failed to start; running cached version ${fallback} instead.`,
+    );
     await log(
       root,
       `fallback: ${version} failed to start, running ${fallback} ` +
