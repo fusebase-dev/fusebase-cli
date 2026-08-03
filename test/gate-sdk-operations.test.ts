@@ -45,7 +45,13 @@ describe("writeGateSdkOperationsToFusebaseJson", () => {
     });
 
     expect(snap.usedOps).toEqual(["listOrgUsers", "listTokens"]);
-    expect(snap.permissions).toBeUndefined();
+    // Merge by default (NIM-42739): shrinking usedOps must not delete stored grants —
+    // the resolver refills only what it can infer, so clearing here wipes hand-declared ones.
+    expect(snap.permissions).toEqual([
+      "org.members.read",
+      "token.read",
+      "token.write",
+    ]);
     expect(snap.usedOpsChangedAt).toBe(analyzedAt);
 
     const raw = JSON.parse(readFileSync(fusebasePath, "utf-8")) as {
@@ -55,7 +61,19 @@ describe("writeGateSdkOperationsToFusebaseJson", () => {
       }>;
     };
     expect(raw.apps[0]?.fusebaseGateMeta.usedOps).toEqual(["listOrgUsers", "listTokens"]);
-    expect(raw.apps[0]?.fusebaseGateMeta.permissions).toBeUndefined();
+    expect(raw.apps[0]?.fusebaseGateMeta.permissions).toEqual([
+      "org.members.read",
+      "token.read",
+      "token.write",
+    ]);
+
+    const pruned = writeGateSdkOperationsToFusebaseJson(
+      dir,
+      "app-1",
+      { analyzedAt, usedOps: ["listOrgUsers", "listTokens"], sdkVersion: "1.0.0" },
+      { prunePermissions: true },
+    );
+    expect(pruned.permissions).toBeUndefined();
 
     rmSync(dir, { recursive: true });
   });
@@ -97,7 +115,16 @@ describe("writeGateSdkOperationsToFusebaseJson", () => {
     });
 
     expect(snap.usedOps).toEqual([]);
-    expect(snap.permissions).toBeUndefined();
+    expect(snap.permissions).toEqual(["token.read"]);
+
+    expect(
+      writeGateSdkOperationsToFusebaseJson(
+        dir,
+        "app-1",
+        { analyzedAt, usedOps: [], sdkVersion: "1.0.0" },
+        { prunePermissions: true },
+      ).permissions,
+    ).toBeUndefined();
 
     rmSync(dir, { recursive: true });
   });
@@ -193,7 +220,12 @@ describe("writeGateSdkOperationsToFusebaseJson", () => {
     });
 
     expect(snap.manualPermissions).toEqual(["isolated_store.rls.bypass"]);
-    expect(snap.permissions).toEqual(["isolated_store.rls.bypass"]);
+    // Previously resolved permissions are carried forward alongside the manual ones
+    // until the resolver (or an explicit prune) replaces them (NIM-42739).
+    expect(snap.permissions).toEqual([
+      "isolated_store.read",
+      "isolated_store.rls.bypass",
+    ]);
 
     const raw = JSON.parse(readFileSync(fusebasePath, "utf-8")) as {
       apps: Array<{
@@ -207,6 +239,7 @@ describe("writeGateSdkOperationsToFusebaseJson", () => {
       "isolated_store.rls.bypass",
     ]);
     expect(raw.apps[0]?.fusebaseGateMeta?.permissions).toEqual([
+      "isolated_store.read",
       "isolated_store.rls.bypass",
     ]);
 

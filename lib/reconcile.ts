@@ -9,7 +9,7 @@ import {
 } from "./config";
 import assert from "assert";
 import { reconcileAppSecrets } from "./reconcile-secrets";
-import { mergeFeaturePermissions } from "./permissions";
+import { buildDeployPermissions } from "./permissions";
 
 export type AppPlatformState = Pick<App, "title" | "accessPrincipals" | "permissions" | "path" | "id" | "sub">;
 
@@ -236,9 +236,10 @@ async function applyAppUpdates(params: {
 
   const desiredTitle = appConfig.name;
   const desiredAccess = appConfig.access;
-  const desiredPermissions = mergeFeaturePermissions({
+  const desiredPermissions = buildDeployPermissions({
     manualPermissions: appConfig.permissions,
-    gatePermissions: appConfig.fusebaseGateMeta?.permissions,
+    gateMetaPermissions: appConfig.fusebaseGateMeta?.permissions,
+    platformPermissions: platformApp?.permissions,
   });
 
   const updateRequest: UpdateAppRequest = {};

@@ -171,7 +171,11 @@ analyzeCommand
   )
   .option(
     "--write",
-    "Save the analyzed fusebaseGateMeta into fusebase.json, replacing the previous usedOps/permissions snapshot (read-only without this flag)",
+    "Save the analyzed fusebaseGateMeta into fusebase.json, replacing usedOps and merging permissions with the stored set (read-only without this flag)",
+  )
+  .option(
+    "--prune-gate-permissions",
+    "Requires --write: rebuild permissions from static analysis alone, dropping stored grants it cannot infer (e.g. hand-declared app_api.*)",
   )
   .action(
     async (opts: {
@@ -179,11 +183,17 @@ analyzeCommand
       json?: boolean;
       feature?: string;
       write?: boolean;
+      pruneGatePermissions?: boolean;
     }) => {
       if (opts.operations === false) {
         console.error(
           "Error: No analysis mode selected. Use --operations (default: on).",
         );
+        process.exit(1);
+      }
+
+      if (opts.pruneGatePermissions === true && opts.write !== true) {
+        console.error("Error: --prune-gate-permissions requires --write.");
         process.exit(1);
       }
 
@@ -206,6 +216,7 @@ analyzeCommand
             feature,
             apiKey,
             persistFusebaseJson: save,
+            prunePermissions: opts.pruneGatePermissions === true,
             onWarning: (message) => {
               if (!opts.json) {
                 console.error(`Warning: ${message}`);

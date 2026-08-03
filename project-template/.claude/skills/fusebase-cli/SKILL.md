@@ -274,7 +274,8 @@ Update settings for an existing app.
 
 - `--access <principals>` - Set access principals, comma-separated (e.g., `visitor`, `orgRole:member`, `visitor,orgRole:guest`)
 - `--permissions <permissions>` - Set dashboard view permissions (format: `dashboardView.dashboardId:viewId.read,write;...`). Entries that are Gate privileges instead — e.g. `app_api.<namespace>.<capability>.<action>` or `org.members.read` — are **added** to the app's Gate permissions rather than replacing them.
-- `--sync-gate-permissions` - Analyze Gate SDK calls in the app's runtime code and sync the detected operations as Gate permissions on the app. Required before an app that uses `@fusebase/fusebase-gate-sdk` can be considered fully published.
+- `--sync-gate-permissions` - Analyze Gate SDK calls in the app's runtime code and sync the detected operations as Gate permissions on the app. It **merges** with the privileges already granted, so a hand-granted capability such as `app_api.<ns>.<cap>.<action>` survives a sync. Required before an app that uses `@fusebase/fusebase-gate-sdk` can be considered fully published.
+- `--prune-gate-permissions` - Revoke Gate privileges outside the analyzed set. This is the only way to remove a granted privilege; it prints every removal and also prunes it from `fusebase.json` so the next deploy does not re-grant it. Requires `--sync-gate-permissions` and cannot be combined with `--permissions`.
 
 **Access Principals:**
 

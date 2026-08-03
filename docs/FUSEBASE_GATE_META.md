@@ -28,6 +28,7 @@ Options:
 | `--json` | off | Print machine-readable JSON (always includes the `fusebaseGateMeta` fields, plus `fusebaseSaved`). |
 | `--feature <featureId>` | off | Analyze only one app; otherwise analyze all configured apps with `path`. |
 | `--write` | off | Save the snapshot into `fusebase.json`. **Without it the command is read-only.** |
+| `--prune-gate-permissions` | off | Requires `--write`: rebuild `permissions` from static analysis alone, dropping stored grants it cannot infer. |
 
 ### Read-only by default
 
@@ -41,7 +42,13 @@ If you relied on `analyze gate` refreshing the snapshot in place, add `--write`:
 fusebase analyze gate --operations --feature <appId> --write
 ```
 
-Note that `--write` still replaces `usedOps`/`permissions` from the current analysis — put anything the analyzer cannot see into `manualPermissions` (preserved across writes) or grant it with `fusebase app update <appId> --permissions="..."`, which records it in `apps[].permissions`.
+`--write` replaces `usedOps`, but since NIM-42739 it **merges** `permissions` into the stored set instead of replacing them, so a hand-declared `app_api.*` survives a refresh. Use `--prune-gate-permissions` when you actually want the analyzed set alone:
+
+```bash
+fusebase analyze gate --operations --feature <appId> --write --prune-gate-permissions
+```
+
+**Skipping `--write` has a deploy consequence.** `fusebase deploy` reconcile feeds `fusebaseGateMeta.permissions` into the app's published permission set, so the snapshot is a deploy input and not only a local report. An "analyze → deploy" habit therefore publishes the *previously stored* grant set: a newly added SDK operation is under-granted until a `--write` or a `fusebase app update <appId> --sync-gate-permissions` refreshes the snapshot. The documented sync flow is unaffected.
 
 `fusebase app update --sync-gate-permissions` runs its own analyze and keeps writing the snapshot; it is unaffected by this flag.
 

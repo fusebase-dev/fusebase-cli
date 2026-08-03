@@ -544,6 +544,124 @@ function buildGatePermissionItems(
   return [{ type: "gate", privileges }];
 }
 
+/** Unscoped Gate privileges already stored on an app permission set. */
+export function readGatePrivilegesFromPermissions(
+  permissions: AppPermissions | undefined,
+): string[] {
+  return normalizeGatePermissionStrings(
+    (permissions?.items ?? [])
+      .filter(
+        (item): item is AppGatePermissionItem =>
+          item.type === "gate" && !item.resource,
+      )
+      .flatMap((item) => item.privileges),
+  );
+}
+
+/**
+ * The stored grant set every sync merges into. A grant is written to both the app record and
+ * `apps[].permissions`, but either copy can exist alone — a fresh checkout has the local one
+ * before its first deploy. Hand-building this union drifted apart across three call sites
+ * (NIM-42739): the drift check predicted a union while one sync still read the remote alone,
+ * so the default-yes sync prompt returned on every Gate-SDK bump.
+ */
+export function unionStoredPermissions(
+  ...sources: (AppPermissions | undefined)[]
+): AppPermissions {
+  return { items: sources.flatMap((source) => source?.items ?? []) };
+}
+
+/**
+ * Merge-by-default for `--sync-gate-permissions` (NIM-42739). Static analysis only
+ * returns privileges it can infer from Gate SDK usage, so replacing the stored set
+ * silently deletes every hand-granted one — prod lost `app_magic_link.write` and
+ * `app_api.tenancy.membership.read` this way. Pruning is the explicit opt-in.
+ */
+export function mergeSyncedGatePermissions(params: {
+  analyzedGatePermissions: string[];
+  storedPermissions?: AppPermissions;
+  backendOnlyGatePermissions?: string[];
+  prune?: boolean;
+}): { gatePermissions: string[]; removed: string[] } {
+  const {
+    analyzedGatePermissions,
+    storedPermissions,
+    backendOnlyGatePermissions = [],
+    prune = false,
+  } = params;
+  const analyzed = new Set(analyzedGatePermissions);
+  // Backend-only privileges move to the remote manifest rather than being revoked, so they
+  // are never merged back into the browser set nor reported as removals. The platform-fixed
+  // ones are subtracted unconditionally: a set stored by an older CLI can still hold
+  // `isolated_store.rls.bypass`, and merging would re-publish it into the browser gst.
+  const backendOnly = new Set([
+    ...backendOnlyGatePermissions,
+    ...BACKEND_ONLY_GATE_PERMISSIONS,
+  ]);
+  const extras = readGatePrivilegesFromPermissions(storedPermissions).filter(
+    (privilege) => !analyzed.has(privilege) && !backendOnly.has(privilege),
+  );
+
+  return prune
+    ? {
+        gatePermissions: normalizeGatePermissionStrings(analyzedGatePermissions),
+        removed: extras,
+      }
+    : {
+        gatePermissions: normalizeGatePermissionStrings([
+          ...analyzedGatePermissions,
+          ...extras,
+        ]),
+        removed: [],
+      };
+}
+
+/**
+ * The permission set `fusebase deploy` publishes for one app. Deploy can only rebuild what
+ * `fusebase.json` records, so the platform's own set is merged in instead of replacing it —
+ * otherwise a privilege granted outside this project is revoked with no prompt and no output.
+ * A real revoke still sticks: `--prune-gate-permissions` already removed it from the app record.
+ */
+export function buildDeployPermissions(args: {
+  manualPermissions?: AppPermissions;
+  gateMetaPermissions?: string[];
+  platformPermissions?: AppPermissions;
+}): AppPermissions | undefined {
+  const { manualPermissions, gateMetaPermissions, platformPermissions } = args;
+
+  return mergeFeaturePermissions({
+    manualPermissions,
+    existingPermissions: platformPermissions,
+    gatePermissions: gateMetaPermissions
+      ? mergeSyncedGatePermissions({
+          analyzedGatePermissions: gateMetaPermissions,
+          storedPermissions: platformPermissions,
+        }).gatePermissions
+      : undefined,
+  });
+}
+
+/** Drop unscoped Gate privileges from a permission set (the explicit revoke path). */
+export function removeGatePrivilegesFromPermissions(
+  permissions: AppPermissions,
+  privilegesToRemove: string[],
+): AppPermissions {
+  const removed = new Set(privilegesToRemove);
+
+  const items = permissions.items.flatMap((item): AppPermissionItem[] => {
+    if (item.type !== "gate" || item.resource) {
+      return [item];
+    }
+
+    const privileges = item.privileges.filter(
+      (privilege) => !removed.has(privilege),
+    );
+    return privileges.length > 0 ? [{ ...item, privileges }] : [];
+  });
+
+  return { items };
+}
+
 export function mergeFeaturePermissions(args: {
   manualPermissions?: AppPermissions;
   existingPermissions?: AppPermissions;
@@ -577,20 +695,46 @@ export function mergeFeaturePermissions(args: {
     ? manualResourceItems
     : existingItems.filter((item) => item.type !== "gate");
 
+  const existingGateItems = existingItems.filter(
+    (item): item is AppGatePermissionItem => item.type === "gate",
+  );
+  // A resolved Gate set replaces the unscoped item only. Scoped items carry a
+  // `resource` static analysis never produces, so rebuilding over them revokes a
+  // resource grant nothing can restore (NIM-42739).
   const gateItems =
     gatePermissions === undefined
-      ? existingItems.filter(
-          (item): item is AppGatePermissionItem => item.type === "gate",
-        )
-      : buildGatePermissionItems(gatePermissions);
+      ? existingGateItems
+      : [
+          ...existingGateItems.filter((item) => item.resource),
+          ...buildGatePermissionItems(gatePermissions),
+        ];
 
   return {
     items: [
       ...resourceItems,
-      ...manualScopedGateItems,
-      ...addGatePrivileges(gateItems, manualGatePrivileges),
+      ...dedupeGateItems([
+        ...manualScopedGateItems,
+        ...addGatePrivileges(gateItems, manualGatePrivileges),
+      ]),
     ],
   };
+}
+
+/** Manual and existing permissions overlap once both are read; keep one of each item. */
+function dedupeGateItems(items: AppGatePermissionItem[]): AppGatePermissionItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = JSON.stringify([
+      item.resource?.kind ?? null,
+      [...(item.resource?.ids ?? [])].sort(),
+      [...item.privileges].sort(),
+    ]);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
