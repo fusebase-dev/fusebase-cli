@@ -305,7 +305,7 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
 export const appUpdateCommand = new Command("update")
   .description("Update an app's settings")
   .argument("<appId>", "App ID to update")
-  .option("--access <principals>", "Set access principals, comma-separated (e.g., visitor, org roles like orgRole:member, or portal principals portalClient/portalManager/portalMember)")
+  .option("--access <principals>", "Set access principals, comma-separated (e.g., visitor, org roles like orgRole:member, or portal principals portalClient/portalManager/portalMember). REPLACES the whole list — run 'app get <appId>' first to see the current one")
   .option("--permissions <permissions>", "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read;app_api.namespace.capability.read). Resource permissions replace the remote set; Gate privileges are added to it.")
   .option("--sync-gate-permissions", "Analyze this app path and sync generated Gate permissions. Merges with the privileges already granted on the app — nothing is removed without --prune-gate-permissions.")
   .option(

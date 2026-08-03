@@ -279,7 +279,25 @@ Update settings for an existing app.
 
 **Access Principals:**
 
-The `--access` option replaces the entire access principal list. Principals are comma-separated entries of the form `type` or `type:id`:
+The `--access` option **replaces the entire access principal list**. **Always run
+`fusebase app get <appId>` first** — it is read-only and prints the current
+principals in the same syntax, so you can see what the overwrite would drop
+instead of silently locking people (or production) out. Add `--json` for the
+raw payload when you want to snapshot the grants first.
+
+```bash
+fusebase app get аgjg851jguanadi41
+#   My App
+#     ID:   аgjg851jguanadi41
+#     URL:  https://.../my-app
+#     Access: visitor, orgRole:member
+```
+
+If that output carries a `!` line, the app has principals `--access` cannot
+express (`user:<id>`, `orgGroup:<id>`, granted from the UI). Running
+`app update --access` at all would revoke them — change those grants in the UI.
+
+Principals are comma-separated entries of the form `type` or `type:id`:
 
 | Principal      | Example          | Description                                                                                  |
 | -------------- | ---------------- | -------------------------------------------------------------------------------------------- |

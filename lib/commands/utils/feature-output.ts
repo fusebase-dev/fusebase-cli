@@ -1,4 +1,5 @@
-import type { App, AppPermissionItem } from "../../api.ts";
+import type { App, AppAccessPrincipal, AppPermissionItem } from "../../api.ts";
+import { parsePrincipals } from "../../permissions.ts";
 import type { AppPermissionItemEnriched } from "./get-feature-resources-info.ts";
 
 interface PrintFeatureOptions {
@@ -95,6 +96,49 @@ function printPermissionTable(rows: PermissionRow[]): void {
   }
 }
 
+/**
+ * Render a principal in the same syntax `--access` accepts, so the output of
+ * `app get` can be pasted straight back into `app update --access` without
+ * having to guess the current grants.
+ *
+ * Some principals the platform stores (`user:<id>`, `orgGroup:<id>`, granted
+ * from the UI) cannot be authored by the CLI at all — they are still shown,
+ * but `printFeature` warns that re-applying the line would drop them.
+ */
+export function formatAccessPrincipal(principal: AppAccessPrincipal): string {
+  // `visitor` is stored with the sentinel id "0"; portal principals are
+  // context-relative and carry no id. Both are written bare.
+  if (!principal.id || (principal.type === "visitor" && principal.id === "0")) {
+    return principal.type;
+  }
+
+  return `${principal.type}:${principal.id}`;
+}
+
+export function formatAccessPrincipals(principals?: AppAccessPrincipal[]): string {
+  if (!principals || principals.length === 0) {
+    return "none";
+  }
+
+  return principals.map(formatAccessPrincipal).join(", ");
+}
+
+/**
+ * Principals `--access` cannot express. Asking the parser instead of keeping a
+ * second list of types means this can never drift from what `app update`
+ * actually accepts.
+ */
+export function findUnauthorableAccessPrincipals(principals?: AppAccessPrincipal[]): string[] {
+  return (principals ?? []).map(formatAccessPrincipal).filter((rendered) => {
+    try {
+      parsePrincipals(rendered);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+}
+
 export function printFeature(
   feature: App,
   options: PrintFeatureOptions = {},
@@ -103,6 +147,12 @@ export function printFeature(
   console.log(`  ${feature.title}`);
   console.log(`    ID:   ${feature.id}`);
   console.log(`    URL:  ${feature.url}`);
+  console.log(`    Access: ${formatAccessPrincipals(feature.accessPrincipals)}`);
+
+  const unauthorable = findUnauthorableAccessPrincipals(feature.accessPrincipals);
+  if (unauthorable.length > 0) {
+    console.log(`            ! 'app update --access' cannot express: ${unauthorable.join(", ")} — running it would revoke that access.`);
+  }
 
   if (options.includeResourceAccess) {
     printPermissionTable(getPermissionRows(feature, helpData.featurePermissionsData));
