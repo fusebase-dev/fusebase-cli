@@ -7,7 +7,7 @@ import {
   readdir,
   mkdir,
   cp,
-  constants,
+  rm,
 } from "fs/promises";
 import { join, dirname, basename } from "path";
 import { homedir } from "os";
@@ -171,6 +171,26 @@ async function ensureRequiredMcpEnvKeys(options: { targetDir: string }): Promise
 async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Probe a directory with a real write. `access(dir, W_OK)` only reflects the
+ * read-only attribute on Windows, so it passes for ACL-protected locations such
+ * as `C:\Program Files` and the failure only surfaces later, deep inside zip
+ * extraction, as a misleading `ENOENT: chmod` (NIM-42970).
+ */
+export async function isDirWritable(dir: string): Promise<boolean> {
+  // Keep the leading dot: if the process is killed before the cleanup below, the
+  // leftover file must stay invisible to isDirectoryEmpty() so the next run still
+  // copies the template.
+  const probePath = join(dir, `.fusebase-write-check-${process.pid}`);
+  try {
+    await writeFile(probePath, "");
+    await rm(probePath, { force: true });
     return true;
   } catch {
     return false;
@@ -525,11 +545,12 @@ export const initCommand = new Command("init")
       const fuseJsonPath = join(cwd, FUSE_JSON);
 
       // Check if current directory is writable
-      try {
-        await access(cwd, constants.W_OK);
-      } catch {
+      if (!(await isDirWritable(cwd))) {
         console.error(
-          "Current directory is not writable. Make sure you created a directory for your application and navigated to it.",
+          `Current directory is not writable: ${cwd}\n` +
+            "Make sure you created a directory for your application and navigated to it. " +
+            'On Windows, avoid protected locations such as "C:\\Program Files" — ' +
+            "use a folder under your user profile (e.g. Documents).",
         );
         process.exit(1);
       }
