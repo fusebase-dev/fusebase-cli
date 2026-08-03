@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
@@ -83,6 +83,29 @@ describe("enumerate / previous / prune", () => {
     expect(await findPreviousVersion(root, "0.25.6")).toBeNull();
   });
 
+  it("findPreviousVersion skips a dev folder that outranks the prod versions", async () => {
+    await seedVersion("0.27.0");
+    await seedVersion("0.28.0");
+    await seedVersion("2026.072918.1744");
+    expect(await findPreviousVersion(root, "0.28.0")).toBe("0.27.0");
+  });
+
+  it("findPreviousVersion prefers the previous dev build when active is a dev build", async () => {
+    await seedVersion("0.28.0");
+    await seedVersion("2026.072918.1744");
+    await seedVersion("2026.080110.0912");
+    expect(await findPreviousVersion(root, "2026.080110.0912")).toBe(
+      "2026.072918.1744",
+    );
+  });
+
+  it("findPreviousVersion never falls back to the other channel", async () => {
+    await seedVersion("0.28.0");
+    await seedVersion("2026.072918.1744");
+    expect(await findPreviousVersion(root, "2026.072918.1744")).toBeNull();
+    expect(await findPreviousVersion(root, "0.28.0")).toBeNull();
+  });
+
   it("pruneToTwo keeps exactly {active, previous} and deletes older", async () => {
     await seedVersion("0.25.3");
     await seedVersion("0.25.4");
@@ -92,6 +115,67 @@ describe("enumerate / previous / prune", () => {
     await pruneToTwo(root, "0.25.6");
 
     expect((await readdir(versionsDir(root))).sort()).toEqual(["0.25.5", "0.25.6"]);
+  });
+
+  it("pruneToTwo clears a leftover dev folder from a prod cache", async () => {
+    // Pavel's cache: the dev folder sorts above every 0.x, so pre-fix it took the
+    // `previous` slot and the prune targeted the running 0.27.0 (EACCES on Windows).
+    await seedVersion("0.27.0");
+    await seedVersion("0.28.0");
+    await seedVersion("2026.072918.1744");
+
+    await pruneToTwo(root, "0.28.0", "0.27.0");
+
+    expect((await readdir(versionsDir(root))).sort()).toEqual(["0.27.0", "0.28.0"]);
+  });
+
+  it("pruneToTwo keeps the running version when it is not the retained previous", async () => {
+    // Channel switch: running a prod build while updating to dev, so `previous`
+    // is the older dev folder and the live 0.28.0 .exe is neither active nor previous.
+    await seedVersion("0.28.0");
+    await seedVersion("2026.072918.1744");
+    await seedVersion("2026.080110.0912");
+
+    await pruneToTwo(root, "2026.080110.0912", "0.28.0");
+
+    expect((await readdir(versionsDir(root))).sort()).toEqual([
+      "0.28.0",
+      "2026.072918.1744",
+      "2026.080110.0912",
+    ]);
+  });
+
+  it("pruneToTwo prunes the previously running version once it is not running", async () => {
+    await seedVersion("0.27.0");
+    await seedVersion("0.28.0");
+    await seedVersion("0.29.0");
+
+    await pruneToTwo(root, "0.29.0", "0.28.0");
+
+    expect((await readdir(versionsDir(root))).sort()).toEqual(["0.28.0", "0.29.0"]);
+  });
+
+  it("pruneToTwo survives an undeletable folder and prunes the rest", async () => {
+    await seedVersion("0.25.3");
+    await seedVersion("0.25.4");
+    await seedVersion("0.25.5");
+    await seedVersion("0.25.6");
+    // Stand-in for the Windows image lock: rm throws EACCES on one folder.
+    // Injected rather than simulated with chmod, which root would bypass.
+    const remove = async (dir: string) => {
+      if (dir.endsWith("0.25.3")) {
+        throw new Error("EACCES: permission denied");
+      }
+      await rm(dir, { recursive: true, force: true });
+    };
+
+    await pruneToTwo(root, "0.25.6", undefined, remove);
+
+    expect((await readdir(versionsDir(root))).sort()).toEqual([
+      "0.25.3",
+      "0.25.5",
+      "0.25.6",
+    ]);
   });
 });
 

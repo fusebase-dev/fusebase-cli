@@ -33,7 +33,14 @@ versioning model, and the developer rollout workflow.
   stored. The "previous" version is found by enumerating `versions\` (the folder
   that isn't active), which is why downloads are **staged** (written to a staging
   dir and moved in only on completion) so `versions\` never holds a partial folder.
-- Retention is `{active, previous}` total — not per channel.
+- "Previous" is the newest cached folder that isn't active **and is on the same
+  channel as active** (channel = `isDevVersion`: a dev build is a timestamp
+  version, major segment `>= 2026`; prod is `0.x`). A folder from the other
+  channel is never used as previous — dev builds sort above every `0.x`, so
+  without the channel filter a leftover dev folder would hold the previous slot
+  forever and the real previous prod version would be pruned on every update.
+  After a channel switch there is no previous version for the new channel, and
+  `--previous-version` says so instead of silently running the other channel.
 - Temporary rollout guard: if `current.json` points at a known legacy Windows CLI
   and the user runs ordinary `fusebase update`, the launcher delegates that same
   command to a cached launcher-aware CLI instead of running the legacy updater.
@@ -118,8 +125,13 @@ launcher is refreshed).
   `fusebase <cmd>` finds an empty cache → the launcher **bootstraps** the latest
   CLI for the active channel, then runs it.
 - **`fusebase update`** — cache swap: download the CLI bin to staging → move into
-  `versions\<new>\` → atomically flip `current.json` → prune to two. Reports
+  `versions\<new>\` → atomically flip `current.json` → prune the cache down to
+  `{active, previous}` plus the running version. Reports
   `FuseBase CLI updated from <old> to <new>.` No elevation, no installer, no exit.
+  Prune never deletes the folder the running `.exe` lives in (Windows keeps it
+  locked for the process lifetime); it is removed by the next update. A folder
+  that still cannot be removed is warned about, not treated as a failed update —
+  the version flip has already committed.
   During the legacy prod rollout window, if the active cached CLI is known legacy,
   the launcher first redirects this command to a cached launcher-aware CLI so the
   cache-swap updater owns the operation.
@@ -127,8 +139,16 @@ launcher is refreshed).
   installer and runs it elevated (UAC) to replace the launcher in Program Files.
   Windows-only; a no-op on macOS/Linux.
 - **`fusebase --previous-version`** — launcher-intercepted (before exec); runs the
-  retained previous cached version for that one invocation. Escape hatch during a
-  breaking-launcher block or a bad new version. Graceful error if no previous exists.
+  retained previous cached version **of the active channel** for that one
+  invocation. Escape hatch during a breaking-launcher block or a bad new version.
+  If that channel has no previous version cached it exits non-zero with
+  *"No previous CLI version is downloaded for the &lt;prod|dev&gt; channel."*
+  (or *"No CLI version is downloaded yet."* when the cache is empty).
+- **Crash fallback** — if the *active* binary is missing or won't start, the
+  launcher runs the newest other cached version. This one is **not**
+  channel-scoped, unlike `--previous-version`: it is the last resort before the
+  CLI is unusable, so running the other channel's build beats running nothing.
+  It prints which version it fell back to, so it is never silent.
 - **Self-reject message** — after a breaking bump, non-allowlisted commands print
   *"Your launcher is too old for this CLI version. Run `fusebase update --launcher`."*
   followed by a second line noting `--previous-version` as a stopgap while urging a

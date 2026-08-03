@@ -2,7 +2,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "fs/promis
 import { homedir } from "os";
 import { join } from "path";
 
-import { compareVersions } from "./remote-version";
+import { compareVersions, isDevVersion } from "./remote-version";
 
 /**
  * Windows versioned CLI cache (`%LOCALAPPDATA%\FuseBase\CLI\`).
@@ -121,19 +121,56 @@ export async function enumerateVersions(root: string): Promise<string[]> {
   return present.sort((a, b) => compareVersions(b, a));
 }
 
-/** The retained previous version (newest cached folder that isn't `active`), or null. */
+/**
+ * The retained previous version — newest cached folder that isn't `active` and is
+ * on the **same channel** as `active` — or null when the channel has only one
+ * cached version.
+ *
+ * Channel-scoped because a dev build sorts above every `0.x` prod version, so a
+ * leftover dev folder would otherwise hold the previous slot forever — pinning
+ * `--previous-version` to a stale dev build and pruning the real previous prod
+ * version on every update (NIM-42951). A folder from the other channel is never
+ * returned: after a channel switch `--previous-version` says no previous version
+ * is downloaded for this channel rather than silently running the other one.
+ */
 export async function findPreviousVersion(
   root: string,
   active: string,
 ): Promise<string | null> {
-  const others = (await enumerateVersions(root)).filter((v) => v !== active);
-  return others[0] ?? null;
+  const versions = await enumerateVersions(root);
+  return (
+    versions.find(
+      (v) => v !== active && isDevVersion(v) === isDevVersion(active),
+    ) ?? null
+  );
 }
 
-/** Keeps only `{active, previous}` cached; deletes any older version folders. */
-export async function pruneToTwo(root: string, active: string): Promise<void> {
+/**
+ * Keeps `{active, previous}` plus the running version cached; deletes the rest.
+ *
+ * `running` is the version whose `.exe` is the live process image. Windows keeps
+ * that file memory-mapped, so deleting its folder fails with EACCES — and it is
+ * not always the retained `previous` (after a channel switch the running build
+ * is on the other channel, so `previous` is a same-channel folder instead). It
+ * is kept here and pruned by the next update, when nothing runs from it. Cleanup
+ * is best-effort:
+ * a folder that cannot be removed is reported, never fatal — the version flip
+ * has already committed by this point (NIM-42951).
+ *
+ * `remove` is injected only by tests, to make an undeletable folder deterministic
+ * rather than dependent on the runner's uid.
+ */
+export async function pruneToTwo(
+  root: string,
+  active: string,
+  running?: string,
+  remove: (dir: string) => Promise<void> = (dir) =>
+    rm(dir, { recursive: true, force: true }),
+): Promise<void> {
   const previous = await findPreviousVersion(root, active);
-  const keep = new Set([active, previous].filter((v): v is string => Boolean(v)));
+  const keep = new Set(
+    [active, previous, running].filter((v): v is string => Boolean(v)),
+  );
   let entries: string[];
   try {
     entries = await readdir(versionsDir(root));
@@ -141,8 +178,12 @@ export async function pruneToTwo(root: string, active: string): Promise<void> {
     return;
   }
   for (const name of entries) {
-    if (!keep.has(name)) {
-      await rm(join(versionsDir(root), name), { recursive: true, force: true });
+    if (keep.has(name)) continue;
+    const dir = join(versionsDir(root), name);
+    try {
+      await remove(dir);
+    } catch (err) {
+      console.warn(`⚠ Could not remove old CLI version ${dir}: ${String(err)}`);
     }
   }
 }

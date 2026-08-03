@@ -269,7 +269,8 @@ async function applyPosixUpdate(version: string, data: ArrayBuffer): Promise<voi
 
 /**
  * Core Windows cache swap (injectable for tests): stage the new bin into
- * `versions\<new>\`, atomically flip `current.json`, prune to two. Never touches
+ * `versions\<new>\`, atomically flip `current.json`, prune the cache down to
+ * `{active, previous}` plus the running version. Never touches
  * the running binary; the new version takes effect on the next invocation.
  */
 export async function runWindowsCacheSwap(
@@ -284,7 +285,7 @@ export async function runWindowsCacheSwap(
     version: newVersion,
     updatedAt: new Date().toISOString(),
   });
-  await pruneToTwo(root, newVersion);
+  await pruneToTwo(root, newVersion, oldVersion);
   console.log(`✓ FuseBase CLI updated from ${oldVersion} to ${newVersion}.`);
 }
 
