@@ -58,6 +58,7 @@ function getAnalyzableFeatures(
 function printFeatureScopedResult(
   analysis: FeatureGateAnalysisOutput,
   json: boolean,
+  saved: boolean,
 ): void {
   if (json) return;
 
@@ -65,11 +66,15 @@ function printFeatureScopedResult(
   console.log(`Path: ${analysis.featurePath}`);
   console.log("");
   printGateOperationsResult(analysis.result, false, {
-    fusebaseSaved: true,
+    fusebaseSaved: saved,
     fusebaseSnapshot: analysis.fusebaseSnapshot,
   });
   console.log("");
-  console.log(`✓ fusebaseGateMeta saved to feature ${analysis.featureId} in fusebase.json`);
+  console.log(
+    saved
+      ? `✓ fusebaseGateMeta saved to feature ${analysis.featureId} in fusebase.json`
+      : `fusebase.json not modified (analyze is read-only). Re-run with --write to save fusebaseGateMeta.`,
+  );
 }
 
 function printFeatureScopedAppApiResult(
@@ -164,8 +169,17 @@ analyzeCommand
     "--feature <featureId>",
     "Analyze only one feature from fusebase.json; otherwise analyze all configured features",
   )
+  .option(
+    "--write",
+    "Save the analyzed fusebaseGateMeta into fusebase.json, replacing the previous usedOps/permissions snapshot (read-only without this flag)",
+  )
   .action(
-    async (opts: { operations?: boolean; json?: boolean; feature?: string }) => {
+    async (opts: {
+      operations?: boolean;
+      json?: boolean;
+      feature?: string;
+      write?: boolean;
+    }) => {
       if (opts.operations === false) {
         console.error(
           "Error: No analysis mode selected. Use --operations (default: on).",
@@ -184,12 +198,14 @@ analyzeCommand
         const features = getAnalyzableFeatures(fuseConfig.apps, opts.feature);
         const analyses: FeatureGateAnalysisOutput[] = [];
         const apiKey = getConfig().apiKey;
+        const save = opts.write === true;
 
         for (const feature of features) {
           const analysis = await analyzeFeatureGatePermissions({
             projectRoot,
             feature,
             apiKey,
+            persistFusebaseJson: save,
             onWarning: (message) => {
               if (!opts.json) {
                 console.error(`Warning: ${message}`);
@@ -221,7 +237,7 @@ analyzeCommand
                   ...(analysis.fusebaseSnapshot.permissions && {
                     permissions: analysis.fusebaseSnapshot.permissions,
                   }),
-                  fusebaseSaved: true,
+                  fusebaseSaved: save,
                 },
                 null,
                 2,
@@ -247,7 +263,7 @@ analyzeCommand
                     ...(analysis.fusebaseSnapshot.permissions && {
                       permissions: analysis.fusebaseSnapshot.permissions,
                     }),
-                    fusebaseSaved: true,
+                    fusebaseSaved: save,
                   })),
                 },
                 null,
@@ -262,7 +278,7 @@ analyzeCommand
           if (index > 0) {
             console.log("");
           }
-          printFeatureScopedResult(analysis, false);
+          printFeatureScopedResult(analysis, false, save);
         }
       } catch (e) {
         console.error(

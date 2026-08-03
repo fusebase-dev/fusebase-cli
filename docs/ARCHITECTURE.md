@@ -162,7 +162,7 @@ program.addCommand(devCommand)    // from lib/commands/dev.ts
    - Fields: `orgId`, `productId`, `env?`, `apps[]`
    - Optional per-app field: `apps[].fusebaseGateMeta` — Gate SDK operation scan + resolved permissions (see [Fusebase Gate meta](FUSEBASE_GATE_META.md))
    - Read via: `loadFuseConfig()`
-   - Written by: `fusebase init`, `fusebase app create`, `fusebase analyze gate`
+   - Written by: `fusebase init`, `fusebase app create`, `fusebase analyze gate --write`
 
 3. **Environment Variables**:
    - `ENV`: Set to `"dev"` to use dev API endpoints

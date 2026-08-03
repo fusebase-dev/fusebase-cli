@@ -131,7 +131,7 @@ export async function maybePromptGatePermissionsSyncAfterSdkUpdate(
     if (!options.isTty) {
       console.log("");
       console.log(
-        "Run `fusebase analyze gate --operations --feature <id>` to refresh fusebaseGateMeta.",
+        "Run `fusebase analyze gate --operations --feature <id> --write` to refresh fusebaseGateMeta.",
       );
       return result;
     }
@@ -142,7 +142,7 @@ export async function maybePromptGatePermissionsSyncAfterSdkUpdate(
     });
     if (!shouldRefreshMeta) {
       console.log(
-        "Skipped. Run `fusebase analyze gate --operations --feature <id>` when ready.",
+        "Skipped. Run `fusebase analyze gate --operations --feature <id> --write` when ready.",
       );
       return result;
     }

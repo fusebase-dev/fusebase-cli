@@ -1052,7 +1052,7 @@ function readFeatureAppApiDependenciesMetaFromFeatureRaw(
 }
 
 /** Read one Gate snapshot object from parsed JSON; supports legacy `changedAt`, `used`, `requiredPermissions`. */
-function readGateSdkSnapshotFromRaw(
+export function readGateSdkSnapshotFromRaw(
   raw: unknown,
 ): GateSdkOperationsSnapshot | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -1602,6 +1602,32 @@ export function upsertManualAppApiDependencyInFusebaseJson(
     snapshot,
     added: !alreadyPresent,
   };
+}
+
+/**
+ * Read the stored Gate analyze snapshot for one app straight from fusebase.json,
+ * using the same lookup as the writeback (so legacy project-level `fusebaseGateMeta`
+ * and nested `gateSdkOperations` are still found). Returns undefined when the file
+ * is missing/unparsable or the app has no snapshot.
+ */
+export function readGateSdkOperationsFromFusebaseJson(
+  projectRoot: string,
+  featureId: string,
+): GateSdkOperationsSnapshot | undefined {
+  const fuseJsonPath = join(projectRoot, "fusebase.json");
+  if (!existsSync(fuseJsonPath)) return undefined;
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(readFileSync(fuseJsonPath, "utf-8")) as Record<
+      string,
+      unknown
+    >;
+  } catch {
+    return undefined;
+  }
+  normalizeRawFuseConfigShape(raw);
+  rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
+  return readPreviousGateSnapshotForFeature(raw, featureId);
 }
 
 /**

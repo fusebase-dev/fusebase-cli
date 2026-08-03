@@ -25,18 +25,35 @@ Options:
 | Option | Default | Meaning |
 |--------|---------|--------|
 | `--operations` | `true` | Run the Gate SDK scan (only mode implemented today). |
-| `--json` | off | Print machine-readable JSON (includes `fusebaseGateMeta` fields when saved). |
+| `--json` | off | Print machine-readable JSON (always includes the `fusebaseGateMeta` fields, plus `fusebaseSaved`). |
 | `--feature <featureId>` | off | Analyze only one app; otherwise analyze all configured apps with `path`. |
+| `--write` | off | Save the snapshot into `fusebase.json`. **Without it the command is read-only.** |
+
+### Read-only by default
+
+`fusebase analyze gate` **does not modify `fusebase.json`** unless you pass `--write`. It computes the snapshot in memory and prints it, so a routine "which Gate ops do we use?" check cannot erase anything.
+
+This matters because a write **replaces** the snapshot with what static analysis can see. Analysis cannot infer contract-scoped capabilities such as `app_api.<ns>.<cap>.<action>`, so before this change a plain `analyze gate` run silently dropped hand-declared entries from `fusebaseGateMeta.permissions`.
+
+If you relied on `analyze gate` refreshing the snapshot in place, add `--write`:
+
+```bash
+fusebase analyze gate --operations --feature <appId> --write
+```
+
+Note that `--write` still replaces `usedOps`/`permissions` from the current analysis — put anything the analyzer cannot see into `manualPermissions` (preserved across writes) or grant it with `fusebase app update <appId> --permissions="..."`, which records it in `apps[].permissions`.
+
+`fusebase app update --sync-gate-permissions` runs its own analyze and keeps writing the snapshot; it is unaffected by this flag.
 
 **Requirements**: `fusebase.json` in the project root (from `fusebase init`), `@fusebase/fusebase-gate-sdk` in `node_modules`, and a valid `tsconfig.json` that includes your app sources.
 
-**API key**: Resolving permissions uses `~/.fusebase/config.json` → `apiKey`. If missing, the analyzer still writes `fusebaseGateMeta` but **skips** the resolve call and prints a warning (unless `--json`).
+**API key**: Resolving permissions uses `~/.fusebase/config.json` → `apiKey`. If missing, the analyzer still reports the snapshot but **skips** the resolve call and prints a warning (unless `--json`).
 
 ## What the analyzer does
 
 1. **Allowlist** — Reads operation ids from the installed SDK (`node_modules/@fusebase/fusebase-gate-sdk/dist/apis/*.js`, `opId: "..."`).
 2. **TypeScript usage** — Builds a program from your `tsconfig`, walks source files (excluding `node_modules` and `.d.ts`), and records **method names** called on values typed as Gate SDK `*Api` instances. Prefer **full `*Api` factories in app code** (`createAccessApi(): AccessApi`); narrowed types like `Pick<AccessApi, "getMe">` may be detected but are **discouraged** because they hide operations from review and caused grant/sync drift in production.
-3. **Snapshot** — Writes sorted **`usedOps`**, **`sdkVersion`**, and timestamps into the current app’s **`fusebaseGateMeta`**.
+3. **Snapshot** — Builds sorted **`usedOps`**, **`sdkVersion`**, and timestamps for the current app’s **`fusebaseGateMeta`**; written to `fusebase.json` only with `--write`.
 4. **Resolve permissions** (conditional) — If this run **changed** the `usedOps` set compared to the previous snapshot, calls **`resolveGateOperationPermissions`** with the current `usedOps` and merges the returned **`permissions`** array into the snapshot. Any reviewed **`manualPermissions`** are also merged into `permissions`.
 
 Implementation lives in:
@@ -143,6 +160,12 @@ Older projects may have:
 
 ```json
 "internal:gate-analyze": "bun index.ts analyze gate --operations"
+```
+
+This script is read-only. Append `--write` when you want the snapshot persisted:
+
+```json
+"internal:gate-analyze-write": "bun index.ts analyze gate --operations --write"
 ```
 
 ## See also
