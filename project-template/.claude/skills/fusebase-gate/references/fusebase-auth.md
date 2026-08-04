@@ -24,7 +24,7 @@ category: specialized
 - [`getMyOrgAccess` `source` Field](#getmyorgaccess-source-field)
 - [Gate Error Envelope Decoding](#gate-error-envelope-decoding)
 - [Two Names For Feature Token](#two-names-for-feature-token)
-- [Browser Token Is Identity Only (Guarded App APIs)](#browser-token-is-identity-only-guarded-app-apis)
+- [Browser Token Against Guarded App APIs](#browser-token-against-guarded-app-apis)
 - [App `accessPrincipals` Vs Org Membership](#app-accessprincipals-vs-org-membership)
 - [Visitor Access Vs Open API (Platform Edge)](#visitor-access-vs-open-api-platform-edge)
 - [Magic-Link → App Session Exchange](#magic-link--app-session-exchange)
@@ -135,12 +135,12 @@ Gate BFF errors are often wrapped. Read **status + inner code**, not only the ou
 
 ## Two Names For Feature Token
 
-- **`window.FBS_FEATURE_TOKEN` / cookie `fbsfeaturetoken`** (browser): visitor-scoped JWE from `/_auth/` for SPA and app-proxy. Cannot perform `org.members.write`.
+- **`window.FBS_FEATURE_TOKEN` / cookie `fbsfeaturetoken`** (browser): JWE from `/_auth/` for SPA and app-proxy, embedding a Gate token with the app's non-backend-only permissions. Cannot perform `org.members.write`.
 - **`process.env.FBS_FEATURE_TOKEN`** (backend pod env): deploy-time Gate **service** token with app permissions. Required for privileged provisioning from trusted BFF routes.
 
-## Browser Token Is Identity Only (Guarded App APIs)
+## Browser Token Against Guarded App APIs
 
-The platform-minted browser `fbsfeaturetoken` carries **identity only** — no scopes, no permissions. App API contract guards (`x-fusebase-allowed-callers`, `x-fusebase-required-permissions`) are evaluated against the **calling** identity, so a browser token can never satisfy them by design.
+The platform-minted browser `fbsfeaturetoken` is a JWE that **embeds a Gate service token**, and Gate resolves the request against that embedded token's scopes and permissions — including `client:<productId>`. So a browser token **does** satisfy `x-fusebase-allowed-callers` for its own product: the cookie is not HttpOnly (also `window.FBS_FEATURE_TOKEN`), so any end user can replay it from devtools. Only `x-fusebase-required-permissions` is browser-proof, because `app_api.*` capabilities are backend-only and the browser mint omits them. **Pair the two guards on anything sensitive** — `allowedCallers` alone is a product filter, not an authorization check.
 
 Two supported ways to run a guarded operation for an end user:
 

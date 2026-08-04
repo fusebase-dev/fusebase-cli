@@ -314,7 +314,10 @@ Practical guidance:
 - Use `x-fusebase-visibility: org` for business operations that other apps/agents in the org may discover and call
 - Use `x-fusebase-visibility: private` for internal-only routes such as `health`, debug/admin endpoints, and routes that should not appear in org-wide discovery
 
-`org` means **every member of the organization**, including **external members** (`orgRole: client` / `guest`), not just internal roles (`member`/`manager`/`owner`). A cross-app caller with any valid org role can discover and call an `org` operation — op lookup returns the operation, never 404-by-role. Enforce per-user, per-resource authorization (channel/record membership, ownership) **inside your handler** and return **200 or 403**; do not rely on `visibility` to hide an operation from a subset of org members. Use `x-fusebase-allowed-callers` to restrict which caller **project** may invoke the op — a caller id is the calling project's `productId` (`client:<productId>`), not an app id, so sibling apps of one project share it. It filters caller identity, not org role.
+`org` means **every member of the organization**, including **external members** (`orgRole: client` / `guest`), not just internal roles (`member`/`manager`/`owner`). A cross-app caller with any valid org role can discover and call an `org` operation — op lookup returns the operation, never 404-by-role. Enforce per-user, per-resource authorization (channel/record membership, ownership) **inside your handler** and return **200 or 403**; do not rely on `visibility` to hide an operation from a subset of org members. Use `x-fusebase-allowed-callers` to restrict which caller **project** may invoke the op — a caller id is the calling project's `productId` (`client:<productId>`), not an app id, so sibling apps of one project share it. It filters caller identity, not org role —
+and not end users either: the browser `fbsfeaturetoken` embeds a Gate token with the same
+`client:<productId>`, so any user of an allowed project matches it from devtools. Pair it with
+`x-fusebase-required-permissions` (backend-only, never in the browser token) on anything sensitive.
 - Use `x-fusebase-execution-mode: sync` for normal request/response APIs
 - Use `x-fusebase-execution-mode: async` for long-running or async-style operations
 

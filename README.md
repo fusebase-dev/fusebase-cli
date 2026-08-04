@@ -449,6 +449,12 @@ product. `app:<id>` is accepted by the validator but is matched against that sam
 `app:<apps[].id>` never matches. Apps in one project therefore share a caller identity and
 `allowed-callers` cannot separate them — use `x-fusebase-required-permissions` for that.
 
+The end users of an allowed project match too: the browser `fbsfeaturetoken` embeds a Gate service
+token carrying that same `client:<productId>`, and it is readable from devtools. So
+`allowed-callers` alone keeps out other projects, not other people — declare
+`x-fusebase-required-permissions` as well on anything sensitive. That one is browser-proof:
+`app_api.*` capabilities are backend-only and never reach the browser token.
+
 `x-fusebase-required-permissions` is intentionally namespaced with `app_api.` so app-to-app
 capabilities do not collide with system Gate permissions such as `isolated_store.read`.
 
