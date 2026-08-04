@@ -308,6 +308,13 @@ set the platform can mint into a token, so it fails the shape check.
 > policy is never restricted. Grant the `app_api.*` capabilities a peer app requires **before**
 > enforcement reaches your environment, or its callers start getting `403 app_api_missing_permissions`.
 >
+> A caller id in `x-fusebase-allowed-callers` is the **calling project's `productId`**
+> (`client:<productId>`), not an app id — the platform identifies a caller by the `client` scope
+> of its token, which holds the product. `app:<id>` is accepted by `fusebase api validate` but is
+> matched against the same `productId`, so `app:<apps[].id>` never matches and would deny the
+> intended caller once enforcement is on. Apps in one project share a caller identity; use
+> `x-fusebase-required-permissions` to separate them.
+>
 > A capability must be spelled `app_api.<namespace>.<capability>.<action>` in lowercase to be
 > grantable. `fusebase api validate` also accepts camelCase and hyphens, but the platform cannot
 > mint those, so an operation declaring one is rejected with a `400` naming it.

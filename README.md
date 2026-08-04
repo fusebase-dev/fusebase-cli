@@ -421,7 +421,7 @@ Behavior:
   - unique `operationId`
   - basic `x-fusebase-*` fields
   - app API access policy:
-    - `x-fusebase-allowed-callers`: array of `client:<clientId>` or `app:<appId>` caller ids
+    - `x-fusebase-allowed-callers`: array of `client:<productId>` caller ids (see below)
     - `x-fusebase-required-permissions`: array of `app_api.<namespace>.<capability>.<action>` permissions
 
 **Examples:**
@@ -436,19 +436,25 @@ fusebase api validate --file openapi.json
 ```json
 {
   "x-fusebase-visibility": "org",
-  "x-fusebase-allowed-callers": ["client:signup-client-id"],
+  "x-fusebase-allowed-callers": ["client:k7m2p9x4qv1nz8bd"],
   "x-fusebase-required-permissions": [
     "app_api.client_portal.provision.write"
   ]
 }
 ```
 
+A caller id is the **calling project's `productId`** (`productId` in its `fusebase.json`), not an
+app id: the platform identifies a caller by the `client` scope of its token, which holds the
+product. `app:<id>` is accepted by the validator but is matched against that same `productId`, so
+`app:<apps[].id>` never matches. Apps in one project therefore share a caller identity and
+`allowed-callers` cannot separate them — use `x-fusebase-required-permissions` for that.
+
 `x-fusebase-required-permissions` is intentionally namespaced with `app_api.` so app-to-app
 capabilities do not collide with system Gate permissions such as `isolated_store.read`.
 
-> **Not enforced at runtime yet.** Both extensions are validated here but are **currently
-> ignored** by the platform: the publish path does not propagate them, so `listAppApiOperations`
-> reports an empty policy and `callAppApi` enforces nothing. Grant the matching
+> **Enforcement arrives per environment.** Both extensions are published to the registry and
+> read by `callAppApi`, but the platform switches enforcement on per environment; until then a
+> declared policy denies nothing. Grant the matching
 > `app_api.<namespace>.<capability>.<action>` capability to callers now
 > (`fusebase app update <appId> --permissions "app_api.…"`, see
 > [docs/PERMISSIONS.md](docs/PERMISSIONS.md)) so the grants are already in place when

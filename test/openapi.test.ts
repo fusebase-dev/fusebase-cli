@@ -113,7 +113,7 @@ describe("OpenAPI Phase 1 validator", () => {
     });
 
     expect(result.issues.map((issue) => issue.message)).toContain(
-      "x-fusebase-allowed-callers must be an array of caller ids like 'app:<appId>' or 'client:<clientId>'.",
+      "x-fusebase-allowed-callers must be an array of caller ids like 'client:<productId>' — the calling project's productId, not an app id. 'app:<id>' is accepted but is matched against the same productId.",
     );
     expect(result.issues.map((issue) => issue.message)).toContain(
       "x-fusebase-required-permissions must be app API permissions like 'app_api.<namespace>.<capability>.<action>'.",

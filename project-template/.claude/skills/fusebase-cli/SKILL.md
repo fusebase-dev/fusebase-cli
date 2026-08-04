@@ -358,8 +358,11 @@ rebuilds the app's permissions from `fusebase.json`, so a grant that lives only 
 app record is reverted by the next `fusebase deploy`.
 
 > App API policy extensions (`x-fusebase-allowed-callers`, `x-fusebase-required-permissions`)
-> are **currently ignored at runtime** — the publish path does not propagate them yet. Grant
-> the capability now so it is durable, but do not rely on the extensions for authorization.
+> are published and read by `callAppApi`, but **enforcement is switched on per environment** by
+> the platform. Grant the capability now so it is durable and in place when enforcement reaches
+> your environment, but do not rely on the extensions as your only authorization check.
+> A caller id in `x-fusebase-allowed-callers` is the calling project's `productId`
+> (`client:<productId>`), not an app id.
 
 ### Smart update (`fusebase update`)
 

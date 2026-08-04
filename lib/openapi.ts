@@ -315,7 +315,7 @@ export function validateOpenApiDocument(
           ) {
             pushIssue(
               `${operationPrefix}.x-fusebase-allowed-callers`,
-              "x-fusebase-allowed-callers must be an array of caller ids like 'app:<appId>' or 'client:<clientId>'.",
+              "x-fusebase-allowed-callers must be an array of caller ids like 'client:<productId>' — the calling project's productId, not an app id. 'app:<id>' is accepted but is matched against the same productId.",
             );
           }
         }
