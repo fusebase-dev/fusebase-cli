@@ -447,7 +447,6 @@ export const KNOWN_FLAGS = [
   "cross-app-api-calls-analysis",
   "environments",
   "dev-backend",
-  "password-invite",
   "notes-markdown",
   MANAGED_INTEGRATIONS_FLAG,
 ] as const;
@@ -472,8 +471,6 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Enable named app environments (`environments/<name>.json` + `.env.<name>`, `fusebase env` commands, per-env backend/org). Off → legacy single-env behavior. See docs/proposals/APP-ENVIRONMENTS.md.",
   "dev-backend":
     "Internal: show the dev/prod platform-backend choice in interactive env prompts. Off (default) → interactive flows assume prod; explicit --backend still works.",
-  "password-invite":
-    "Include the `invite-with-password` skill (`setFusebaseInitialPassword` + `needsInitialPassword`) in generated projects. Requires the platform flag `password_invite` on the target backend.",
   "notes-markdown":
     "Include markdown (v3) note Gate permissions in generated MCP tokens. Requires the platform flag `notes_markdown` on the target backend.",
   [MANAGED_INTEGRATIONS_FLAG]:
