@@ -678,7 +678,9 @@ One command to refresh a generated app after a CLI or template upgrade:
 5. **`npm install`** — runs **only** in directories where a managed dependency version actually changed.
 6. **Gate permission drift (interactive)** — when `@fusebase/fusebase-gate-sdk` version changed and `npm install` completed, dry-runs SDK analysis per deployed app and compares runtime Gate permissions on the platform with what a fresh `--sync-gate-permissions` would publish. If drift is found, prompts (TTY) to run sync for all affected apps. The sync merges (it cannot remove a grant — that needs `app update --sync-gate-permissions --prune-gate-permissions`). Skipped on `--dry-run`, without auth, when Gate SDK unchanged, or with `--skip-gate-permissions-sync`.
 
-**Pre-update Git checkpoint:** In a TTY, you are prompted for an optional commit before changes (empty commit if the tree is clean). If current branch tracks a remote (upstream configured), the pre-update commit is pushed immediately. Without Git, you are warned about rollback risk and can initialize a repo first. Use **`--skip-commit`** to skip, or **`--commit`** to run the checkpoint in CI/non-interactive mode without prompts.
+**Pre-update Git checkpoint:** In a TTY, you are prompted for an optional commit before changes (empty commit if the tree is clean). If current branch tracks a remote (upstream configured), the pre-update commit is pushed immediately. Without Git, you are warned about rollback risk and can initialize a repo first.
+
+**Post-update Git commit:** After all stages, if the working tree is dirty, the CLI lists the changed paths and (in TTY) prompts to commit them as `chore(update): post app update (...)`. No empty post-commit when the tree is clean. Upstream push uses the same rule as pre-update. Use **`--skip-commit`** to skip both pre and post commits (dirty-tree notification still prints), or **`--commit`** to run both checkpoints in CI/non-interactive mode without prompts.
 
 **Prerequisites:** `fusebase.json` with `orgId` and `productId`; `fusebase auth` for stages that touch MCP tokens.
 
@@ -715,8 +717,8 @@ fusebase update --skip-commit
 | `--skip-deps` | Skip managed dependency version sync |
 | `--skip-install` | After dep sync, do not run `npm install` |
 | `--skip-gate-permissions-sync` | After a Gate SDK bump, skip interactive drift check and permission sync prompt |
-| `--skip-commit` | Skip pre-update Git checkpoint |
-| `--commit` | Run Git checkpoint without prompts (non-interactive) |
+| `--skip-commit` | Skip pre- and post-update Git checkpoints |
+| `--commit` | Run pre/post Git checkpoints without prompts (non-interactive) |
 | `--dry-run` | Print planned work only |
 
 `fusebase update` is the single update command.

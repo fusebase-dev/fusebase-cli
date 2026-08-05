@@ -369,9 +369,10 @@ fusebase update
 
 Single update command for both CLI and app:
 
-- in app directory (`fusebase.json` exists): runs CLI self-update first (skip with `--skip-cli-update`; local linked/source mode auto-skips), then refreshes agent assets (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`), then runs selective MCP token refresh + IDE MCP config refresh, then syncs managed SDK deps and runs targeted `npm install`;
+- in app directory (`fusebase.json` exists): runs CLI self-update first (skip with `--skip-cli-update`; local linked/source mode auto-skips), then optional pre-update Git checkpoint, then refreshes agent assets (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`), then runs selective MCP token refresh + IDE MCP config refresh, then syncs managed SDK deps and runs targeted `npm install`, then optional post-update Git commit when the tree is dirty (always prints changed paths);
 - outside app directory: runs only CLI self-update;
-- use `--skip-product` to force CLI-only mode even inside an app directory.
+- use `--skip-product` to force CLI-only mode even inside an app directory;
+- `--skip-commit` / `--commit` gate both pre- and post-update Git checkpoints.
 
 On Windows the CLI self-update is a **cache swap** (updates the cached CLI under `%LOCALAPPDATA%\FuseBase\CLI\` with no admin elevation and no installer download), so the remaining app stages continue in the same run — just like macOS/Linux.
 

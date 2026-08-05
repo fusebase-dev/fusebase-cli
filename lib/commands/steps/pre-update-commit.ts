@@ -6,19 +6,14 @@ import {
   runGitCapture,
   runGitInitInDirectory,
 } from "../../git-local";
+import {
+  gitHeadSha,
+  pushToUpstreamIfConfigured,
+  updateCheckpointCommitMessage,
+} from "./update-git-checkpoint";
 
 function commitMessage(): string {
-  const stamp = new Date().toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "medium",
-  });
-  return `chore(update): pre app update (${stamp})`;
-}
-
-async function gitHeadSha(cwd: string): Promise<string | undefined> {
-  const { code, stdout } = await runGitCapture(cwd, ["rev-parse", "HEAD"]);
-  if (code !== 0) return undefined;
-  return stdout.trim() || undefined;
+  return updateCheckpointCommitMessage("pre");
 }
 
 export interface PreUpdateCommitOptions {
@@ -34,31 +29,6 @@ export interface PreUpdateCommitResult {
   sha?: string;
   pushed?: boolean;
   reason?: string;
-}
-
-async function pushToUpstreamIfConfigured(cwd: string): Promise<{
-  pushed: boolean;
-  reason?: "no-upstream" | "push-failed";
-}> {
-  // Returns non-zero when upstream is not configured; treat as non-fatal skip.
-  const upstream = await runGitCapture(cwd, [
-    "rev-parse",
-    "--abbrev-ref",
-    "--symbolic-full-name",
-    "@{u}",
-  ]);
-  if (upstream.code !== 0 || !upstream.stdout.trim()) {
-    return { pushed: false, reason: "no-upstream" };
-  }
-
-  const pushCode = await runGit(cwd, ["push"], { stdio: "inherit" });
-  if (pushCode !== 0) {
-    console.warn("⚠ Pre-update commit created locally, but git push failed.");
-    return { pushed: false, reason: "push-failed" };
-  }
-
-  console.log(`✓ Pushed pre-update commit to ${upstream.stdout.trim()}`);
-  return { pushed: true };
 }
 
 /**
@@ -124,7 +94,7 @@ export async function runPreUpdateCommit(
         return { ok: false, skipped: false };
       }
       const sha = await gitHeadSha(cwd);
-      const push = await pushToUpstreamIfConfigured(cwd);
+      const push = await pushToUpstreamIfConfigured(cwd, "Pre-update");
       console.log(`✓ Pre-update commit created${sha ? ` (${sha})` : ""}`);
       return { ok: true, skipped: false, sha, pushed: push.pushed };
     }
@@ -194,7 +164,7 @@ export async function runPreUpdateCommit(
   }
 
   const sha = await gitHeadSha(cwd);
-  const push = await pushToUpstreamIfConfigured(cwd);
+  const push = await pushToUpstreamIfConfigured(cwd, "Pre-update");
   console.log(`✓ Pre-update commit created${sha ? ` (${sha})` : ""}`);
   return { ok: true, skipped: false, sha, pushed: push.pushed };
 }

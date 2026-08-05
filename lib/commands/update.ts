@@ -30,8 +30,8 @@ export const updateCommand = new Command("update")
     "--force-gate-permissions-sync",
     "Run Gate permission drift check even when Gate SDK version did not change",
   )
-  .option("--skip-commit", "Skip pre-update Git checkpoint")
-  .option("--commit", "Run pre-update Git checkpoint in non-interactive mode (no prompt)")
+  .option("--skip-commit", "Skip pre/post-update Git checkpoints")
+  .option("--commit", "Run pre/post-update Git checkpoints in non-interactive mode (no prompt)")
   .option("--dry-run", "Print planned work without writing files or running installs", false)
   .action(async (opts: SmartUpdateOptions) => {
     if (opts.launcher) {

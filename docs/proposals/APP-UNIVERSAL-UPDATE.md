@@ -10,7 +10,7 @@ Add a single command that safely refreshes a Fusebase app project in one run:
    - app root `package.json`
    - app-level `package.json` files (from `fusebase.json.apps[].path`)
 4. Run package manager install where dependency changes were applied.
-5. Offer a pre-update commit when project is a Git repo and working tree is dirty.
+5. Offer a pre-update commit when project is a Git repo and working tree is dirty (and a post-update commit when update left changes).
 
 The command must not overwrite user-owned dependencies or scripts.
 
@@ -31,7 +31,7 @@ This proposal uses `fusebase app update`.
 
 ## Default Behavior
 
-Running `fusebase app update` with no flags performs all update stages in this order:
+Running `fusebase update` (shipped name; proposal originally used `fusebase app update`) with no flags performs all update stages in this order:
 
 1. Preflight checks (`fusebase.json`, auth prerequisites for token refresh).
 2. Pre-update Git commit prompt (when applicable).
@@ -39,7 +39,8 @@ Running `fusebase app update` with no flags performs all update stages in this o
 4. MCP token refresh + IDE config refresh.
 5. Managed dependency refresh in root + app package manifests.
 6. `npm install` in each changed package location.
-7. Summary output with changed files/paths.
+7. Post-update Git commit when the working tree is dirty (notify always; commit when enabled).
+8. Summary output with changed files/paths.
 
 ---
 
@@ -52,7 +53,7 @@ Use one boolean style everywhere: `--<stage>` / `--no-<stage>`.
 - `--force-mcp` - force MCP token + IDE refresh even when version trigger says "no update needed".
 - `--deps` / `--skip-deps` - enable/disable managed dependency sync in `package.json`.
 - `--install` / `--skip-install` - enable/disable `npm install` after deps sync.
-- `--commit` / `--skip-commit` - enable/disable pre-update commit prompt.
+- `--commit` / `--skip-commit` - enable/disable pre- and post-update commit prompts.
 - `--dry-run` - print planned actions and target files without writing.
 
 Default values:
@@ -111,6 +112,25 @@ Safety:
 
 - Do not force commit.
 - If commit fails, stop before mutating project files.
+
+## 2b) Post-update Git Commit
+
+After all mutating stages (skills, MCP/IDE, deps, install, gate permissions sync):
+
+- If not inside a Git work tree, or Git is unavailable: skip quietly.
+- If `git status --short` is empty: skip (`no changes`); do **not** create an empty commit.
+- If dirty:
+  - always print a short notification listing changed paths (top-N + count);
+  - if `commit=true` (TTY default / `--commit`):
+    - prompt to create a post-update commit of those changes;
+    - message: `chore(update): post app update (<local timestamp>)`;
+    - push to upstream when configured (same as pre);
+  - if user declines or `--skip-commit`: leave the tree dirty and remind the user in the summary.
+
+Notes:
+
+- `.env` is gitignored — MCP token refreshes are never committed.
+- One flag pair (`--commit` / `--skip-commit`) gates both pre and post checkpoints.
 
 ## 3) Skills / Agent Assets Update
 
@@ -228,6 +248,7 @@ Final summary should include:
 - manifests changed (root + app paths)
 - install results per location
 - pre-update commit SHA (if created)
+- post-update commit SHA (if created) / dirty-tree reminder when skipped with changes
 
 Example summary headings:
 
@@ -236,6 +257,7 @@ Example summary headings:
 - `MCP tokens and IDE`
 - `Managed dependencies`
 - `Install results`
+- `Post-update commit`
 
 ---
 
@@ -247,6 +269,8 @@ Recommended files:
 - `lib/commands/app-update.ts` - orchestrator for `app update`.
 - `lib/commands/steps/update-managed-deps.ts` - manifest sync logic.
 - optional: `lib/commands/steps/pre-update-commit.ts` - git prompt + commit flow.
+- optional: `lib/commands/steps/post-update-commit.ts` - dirty-tree notify + post commit.
+- shared: `lib/commands/steps/update-git-checkpoint.ts` - SHA/push/status helpers.
 
 Existing code to reuse directly:
 
@@ -267,6 +291,7 @@ Existing code to reuse directly:
 - In apps, update managed deps only when already present (no auto-add).
 - Install only where managed deps changed.
 - Pre-update commit prompt.
+- Post-update dirty-tree notify + optional commit.
 - MCP refresh trigger by Dashboards + Gate **permission policy fingerprints** (not SDK semver).
 - Manual MCP override via `--force-mcp`.
 
@@ -307,6 +332,9 @@ Minimum automated coverage:
 6. IDE configs refresh with force mode.
 7. `--skip-*` flags correctly gate stages.
 8. `--dry-run` performs no writes.
+9. Post-update: dirty tree + commitEnabled -> post commit created, tree clean.
+10. Post-update: clean tree -> skipped (`no changes`).
+11. Post-update: dirty + commit disabled -> notify, tree stays dirty.
 
 ---
 

@@ -13,6 +13,7 @@ import {
   readEnvFileMap,
 } from "./steps/create-env";
 import { runPreUpdateCommit } from "./steps/pre-update-commit";
+import { runPostUpdateCommit } from "./steps/post-update-commit";
 import { printIdeSetupResults, setupIdeConfig, type IdePreset } from "./steps/ide-setup";
 import { syncManagedDependencies } from "./steps/update-managed-deps";
 import { maybePromptGatePermissionsSyncAfterSdkUpdate } from "./steps/post-update-gate-permissions-sync";
@@ -122,6 +123,7 @@ function printUpdateSummary(summary: {
   managedDeps: string;
   installs: string;
   gatePermissionsSync: string;
+  postUpdateCommit: string;
 }, installTargets: string[]): void {
   const rows: Array<{ key: string; value: string; renderedValue: string }> = [
     {
@@ -183,6 +185,13 @@ function printUpdateSummary(summary: {
       key: "gate permissions",
       value: summary.gatePermissionsSync,
       renderedValue: renderGatePermissionsSummaryValue(summary.gatePermissionsSync),
+    },
+    {
+      key: "post-update commit",
+      value: summary.postUpdateCommit,
+      renderedValue: summary.postUpdateCommit.startsWith("created")
+        ? chalk.green.bold(summary.postUpdateCommit)
+        : summary.postUpdateCommit,
     },
     ...(installTargets.length > 0
       ? [
@@ -264,6 +273,7 @@ export async function runProductUpdate(opts: ProductUpdateOptions): Promise<void
     managedDeps: string;
     installs: string;
     gatePermissionsSync: string;
+    postUpdateCommit: string;
   } = {
     cliUpdate: doCliUpdate ? "pending" : "skipped (--skip-cli-update)",
     preUpdateCommit: doCommit ? "requested" : "skipped",
@@ -274,6 +284,7 @@ export async function runProductUpdate(opts: ProductUpdateOptions): Promise<void
     managedDeps: doDeps ? "pending" : "skipped",
     installs: doInstall ? "pending" : "skipped",
     gatePermissionsSync: "pending",
+    postUpdateCommit: doCommit ? "pending" : "skipped",
   };
 
       if (doCliUpdate) {
@@ -539,6 +550,20 @@ export async function runProductUpdate(opts: ProductUpdateOptions): Promise<void
         }
       }
 
+  const post = await runPostUpdateCommit({ cwd, commitEnabled: doCommit, dryRun });
+  if (!post.ok) {
+    process.exit(1);
+  }
+  if (post.skipped) {
+    summary.postUpdateCommit = `skipped (${post.reason ?? "n/a"})`;
+  } else if (post.sha) {
+    summary.postUpdateCommit = post.pushed
+      ? `created + pushed (${post.sha.slice(0, 7)})`
+      : `created (${post.sha.slice(0, 7)})`;
+  } else {
+    summary.postUpdateCommit = "created";
+  }
+
   console.log("");
   printUpdateSummary(summary, installRoots);
   console.log("");
@@ -564,7 +589,7 @@ productCommand
     "--force-gate-permissions-sync",
     "Run Gate permission drift check even when Gate SDK version did not change (e.g. stale fusebaseGateMeta)",
   )
-  .option("--skip-commit", "Skip pre-update Git checkpoint")
-  .option("--commit", "Run pre-update Git checkpoint in non-interactive mode (no prompt)")
+  .option("--skip-commit", "Skip pre/post-update Git checkpoints")
+  .option("--commit", "Run pre/post-update Git checkpoints in non-interactive mode (no prompt)")
   .option("--dry-run", "Print planned work without writing files or running installs", false)
   .action(runProductUpdate);
