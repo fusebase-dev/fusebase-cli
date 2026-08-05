@@ -1122,9 +1122,18 @@ function readLegacyProjectGateMetaFromFusebaseRaw(
   );
 }
 
+/**
+ * Locate an `apps[]` entry in the raw fusebase.json for write-back.
+ *
+ * After `env init --strip`, platform ids live only in
+ * `environments/<name>.json`. Callers often pass the platform id (from the
+ * active overlay / remote API), so we reverse-lookup via the active env
+ * lockfile before falling back to key/path/subdomain / sole-app.
+ */
 function getFeatureIndexById(
   raw: Record<string, unknown>,
   featureId: string,
+  projectRoot: string = process.cwd(),
 ): number {
   const apps = Array.isArray(raw.apps) ? raw.apps : [];
   const byId = apps.findIndex((app) => {
@@ -1132,6 +1141,24 @@ function getFeatureIndexById(
     return (app as Record<string, unknown>).id === featureId;
   });
   if (byId !== -1) return byId;
+
+  // Named environments: platform id → env apps[key].id → fusebase.json entry
+  // keyed by environmentAppKey (key > subdomain > path basename).
+  const active = getActiveEnvironment(projectRoot);
+  const envApps = active?.config.apps;
+  if (envApps) {
+    for (const [key, entry] of Object.entries(envApps)) {
+      if (!entry?.id || entry.id !== featureId) continue;
+      const byEnvKey = apps.findIndex((app) => {
+        if (!app || typeof app !== "object") return false;
+        return (
+          environmentAppKey(app as { key?: string; subdomain?: string; id?: string; path?: string }) ===
+          key
+        );
+      });
+      if (byEnvKey !== -1) return byEnvKey;
+    }
+  }
 
   // App environments keep resolved ids in environments/<name>.json, so raw
   // fusebase.json often has no apps[].id. Fall back to stable key / path /
@@ -1142,7 +1169,9 @@ function getFeatureIndexById(
     return (
       entry.key === featureId ||
       entry.path === featureId ||
-      entry.subdomain === featureId
+      entry.subdomain === featureId ||
+      environmentAppKey(entry as { key?: string; subdomain?: string; id?: string; path?: string }) ===
+        featureId
     );
   });
   if (byKey !== -1) return byKey;
@@ -1150,12 +1179,42 @@ function getFeatureIndexById(
   return -1;
 }
 
+/**
+ * Resolve a local app entry from the (env-overlaid) fuse config by platform id,
+ * stable key, path, subdomain, or environmentAppKey. Used by `app update` and
+ * Gate permission sync so stripped manifests still work.
+ */
+export function resolveLocalAppFromFuseConfig(
+  fuseConfig: FuseConfig,
+  appRef: string,
+): FeatureConfig {
+  const apps = fuseConfig.apps ?? [];
+  const match =
+    apps.find((app) => app.id === appRef) ??
+    apps.find(
+      (app) =>
+        app.key === appRef ||
+        app.path === appRef ||
+        app.subdomain === appRef ||
+        environmentAppKey(app) === appRef,
+    );
+  if (!match) {
+    const active = getActiveEnvironment();
+    const hint = active
+      ? ` (checked fusebase.json + environments/${active.name}.json). Pass a platform id, stable key, path, or subdomain.`
+      : ".";
+    throw new Error(`App "${appRef}" not found in fusebase.json${hint}`);
+  }
+  return match;
+}
+
 function readPreviousGateSnapshotForFeature(
   raw: Record<string, unknown>,
   featureId: string,
+  projectRoot: string = process.cwd(),
 ): GateSdkOperationsSnapshot | undefined {
   const apps = Array.isArray(raw.apps) ? raw.apps : [];
-  const featureIndex = getFeatureIndexById(raw, featureId);
+  const featureIndex = getFeatureIndexById(raw, featureId, projectRoot);
   if (featureIndex === -1) return undefined;
 
   const featureRaw = apps[featureIndex];
@@ -1172,9 +1231,10 @@ function readPreviousGateSnapshotForFeature(
 function readPreviousAppApiDependenciesSnapshotForFeature(
   raw: Record<string, unknown>,
   featureId: string,
+  projectRoot: string = process.cwd(),
 ): AppApiDependenciesSnapshot | undefined {
   const apps = Array.isArray(raw.apps) ? raw.apps : [];
-  const featureIndex = getFeatureIndexById(raw, featureId);
+  const featureIndex = getFeatureIndexById(raw, featureId, projectRoot);
   if (featureIndex === -1) return undefined;
 
   const featureRaw = apps[featureIndex];
@@ -1185,9 +1245,10 @@ function writeGateSnapshotToFeatureRaw(
   raw: Record<string, unknown>,
   featureId: string,
   snapshot: GateSdkOperationsSnapshot,
+  projectRoot: string = process.cwd(),
 ): void {
   const apps = Array.isArray(raw.apps) ? [...raw.apps] : [];
-  const featureIndex = getFeatureIndexById(raw, featureId);
+  const featureIndex = getFeatureIndexById(raw, featureId, projectRoot);
   if (featureIndex === -1) {
     throw new Error(`App "${featureId}" not found in fusebase.json`);
   }
@@ -1213,9 +1274,10 @@ function writeAppApiDependenciesSnapshotToFeatureRaw(
   raw: Record<string, unknown>,
   featureId: string,
   snapshot: AppApiDependenciesSnapshot,
+  projectRoot: string = process.cwd(),
 ): void {
   const apps = Array.isArray(raw.apps) ? [...raw.apps] : [];
-  const featureIndex = getFeatureIndexById(raw, featureId);
+  const featureIndex = getFeatureIndexById(raw, featureId, projectRoot);
   if (featureIndex === -1) {
     throw new Error(`App "${featureId}" not found in fusebase.json`);
   }
@@ -1441,10 +1503,10 @@ export function writeGateSdkOperationsToFusebaseJson(
   normalizeRawFuseConfigShape(raw);
   rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
 
-  const prev = readPreviousGateSnapshotForFeature(raw, featureId);
+  const prev = readPreviousGateSnapshotForFeature(raw, featureId, projectRoot);
   const snapshot = buildGateSdkOperationsSnapshot(prev, input, options);
 
-  writeGateSnapshotToFeatureRaw(raw, featureId, snapshot);
+  writeGateSnapshotToFeatureRaw(raw, featureId, snapshot, projectRoot);
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
   invalidateFuseConfigCache();
   return snapshot;
@@ -1484,7 +1546,7 @@ export function writeAppApiDependenciesToFusebaseJson(
   normalizeRawFuseConfigShape(raw);
   rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
 
-  const prev = readPreviousAppApiDependenciesSnapshotForFeature(raw, featureId);
+  const prev = readPreviousAppApiDependenciesSnapshotForFeature(raw, featureId, projectRoot);
   const previousManualDependencies = (prev?.dependencies ?? []).filter(
     (dependency) => dependency.source === "manual",
   );
@@ -1533,7 +1595,7 @@ export function writeAppApiDependenciesToFusebaseJson(
     unresolved: mergedUnresolved,
   });
 
-  writeAppApiDependenciesSnapshotToFeatureRaw(raw, featureId, snapshot);
+  writeAppApiDependenciesSnapshotToFeatureRaw(raw, featureId, snapshot, projectRoot);
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
   invalidateFuseConfigCache();
   return snapshot;
@@ -1567,7 +1629,7 @@ export function upsertManualAppApiDependencyInFusebaseJson(
   normalizeRawFuseConfigShape(raw);
   rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
 
-  const prev = readPreviousAppApiDependenciesSnapshotForFeature(raw, featureId);
+  const prev = readPreviousAppApiDependenciesSnapshotForFeature(raw, featureId, projectRoot);
   const now = new Date().toISOString();
   const alreadyPresent = (prev?.dependencies ?? []).some(
     (item) =>
@@ -1600,7 +1662,7 @@ export function upsertManualAppApiDependencyInFusebaseJson(
     unresolved: prev?.unresolved ?? [],
   });
 
-  writeAppApiDependenciesSnapshotToFeatureRaw(raw, featureId, snapshot);
+  writeAppApiDependenciesSnapshotToFeatureRaw(raw, featureId, snapshot, projectRoot);
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
   invalidateFuseConfigCache();
 
@@ -1633,7 +1695,7 @@ export function readGateSdkOperationsFromFusebaseJson(
   }
   normalizeRawFuseConfigShape(raw);
   rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
-  return readPreviousGateSnapshotForFeature(raw, featureId);
+  return readPreviousGateSnapshotForFeature(raw, featureId, projectRoot);
 }
 
 /**
@@ -1661,7 +1723,7 @@ export function updateGateSdkPermissionsInFusebaseJson(
   }
   normalizeRawFuseConfigShape(raw);
   rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
-  const g = readPreviousGateSnapshotForFeature(raw, featureId);
+  const g = readPreviousGateSnapshotForFeature(raw, featureId, projectRoot);
   if (!g) {
     throw new Error(
       `App-scoped fusebaseGateMeta missing or invalid for app "${featureId}" in fusebase.json`,
@@ -1672,7 +1734,7 @@ export function updateGateSdkPermissionsInFusebaseJson(
     permissions,
     resolvedAt,
   );
-  writeGateSnapshotToFeatureRaw(raw, featureId, next);
+  writeGateSnapshotToFeatureRaw(raw, featureId, next, projectRoot);
   writeFileSync(fuseJsonPath, JSON.stringify(raw, null, 2) + "\n", "utf-8");
   invalidateFuseConfigCache();
   return next;
@@ -1775,7 +1837,7 @@ function updateFusebaseJsonAppEntry(
   rewriteLegacyFeaturePathsInRaw(raw, projectRoot);
 
   const apps = Array.isArray(raw.apps) ? [...raw.apps] : [];
-  const featureIndex = getFeatureIndexById(raw, featureId);
+  const featureIndex = getFeatureIndexById(raw, featureId, projectRoot);
   if (featureIndex === -1) {
     throw new Error(`App "${featureId}" not found in fusebase.json`);
   }

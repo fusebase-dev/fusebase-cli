@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { fetchApps, updateApp } from "./api.ts";
 import type { App, AppAccessPrincipal, AppPermissions } from "./api.ts";
 import type { FeatureConfig } from "./config.ts";
-import { loadFuseConfig, writeBackendOnlyGatePermissionsToFusebaseJson } from "./config.ts";
+import { loadFuseConfig, requireAppId, resolveLocalAppFromFuseConfig, writeBackendOnlyGatePermissionsToFusebaseJson } from "./config.ts";
 import { analyzeFeatureGatePermissions } from "./gate-sdk-analyze.ts";
 import {
   buildSyncedBackendOnlyGatePermissions,
@@ -129,26 +129,22 @@ export async function syncAppGatePermissions(
     throw new Error("No fusebase.json found. Run fusebase init first.");
   }
 
-  const featureConfig = fuseConfig.apps?.find((item) => item.id === options.appId);
-  if (!featureConfig) {
-    throw new Error(
-      `App with ID '${options.appId}' is missing from local fusebase.json.`,
-    );
-  }
+  const featureConfig = resolveLocalAppFromFuseConfig(fuseConfig, options.appId);
   if (!featureConfig.path) {
     throw new Error(
       `App with ID '${options.appId}' is missing "path" in fusebase.json.`,
     );
   }
+  const appId = requireAppId(featureConfig);
 
   const appsResponse = await fetchApps(
     options.apiKey,
     options.orgId,
     options.productId,
   );
-  const app = appsResponse.apps.find((item) => item.id === options.appId);
+  const app = appsResponse.apps.find((item) => item.id === appId);
   if (!app) {
-    throw new Error(`App with ID '${options.appId}' not found on the platform.`);
+    throw new Error(`App with ID '${appId}' not found on the platform.`);
   }
 
   const { gatePermissions, backendOnlyGatePermissions, backendOnlyDeclaredInFusebaseJson } =
@@ -191,7 +187,7 @@ export async function syncAppGatePermissions(
     options.apiKey,
     options.orgId,
     options.productId,
-    options.appId,
+    appId,
     updateRequest,
   );
 
@@ -219,7 +215,7 @@ export async function syncAppGatePermissions(
     try {
       writeBackendOnlyGatePermissionsToFusebaseJson(
         cwd,
-        options.appId,
+        appId,
         backendOnlyGatePermissions,
       );
       if (!options.quiet) {

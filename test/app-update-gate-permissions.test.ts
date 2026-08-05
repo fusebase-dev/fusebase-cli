@@ -34,6 +34,24 @@ mock.module("../lib/api.ts", () => ({
 mock.module("../lib/config.ts", () => ({
   getConfig: () => ({ apiKey: "key" }),
   loadFuseConfig: () => ({ orgId: "o1", productId: "p1", apps: [localApp] }),
+  requireAppId: (app: { id?: string }) => {
+    if (!app.id) throw new Error("missing id");
+    return app.id;
+  },
+  resolveLocalAppFromFuseConfig: (
+    fuseConfig: { apps?: Record<string, unknown>[] },
+    appRef: string,
+  ) => {
+    const apps = fuseConfig.apps ?? [];
+    const match =
+      apps.find((app) => app.id === appRef) ??
+      apps.find(
+        (app) =>
+          app.key === appRef || app.path === appRef || app.subdomain === appRef,
+      );
+    if (!match) throw new Error(`App "${appRef}" not found in fusebase.json`);
+    return match;
+  },
   writeBackendOnlyGatePermissionsToFusebaseJson: () => {},
   writeAppPermissionsToFusebaseJson: (
     _projectRoot: string,

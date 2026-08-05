@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
@@ -6,6 +6,14 @@ import {
   updateGateSdkPermissionsInFusebaseJson,
   writeGateSdkOperationsToFusebaseJson,
 } from "../lib/config.ts";
+import {
+  ENVIRONMENTS_DIR,
+  overrideEnvironmentsFeatureForTests,
+  resetEnvironmentsStateForTests,
+  setEnvironmentOverride,
+  writeActiveEnvironmentState,
+  writeEnvironmentConfig,
+} from "../lib/environments.ts";
 
 describe("writeGateSdkOperationsToFusebaseJson", () => {
   it("shrinks usedOps when the analyzer reports fewer operations", () => {
@@ -287,5 +295,73 @@ describe("writeGateSdkOperationsToFusebaseJson", () => {
     ]);
 
     rmSync(dir, { recursive: true });
+  });
+});
+
+describe("writeGateSdkOperationsToFusebaseJson with env-stripped ids", () => {
+  it("writes fusebaseGateMeta by reverse-looking up platform id via environments/<name>.json", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fusebase-gate-env-"));
+    const prevCwd = process.cwd();
+    process.chdir(dir);
+
+    try {
+      resetEnvironmentsStateForTests();
+      overrideEnvironmentsFeatureForTests(true);
+      mkdirSync(join(dir, ENVIRONMENTS_DIR), { recursive: true });
+      writeEnvironmentConfig(dir, "beta", {
+        backend: "prod",
+        orgId: "org-beta",
+        productId: "prod-beta",
+        apps: {
+          "admin-area": { id: "49gxiw8zpz0xzmai" },
+          "customer-portal": { id: "8i1ibjmsxyw2q1he" },
+        },
+      });
+      writeActiveEnvironmentState(dir, "beta");
+      setEnvironmentOverride("beta");
+
+      writeFileSync(
+        join(dir, "fusebase.json"),
+        JSON.stringify(
+          {
+            apps: [
+              { key: "admin-area", path: "apps/admin-area", subdomain: "admin" },
+              {
+                key: "customer-portal",
+                path: "apps/customer-portal",
+                subdomain: "portal",
+              },
+            ],
+          },
+          null,
+          2,
+        ),
+      );
+
+      const analyzedAt = new Date().toISOString();
+      const snap = writeGateSdkOperationsToFusebaseJson(dir, "49gxiw8zpz0xzmai", {
+        analyzedAt,
+        usedOps: ["listIsolatedStores"],
+        sdkVersion: "2.0.0",
+      });
+
+      expect(snap.usedOps).toEqual(["listIsolatedStores"]);
+
+      const raw = JSON.parse(readFileSync(join(dir, "fusebase.json"), "utf-8")) as {
+        apps: Array<{
+          key?: string;
+          id?: string;
+          fusebaseGateMeta?: { usedOps: string[] };
+        }>;
+      };
+      expect(raw.apps[0]?.id).toBeUndefined();
+      expect(raw.apps[0]?.key).toBe("admin-area");
+      expect(raw.apps[0]?.fusebaseGateMeta?.usedOps).toEqual(["listIsolatedStores"]);
+      expect(raw.apps[1]?.fusebaseGateMeta).toBeUndefined();
+    } finally {
+      resetEnvironmentsStateForTests();
+      process.chdir(prevCwd);
+      rmSync(dir, { recursive: true });
+    }
   });
 });

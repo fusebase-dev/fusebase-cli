@@ -2,7 +2,14 @@ import { Command } from "commander";
 import { resolve } from "node:path";
 import { updateApp, fetchApps } from "../api.ts";
 import type { AppAccessPrincipal, AppPermissions } from "../api.ts";
-import { getConfig, loadFuseConfig } from "../config.ts";
+import {
+  getConfig,
+  loadFuseConfig,
+  requireAppId,
+  resolveLocalAppFromFuseConfig,
+  writeAppPermissionsToFusebaseJson,
+  writeBackendOnlyGatePermissionsToFusebaseJson,
+} from "../config.ts";
 import {
   formatPermissionItem,
   mergeFeaturePermissions,
@@ -14,10 +21,6 @@ import {
   unionStoredPermissions,
 } from "../permissions.ts";
 import { resolveGateSyncPermissions } from "../sync-app-gate-permissions.ts";
-import {
-  writeAppPermissionsToFusebaseJson,
-  writeBackendOnlyGatePermissionsToFusebaseJson,
-} from "../config.ts";
 
 export interface AppUpdateOptions {
   access?: string;
@@ -44,7 +47,11 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
   const { orgId, productId } = fuseConfig;
 
   if (!orgId || !productId) {
-    console.error("Error: fusebase.json is missing orgId or productId.");
+    console.error(
+      "Error: fusebase.json is missing orgId or productId" +
+        " (and no active environment supplied them)." +
+        " Select an environment with `fusebase env use <name>` or pass --env <name>.",
+    );
     process.exit(1);
   }
 
@@ -94,12 +101,36 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     }
   }
 
+  let featureConfig: ReturnType<typeof resolveLocalAppFromFuseConfig> | undefined;
+  let appId: string;
+  try {
+    featureConfig = resolveLocalAppFromFuseConfig(fuseConfig, appIdArg);
+    appId = requireAppId(featureConfig);
+  } catch {
+    // Platform id may target an app that exists remotely but is not declared in
+    // this project's fusebase.json (hand-operated update). Sync still requires a
+    // local path for analysis — that is checked below.
+    featureConfig = undefined;
+    appId = appIdArg;
+  }
+
+  if (options.syncGatePermissions && !featureConfig?.path) {
+    console.error(
+      featureConfig
+        ? `Error: App '${appIdArg}' is missing "path" in fusebase.json.`
+        : `Error: App "${appIdArg}" not found in fusebase.json` +
+            " (Gate permission sync needs a local apps[] entry with path)." +
+            " With named environments, select --env / `env use` so ids overlay from environments/<name>.json.",
+    );
+    process.exit(1);
+  }
+
   try {
     const appsResponse = await fetchApps(config.apiKey, orgId, productId);
-    const app = appsResponse.apps.find(f => f.id === appIdArg);
+    const app = appsResponse.apps.find((f) => f.id === appId);
 
     if (!app) {
-      console.error(`Error: App with ID '${appIdArg}' not found.`);
+      console.error(`Error: App with ID '${appId}' not found on the platform for this org/product.`);
       process.exit(1);
     }
 
@@ -108,13 +139,8 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     let backendOnlyGatePermissions: string[] | undefined;
     let backendOnlyDeclaredInFusebaseJson = false;
     if (options.syncGatePermissions) {
-      const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
-      if (!featureConfig) {
-        console.error(`Error: App with ID '${appIdArg}' is missing from local fusebase.json.`);
-        process.exit(1);
-      }
-      if (!featureConfig.path) {
-        console.error(`Error: App with ID '${appIdArg}' is missing "path" in fusebase.json.`);
+      if (!featureConfig?.path) {
+        console.error(`Error: App '${appIdArg}' is missing "path" in fusebase.json.`);
         process.exit(1);
       }
 
@@ -175,7 +201,7 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       config.apiKey,
       orgId,
       productId,
-      appIdArg,
+      appId,
       updateRequest
     );
 
@@ -205,7 +231,6 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         );
         // The same privileges live in fusebase.json once granted, and deploy reconcile
         // republishes from there — leaving them would re-grant on the next deploy.
-        const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
         // manualPermissions is hand-authored, so the CLI does not edit it; it is re-unioned
         // into the snapshot on every analyze and would re-grant silently.
         const stillDeclared = (featureConfig?.fusebaseGateMeta?.manualPermissions ?? []).filter(
@@ -221,7 +246,7 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
           try {
             writeAppPermissionsToFusebaseJson(
               resolve(process.cwd()),
-              appIdArg,
+              appId,
               removeGatePrivilegesFromPermissions(featureConfig.permissions, prunedGatePrivileges),
             );
             console.log("  fusebase.json: apps[].permissions pruned");
@@ -238,23 +263,25 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     // apps[].permissions is the durable record — the copy that survives a checkout elsewhere,
     // where the remote record is the only other one (NIM-42737).
     if (permissions !== undefined) {
-      const featureConfig = fuseConfig.apps?.find((item) => item.id === appIdArg);
       // Writing this entry makes reconcile PATCH the app to match it, so seed it from the remote
       // record when nothing is declared locally — otherwise the first grant would narrow the app
       // to a subset. Gate privileges are seeded minus the ones fusebaseGateMeta already
       // republishes, so --sync-gate-permissions can still prune the analyzed set.
-      const localPermissions = featureConfig
-        ? mergeFeaturePermissions({
-            manualPermissions: permissions,
-            existingPermissions:
-              featureConfig.permissions ??
-              seedPermissionsFromRemote(app.permissions, featureConfig.fusebaseGateMeta?.permissions),
-          })
-        : undefined;
+      if (!featureConfig) {
+        console.warn(
+          `  Warning: app '${appIdArg}' is not in fusebase.json, so the grant was not persisted locally. ` +
+            "`fusebase deploy` from a project that declares this app will revert it.",
+        );
+      } else {
+        const localPermissions = mergeFeaturePermissions({
+          manualPermissions: permissions,
+          existingPermissions:
+            featureConfig.permissions ??
+            seedPermissionsFromRemote(app.permissions, featureConfig.fusebaseGateMeta?.permissions),
+        });
 
-      if (localPermissions) {
         try {
-          writeAppPermissionsToFusebaseJson(resolve(process.cwd()), appIdArg, localPermissions);
+          writeAppPermissionsToFusebaseJson(resolve(process.cwd()), appId, localPermissions);
           console.log("  fusebase.json: apps[].permissions updated");
         } catch (error) {
           console.warn(
@@ -262,11 +289,6 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
               "The grant is on the app record but `fusebase deploy` will revert it.",
           );
         }
-      } else {
-        console.warn(
-          `  Warning: app '${appIdArg}' is not in fusebase.json, so the grant was not persisted locally. ` +
-            "`fusebase deploy` from a project that declares this app will revert it.",
-        );
       }
     }
 
@@ -283,7 +305,7 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
         try {
           writeBackendOnlyGatePermissionsToFusebaseJson(
             resolve(process.cwd()),
-            appIdArg,
+            appId,
             backendOnlyGatePermissions,
           );
           console.log(
@@ -304,7 +326,10 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
 
 export const appUpdateCommand = new Command("update")
   .description("Update an app's settings")
-  .argument("<appId>", "App ID to update")
+  .argument(
+    "<appId>",
+    "Platform app id, or (with named environments) stable key / path / subdomain from fusebase.json",
+  )
   .option("--access <principals>", "Set access principals, comma-separated (e.g., visitor, org roles like orgRole:member, or portal principals portalClient/portalManager/portalMember). REPLACES the whole list — run 'app get <appId>' first to see the current one")
   .option("--permissions <permissions>", "Set app permissions (format: dashboardView.dashboardId:viewId.read,write;database.id:databaseId.read;app_api.namespace.capability.read). Resource permissions replace the remote set; Gate privileges are added to it.")
   .option("--sync-gate-permissions", "Analyze this app path and sync generated Gate permissions. Merges with the privileges already granted on the app — nothing is removed without --prune-gate-permissions.")
