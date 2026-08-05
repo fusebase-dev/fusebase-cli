@@ -1,7 +1,7 @@
 ---
 version: "1.9.0"
 mcp_prompt: isolatedSql
-last_synced: "2026-07-01"
+last_synced: "2026-07-31"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -61,6 +61,8 @@ Load MCP prompt **`isolatedSqlMigrationDiscipline`** (`prompts_search`, groups `
 ### Data path (no DDL)
 
 Prefer structured APIs: **`getIsolatedStoreSqlStats`**, **`countIsolatedStoreSqlRows`**, **`selectIsolatedStoreSqlRows`**, **`insertIsolatedStoreSqlRow`**, **`batchInsertIsolatedStoreSqlRows`**, **`importIsolatedStoreSqlRows`**, **`updateIsolatedStoreSqlRows`**, **`deleteIsolatedStoreSqlRows`**. Raw: **`queryIsolatedStoreSql`** (read); **`executeIsolatedStoreSql`** — DML only, **no DDL**; schema only via **`applyIsolatedStoreSqlMigrations`**.
+Need several SQL steps for one user action? Send them as **one** **`runIsolatedStoreSqlBatch`** call instead of K sequential calls. Every SQL call pays a ~200-300ms infrastructure floor regardless of query cost; a batch pays it **once** and runs all operations in **one** transaction with the RLS context applied once.
+- **`runIsolatedStoreSqlBatch`**: up to **25** operations (`query`, `execute`, `count`, `select`, `insert`, `batchInsert`, `update`, `delete`); each operation carries the same fields as its single-operation request, while `rlsContext` / `trustedRuntimeContext` are set **once for the batch**. Results come back in request order. **All-or-nothing** — the first failure rolls the whole batch back and the error names the failing index. Each operation still needs its own permission. RLS-bypass reads and **`importIsolatedStoreSqlRows`** are **not** batchable. Each statement in a batch is bounded by a **30s** timeout.
 Runtime app path does **not** require a custom backend by default. Frontend/browser code can call Gate SDK methods such as **`selectIsolatedStoreSqlRows`**, **`countIsolatedStoreSqlRows`**, and other allowed structured operations directly with the app token. Add a feature backend only when you need privileged logic, external secrets, heavy orchestration, or non-user-context work.
 Runtime app path also does **not** require users to create secrets for Gate-resolved store identity. Do not put `storeId`, database IDs, physical database names, or provider connection details into app secrets/env. Resolve the store through Gate from the app token/source scope and stable alias, or use the platform-provided binding when available.
 Public/visitor apps can open with `--access=visitor`, but visitor tokens normally do **not** receive isolated-store permissions. For public portal reads/writes, use an app backend with a service token plus trusted portal/workspace context; do not expect direct visitor-token Gate SDK calls to the store to work.
@@ -164,5 +166,5 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 - **Version**: 1.9.0
 - **Category**: specialized
-- **Last synced**: 2026-07-01
+- **Last synced**: 2026-07-31
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

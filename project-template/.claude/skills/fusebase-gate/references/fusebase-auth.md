@@ -1,7 +1,7 @@
 ---
-version: "1.9.0"
+version: "1.10.0"
 mcp_prompt: fusebaseAuth
-last_synced: "2026-07-31"
+last_synced: "2026-08-05"
 title: "Fusebase Auth For AI Apps"
 category: specialized
 ---
@@ -19,6 +19,7 @@ category: specialized
 - [Architecture Rules](#architecture-rules)
 - [Org Onboarding](#org-onboarding)
 - [Public Registration With Org Membership](#public-registration-with-org-membership)
+- [Forward The Visitor's IP On Auth Calls](#forward-the-visitors-ip-on-auth-calls)
 - [Auth Operation Client Matrix](#auth-operation-client-matrix)
 - [`getMyOrgAccess` `source` Field](#getmyorgaccess-source-field)
 - [Gate Error Envelope Decoding](#gate-error-envelope-decoding)
@@ -80,6 +81,26 @@ Acceptance flows that require `registerFusebaseOrgMember` (create account **and*
 - Grant `org.members.write` on the app feature (`fusebase sync` / redeploy) before testing registration-with-membership.
 - For instant password-based onboarding, prefer `registerFusebaseOrgMember` with `autoConfirmEmail: true`. `autoConfirmClientInvite` is only for `addOrgUser` org-only client invites and does not affect auth-form account registration.
 - After success, set the returned `sessionId` as an app-domain cookie and verify membership with `getMyOrgAccess` (session header + feature token as documented for user-context reads).
+
+## Forward The Visitor's IP On Auth Calls
+
+auth-form rate-limits registration by client IP (5 per 24h). A backend-to-Gate call carries the **app backend's** egress IP, which is shared by every visitor of the app — so without forwarding, one visitor's signups exhaust the bucket for everyone. Every SDK method takes per-call `headers`, so pass the visitor's IP through on `registerFusebaseUser`, `registerFusebaseOrgMember`, `loginFusebaseUser`, `completeFusebaseAuthChallenge` and `requestFusebasePasswordRestore`:
+
+```ts
+// visitor IP as the platform edge saw it: leftmost entry of the inbound chain
+const visitorIp = (req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
+
+const authApi = new FusebaseAuthApi(createClient({ baseUrl }));
+await authApi.registerFusebaseUser({
+  body: { email, password, autoConfirmEmail: true },
+  ...(visitorIp ? { headers: { 'X-Forwarded-For': visitorIp } } : {}),
+});
+```
+
+- Take the IP **only** from the incoming request's `X-Forwarded-For` (app-wrapper forwards it) — never from the request body or a query param, which would let a caller pick its own limiter bucket per request.
+- Send the single leftmost entry, not the whole chain: intermediate hops append their own address and Gate reads the leftmost entry.
+- Omit the header when the inbound request has none (local `fusebase dev`); an absent header is better than a fabricated one.
+- Symptom of a missing forward: `-20` / `403` auth-form anti-abuse errors on registrations that are the first signup for that person but not for that app.
 
 ## Auth Operation Client Matrix
 
@@ -240,7 +261,7 @@ https://<app-host>/_auth/openid/microsoft?appSuccess=<urlencoded same-app-host U
 
 ## Version
 
-- **Version**: 1.9.0
+- **Version**: 1.10.0
 - **Category**: specialized
-- **Last synced**: 2026-07-31
+- **Last synced**: 2026-08-05
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
