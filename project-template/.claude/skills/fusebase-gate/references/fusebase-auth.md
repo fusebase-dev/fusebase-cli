@@ -33,8 +33,8 @@ category: specialized
 - [Challenge, 2FA, And MFA](#challenge-2fa-and-mfa)
 - [Password Restore](#password-restore)
 - [Google Auth](#google-auth)
-<% if (it.flags?.includes("direct-openid-login")) { %>  - [Google / Microsoft direct login (app-wrapper OpenID routes)](#google--microsoft-direct-login-app-wrapper-openid-routes)
-<% } %>- [Common Pitfalls](#common-pitfalls)
+  - [Google / Microsoft direct login (app-wrapper OpenID routes)](#google--microsoft-direct-login-app-wrapper-openid-routes)
+- [Common Pitfalls](#common-pitfalls)
 
 ---
 ## Fusebase Auth For AI Apps
@@ -217,7 +217,6 @@ Split the recipe so smoke tests don't grow the production attack surface and don
 - After the redirect flow produces a Fusebase session, the AI App should persist the app-domain session cookie and route to the requested relative path using the same redirect rules as email/password login.
 - Do not introduce a second Google Client ID in the AI App unless the Fusebase auth-form/OpenID configuration has explicitly been changed to trust it.
 
-<% if (it.flags?.includes("direct-openid-login")) { %>
 ### Google / Microsoft direct login (app-wrapper OpenID routes)
 
 For a one-click "Continue with Google / Microsoft" button on the **platform** OAuth client ids (apps must not register their own), link to the **app-wrapper** routes on the app host:
@@ -227,7 +226,6 @@ https://<app-host>/_auth/openid/google?appSuccess=<urlencoded same-app-host URL>
 https://<app-host>/_auth/openid/microsoft?appSuccess=<urlencoded same-app-host URL>
 ```
 
-<% } %>
 ## Common Pitfalls
 
 - Do not put these app routes under `/api/auth/*` in generated app backends; deployed platform proxies may reserve that prefix. Prefer `/api/account/*` or another app-owned prefix.

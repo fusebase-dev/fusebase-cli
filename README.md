@@ -947,7 +947,6 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
 | `password-invite` | Includes the `invite-with-password` skill (`needsInitialPassword` from `/auth/context` + Gate `setFusebaseInitialPassword`). Requires the platform flag `password_invite` on the target backend — dev only today. |
 | `notes-markdown` | Adds `notes.markdown.read` / `notes.markdown.write` to generated Gate MCP tokens. Requires the platform flag `notes_markdown` on the target backend. |
-| `direct-openid-login` | Includes the "Google / Microsoft direct login (app-wrapper OpenID routes)" section of the `fusebase-gate` auth reference — one-click `https://<app-host>/_auth/openid/{google,microsoft}` links on the platform OAuth client ids. Off (default): the section is omitted. |
 
 Enable a flag globally, then refresh the project template:
 
