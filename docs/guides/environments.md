@@ -118,6 +118,7 @@ fusebase env use <name> [--tokens]     # switch this checkout's active env
 fusebase deploy [--env <name>]         # deploy to the active (or named) env
 fusebase dev start [--env <name>]      # dev server against the active (or named) env
 fusebase env tokens [--env <name>]     # refresh MCP tokens for an env
+fusebase env provision-store [--env <name>]  # create/apply each app's isolated store in the env
 fusebase env remove <name> [--yes]     # delete local env files (lockfile + .env.<name>);
                                        # platform product/apps are NOT deleted
 fusebase env strip [--into <name>]     # move leftover ids (apps[].id, storeId) from
@@ -197,6 +198,47 @@ PW_USER_CLIENT_PASSWORD=…
 
 Test runners read both: same case set on every environment by construction.
 
+## Isolated stores per environment
+
+`fusebase deploy` creates the product, apps, and code — but **not** the app's
+isolated SQL store. A freshly-deployed environment therefore has no database to
+apply migrations against (Gate `listIsolatedStores` returns `[]`), and the app's
+backend 401s at runtime. Provisioning fills that gap:
+
+```bash
+fusebase env provision-store --env <name>   # create-or-get store, apply migrations,
+                                            # verify RLS, record storeId in the lockfile
+fusebase env provision-store --env <name> --dry-run   # show the plan, touch nothing
+```
+
+For each app with `isolatedStores.sql[]` it:
+
+1. **create-or-get** the Gate store (idempotent),
+2. **applies** the app's `postgres/migrations`,
+3. **verifies** migration status + RLS enforcement (warns loudly if a data table
+   has no row-level policy, or if the runtime role can bypass RLS),
+4. **records** the resolved `storeId` into `environments/<name>.json` under
+   `apps.<key>.stores.<alias>`.
+
+**Deploy runs this automatically** after reconcile and before code deploy, so a
+store-less environment is impossible to ship. Opt out with
+`fusebase deploy --skip-store-provision`, or provision by hand with the command
+above.
+
+### One org, many environments
+
+Managed store aliases are **unique per org**. Environments that share a backend
+org would otherwise collide on the same alias, so the Gate-side store alias is
+**env-suffixed** (`<alias>-<env>`). That suffix never reaches the lockfile or
+your app code: the lockfile records the storeId under the **logical** alias, and
+the runtime overlay substitutes the per-env `storeId`. Your app keeps asking for
+`todos`; each environment resolves to its own store. Isolation is by `storeId`
+plus RLS — not by alias.
+
+If the env-suffixed alias is already taken by a store this environment does not
+own, provisioning **fails with guidance** (use `--alias-suffix <s>` or a separate
+org) rather than touching someone else's database.
+
 ## Gotchas
 
 - **Hash-skip vs env metadata.** The frontend hash is computed from sources,
@@ -207,6 +249,11 @@ Test runners read both: same case set on every environment by construction.
 - **Same-backend environments collide on subdomains** unless you set
   `subdomainSuffix` or per-app `subdomain` overrides in the env file
   (`env clone --subdomain-suffix` does it for you).
+- **Same-org environments collide on store aliases.** Managed isolated-store
+  aliases are unique per org; `provision-store` env-suffixes the Gate alias so
+  many envs coexist in one org (see *Isolated stores per environment*). Deploy
+  provisions stores automatically — a store-less env that 401s at runtime means
+  provisioning was skipped (`--skip-store-provision`) or never run.
 - **`env tokens` needs a product.** A fresh env has no `productId` until the
   first `deploy --nocode` bootstraps it — the error message tells you so.
 - **Don't hand-edit resolved ids.** `id`/`productId`/store ids in env files
@@ -235,6 +282,7 @@ Test runners read both: same case set on every environment by construction.
 | Inspect | `fusebase env list` / `fusebase env status` |
 | Bootstrap on platform | `fusebase deploy --env <name> --nocode` |
 | Deploy | `fusebase deploy [--env <name>]` |
+| Provision stores | `fusebase env provision-store [--env <name>]` (auto-run by deploy) |
 | Tokens | `fusebase env tokens [--env <name>]` |
 | Remove (local files only) | `fusebase env remove <name>` (`--yes` for CI) |
 | Auth per backend | `fusebase auth` / `fusebase auth --dev` |

@@ -348,6 +348,14 @@ a successful deploy the resolved id is written back into the matching `apps[]` e
 | `--force` | Force re-upload and re-deploy regardless of frontend/backend hash match |
 | `--nocode` | Only reconcile infrastructure (bind/create apps on the platform, write back resolved ids); skip code build/upload/backend deploy |
 | `--app <app>` | Deploy only the app whose `subdomain`, `id`, `name`, or `path` matches |
+| `--skip-store-provision` | Skip the automatic isolated-store provisioning step (env mode) |
+
+In **env mode**, after reconcile and **before** code deploy, deploy auto-provisions each
+app's isolated SQL store in the target environment — create-or-get the Gate store, apply the
+app's migrations, verify RLS, and record the `storeId` in the env lockfile. This closes the
+first-deploy gap where an app shipped without a database (Gate `listIsolatedStores` → `[]`).
+It is idempotent; a failure aborts before code is shipped. Opt out with `--skip-store-provision`.
+See [`fusebase env provision-store`](#fusebase-env) for the standalone command.
 
 **Prerequisites:**
 
@@ -821,6 +829,7 @@ Design rationale: [docs/proposals/APP-ENVIRONMENTS.md](docs/proposals/APP-ENVIRO
 | `fusebase env use <name> [--tokens]` | Switch active env; offers re-auth for the backend and token refresh |
 | `fusebase env list` / `env status` | Envs with backend/org/auth; active env detail incl. per-app id resolution and MCP token freshness |
 | `fusebase env tokens [--env <name>]` | Write MCP tokens into `.env.<name>` (and materialize `.env` when active) |
+| `fusebase env provision-store [--env <name>] [--app <path\|key>] [--alias <alias>] [--alias-suffix <s>] [--dry-run] [--yes]` | Create-or-get each app's isolated SQL store in the env, apply migrations, verify RLS, and record `storeId` in the lockfile under the logical alias. Gate-side alias is env-suffixed (`<alias>-<env>`) because managed aliases are unique per org. Deploy runs this automatically |
 | `fusebase env remove <name> [--yes]` (alias `delete`) | Remove the env's **local** files (lockfile + `.env.<name>`, clears active state); deployed product/apps on the platform are NOT deleted |
 | `fusebase env strip [--into <name>]` | Move leftover env-specific ids (`apps[].id`, store `storeId`) from fusebase.json into an environment lockfile; ids unknown to every env are first recorded into the home env (matching org/product) or `--into` |
 

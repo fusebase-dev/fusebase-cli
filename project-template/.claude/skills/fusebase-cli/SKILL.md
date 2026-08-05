@@ -409,8 +409,17 @@ fusebase env use dev              # switch (offers re-auth + token refresh)
 fusebase env list                 # envs, backends, auth state
 fusebase env status               # active env: ids resolved? tokens fresh?
 fusebase env tokens               # write MCP tokens into .env.<active>
-fusebase deploy --env dev         # first deploy bootstraps product/apps in that org
+fusebase deploy --env dev         # first deploy bootstraps product/apps + provisions stores
+fusebase env provision-store --env dev   # (also run by deploy) create store, migrate, verify RLS
 ```
+
+If an app has an isolated SQL store (`isolatedStores.sql[]`), `deploy` also
+provisions it in the target env — create-or-get the store, apply migrations,
+verify RLS, and record the `storeId` in the lockfile — so a fresh env never
+serves code against a missing database. Store aliases are unique per org, so the
+Gate-side alias is env-suffixed automatically; your app code and the lockfile
+keep the logical alias. Provision by hand with `fusebase env provision-store`, or
+skip it with `fusebase deploy --skip-store-provision`.
 
 Any command accepts `--env <name>`; CI can use `FUSEBASE_ENV` +
 `FUSEBASE_API_KEY`. Auth is per backend: `fusebase auth --dev` and
@@ -539,6 +548,7 @@ Options:
 - `--force` — ignore hash matches and re-upload + redeploy every app
 - `--app <subdomain|id|name|path>` — deploy only the matching app
 - `--nocode` — only reconcile infrastructure (bind/create apps on the platform), skip code deployment
+- `--skip-store-provision` — skip automatic isolated-store provisioning (env mode)
 
 The project template includes ESLint (`npm run lint`) and root `npm run typecheck` (TypeScript across apps — catches errors ESLint does not). Run both before saying "Done" so deploy succeeds; see AGENTS.md "Final Gate". Claude Code runs lint and typecheck on Stop via `.claude/settings.json` hooks.
 

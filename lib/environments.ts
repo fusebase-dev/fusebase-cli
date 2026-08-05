@@ -548,6 +548,29 @@ export function writeEnvironmentAppResolution(
   writeEnvironmentConfig(projectRoot, envName, { ...config, apps });
 }
 
+/**
+ * Persist a provisioned isolated-store id into `environments/<name>.json`,
+ * keyed by the app's LOGICAL store alias (from fusebase.json). The runtime
+ * overlay substitutes this storeId into `isolatedStores.sql[].storeId`, so the
+ * app keeps asking for its logical alias while each environment resolves to its
+ * own store. The Gate-side store alias may be env-suffixed for org uniqueness;
+ * that suffix never leaks into the lockfile or app code.
+ */
+export function writeEnvironmentStoreId(
+  projectRoot: string,
+  envName: string,
+  appKey: string,
+  storeAlias: string,
+  storeId: string,
+): void {
+  const config = loadEnvironmentConfig(projectRoot, envName);
+  const apps = { ...(config.apps ?? {}) };
+  const entry: EnvironmentAppEntry = { ...(apps[appKey] ?? {}) };
+  entry.stores = { ...(entry.stores ?? {}), [storeAlias]: storeId };
+  apps[appKey] = entry;
+  writeEnvironmentConfig(projectRoot, envName, { ...config, apps });
+}
+
 /** Persist a reconcile-created productId into `environments/<name>.json`. */
 export function writeEnvironmentProductId(
   projectRoot: string,

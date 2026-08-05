@@ -26,12 +26,19 @@ import {
   getRawConfig,
   getEnv,
   hasFlag,
+  loadFuseConfig as loadFullFuseConfig,
   normalizeRawFuseConfigShape,
   rewriteLegacyFeaturePathsInRaw,
   invalidateFuseConfigCache,
   setProcessEnvOverride,
+  type FeatureConfig,
 } from "../config";
 import { fetchOrgs, type Organization } from "../api";
+import {
+  provisionStoresForEnvironment,
+  StoreAliasCollisionError,
+  type ProvisionAppInput,
+} from "../provision-store";
 import {
   ENVIRONMENTS_FLAG,
   environmentsFeatureEnabled,
@@ -51,6 +58,7 @@ import {
   writeActiveEnvironmentState,
   writeEnvironmentAppResolution,
   writeEnvironmentConfig,
+  environmentAppKey,
   type ActiveEnvironment,
   type EnvironmentAppEntry,
   type EnvironmentBackend,
@@ -1055,6 +1063,122 @@ async function runEnvTokens(options: { env?: string; force?: boolean }): Promise
   await runTokensForEnvironment(active, options.force !== false);
 }
 
+// --- provision-store ---------------------------------------------------------
+
+type ProvisionStoreCliOptions = {
+  env?: string;
+  app?: string;
+  alias?: string;
+  aliasSuffix?: string;
+  dryRun?: boolean;
+  yes?: boolean;
+};
+
+/**
+ * `fusebase env provision-store` — stand up each app's isolated SQL store in the
+ * target environment: create-or-get the store, apply the app's migrations,
+ * verify RLS, and record the resolved storeId into `environments/<env>.json`.
+ *
+ * Closes the first-deploy gap: `fusebase deploy` creates product + apps + code
+ * but never the store, so a fresh environment's backend has no database to
+ * apply migrations against (Gate `listIsolatedStores` returns []). The shared
+ * core lives in ../provision-store and is also invoked from `fusebase deploy`.
+ */
+async function runProvisionStore(options: ProvisionStoreCliOptions): Promise<void> {
+  requireEnvironmentsFlag();
+  const cwd = process.cwd();
+  if (options.env) setEnvironmentOverride(options.env);
+
+  const active = getActiveEnvironment(cwd);
+  if (!active) {
+    console.error(
+      "Error: no active environment. Select one with `fusebase env use <name>` or pass --env <name>.",
+    );
+    process.exit(1);
+  }
+  const { config } = active;
+  if (config.backend === "local") {
+    console.error("Error: provision-store needs a dev or prod backend.");
+    process.exit(1);
+  }
+  const productId = config.productId;
+  if (!productId) {
+    console.error(
+      `Error: environment "${active.name}" has no productId yet. Run \`fusebase deploy --env ${active.name} --nocode\` first (reconcile creates the product + apps).`,
+    );
+    process.exit(1);
+  }
+  if (config.protected && options.yes !== true && !options.dryRun) {
+    console.error(
+      `Refusing to provision stores in protected environment "${active.name}" without --yes.`,
+    );
+    process.exit(1);
+  }
+
+  const apiKey = getConfig().apiKey;
+  if (!apiKey) {
+    const hint = config.backend === "dev" ? "fusebase auth --dev" : "fusebase auth";
+    console.error(`Error: no API key for backend "${config.backend}". Run '${hint}' first.`);
+    process.exit(1);
+  }
+
+  // Resolve apps with SQL stores, injecting each app's env-specific id (from the
+  // lockfile) so the migration bundle can be built.
+  const fuseConfig = loadFullFuseConfig();
+  const apps: ProvisionAppInput[] = [];
+  for (const app of fuseConfig?.apps ?? []) {
+    if ((app.isolatedStores?.sql?.length ?? 0) === 0) continue;
+    const key = environmentAppKey(app);
+    if (!key) continue;
+    if (options.app && app.path !== options.app && key !== options.app) continue;
+    const envAppId = config.apps?.[key]?.id;
+    if (!envAppId) {
+      console.error(
+        `Error: app "${key}" is not deployed in env "${active.name}" (no id in lockfile). Run \`fusebase deploy --env ${active.name} --nocode\` first.`,
+      );
+      process.exit(1);
+    }
+    apps.push({ key, appConfig: { ...app, id: envAppId } as FeatureConfig });
+  }
+  if (apps.length === 0) {
+    console.log("No apps with isolatedStores.sql[] to provision.");
+    return;
+  }
+
+  console.log(
+    `Provisioning stores — env ${active.name} (backend ${config.backend}, org ${config.orgId})`,
+  );
+  try {
+    const results = await provisionStoresForEnvironment({
+      cwd,
+      envName: active.name,
+      backend: config.backend,
+      orgId: config.orgId,
+      productId,
+      apps,
+      apiKey,
+      alias: options.alias,
+      aliasSuffix: options.aliasSuffix,
+      dryRun: options.dryRun,
+      log: (line) => console.log(line),
+      warn: (line) => console.warn(line),
+    });
+    if (options.dryRun) {
+      console.log("Dry run — no stores created, no migrations applied, lockfile untouched.");
+    } else {
+      console.log(
+        `\n✓ Provisioned ${results.length} store(s). storeIds recorded in ${active.filePath}.`,
+      );
+    }
+  } catch (error) {
+    if (error instanceof StoreAliasCollisionError) {
+      console.error(`Error: ${error.message}`);
+      process.exit(1);
+    }
+    throw error;
+  }
+}
+
 // --- command wiring ------------------------------------------------------------
 
 export const envCommand = new Command("env")
@@ -1191,6 +1315,29 @@ envCommand
   .action(async (options: { env?: string; force?: boolean }) => {
     try {
       await runEnvTokens(options);
+    } catch (error) {
+      console.error("Error:", error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+envCommand
+  .command("provision-store")
+  .description(
+    "Create each app's isolated SQL store in an environment, apply migrations, verify RLS, and record storeIds in the lockfile",
+  )
+  .option("--env <name>", "Target environment (default: active)")
+  .option("--app <app>", "Only this app (path or key from fusebase.json)")
+  .option("--alias <alias>", "Only this isolated store alias")
+  .option(
+    "--alias-suffix <suffix>",
+    "Gate-side alias suffix for org uniqueness (default: environment name)",
+  )
+  .option("--dry-run", "Show what would be provisioned without calling Gate", false)
+  .option("--yes", "Confirm provisioning in a protected environment", false)
+  .action(async (options: ProvisionStoreCliOptions) => {
+    try {
+      await runProvisionStore(options);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);
       process.exit(1);

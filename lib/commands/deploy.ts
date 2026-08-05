@@ -53,6 +53,11 @@ import {
   injectEnvInfoIntoIndexHtml,
   writeEnvironmentProductId,
 } from "../environments";
+import {
+  provisionStoresForEnvironment,
+  StoreAliasCollisionError,
+  type ProvisionAppInput,
+} from "../provision-store";
 import { readEnvFileMap } from "./steps/create-env";
 import { getFusebaseAppHostForBackend } from "../config";
 import {
@@ -609,7 +614,17 @@ export const deployCommand = new Command("deploy")
     "--app <app>",
     "Deploy only the app matching this subdomain, id, name, or path",
   )
-  .action(async (opts: { force?: boolean; nocode?: boolean; app?: string }) => {
+  .option(
+    "--skip-store-provision",
+    "Skip auto-provisioning of isolated stores in the target environment",
+  )
+  .action(
+    async (opts: {
+      force?: boolean;
+      nocode?: boolean;
+      app?: string;
+      skipStoreProvision?: boolean;
+    }) => {
     const force = opts.force ?? false;
     const nocode = opts.nocode ?? false;
     // Check if app is initialized
@@ -778,6 +793,52 @@ export const deployCommand = new Command("deploy")
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Error: Failed to reconcile apps: ${message}`);
       process.exit(1);
+    }
+
+    // Provision each app's isolated store in this environment before serving.
+    // Deploy creates apps + code but never the store, so without this a fresh
+    // env has no database (Gate listIsolatedStores → []) and the app's backend
+    // 401s at runtime. Idempotent (create-or-get); runs before code deploy so a
+    // failure aborts before shipping code. Opt out with --skip-store-provision.
+    // Env mode only — legacy single-env projects keep storeIds in fusebase.json.
+    if (activeEnvironment && !opts.skipStoreProvision) {
+      const storeApps: ProvisionAppInput[] = deployTargets
+        .filter((t) => (t.appConfig.isolatedStores?.sql?.length ?? 0) > 0)
+        .map((t) => ({
+          key:
+            environmentAppKey(t.appConfig) ??
+            t.appConfig.subdomain ??
+            t.appId,
+          appConfig: { ...t.appConfig, id: t.appId },
+        }));
+      if (storeApps.length > 0) {
+        console.log("\nProvisioning isolated stores...");
+        try {
+          await provisionStoresForEnvironment({
+            cwd: process.cwd(),
+            envName: activeEnvironment.name,
+            backend: activeEnvironment.config.backend,
+            orgId: fuseConfig.orgId,
+            productId: fuseConfig.productId,
+            apps: storeApps,
+            apiKey: config.apiKey,
+            log: (line) => console.log(line),
+            warn: (line) => console.warn(line),
+          });
+        } catch (error) {
+          const message =
+            error instanceof StoreAliasCollisionError
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : String(error);
+          console.error(`Error: Failed to provision isolated stores: ${message}`);
+          console.error(
+            "(Deploy aborted before code deployment. Fix the store, or pass --skip-store-provision to deploy code without it.)",
+          );
+          process.exit(1);
+        }
+      }
     }
 
     // `--nocode`: infrastructure only. Reconcile already bound/created the
