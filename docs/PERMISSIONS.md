@@ -299,11 +299,25 @@ win over the remote ones. And since nothing shrinks the gate set by itself,
 `app_magic_link.client_invite` cannot be granted this way: its action segment is outside the
 set the platform can mint into a token, so it fails the shape check.
 
-> **App API policy extensions are not enforced yet.** `x-fusebase-required-permissions` and
-> `x-fusebase-allowed-callers` in an app's `openapi.json` are validated by `fusebase api validate`
-> but are **currently ignored at runtime** — the publish path does not propagate them, so
-> `listAppApiOperations` reports an empty policy and `callAppApi` enforces nothing.
-> Granting `app_api.*` today makes the grant durable ahead of enforcement (NIM-42740 / B1).
+> **App API policy extensions are enforced when the platform enables them.**
+> `x-fusebase-required-permissions` and `x-fusebase-allowed-callers` in an app's `openapi.json` are
+> published to the registry and read by `callAppApi` (NIM-42740 / B1). They were **ignored at
+> runtime before that change** — the publish path dropped them, so `listAppApiOperations` reported
+> an empty policy for every operation. Enforcement itself is behind a Gate feature flag
+> (`app_api_policy_enforcement`) and is rolled out per environment; an operation that declares no
+> policy is never restricted. Grant the `app_api.*` capabilities a peer app requires **before**
+> enforcement reaches your environment, or its callers start getting `403 app_api_missing_permissions`.
+>
+> A caller id in `x-fusebase-allowed-callers` is the **calling project's `productId`**
+> (`client:<productId>`), not an app id — the platform identifies a caller by the `client` scope
+> of its token, which holds the product. `app:<id>` is accepted by `fusebase api validate` but is
+> matched against the same `productId`, so `app:<apps[].id>` never matches and would deny the
+> intended caller once enforcement is on. Apps in one project share a caller identity; use
+> `x-fusebase-required-permissions` to separate them.
+>
+> A capability must be spelled `app_api.<namespace>.<capability>.<action>` in lowercase to be
+> grantable. `fusebase api validate` also accepts camelCase and hyphens, but the platform cannot
+> mint those, so an operation declaring one is rejected with a `400` naming it.
 
 **2. Derived from Gate SDK usage analysis**
 

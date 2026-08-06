@@ -91,10 +91,10 @@ If the task references **another Fusebase app in the same organization** and ask
 **Security-sensitive operations:**
 
 - Prefer contract-level policy over ad hoc shared secrets when the platform supports it.
-- Use `x-fusebase-allowed-callers` to restrict which caller app/client may invoke the operation.
+- Use `x-fusebase-allowed-callers` to restrict which caller project may invoke the operation — a caller id is the calling project's `productId` (`client:<productId>`), not an app id.
 - Use `x-fusebase-required-permissions` only with the `app_api.<namespace>.<capability>.<action>` format, for example `app_api.client_portal.provision.write`.
 - Treat `allowedCallers` as caller identity and `requiredPermissions` as caller capability; do not mix these concerns.
-- **Both extensions are currently ignored at runtime** — the publish path does not propagate them yet, so `callAppApi` enforces nothing. Declare them and grant the capability to caller apps now (`fusebase app update <callerAppId> --permissions "app_api.<namespace>.<capability>.<action>"`), but never make them your only authorization check.
+- **Enforcement arrives per environment.** Both extensions are published now, but `callAppApi` only enforces them where the platform has switched enforcement on. Declare them and grant the capability to caller apps now (`fusebase app update <callerAppId> --permissions "app_api.<namespace>.<capability>.<action>"`) so the grants are in place, but never make them your only authorization check.
 
 **Anti-patterns:**
 
