@@ -1,7 +1,7 @@
 ---
-version: "1.2.0"
+version: "1.1.0"
 mcp_prompt: bootstrap
-last_synced: "2026-08-05"
+last_synced: "2026-08-06"
 title: "Bootstrap"
 category: meta
 ---
@@ -26,14 +26,13 @@ You are connecting to a Model Context Protocol (MCP) server for Fusebase Platfor
 
 ## Defaults Rule
 
-Apply `defaults.toolArgs` ONLY to tools whose input schema declares `scope_type` and `scope_id` and you did not provide them:
+If a tool call requires `scope_type` and `scope_id` and you did not provide them:
 - Use the values from `defaults.toolArgs` in the connection context.
 - If you provide these arguments explicitly, they always take precedence over defaults.
-- Do NOT send `scope_type`/`scope_id` to a tool that does not declare them (check the tool's inputSchema via `tools_describe`). Some operations take `orgId` instead and reject unknown properties (`additionalProperties: false`). For those, pass `auth.org.id` as the required id (e.g. `orgId`).
 
 ## Important Notes
 
-- The organization scope (`scope_type = "org"`) is the default and most common scope for tools that declare scope arguments.
+- The organization scope (`scope_type = "org"`) is the default and most common scope.
 - Use the organization `scope_id` from the connection context when a tool requires scope arguments and no other scope is specified.
 
 - Treat all `scope_id` values as opaque strings.
@@ -84,7 +83,7 @@ Proceed by loading the connection context first, then discover available tools.
 
 ## Version
 
-- **Version**: 1.2.0
+- **Version**: 1.1.0
 - **Category**: meta
-- **Last synced**: 2026-08-05
+- **Last synced**: 2026-08-06
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
