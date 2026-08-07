@@ -104,13 +104,28 @@ function runDeclarative(appPath: string, secrets: AppSecretDeclaration[]): void 
     }
   }
 
-  feature.secrets = merged;
-
+  // NIM-43138: write back into the RAW on-disk file, not the object returned by
+  // `loadFuseConfig()` — that one carries the active environment's overlay
+  // (orgId/productId/app ids/subdomains), which must never be persisted into the
+  // env-neutral fusebase.json.
   const raw = readFileSync(fuseJsonPath, "utf-8");
   const indent = detectIndent(raw);
+  const rawConfig = JSON.parse(raw) as Record<string, unknown>;
+  const rawApps = (rawConfig.apps ?? rawConfig.features) as
+    | Record<string, unknown>[]
+    | undefined;
+  const rawApp = rawApps?.find(
+    (a) => a && typeof a === "object" && a.path === appPath,
+  );
+  if (!rawApp) {
+    console.error(`Error: App "${appPath}" not found in ${FUSE_JSON}.`);
+    process.exit(1);
+  }
+  rawApp.secrets = merged;
+
   writeFileSync(
     fuseJsonPath,
-    JSON.stringify(fuseConfig, null, indent) + "\n",
+    JSON.stringify(rawConfig, null, indent) + "\n",
     "utf-8",
   );
   invalidateFuseConfigCache();

@@ -24,7 +24,7 @@ interface RunResult {
 
 async function runCli(
   args: string[],
-  opts: { cwd: string; home: string },
+  opts: { cwd: string; home: string; env?: string },
 ): Promise<RunResult> {
   const proc = Bun.spawn({
     cmd: ["bun", CLI_ENTRY, ...args],
@@ -34,6 +34,7 @@ async function runCli(
       HOME: opts.home,
       USERPROFILE: opts.home,
       FUSEBASE_DISABLE_ANALYTICS: "1",
+      ...(opts.env ? { FUSEBASE_ENV: opts.env } : {}),
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -52,7 +53,10 @@ interface Workspace {
   cleanup: () => void;
 }
 
-function setupWorkspace(flags: string[]): Workspace {
+function setupWorkspace(
+  flags: string[],
+  fuseJson?: Record<string, unknown>,
+): Workspace {
   const root = mkdtempSync(join(tmpdir(), "fusebase-secret-create-"));
   const cwd = join(root, "project");
   const home = join(root, "home");
@@ -70,7 +74,7 @@ function setupWorkspace(flags: string[]): Workspace {
   writeFileSync(
     fuseJsonPath,
     JSON.stringify(
-      {
+      fuseJson ?? {
         orgId: "org-1",
         productId: "prod-1",
         apps: [{ subdomain: "my-app", path: "apps/my-app" }],
@@ -113,5 +117,53 @@ describe("fusebase secret create", () => {
     expect(cfg.apps[0].secrets).toEqual([
       { key: "STRIPE_KEY", description: "Stripe secret" },
     ]);
+  });
+});
+
+// NIM-43138: with named environments the loaded config is env-overlaid; the
+// write must stay on the raw env-neutral file.
+describe("fusebase secret create with a stripped manifest + active env", () => {
+  let ws: Workspace;
+  afterEach(() => ws?.cleanup());
+
+  beforeEach(() => {
+    ws = setupWorkspace(["environments"], {
+      apps: [{ subdomain: "my-app", name: "My App", path: "apps/my-app" }],
+    });
+    mkdirSync(join(ws.cwd, "environments"), { recursive: true });
+    writeFileSync(
+      join(ws.cwd, "environments", "beta.json"),
+      JSON.stringify(
+        {
+          backend: "prod",
+          orgId: "org-beta",
+          productId: "prod-beta",
+          subdomainSuffix: "-beta",
+          apps: { "my-app": { id: "app-beta-1", subdomain: "my-app-beta" } },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+  });
+
+  it("adds only secrets[] and leaves the manifest env-neutral", async () => {
+    const res = await runCli(CREATE_ARGS, {
+      cwd: ws.cwd,
+      home: ws.home,
+      env: "beta",
+    });
+    expect(res.exitCode).toBe(0);
+
+    const cfg = JSON.parse(readFileSync(ws.fuseJsonPath, "utf-8"));
+    expect(cfg.apps[0].secrets).toEqual([
+      { key: "STRIPE_KEY", description: "Stripe secret" },
+    ]);
+    expect(cfg.orgId).toBeUndefined();
+    expect(cfg.productId).toBeUndefined();
+    expect(cfg.env).toBeUndefined();
+    expect(cfg.apps[0].id).toBeUndefined();
+    expect(cfg.apps[0].subdomain).toBe("my-app");
   });
 });
