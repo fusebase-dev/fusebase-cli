@@ -69,6 +69,7 @@ import {
   GATE_MCP_POLICY_FP_KEY,
   matchesCurrentOrLegacyFallback,
 } from "../mcp-token-policy";
+import { findStaleIdeMcpConfigs } from "../ide-mcp-config";
 import { runAuthFlow } from "./steps/auth-flow";
 
 const FUSE_JSON = "fusebase.json";
@@ -157,17 +158,18 @@ function printProtectedBanner(env: ActiveEnvironment): void {
 
 // --- token flow (shared by legacy `env create` and `env tokens`) ------------
 
-async function offerIdeRefresh(cwd: string): Promise<void> {
-  if (!isTty()) return;
+async function offerIdeRefresh(
+  cwd: string,
+  message = "Tokens updated. Update MCP configs for all IDEs now? (runs `fusebase config ide --force`)",
+): Promise<void> {
   let shouldRunIdeRefresh = false;
-  try {
-    shouldRunIdeRefresh = await confirm({
-      message: "Tokens updated. Update MCP configs for all IDEs now? (runs `fusebase config ide --force`)",
-      default: true,
-    });
-  } catch {
-    // Prompt can be interrupted; treat as refusal and show manual step.
-    shouldRunIdeRefresh = false;
+  if (isTty()) {
+    try {
+      shouldRunIdeRefresh = await confirm({ message, default: true });
+    } catch {
+      // Prompt can be interrupted; treat as refusal and show manual step.
+      shouldRunIdeRefresh = false;
+    }
   }
 
   if (!shouldRunIdeRefresh) {
@@ -182,6 +184,23 @@ async function offerIdeRefresh(cwd: string): Promise<void> {
     force: true,
   });
   printIdeSetupResults(ideResult, presets);
+  console.log("  Reconnect/restart your IDE's MCP servers to pick up the new tokens.");
+}
+
+/**
+ * IDE MCP configs bake the tokens in as literals, so a `.env` switch leaves
+ * them authenticating as the PREVIOUS environment. Refresh them (or, outside a
+ * TTY, print the command) whenever they disagree with the active env.
+ */
+async function reconcileIdeMcpConfigs(cwd: string, envFileName: string): Promise<void> {
+  const envMap = await readEnvFileMap(cwd, envFileName);
+  const stale = await findStaleIdeMcpConfigs(cwd, envMap);
+  if (stale.length === 0) return;
+
+  console.warn(
+    `⚠ IDE MCP configs still hold another environment's tokens: ${stale.map((s) => s.path).join(", ")}`,
+  );
+  await offerIdeRefresh(cwd, "Refresh IDE MCP configs for this environment now? (runs `fusebase config ide --force`)");
 }
 
 /**
@@ -706,10 +725,14 @@ async function runEnvUse(name: string, options: { tokens?: boolean }): Promise<v
 
   // Per-env dotenv.
   const envFile = getEnvironmentEnvFilePath(cwd, name);
+  // `runTokensForEnvironment` already offers the IDE refresh; only the paths
+  // that skip it have to reconcile the (now stale) IDE MCP configs themselves.
+  let tokensFlowRan = false;
   if (!existsSync(envFile)) {
     if (options.tokens) {
       const active = getActiveEnvironment(cwd);
       if (active) await runTokensForEnvironment(active, true);
+      tokensFlowRan = Boolean(active);
     } else if (isTty()) {
       let createTokens = false;
       try {
@@ -723,6 +746,7 @@ async function runEnvUse(name: string, options: { tokens?: boolean }): Promise<v
       if (createTokens) {
         const active = getActiveEnvironment(cwd);
         if (active) await runTokensForEnvironment(active, true);
+        tokensFlowRan = Boolean(active);
       } else {
         console.log(`Next: run \`fusebase env tokens\` to create .env.${name}.`);
       }
@@ -737,8 +761,13 @@ async function runEnvUse(name: string, options: { tokens?: boolean }): Promise<v
   } else if (options.tokens) {
     const active = getActiveEnvironment(cwd);
     if (active) await runTokensForEnvironment(active, true);
+    tokensFlowRan = Boolean(active);
   } else if (materializeActiveEnvFile(cwd, name)) {
     console.log(`✓ Materialized .env from .env.${name}`);
+  }
+
+  if (!tokensFlowRan && existsSync(envFile)) {
+    await reconcileIdeMcpConfigs(cwd, `.env.${name}`);
   }
 }
 
@@ -1041,6 +1070,18 @@ async function runEnvStatus(): Promise<void> {
       console.log(
         `  tokens:    ${envFileName} ${fresh ? "ok" : "STALE policy — run `fusebase env tokens`"}`,
       );
+    }
+
+    // IDE MCP configs carry the tokens as literals — they do not follow `.env`.
+    const stale = await findStaleIdeMcpConfigs(cwd, envMap);
+    if (stale.length > 0) {
+      console.log(
+        `  ide mcp:   STALE — ${stale
+          .map((s) => `${s.path} (${s.servers.join(", ")})`)
+          .join(", ")} still hold another environment's tokens. Run \`fusebase config ide --force\` and reconnect MCP in your IDE.`,
+      );
+    } else {
+      console.log("  ide mcp:   ok");
     }
   }
 }

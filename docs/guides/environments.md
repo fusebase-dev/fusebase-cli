@@ -113,7 +113,8 @@ fusebase env tokens           # MCP tokens for the active env → .env.dev (+ .e
 
 ```bash
 fusebase env list                      # environments: backend, org, auth state, active marker
-fusebase env status [--env <name>]     # org/product, auth, per-app id resolution, token freshness
+fusebase env status [--env <name>]     # org/product, auth, per-app id resolution, token freshness,
+                                       # IDE MCP config drift
 fusebase env use <name> [--tokens]     # switch this checkout's active env
 fusebase deploy [--env <name>]         # deploy to the active (or named) env
 fusebase dev start [--env <name>]      # dev server against the active (or named) env
@@ -152,6 +153,20 @@ Run each once — commands pick the key matching the target env's backend.
 `env list`/`env status` show per-backend auth state. If you see
 `auth legacy-key`, run the matching `fusebase auth [--dev]` once to bind the
 key to its backend explicitly.
+
+## IDE MCP configs follow the active env
+
+The generated IDE MCP configs (`.mcp.json`, `.cursor/mcp.json`,
+`.vscode/mcp.json`, `opencode.json`, `.codex/config.toml`, `mcp_example.json`)
+embed the Dashboards/Gate bearer tokens as **literals** — they do not read
+`.env` at connect time. Switching environments therefore leaves them
+authenticating as the previous env until they are regenerated.
+
+`fusebase env use <name>` compares the tokens in those files against
+`.env.<name>` and, when they disagree, offers `fusebase config ide --force`
+(prints it as the next step outside a TTY). `fusebase env status` reports the
+same drift on its `ide mcp:` line. After regenerating, **reconnect/restart the
+MCP servers in the IDE** — a live session keeps the old token.
 
 CI: `FUSEBASE_API_KEY` overrides everything —
 `FUSEBASE_ENV=prod-test FUSEBASE_API_KEY=$KEY fusebase deploy --nocode`.
