@@ -156,6 +156,7 @@ Two separate boundaries decide whether a rewritten host works. Activation is key
 ## Access Model
 
 - `createAppMagicLink`, `bulkCreateAppMagicLinks`, `revokeAppMagicLink`, and `listAppMagicLinks` all require `app_magic_link.write` plus org access. Granted by default to `owner`, `manager`, `member`, and `guest` org roles via the existing `GATE_ALL_PERMISSIONS` set.
+- Grant the app `app_magic_link.write` through `apps[].backendOnlyGatePermissions` in `fusebase.json` + `fusebase app update <id> --sync-gate-permissions`, **not** `--permissions`: the CLI accepts either, but `--permissions` embeds it in the browser/visitor `gst`, where it can mint sign-in links for arbitrary emails.
 - `requestAppMagicLink` and `activateAppMagicLink` are visitor endpoints (no permission, no session). The policy is enforced inside nimbus-ai by re-evaluating `accessPrincipals` against the resolved user.
 
 ## `accessPrincipals` Vs Org Membership

@@ -11,11 +11,14 @@ import {
   writeBackendOnlyGatePermissionsToFusebaseJson,
 } from "../config.ts";
 import {
+  findBrowserSensitiveGatePrivileges,
   formatPermissionItem,
   mergeFeaturePermissions,
   mergeSyncedGatePermissions,
   parsePermissions,
   parsePrincipals,
+  readBackendOnlyGatePermissionsFromFeature,
+  readGatePrivilegesFromPermissions,
   removeGatePrivilegesFromPermissions,
   seedPermissionsFromRemote,
   unionStoredPermissions,
@@ -114,6 +117,26 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     appId = appIdArg;
   }
 
+  const declaredBackendOnly = featureConfig
+    ? readBackendOnlyGatePermissionsFromFeature(featureConfig)
+    : [];
+
+  // A hand-granted privilege skips the analyzed-set split, so a browser-unsafe one lands in
+  // the visitor gst (NIM-43139). Declaring it backend-only keeps it out — say so.
+  if (permissions !== undefined) {
+    const declared = new Set(declaredBackendOnly);
+    const bleeding = findBrowserSensitiveGatePrivileges(
+      readGatePrivilegesFromPermissions(permissions),
+    ).filter((privilege) => !declared.has(privilege));
+    if (bleeding.length > 0) {
+      console.warn(
+        `Warning: ${bleeding.join(", ")} will be embedded in the browser/visitor token. ` +
+          "Declare it in apps[].backendOnlyGatePermissions in fusebase.json and run " +
+          "`app update --sync-gate-permissions` to keep it backend-only.",
+      );
+    }
+  }
+
   if (options.syncGatePermissions && !featureConfig?.path) {
     console.error(
       featureConfig
@@ -172,6 +195,19 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       backendOnlyDeclaredInFusebaseJson = resolved.backendOnlyDeclaredInFusebaseJson;
     }
 
+    // Manual grants are unioned in after the analyzed set was split, so a privilege declared
+    // backend-only would ride back into the browser gst — and into apps[].permissions, from
+    // where deploy republishes it — through --permissions (NIM-43139). Subtracted from the
+    // merged result, not from `permissions` itself: an emptied manual set reads as
+    // "clear the resource permissions".
+    const backendOnly = backendOnlyGatePermissions ?? declaredBackendOnly;
+    const withoutBackendOnly = (
+      merged: AppPermissions | undefined,
+    ): AppPermissions | undefined =>
+      merged && backendOnly.length > 0
+        ? removeGatePrivilegesFromPermissions(merged, backendOnly)
+        : merged;
+
     const updateRequest: {
       accessPrincipals?: AppAccessPrincipal[];
       permissions?: AppPermissions;
@@ -183,11 +219,13 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     }
 
     if (permissions !== undefined || options.syncGatePermissions) {
-      updateRequest.permissions = mergeFeaturePermissions({
-        manualPermissions: permissions,
-        existingPermissions: app.permissions,
-        gatePermissions,
-      });
+      updateRequest.permissions = withoutBackendOnly(
+        mergeFeaturePermissions({
+          manualPermissions: permissions,
+          existingPermissions: app.permissions,
+          gatePermissions,
+        }),
+      );
     }
 
     if (backendOnlyGatePermissions !== undefined) {
@@ -273,12 +311,14 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
             "`fusebase deploy` from a project that declares this app will revert it.",
         );
       } else {
-        const localPermissions = mergeFeaturePermissions({
-          manualPermissions: permissions,
-          existingPermissions:
-            featureConfig.permissions ??
-            seedPermissionsFromRemote(app.permissions, featureConfig.fusebaseGateMeta?.permissions),
-        });
+        const localPermissions = withoutBackendOnly(
+          mergeFeaturePermissions({
+            manualPermissions: permissions,
+            existingPermissions:
+              featureConfig.permissions ??
+              seedPermissionsFromRemote(app.permissions, featureConfig.fusebaseGateMeta?.permissions),
+          }),
+        );
 
         try {
           writeAppPermissionsToFusebaseJson(resolve(process.cwd()), appId, localPermissions);

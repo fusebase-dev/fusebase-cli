@@ -303,3 +303,75 @@ describe("--prune-gate-permissions is the explicit revoke path", () => {
     expect(permissionsWriteBacks.at(-1)!.permissions.items).toEqual([]);
   });
 });
+
+// NIM-43139: app_magic_link.write is grantable via --permissions, so a hand grant must not
+// smuggle it back into the browser gst when the app declares it backend-only.
+describe("a backend-only privilege granted via --permissions (NIM-43139)", () => {
+  it("stays out of the browser gate set and out of apps[].permissions", async () => {
+    reset();
+    localApp = {
+      id: "app-1",
+      path: "apps/x",
+      backendOnlyGatePermissions: ["app_magic_link.write"],
+    };
+
+    await runAppUpdate("app-1", {
+      syncGatePermissions: true,
+      permissions: "app_magic_link.write",
+    });
+
+    const request = updateCalls.at(-1)!;
+    expect(syncedGatePrivileges(request)).not.toContain("app_magic_link.write");
+    expect(
+      (request.manifest as { backendOnlyGatePermissions: string[] }).backendOnlyGatePermissions,
+    ).toContain("app_magic_link.write");
+    // Left in the local entry, deploy reconcile republishes it into the browser set.
+    expect(
+      permissionsWriteBacks.at(-1)!.permissions.items.flatMap((item) =>
+        item.type === "gate" ? item.privileges : [],
+      ),
+    ).not.toContain("app_magic_link.write");
+  });
+
+  it("stays out of the browser set without --sync-gate-permissions too", async () => {
+    reset();
+    localApp = {
+      id: "app-1",
+      path: "apps/x",
+      backendOnlyGatePermissions: ["app_magic_link.write"],
+    };
+    remotePermissions = {
+      items: [
+        { type: "dashboardView", resource: { dashboardId: "d1", viewId: "v1" }, privileges: ["read"] },
+      ],
+    };
+
+    await runAppUpdate("app-1", { permissions: "app_magic_link.write" });
+    remotePermissions = undefined;
+
+    const items = (updateCalls.at(-1)!.permissions as AppPermissions).items;
+    expect(
+      items.flatMap((item) => (item.type === "gate" ? item.privileges : [])),
+    ).not.toContain("app_magic_link.write");
+    // The manual set is Gate-only, so the remote resource grant must survive: an emptied
+    // manual set would otherwise read as "replace the resource permissions with nothing".
+    expect(items.map((item) => item.type)).toContain("dashboardView");
+  });
+
+  it("warns about browser bleed when it is not declared backend-only", async () => {
+    reset();
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.join(" "));
+    };
+    try {
+      await runAppUpdate("app-1", { permissions: "app_magic_link.write" });
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    expect(warnings.join("\n")).toContain("app_magic_link.write");
+    expect(warnings.join("\n")).toContain("browser/visitor token");
+  });
+});

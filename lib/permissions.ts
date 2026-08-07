@@ -278,7 +278,7 @@ export const GATE_PERMISSIONS_NOTES_MARKDOWN = [
   "notes.markdown.write",
 ] as const;
 
-/** Every Gate permission the platform recognizes (superset of MCP-token + backend-only). */
+/** The MCP token policy baseline (its fingerprint is derived from this set). */
 export const KNOWN_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   ...GATE_PERMISSIONS_BASE,
   ...FILE_GATE_PERMISSIONS,
@@ -287,11 +287,6 @@ export const KNOWN_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   ...GATE_PERMISSIONS_NOTES_MARKDOWN,
   ...BACKEND_ONLY_GATE_PERMISSIONS,
 ]);
-
-/** Return the entries that are not part of the known Gate permission vocabulary. */
-export function findUnknownGatePermissions(permissions: string[]): string[] {
-  return permissions.filter((permission) => !KNOWN_GATE_PERMISSIONS.has(permission));
-}
 
 /** App API capabilities are app-defined, so only their shape can be validated. */
 const APP_API_PRIVILEGE_PREFIX = "app_api.";
@@ -314,14 +309,37 @@ const GATE_PERMISSIONS_EXTRA_GRANTABLE = [
 ] as const;
 
 /**
- * Grantable via `--permissions`: the known vocabulary plus magic links (a real grant
- * that KNOWN_GATE_PERMISSIONS omits because it is not in the legacy MCP fingerprint).
+ * Every Gate permission the platform recognizes. One vocabulary for both validators
+ * (NIM-43139): `--permissions` and `backendOnlyGatePermissions` used to read different
+ * sets, so `app_magic_link.write` was grantable into the browser token yet rejected as
+ * backend-only — exactly backwards. Kept separate from KNOWN_GATE_PERMISSIONS so the
+ * legacy MCP token fingerprint stays stable.
  */
-const GRANTABLE_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
+export const ALL_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   ...KNOWN_GATE_PERMISSIONS,
   ...GATE_PERMISSIONS_MAGIC_LINKS,
   ...GATE_PERMISSIONS_EXTRA_GRANTABLE,
 ]);
+
+/** Return the entries that are not part of the Gate permission vocabulary. */
+export function findUnknownGatePermissions(permissions: string[]): string[] {
+  return permissions.filter((permission) => !ALL_GATE_PERMISSIONS.has(permission));
+}
+
+/**
+ * Privileges that must never ride in the browser/visitor `gst`: a visitor token holding
+ * `app_magic_link.write` can mint sign-in links for arbitrary emails. Declare them in
+ * `apps[].backendOnlyGatePermissions` instead of granting them with `--permissions`.
+ */
+const BROWSER_SENSITIVE_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>(
+  GATE_PERMISSIONS_MAGIC_LINKS,
+);
+
+export function findBrowserSensitiveGatePrivileges(privileges: string[]): string[] {
+  return privileges.filter((privilege) =>
+    BROWSER_SENSITIVE_GATE_PERMISSIONS.has(privilege),
+  );
+}
 
 const BACKEND_ONLY_GATE_PERMISSION_SET = new Set<string>(BACKEND_ONLY_GATE_PERMISSIONS);
 
@@ -343,7 +361,7 @@ export function assertGrantableGatePrivilege(privilege: string): void {
     );
   }
 
-  if (!GRANTABLE_GATE_PERMISSIONS.has(privilege)) {
+  if (!ALL_GATE_PERMISSIONS.has(privilege)) {
     throw new Error(
       `Unknown Gate privilege "${privilege}". Use a known privilege (e.g. "org.members.read") ` +
         `or an app API capability "app_api.<namespace>.<capability>.<action>".`,
@@ -458,8 +476,9 @@ export function buildSyncedBackendOnlyGatePermissions(params: {
   if (unknown.length > 0) {
     throw new Error(
       `Invalid backendOnlyGatePermissions: ${unknown.join(", ")}. ` +
-        "Declare only known Gate permissions (e.g. org.members.read, portals.read, " +
-        "isolated_store.read) in fusebase.json — see docs/PERMISSIONS.md.",
+        "Declare only known Gate permissions in fusebase.json. Accepted: " +
+        [...ALL_GATE_PERMISSIONS].sort((a, b) => a.localeCompare(b)).join(", ") +
+        ".",
     );
   }
   return mergeBackendOnlyGatePermissionLists(

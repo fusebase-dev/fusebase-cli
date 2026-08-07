@@ -476,13 +476,29 @@ store perms are derived from analysis and are unaffected by clearing extras.
 
 On `--sync-gate-permissions`, declared `apps[].backendOnlyGatePermissions` entries
 (or the remote-manifest fallback set, when the field is absent) are validated
-against the known Gate permission vocabulary (`KNOWN_GATE_PERMISSIONS` in
-`lib/permissions.ts` — the same catalog the Gate MCP token grants, plus the
-platform-fixed `isolated_store.rls.*`). An unknown entry (e.g.
-`not_a_real_permission.bogus.write`) fails the sync **before** anything is posted:
-the CLI exits non-zero with an explicit error and nothing is written to the remote
+against the Gate permission vocabulary (`ALL_GATE_PERMISSIONS` in
+`lib/permissions.ts`). An unknown entry (e.g. `not_a_real_permission.bogus.write`)
+fails the sync **before** anything is posted: the CLI exits non-zero with an
+explicit error that lists the accepted set, and nothing is written to the remote
 manifest or `fusebase.json`. Valid extras such as `org.members.read`,
 `portals.read`, and `isolated_store.read` pass unchanged.
+
+`--permissions` and `backendOnlyGatePermissions` read the **same** vocabulary
+(NIM-43139). They used to disagree: `app_magic_link.write` was grantable via
+`--permissions` — landing it in the browser/visitor `gst` — yet rejected as an
+unknown backend-only extra, so the safe way to hold it was the one the CLI
+refused. `KNOWN_GATE_PERMISSIONS` still exists as the Gate MCP token baseline
+(its fingerprint must stay stable) and is a subset of `ALL_GATE_PERMISSIONS`.
+
+#### Browser-sensitive privileges (NIM-43139)
+
+`app_magic_link.write` can mint sign-in links for arbitrary emails, so it must not
+ride in a visitor token. It is still grantable via `--permissions`, but the CLI
+prints a warning naming the browser bleed and pointing at
+`apps[].backendOnlyGatePermissions`. Once it is declared backend-only the CLI drops
+it from the hand-granted set too, so `--permissions` cannot smuggle it back into
+`app.permissions` / the browser `gst` (or into `apps[].permissions`, from where
+deploy would republish it).
 
 ### Final request shape
 
@@ -509,7 +525,9 @@ That means:
 | `apps[].backendOnlyGatePermissions` non-empty in `fusebase.json` | On sync, **merge** into `manifest.backendOnlyGatePermissions` (non-store extras such as `org.members.read`, `portals.read`) **and subtract them from runtime `gate`** so they never ship in `app.permissions` / browser gst (NIM-42264). Written back sorted to `fusebase.json` after sync. |
 | `apps[].backendOnlyGatePermissions` **absent** from `fusebase.json` | Legacy: remote manifest extras are preserved (API-patch / Ovation pattern). |
 | `apps[].backendOnlyGatePermissions: []` (declared empty) in `fusebase.json` | Explicit clear (NIM-42223): extras dropped, remote manifest updated to empty, field removed from `fusebase.json`; not resurrected on next sync. |
-| `apps[].backendOnlyGatePermissions` contains an unknown Gate permission | On sync, **rejected** (NIM-42263): CLI fails fast with a non-zero exit and explicit error; nothing posted to the remote manifest. |
+| `apps[].backendOnlyGatePermissions` contains an unknown Gate permission | On sync, **rejected** (NIM-42263): CLI fails fast with a non-zero exit and an error listing the accepted set; nothing posted to the remote manifest. |
+| `app update <id> --permissions="app_magic_link.write"` | Granted, plus a warning that it will be embedded in the browser/visitor token (NIM-43139). Declare it in `apps[].backendOnlyGatePermissions` to keep it out. |
+| `apps[].backendOnlyGatePermissions` contains a privilege also passed to `--permissions` | The hand grant is dropped from the runtime set and from `apps[].permissions`; the privilege lives only in `manifest.backendOnlyGatePermissions` (NIM-43139). |
 
 ## `fusebase app create`
 
