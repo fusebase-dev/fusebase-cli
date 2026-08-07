@@ -408,9 +408,10 @@ test-user fixtures, `protected` marker) plus a gitignored `.env.<name>`
 ```bash
 fusebase env init                 # adopt: current context becomes the first env
 fusebase env add dev --backend dev --org <orgId>
-fusebase env use dev              # switch (offers re-auth + token refresh)
+fusebase env use dev              # switch (offers re-auth + token refresh, and an
+                                  # IDE MCP config refresh when they hold the old env's tokens)
 fusebase env list                 # envs, backends, auth state
-fusebase env status               # active env: ids resolved? tokens fresh?
+fusebase env status               # active env: ids resolved? tokens fresh? IDE MCP configs in sync?
 fusebase env tokens               # write MCP tokens into .env.<active>
 fusebase deploy --env dev         # first deploy bootstraps product/apps + provisions stores
 fusebase env provision-store --env dev   # (also run by deploy) create store, migrate, verify RLS

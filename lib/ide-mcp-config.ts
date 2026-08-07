@@ -287,6 +287,79 @@ export async function updateIdeMcpServers(options: {
   };
 }
 
+/** Generated MCP servers whose bearer token comes from the project `.env`. */
+const TOKENED_MCP_SERVERS: Record<string, string> = {
+  "fusebase-dashboards": "DASHBOARDS_MCP_TOKEN",
+  "fusebase-gate": "GATE_MCP_TOKEN",
+};
+
+const ALL_IDE_PRESETS: IdePreset[] = [
+  "claude-code",
+  "cursor",
+  "vscode",
+  "opencode",
+  "codex",
+  "other",
+];
+
+export type StaleIdeMcpConfig = {
+  /** Config path relative to the project root. */
+  path: string;
+  /** Server names whose bearer token disagrees with the expected one. */
+  servers: string[];
+};
+
+function bearerToken(spec: unknown): string | undefined {
+  const headers = (spec as { headers?: Record<string, unknown> } | undefined)?.headers;
+  const auth = headers?.["Authorization"];
+  if (typeof auth !== "string") return undefined;
+  const match = auth.match(/^Bearer\s+(.+)$/);
+  return match?.[1]?.trim();
+}
+
+/**
+ * IDE MCP configs embed the tokens as literals, so switching environments
+ * leaves them pinned to the previous env until `config ide --force` reruns.
+ * Report every generated config whose baked token disagrees with `envMap`.
+ * Servers with no expected token (or no literal token in the config) are
+ * skipped — nothing to compare.
+ */
+export async function findStaleIdeMcpConfigs(
+  targetDir: string,
+  envMap: Map<string, string>,
+): Promise<StaleIdeMcpConfig[]> {
+  const stale: StaleIdeMcpConfig[] = [];
+
+  for (const ide of ALL_IDE_PRESETS) {
+    const relPath = getIdeMcpConfigPath(ide);
+    const fullPath = join(targetDir, relPath);
+    if (!(await fileExists(fullPath))) continue;
+
+    let servers: Record<string, unknown>;
+    try {
+      const raw = await readFile(fullPath, "utf-8");
+      servers =
+        ide === "codex"
+          ? parseCodexMcpServersFromToml(raw)
+          : getMcpContainerFromJson(JSON.parse(raw), ide);
+    } catch {
+      continue; // Unparsable/hand-edited config — not our call to judge.
+    }
+
+    const diverged: string[] = [];
+    for (const [serverName, envKey] of Object.entries(TOKENED_MCP_SERVERS)) {
+      const expected = envMap.get(envKey)?.trim();
+      const actual = bearerToken(servers[serverName]);
+      if (!expected || !actual) continue;
+      if (actual !== expected) diverged.push(serverName);
+    }
+
+    if (diverged.length > 0) stale.push({ path: relPath, servers: diverged });
+  }
+
+  return stale;
+}
+
 /**
  * Claude Code only loads project-root `.mcp.json` servers that appear in
  * `.claude/settings.json` → `enabledMcpjsonServers` (or after interactive approval).
