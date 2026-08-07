@@ -3,6 +3,7 @@ import {
   buildDeployPermissions,
   buildSyncedBackendOnlyGatePermissions,
   declareStorePermissionsBackendOnly,
+  findBrowserSensitiveGatePrivileges,
   findUnknownGatePermissions,
   isBackendOnlyGatePermissionsDeclared,
   isStoreGatePermission,
@@ -703,6 +704,64 @@ describe("buildSyncedBackendOnlyGatePermissions validation", () => {
         fromRemoteManifest: [],
       }),
     ).toEqual(["org.members.read", "portals.read"]);
+  });
+
+  it("does not point at the unshipped docs/PERMISSIONS.md (NIM-43139)", () => {
+    expect(() =>
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: [],
+        declaredStoreBackendOnly: [],
+        fromFusebaseJson: ["not_a_real_permission.bogus.write"],
+        fromRemoteManifest: [],
+      }),
+    ).toThrow(/Accepted: .*org\.members\.read/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NIM-43139: app_magic_link.write is grantable, so it must also be declarable
+// backend-only — otherwise the only way to have it is in the browser token.
+// ---------------------------------------------------------------------------
+
+describe("magic-link write in backendOnlyGatePermissions (NIM-43139)", () => {
+  it("is a known Gate permission", () => {
+    expect(findUnknownGatePermissions(["app_magic_link.write"])).toEqual([]);
+  });
+
+  it("is accepted as a fusebase.json backend-only extra", () => {
+    expect(
+      buildSyncedBackendOnlyGatePermissions({
+        platformBackendOnly: [],
+        declaredStoreBackendOnly: [],
+        fromFusebaseJson: ["app_magic_link.write"],
+        fromRemoteManifest: [],
+      }),
+    ).toEqual(["app_magic_link.write"]);
+  });
+
+  it("is still grantable via --permissions", () => {
+    expect(parsePermissions("app_magic_link.write")).toEqual({
+      items: [{ type: "gate", privileges: ["app_magic_link.write"] }],
+    });
+  });
+
+  it("is kept out of the browser runtime set when declared backend-only", () => {
+    expect(
+      subtractBackendOnlyFromRuntime(
+        ["app_magic_link.write", "notes.read"],
+        ["app_magic_link.write"],
+      ),
+    ).toEqual(["notes.read"]);
+  });
+
+  it("is flagged as browser-sensitive", () => {
+    expect(
+      findBrowserSensitiveGatePrivileges(["notes.read", "app_magic_link.write"]),
+    ).toEqual(["app_magic_link.write"]);
+  });
+
+  it("does not flag ordinary privileges", () => {
+    expect(findBrowserSensitiveGatePrivileges(["notes.read"])).toEqual([]);
   });
 });
 

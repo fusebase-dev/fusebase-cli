@@ -11,11 +11,14 @@ import {
   writeBackendOnlyGatePermissionsToFusebaseJson,
 } from "../config.ts";
 import {
+  findBrowserSensitiveGatePrivileges,
   formatPermissionItem,
   mergeFeaturePermissions,
   mergeSyncedGatePermissions,
   parsePermissions,
   parsePrincipals,
+  readBackendOnlyGatePermissionsFromFeature,
+  readGatePrivilegesFromPermissions,
   removeGatePrivilegesFromPermissions,
   seedPermissionsFromRemote,
   unionStoredPermissions,
@@ -114,6 +117,24 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
     appId = appIdArg;
   }
 
+  // A hand-granted privilege skips the analyzed-set split, so a browser-unsafe one lands in
+  // the visitor gst (NIM-43139). Declaring it backend-only keeps it out — say so.
+  if (permissions !== undefined) {
+    const declaredBackendOnly = new Set(
+      featureConfig ? readBackendOnlyGatePermissionsFromFeature(featureConfig) : [],
+    );
+    const bleeding = findBrowserSensitiveGatePrivileges(
+      readGatePrivilegesFromPermissions(permissions),
+    ).filter((privilege) => !declaredBackendOnly.has(privilege));
+    if (bleeding.length > 0) {
+      console.warn(
+        `Warning: ${bleeding.join(", ")} will be embedded in the browser/visitor token. ` +
+          "Declare it in apps[].backendOnlyGatePermissions in fusebase.json and run " +
+          "`app update --sync-gate-permissions` to keep it backend-only.",
+      );
+    }
+  }
+
   if (options.syncGatePermissions && !featureConfig?.path) {
     console.error(
       featureConfig
@@ -170,6 +191,16 @@ export async function runAppUpdate(appIdArg: string, options: AppUpdateOptions):
       prunedGatePrivileges = merged.removed;
       backendOnlyGatePermissions = resolved.backendOnlyGatePermissions;
       backendOnlyDeclaredInFusebaseJson = resolved.backendOnlyDeclaredInFusebaseJson;
+    }
+
+    // Manual grants are unioned in after the analyzed set was split, so a privilege declared
+    // backend-only would ride back into the browser gst — and into apps[].permissions, from
+    // where deploy republishes it — through --permissions (NIM-43139).
+    if (permissions !== undefined && backendOnlyGatePermissions?.length) {
+      permissions = removeGatePrivilegesFromPermissions(
+        permissions,
+        backendOnlyGatePermissions,
+      );
     }
 
     const updateRequest: {
