@@ -1,7 +1,7 @@
 ---
-version: "1.9.0"
+version: "1.10.0"
 mcp_prompt: isolatedSql
-last_synced: "2026-08-06"
+last_synced: "2026-08-07"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -20,6 +20,7 @@ category: specialized
   - [Standard sequence (schema + store)](#standard-sequence-schema--store)
   - [Data path (no DDL)](#data-path-no-ddl)
   - [Structured SQL limits](#structured-sql-limits)
+  - [Hard rule — no file / binary bytes in the SQL store](#hard-rule--no-file--binary-bytes-in-the-sql-store)
   - [MCP bundle size](#mcp-bundle-size)
   - [Tokens](#tokens)
   - [PostgreSQL RLS native mode](#postgresql-rls-native-mode)
@@ -79,7 +80,15 @@ A service-token backend must derive the portal/workspace scope from trusted plat
 - Under PostgreSQL RLS, `INSERT ... RETURNING` and structured `insert` with `returning` require the inserted row to pass the table's `SELECT` policy. If a row becomes visible only after a second portal/link-table insert, generate the id in app code and insert without `returning`.
 - Migration bundles are **schema-only**. Gate rejects top-level `INSERT` / `UPDATE` / `DELETE` / `TRUNCATE` / `MERGE` / `COPY` inside migration SQL.
 - Large **data** seeds: **`importIsolatedStoreSqlRows`** (`csv`/`tsv`, **`COPY FROM STDIN`**); default payload cap **64MiB** UTF-8 per call (`ISOLATED_SQL_IMPORT_MAX_PAYLOAD_BYTES`, hard cap **256MiB**); split larger files.
+- **Do not confuse that 64MiB import cap with ordinary SQL writes.** `executeIsolatedStoreSql`, structured `insert`/`batchInsert`/`update`, and `queryIsolatedStoreSql` ride the Gate JSON/proxy path. Practical reliable request bodies are on the order of **~100–150 KB**; failures become common well below **1 MB** and are **not** a clean hard threshold (retries can appear to "work" once). Never design user file attachments against the 64MiB import figure.
 - Small demo seeds or backfills: structured row APIs (`insert…`, `batchInsert…`) after schema apply, not inside migration SQL.
+
+### Hard rule — no file / binary bytes in the SQL store
+
+- **Never** store user-uploaded files or other binary content in a FuseBase PostgreSQL isolated store — not as `base64` in `TEXT`/`JSONB`, not as `bytea`, not as a data URL, not "for MVP".
+- Upload via Gate file service (`startMultipartFileUpload` → direct `PUT` → `completeMultipartFileUpload`; see MCP prompt **`files`** and skill **`file-upload`**). Persist only **`storedFileUUID`**, **`readUrl`**, and small metadata (name, size, contentType).
+- Needing **`files.write`** (or any new Gate permission) is **not** a reason to choose SQL blob storage. Grant/sync permissions with `fusebase app update <appId> --sync-gate-permissions` (and `--permissions` when required). Permission setup is expected product work, not an architecture escape hatch.
+- A SQL-backed attachment design that later "moves to file service" is a full rewrite — do not lock it as temporary.
 
 ### MCP bundle size
 
@@ -165,7 +174,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 ## Version
 
-- **Version**: 1.9.0
+- **Version**: 1.10.0
 - **Category**: specialized
-- **Last synced**: 2026-08-06
+- **Last synced**: 2026-08-07
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

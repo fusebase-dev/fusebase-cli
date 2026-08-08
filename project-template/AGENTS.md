@@ -537,7 +537,7 @@ For isolated SQL schema work, loading only `fusebase-gate/SKILL.md` is insuffici
 
 ### ✅ file-upload
 
-For file upload functionality (separate service, not part of dashboard SDK).
+For file upload functionality (separate service, not part of dashboard SDK). **Hard rule:** never store user file/binary bytes in isolated SQL (`base64` / `bytea` / data URL) — upload via Gate file service and persist only `storedFileUUID` + `readUrl`. Needing `files.write` is not a reason to use SQL blobs; visitor/public apps broker uploads on the feature backend with `FBS_FEATURE_TOKEN`.
 
 ### ✅ handling-authentication-errors
 
