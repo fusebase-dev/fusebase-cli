@@ -279,7 +279,17 @@ export async function createSignInMagicLink(
       `createAppMagicLink failed: ${res.status} ${body.slice(0, 300)}`,
     );
   }
-  const data = (await res.json()) as { magicLinkUrl: string };
+  const data = (await res.json()) as { magicLinkUrl?: string };
+  if (!data.magicLinkUrl) {
+    // NIM-42663: the platform returns the link only for a brand-new account or
+    // a recipient already in this org — otherwise it emails the link instead,
+    // so nobody can mint a session for someone else's FuseBase account.
+    throw new Error(
+      `createAppMagicLink withheld the link for "${user.email}": the address ` +
+        `already has a FuseBase account outside org "${env.config.orgId}". ` +
+        `Add the fixture user to the org, or use an address with no account.`,
+    );
+  }
   return { magicLinkUrl: data.magicLinkUrl, email: user.email };
 }
 
