@@ -1,7 +1,7 @@
 ---
-version: "1.9.2"
+version: "1.9.3"
 mcp_prompt: appMagicLinks
-last_synced: "2026-07-24"
+last_synced: "2026-08-10"
 title: "Fusebase Gate App Magic Link Operations"
 category: specialized
 ---
@@ -58,12 +58,12 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 ## Relevant Operations
 
 - `createAppMagicLink` — owner/admin invite flow. Creates a magic link for an email (24h lifetime by default, or pass `ttlSeconds` to override) and dispatches it via the `magic_link_app` mail template. Optionally provisions a brand-new user and adds a user principal to every App of the Product.
-- `requestAppMagicLinkURL` — owner/admin, no-email sibling of `createAppMagicLink`. `POST /:orgId/apps/:appId/magic-link-url` with the SAME body/response and side effects, but the platform does NOT send the `magic_link_app` email — the response still carries `magicLinkUrl`, so a white-label app can deliver its own branded email. Use this instead of `createAppMagicLink` when the app sends the invite email itself (avoids the recipient getting two emails). Requires `app_magic_link.write` + org access.
+- `requestAppMagicLinkURL` — owner/admin, no-email sibling of `createAppMagicLink`. `POST /:orgId/apps/:appId/magic-link-url` with the SAME body/response and side effects, but the platform does NOT send the `magic_link_app` email — the response still carries `magicLinkUrl`, so a white-label app can deliver its own branded email. Use this instead of `createAppMagicLink` when the app sends the invite email itself (avoids the recipient getting two emails). **Withheld case:** if the recipient is an existing FuseBase account that is not already a member of this org, `id`/`magicLinkUrl` are absent and the platform sends its own `magic_link_app` email instead — check for `magicLinkUrl` before trying to send your branded one. Requires `app_magic_link.write` + org access.
 - `bulkCreateAppMagicLinks` — owner/admin bulk invite. Invites MANY users to ONE app in a single call (use instead of looping `createAppMagicLink`). Invites run with bounded concurrency (default 5, max 5; the rest are queued); `background=true` returns immediately with `status='processing'`. Per-invitee semantics match `createAppMagicLink`, and one failed invitee never aborts the batch.
 - `requestAppMagicLink` — visitor self-service flow. Visitor enters their email; Gate forwards to nimbus-ai which sends a magic link only when the email already has access under the App's current `accessPrincipals`. Always returns `{ ok: true }` so it cannot be used to enumerate emails or access state.
 - `activateAppMagicLink` — visitor activation. Exchanges a magic-link `globalId` for a session token, a Gate app token (`featureToken`), and a Dashboard token (`dashboardToken`), plus the `redirectPath` the SPA must navigate to.
 - `revokeAppMagicLink` — owner/admin revoke. `POST /:orgId/apps/:appId/magic-links/:globalId/revoke` soft-deletes a link so it can no longer be activated (activation then 404s) and the recipient email can be invited again. The fix for orphaned invites that would otherwise block a re-invite for 24h. Returns 404 for an unknown or already-revoked link. Requires `app_magic_link.write` + org access.
-- `listAppMagicLinks` — owner/admin support/debug. `GET /:orgId/apps/:appId/magic-links?email=` lists the app's active (non-revoked) links, newest first, with an optional email filter. Returns row metadata only (never token material). Use it to find the `globalId` of an orphaned invite to revoke. Requires `app_magic_link.write` + org access.
+- `listAppMagicLinks` — owner/admin support/debug. `GET /:orgId/apps/:appId/magic-links?email=` lists the app's active (non-revoked) links, newest first, with an optional email filter. Returns row metadata only (never token material). Use it to find the `globalId` of an orphaned invite to revoke. NIM-42663: `id` is **omitted** for links whose URL was never disclosed to the owner (self-service links, and invites to existing accounts outside the org) — the id activates the link. Those links cannot be revoked by id; use `removeAppAccessPrincipal` on the recipient instead, which makes activation fail. Requires `app_magic_link.write` + org access.
 - `removeAppAccessPrincipal` — owner/admin. `POST /:orgId/apps/:appId/access-principals/remove` with body `{ type, id }` removes an access principal from EVERY feature of the Product — the inverse of the invite grant. Use it to revoke a user's app access (`{ type: 'user', id: '<userId>' }`) or drop an `orgRole`/`orgGroup`/`visitor` grant. Idempotent: returns `{ removed: false, appsAffected: 0 }` when the principal was not present; 404 when the Product has no apps. Note this removes the app-access principal only — it does not remove the user from the org (see org member removal). Requires `app_magic_link.write` + org access.
 
 ## When To Use Each Flow
@@ -89,7 +89,8 @@ FuseBase renamed its core entities: the old `app` is now a **`product`**, and th
 - `addToAccessPrincipals: true` provisions the user record if needed and appends `{ type: "user", id: <userId> }` to every App of the Product, de-duplicated. Use this when inviting a brand-new client.
 - `addToAccessPrincipals: false` is only valid for emails that already have access. Sending it with an unknown email returns 404 — by design, so the caller does not silently dispatch a useless link.
 - The response is `{ id, magicLinkUrl, expiresAt }`. `id` is the `globalId` and is also embedded inside `magicLinkUrl`.
-- Mail dispatch errors are logged but do not roll the row back; the owner can still copy `magicLinkUrl` from the response.
+- **`id` and `magicLinkUrl` are optional (NIM-42663).** They are returned only when the invite provisions a **brand-new** account, or targets an email that is **already a member of this org**. For any other existing FuseBase account the response is `{ expiresAt }` only and the link is emailed to the recipient — activating a magic link grants a full session as that user, so the platform never hands the link to someone else. Always branch on `magicLinkUrl` being present; never render or forward it unchecked.
+- Mail dispatch errors are logged but do not roll the row back; the owner can still copy `magicLinkUrl` from the response when it was disclosed.
 
 ## Self-Service Rules (`requestAppMagicLink`)
 
@@ -228,9 +229,9 @@ Choose the cookie policy based on what the app actually needs; do not auto-upgra
 Gate exposes **create**, **bulk create**, **request**, **activate**, plus owner-side **list** (`listAppMagicLinks`) and **revoke** (`revokeAppMagicLink`).
 
 - A `createAppMagicLink` row lives for the **24h TTL** (`expiresAt`) by default, or the clamped `ttlSeconds` when provided. Creating a new invite does not delete earlier rows; use `revokeAppMagicLink` to retire one explicitly.
-- **Mail dispatch failure does not roll back** the persisted row. The API still returns `{ id, magicLinkUrl, expiresAt }`; the owner can copy `magicLinkUrl` manually. Treat a failed SMTP/log as a delivery problem, not a failed create.
+- **Mail dispatch failure does not roll back** the persisted row. The API still returns `{ id, magicLinkUrl, expiresAt }` when the link is disclosable; the owner can copy `magicLinkUrl` manually. Treat a failed SMTP/log as a delivery problem, not a failed create.
 - **Lost HTTP response after create:** if your app times out or crashes after Gate accepted the call, the link row **already exists** in nimbus-ai. Rolling back a local dashboard row or assuming "no response = no link" leaves an **orphan**.
-- **Orphan recovery:** call `listAppMagicLinks?email=<addr>` to find the orphan's `globalId`, then `revokeAppMagicLink` it. After revoke the email can be invited again immediately with a fresh `createAppMagicLink`. Alternatively `requestAppMagicLink` re-sends a link to an email that still has access (self-service resend; 30s per-(org,app,email) cooldown).
+- **Orphan recovery:** call `listAppMagicLinks?email=<addr>` to find the orphan's `globalId`, then `revokeAppMagicLink` it. When the row comes back without an `id`, its URL was never disclosed — revoke it by removing the recipient's access principal (`removeAppAccessPrincipal`) instead. After revoke the email can be invited again immediately with a fresh `createAppMagicLink`. Alternatively `requestAppMagicLink` re-sends a link to an email that still has access (self-service resend; 30s per-(org,app,email) cooldown).
 - **Idempotent invite UX:** track `invited_at` / delivery status in your app tables; offer explicit **Resend** (`requestAppMagicLink`) and **Revoke** (`revokeAppMagicLink`), not blind `createAppMagicLink` loops.
 
 ## Working Rules

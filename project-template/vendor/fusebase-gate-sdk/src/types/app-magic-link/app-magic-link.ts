@@ -27,14 +27,21 @@ export interface CreateAppMagicLinkRequestContract {
 export interface CreateAppMagicLinkResponseContract {
   /**
    * globalId of the magic link row, also the value passed to the activation
-   * endpoint.
+   * endpoint. NIM-42663: omitted together with `magicLinkUrl` when the link
+   * may not be handed to the caller.
    */
-  id: string;
+  id?: string;
   /**
    * Fully qualified URL to the app `/link` route with `id` (and optional
    * `redirect`) query params.
+   *
+   * NIM-42663: omitted when the recipient email belongs to an existing
+   * FuseBase account that is not already a member of this organization —
+   * activating a link logs the caller in as that user, so the link is only
+   * emailed to the address itself. Present when the invite provisions a
+   * brand-new account or targets an existing org member.
    */
-  magicLinkUrl: string;
+  magicLinkUrl?: string;
   /**
    * Unix timestamp (seconds) when the link expires (createdAt + 24h).
    */
