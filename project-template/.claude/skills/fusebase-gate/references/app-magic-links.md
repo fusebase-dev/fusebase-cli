@@ -1,7 +1,7 @@
 ---
-version: "1.9.3"
+version: "1.9.2"
 mcp_prompt: appMagicLinks
-last_synced: "2026-08-10"
+last_synced: "2026-08-11"
 title: "Fusebase Gate App Magic Link Operations"
 category: specialized
 ---
@@ -157,7 +157,6 @@ Two separate boundaries decide whether a rewritten host works. Activation is key
 ## Access Model
 
 - `createAppMagicLink`, `bulkCreateAppMagicLinks`, `revokeAppMagicLink`, and `listAppMagicLinks` all require `app_magic_link.write` plus org access. Granted by default to `owner`, `manager`, `member`, and `guest` org roles via the existing `GATE_ALL_PERMISSIONS` set.
-- Grant the app `app_magic_link.write` through `apps[].backendOnlyGatePermissions` in `fusebase.json` + `fusebase app update <id> --sync-gate-permissions`, **not** `--permissions`: the CLI accepts either, but `--permissions` embeds it in the browser/visitor `gst`, where it can mint sign-in links for arbitrary emails.
 - `requestAppMagicLink` and `activateAppMagicLink` are visitor endpoints (no permission, no session). The policy is enforced inside nimbus-ai by re-evaluating `accessPrincipals` against the resolved user.
 
 ## `accessPrincipals` Vs Org Membership
@@ -247,5 +246,5 @@ Gate exposes **create**, **bulk create**, **request**, **activate**, plus owner-
 
 - **Version**: 1.9.2
 - **Category**: specialized
-- **Last synced**: 2026-07-24
+- **Last synced**: 2026-08-11
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

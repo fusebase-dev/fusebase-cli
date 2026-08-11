@@ -1,7 +1,7 @@
 ---
 version: "1.1.0"
 mcp_prompt: bootstrap
-last_synced: "2026-08-06"
+last_synced: "2026-08-11"
 title: "Bootstrap"
 category: meta
 ---
@@ -85,5 +85,5 @@ Proceed by loading the connection context first, then discover available tools.
 
 - **Version**: 1.1.0
 - **Category**: meta
-- **Last synced**: 2026-08-06
+- **Last synced**: 2026-08-11
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

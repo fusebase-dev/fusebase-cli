@@ -1,7 +1,7 @@
 ---
-version: "1.70.0"
+version: "1.98.0"
 mcp_prompt: portals
-last_synced: "2026-08-06"
+last_synced: "2026-08-11"
 title: "Fusebase Gate Portals Operations"
 category: specialized
 ---
@@ -16,6 +16,7 @@ category: specialized
 
 - [Fusebase Gate Portals Operations](#fusebase-gate-portals-operations)
 - [Relevant Operations](#relevant-operations)
+- [Portal page and folder permissions](#portal-page-and-folder-permissions)
 - [Portal block presentation](#portal-block-presentation)
   - [Appearance](#appearance)
   - [Layout](#layout)
@@ -28,6 +29,29 @@ category: specialized
 - [Read Flow Rules](#read-flow-rules)
 - [listPortalContent Flow Rules](#listportalcontent-flow-rules)
 - [Editing an existing portal block](#editing-an-existing-portal-block)
+- [updatePortalNoteBlock](#updateportalnoteblock)
+- [updatePortalHeadingBlock](#updateportalheadingblock)
+- [updatePortalTextBlock](#updateportaltextblock)
+- [updatePortalImageBlock](#updateportalimageblock)
+- [updatePortalEmbedBlock](#updateportalembedblock)
+- [updatePortalDatabaseBlock](#updateportaldatabaseblock)
+- [updatePortalCardBlock](#updateportalcardblock)
+- [updatePortalCarouselBlock](#updateportalcarouselblock)
+- [updatePortalCountdownBlock](#updateportalcountdownblock)
+- [updatePortalBpmnDiagramBlock](#updateportalbpmndiagramblock)
+- [updatePortalDynamicTableBlock](#updateportaldynamictableblock)
+- [updatePortalRecentFilesBlock](#updateportalrecentfilesblock)
+- [updatePortalLinkedBlock](#updateportallinkedblock)
+- [updatePortalFormBlock](#updateportalformblock)
+- [updatePortalCardGroupBlock](#updateportalcardgroupblock)
+- [updatePortalInfoBlock](#updateportalinfoblock)
+- [updatePortalCustomWidgetBlock](#updateportalcustomwidgetblock)
+- [updatePortalHtmlCssBlock](#updateportalhtmlcssblock)
+- [updatePortalTimelineBlock](#updateportaltimelineblock)
+- [updatePortalFileUploaderBlock](#updateportalfileuploaderblock)
+- [updatePortalChatBlock](#updateportalchatblock)
+- [updatePortalAppBlock](#updateportalappblock)
+- [updatePortalAiAgentBlock](#updateportalaiagentblock)
 - [movePortalBlock](#moveportalblock)
 - [deletePortalBlock](#deleteportalblock)
 - [Portal Fields](#portal-fields)
@@ -46,15 +70,39 @@ end-user view of that content.
 Read:
 - listPortals: returns all portals visible to the caller in the organization.
 - getPortal: returns detailed information for a single portal by its ID.
-- listPortalContent: returns the menu tree of a portal (folders, pages, system items).
+- listPortalContent: returns the menu tree of a portal (folders, pages, system items), each with its full `path`.
 - listPortalAiAgents: search or browse the org's AI agents for the AI Agent block picker.
 - getPortalPageBlockCount: count matching blocks already on a page (published + draft).
 - listPortalDatabaseBlockSources: discovers the exact Database/Dashboard/View ids required by addPortalDatabaseBlock.
 - listPortalLinkableBlocks: discovers the exact source block ids required by addPortalLinkedBlock.
-- listPortalPageBlocks: lists EVERY block of one page in display order — the discovery step before moving or removing a block.
+- listPortalPageBlocks: lists EVERY block of one page in display order — the discovery step before reading, updating, moving or removing a block.
+- getPortalBlock: reads ONE block's semantic kind and current public settings — the step before a typed update.
 - searchPortalInfoBlockIcons: discovers the exact icon id required by addPortalInfoBlock.
 
 Content & settings (all STAGED in the customizer draft — see Draft Staging Rule):
+- updatePortalNoteBlock: edit the title and layout of an existing note-backed block (note, blank, Kanban, task list).
+- updatePortalHeadingBlock: edit the content, appearance or layout of an existing Text & Media Heading block.
+- updatePortalTextBlock: edit the content, appearance or layout of an existing Text & Media Simple text block.
+- updatePortalImageBlock: edit the layout of an existing Text & Media Image block.
+- updatePortalEmbedBlock: edit the title, source, link visibility or layout of an existing Embed block.
+- updatePortalDatabaseBlock: edit the source view, title, page size, appearance or layout of an existing Database block.
+- updatePortalCardBlock: edit the Card Type, content, destination, appearance or layout of an existing Card block.
+- updatePortalCarouselBlock: replace Carousel slides or edit its layout.
+- updatePortalCountdownBlock: edit Countdown title, target, appearance or layout.
+- updatePortalBpmnDiagramBlock: edit BPMN Diagram title, canvas height, appearance or layout.
+- updatePortalDynamicTableBlock: edit Dynamic Table title, appearance or layout.
+- updatePortalRecentFilesBlock: edit Recent files title, source or layout.
+- updatePortalLinkedBlock: change the exact source mirrored by a Linked block.
+- updatePortalFormBlock: edit Form title, content, appearance or layout.
+- updatePortalCardGroupBlock: edit Card group title, content, appearance or layout.
+- updatePortalInfoBlock: edit Info title, image, destination, new-tab behavior or layout.
+- updatePortalCustomWidgetBlock: edit Custom widget title, bricks, appearance or layout.
+- updatePortalHtmlCssBlock: edit HTML/CSS title, raw code or layout on a verified custom-CNAME portal.
+- updatePortalTimelineBlock: edit Timeline view, title, steps, appearance or layout.
+- updatePortalFileUploaderBlock: edit File uploader metadata or layout.
+- updatePortalChatBlock: edit a Chat widget target, access, title or layout.
+- updatePortalAppBlock: edit a published app binding or App block title.
+- updatePortalAiAgentBlock: change the exact agent used by an AI Agent block.
 - movePortalBlock: reorder an existing block within its own page using a semantic anchor.
 - deletePortalBlock: remove an existing block from a page, keeping every backing resource.
 - createPortalFolder: create a new empty root folder in the sidebar, topbar or footer.
@@ -95,11 +143,20 @@ Content & settings (all STAGED in the customizer draft — see Draft Staging Rul
 - addPortalAppPage: add a published app as a NEW sidebar page (embed).
 - addPortalAppBlock: add a published app as one block to an EXISTING page.
 - duplicatePortalItem: copy a folder or page (and a folder's subtree) within a portal.
+- updatePortalItem: rename / re-icon / show-hide / reorder / move a menu item between bars.
+- deletePortalItem: delete a menu item (a folder deletes its whole subtree).
 - updatePortalAccess: set who may open the portal (access mode).
 - updatePortalCustomCode: set custom CSS/JS (CNAME-domain portals only).
+- updatePortalHomepage: set the homepage settings (title, sidebar toggles).
+- updatePortalStyle: set the portal branding (color theme, logo, favicon).
 
 Applied immediately (NOT staged in the draft):
 - setDashboardViewReadonly: allow or restrict editing of a Dashboard View. A global View setting.
+- updatePortalContentPermissions: replace or extend the user access list for one
+  published portal page or folder, selected by its exact full path. The change is
+  applied immediately; it is NOT staged in the customizer draft and does not need
+  publishPortalDraft. For a folder, the same permissions are applied recursively
+  to every child folder and page.
 
 Publish:
 - publishPortalDraft: publish the portal's staged draft to the live portal
@@ -112,6 +169,38 @@ Members:
 
 Creating portals themselves (createPortal, duplicatePortal, createWorkspace) is
 covered by the separate `portals-create` prompt group.
+
+## Portal page and folder permissions
+
+Use updatePortalContentPermissions to control access to one published portal page
+or folder by email. Pass the exact full `path`, for example `/inspiration-page`
+or `/docs/start`. If the path is unknown, call listPortalContent first and use
+`items[].path`; do not reconstruct a nested path from `slug`.
+
+Choose the mode strictly from the user's wording:
+- `replace`: use when the user says "only", "only these users", "restrict to",
+  or otherwise asks to replace the current access list. Existing user access is
+  removed and only the supplied emails remain in the client-facing item ACL.
+- `add`: use when the user says "add", "also give access", or otherwise asks to
+  extend access. Existing user access must remain unchanged. Never translate an
+  add request into replace.
+
+The operation resolves emails and creates a targeted portal membership when
+needed. Do NOT call inviteToPortal first: a full-access portal invite can grant
+access to every private page, which is broader than the user's request.
+
+The path is resolved before anything is created, so a call that fails invites
+nobody. Fix the path and retry; there is nothing to clean up.
+
+Permissions are applied immediately. Do NOT call publishPortalDraft after this
+operation. A folder update affects its entire subtree. Item permissions are an
+additional restriction and never bypass portal-level access or workspace
+membership. Portal owners and users with console access retain their
+administrative access even when mode is `replace`.
+
+If `add` targets an item that is already open to everyone, the operation is a
+successful no-op because that user already has access. Do not silently make the
+item private.
 
 ## Portal block presentation
 
@@ -189,7 +278,8 @@ The operation contract is authoritative: it defines whether Appearance, Layout o
   addPortalTimelineBlock,
   addPortalCardGroupBlock, addPortalAppPage,
   addPortalCustomWidgetBlock, addPortalHtmlCssBlock,
-  addPortalAppBlock, updatePortalAccess,
+  addPortalAppBlock, updatePortalItem, deletePortalItem,
+  updatePortalAccess, updatePortalHomepage, updatePortalStyle,
   updatePortalCustomCode) is STAGED in the
   portal's customizer draft. It is NOT published immediately and is NOT yet visible
   on the live portal.
@@ -359,6 +449,40 @@ customizer immediately but on the live portal only after a manager publishes.
   listPortalContent to
   rediscover that draft-only page and do not invent page ids.
   Returns: menuItemId, pageId, url, branchId, seqs, staged (always true).
+
+- updatePortalItem: updates an EXISTING menu item (folder, page, or link) by `itemId`.
+  Required path params: `orgId`, `portalId`, `itemId` (from `listPortalContent`).
+  Optional body (pass only what changes; at least one is required):
+    `name` — rename (also renames the backing page, if any).
+    `icon` — icon key.
+    `visible` — show (true) or hide (false) the item.
+    `index` — 0-based position among its siblings; use this to fix the newest-first
+      root ordering (lower index = higher in the bar).
+    `positionType` — move to another bar: 'sidebar', 'top', or 'footer'. A nested
+      item moves to the root of that bar unless `parentId` names a folder there.
+    `parentId` — re-parent under another folder ('' = root). The item follows its
+      new parent's bar.
+  `parentId` must name an item in the menu that can hold children — a folder,
+  note, section, process or page. A link, dashboard, tag list or the home item
+  is rejected.
+  It may not be the item itself or one of its own descendants. A re-parented
+  item moves to the parent's bar together with its whole subtree, so
+  `positionType` (when also passed) must match it.
+  The item may be PUBLISHED or exist only in the ACTIVE DRAFT: use the exact itemId
+  from listPortalContent for a published item, or the menuItemId/folderId returned by
+  createPortalPage, createPortalPageWithNote, createPortalFolder or createPortalLink
+  for a draft-only one. Draft-created parents work the same way. Never guess ids.
+  The change is STAGED in the draft until the user confirms publishPortalDraft.
+  Returns: branchId, seqs, staged (always true).
+
+- deletePortalItem: deletes an EXISTING menu item (folder, page, or link) by `itemId`.
+  Deleting a folder removes its whole subtree, including items created in the same
+  draft. The home item cannot be deleted.
+  The item may be PUBLISHED or exist only in the ACTIVE DRAFT: use the exact itemId
+  from listPortalContent, or the id its create operation returned. Never guess ids.
+  Required path params: `orgId`, `portalId`, `itemId`.
+  The deletion is STAGED in the draft until the user confirms publishPortalDraft.
+  Returns: branchId, seq, staged (always true).
 
 - createPortalPageWithNote: creates a new sidebar page backed by a freshly created
   Fusebase note (document-style page).
@@ -1504,6 +1628,57 @@ customizer immediately but on the live portal only after a manager publishes.
   user it has no effect on `*.p.<env-domain>` portal subdomains.
   The change is STAGED in the draft. Returns: branchId, seq, staged (always true).
 
+  Portal re-branding via custom CSS: target the stable styling hooks and set
+  visual properties directly (hex is fine). Do NOT override daisyUI vars
+  (`--p`/`--b1`/…): they exist in the compiled CSS but only ~7 cosmetic widgets
+  read them — core surfaces are Tailwind hex utilities, so overriding vars
+  re-brands nothing. Structural hooks: `[data-portal="sidebar"|"footer"|
+  "page-card"|"note-content"|"breadcrumbs"|"search"]`. Write RELATIVE selectors
+  in `css` (Gate auto-nests under `#main-scrolling-container`; no manual prefix),
+  e.g. `[data-portal="sidebar"] { background: #101828; }`. Full contract:
+  reference `portal-theme-variables`.
+
+- updatePortalHomepage: sets the portal Homepage settings — the same panel the
+  customizer shows under Homepage settings.
+  Required path params: `orgId`, `portalId`.
+  Body (at least one field required; only provided fields change):
+    `title`                   — homepage title. Renames the portal's Home menu
+                                item and, with it, the homepage itself.
+    `showSidebarOnOtherPages` — show the sidebar on pages other than the homepage.
+    `showSidebarOnHomePage`   — show the sidebar on the homepage.
+    `expandSidebarByDefault`  — start the sidebar expanded rather than collapsed.
+  Omitted fields are left out of the change events entirely, so they keep their
+  current value — never restate a field just to change another one.
+  This operation does not manage page content: to add blocks to the homepage,
+  resolve its `pageId` from listPortalContent (menu item `type: "home"`) and call
+  the normal semantic block operations (e.g. addPortalTextBlock,
+  addPortalCardBlock) with that `pageId`, exactly as for any other page.
+  One call stages up to two events (sidebar theme, homepage title) in a single
+  draft write, so a mixed update is all-or-nothing.
+  The change is STAGED in the draft and appears in the customizer under Homepage
+  settings. Returns: branchId, seqs (one per staged event), staged (always true).
+
+- updatePortalStyle: sets the portal branding — the same fields the customizer's
+  Portal style panel writes.
+  Required path params: `orgId`, `portalId`.
+  Body (at least one field required; only provided fields change):
+    `theme`    — color theme key. One of: light_purple, soft_light, quite_green,
+                 space_gray, carbon, oxford, ultramarine, milky_blue,
+                 shades_of_green, savvy_red, light_orange, light_blue,
+                 lemon_drop. Recolors the whole portal consistently.
+    `logo`     — `{ storedFileUUID }` of an uploaded image, shown in the header.
+    `favicon`  — `{ storedFileUUID }` of an uploaded image, the browser tab icon.
+  Upload images first with the files operations (see MCP prompt `files`) and pass
+  the returned `storedFileUUID`.
+  Colors are named themes, NOT arbitrary values: the portal theme model has no
+  hex-color and no web-font fields, so a request like "make the buttons #2563eb"
+  or "use the Fraunces font" cannot be served by this operation. Pick the closest
+  theme, then use updatePortalCustomCode for anything more specific (CNAME-domain
+  portals only; see reference `portal-theme-variables`).
+  Read the current branding back from `getPortal` → `style`
+  (`theme`, `logoUrl`, `faviconUrl`).
+  The change is STAGED in the draft. Returns: branchId, seq, staged (always true).
+
 - publishPortalDraft: publishes the portal's staged draft to the live portal.
   Required path params: `orgId`, `portalId`. No body.
   Applies EVERY staged change in the draft (the whole pending branch, including
@@ -1563,7 +1738,7 @@ customizer immediately but on the live portal only after a manager publishes.
 ## Read Flow Rules
 
 - Use `listPortals` to discover available portals when you do not yet have a `portalId`.
-- Use `getPortal` when you already have the `portalId` and need full portal details including CNAME info, status, version, and publish timestamps.
+- Use `getPortal` when you already have the `portalId` and need full portal details including CNAME info, status, version, publish timestamps, and the published branding (`style`: `theme`, `logoUrl`, `faviconUrl`).
 - `getPortal` returns 404 when the portal does not exist or is not accessible.
 
 ## listPortalContent Flow Rules
@@ -1611,6 +1786,306 @@ moved or removed.
 Never send raw blocks, bricks, wrappers, theme tuples, CSS classes, internal
 indexes, DynamicLink fields, response data, changeEvents, eventJson, dtoJson,
 batch ids or client event ids to any of these operations.
+
+Then call getPortalBlock with the selected blockId and inspect its current
+settings before changing anything. It returns the block's semantic `kind` — the
+vocabulary the typed updates use — plus `title`, `place`, `layout` and the
+kind-specific `settings`. Show the user what is set today and confirm the change.
+
+Call the typed updatePortal*Block operation named by `editOperation`. Send only
+the settings the user asked to change: omitted fields and omitted nested fields
+keep their current value, and the add operation's defaults do NOT apply. null
+clears a value only where the operation contract allows it. An update cannot
+change a block's type or template, and cannot create a page, menu item or
+replacement block.
+
+When an array is sent it is the FULL desired list in visual order, not an item
+patch — preserve every item the user did not ask to remove. A discriminated
+object such as appearance, target, destination or visible must be a complete
+valid variant when sent.
+
+An empty patch, or one the block already satisfies, is rejected with 400 rather
+than silently staging nothing.
+
+## updatePortalNoteBlock
+
+Updates the portal wrapper of an existing note-backed block, including one
+created by addPortalNoteBlock, addPortalBlankNoteBlock, addPortalKanbanBlock or
+addPortalTaskListBlock — they all persist as the same block kind.
+
+It accepts only title and layout. layout.colspan is 3, 4, 5 or 6;
+layout.height is null for Auto or a number of at least 50 for Manual.
+
+It cannot replace noteId, boardId or taskListId and cannot edit note content,
+Kanban columns, tasks or task-list items. Use the corresponding product
+operations for that content.
+
+Example — widen a note block and rename it:
+updatePortalNoteBlock({args:{orgId:"org_123",portalId:"portal_456",
+pageId:"page_789",blockId:"block_107",
+body:{title:"Q3 report",layout:{colspan:6}}}})
+
+## updatePortalHeadingBlock
+
+Updates content, appearance or layout of an existing Text & Media Heading
+block. content supports text, color, size, styles and align. Follow the shared
+text, color, variable, background and Layout rules. An image background accepts
+only azure, mira, solis, serenity or glow with optional blur. Send appearance
+complete: re-send the one getPortalBlock reports and change the field you want.
+Under backdrop custom an omitted background keeps the block's current one.
+This operation does not accept a wrapper title, HTML, CSS, image URL or raw
+bricks.
+
+## updatePortalTextBlock
+
+Updates content, appearance or layout of an existing Text & Media Simple text
+block. content supports text, color, size, styles and align. Follow the shared
+text, color, variable, background and Layout rules. An image background accepts
+only azure, mira, solis, serenity or glow with optional blur. Send appearance
+complete: re-send the one getPortalBlock reports and change the field you want.
+Under backdrop custom an omitted background keeps the block's current one.
+This operation does not accept a wrapper title, HTML, CSS, image URL or raw
+bricks.
+
+## updatePortalImageBlock
+
+Updates only layout of an existing Text & Media Image block. Width is 2..6;
+height is null for Auto or at least 50 for Manual.
+
+The image remains the block's existing built-in image. Never send an image URL,
+asset id, upload data, base64, local path, filename, content or appearance.
+
+## updatePortalEmbedBlock
+
+Updates title, embedType, url or content, showEmbedLink, colspan, rowspan or
+height of an existing Embed block.
+
+For embedType=custom use content and do not send url. For a named embed type use
+an absolute supported URL and do not send content. When changing embedType,
+send the complete valid source variant in the same request. colspan is 2..6,
+rowspan is 1..4, and height is null for Auto or a supported pixel value.
+
+## updatePortalDatabaseBlock
+
+Updates target, title, itemsPerPage, appearance or layout of an existing
+Database block.
+
+Before changing target, call listPortalDatabaseBlockSources and use the exact
+databaseId, dashboardId and viewId chain it returns. Send the complete target
+variant. itemsPerPage is 10, 20, 50, 100, 200 or 500. Follow the shared
+Appearance and Layout rules; layout width is 2..6 and manual height is >=50.
+
+Example — change the source view and width while preserving other settings:
+updatePortalDatabaseBlock({args:{orgId:"org_123",portalId:"portal_456",
+pageId:"page_789",blockId:"block_101",body:{target:{type:"database",
+databaseId:"database_1",dashboardId:"table_2",viewId:"view_3"},
+layout:{colspan:4}}}})
+
+## updatePortalCardBlock
+
+Updates view, content, appearance or layout of an existing Card block.
+
+Each content item is a complete variant: send only what changes and the
+rest of that item is kept. A hidden item is reported as visible:false and
+only; re-show it with visible:true alone and it keeps its stored text and
+styles. destination is the Card's single link, shared with its Button, and
+null removes it. Changing view repaints the text colours unless an explicit
+color is sent with it. getPortalBlock reports no appearance for a Card on
+its original wrapper: that is not a backdrop you can send back. Follow the
+shared Appearance and Layout rules; layout width is 2..6 and manual height
+is >=50.
+
+Example — retitle the heading and widen the Card:
+updatePortalCardBlock({args:{orgId:"org_123",portalId:"portal_456",
+pageId:"page_789",blockId:"block_101",body:{content:{heading:{
+text:"Client resources"}},layout:{colspan:4}}}})
+
+## updatePortalCarouselBlock
+
+Updates content or layout of an existing Carousel block. content.items is the
+FULL desired list of 1..6 slides in visual order. Each slide may contain
+caption, description, button {text} or null, and destination or null.
+
+The slide surface and Button share one destination. Description supports only
+{{ClientName}} and {{ClientLastName}}; caption and Button text support no
+variables. Images remain built in. Do not send media, autoplay, duration,
+controls, indicators, appearance or item ids. Width is 2..6; manual height is
+at least 50.
+
+## updatePortalCountdownBlock
+
+Updates title, content.targetAt, appearance or layout of an existing Countdown
+block. targetAt is an absolute RFC 3339 date-time with Z or an explicit UTC
+offset. It must not be in the past or more than 99 days from the update.
+
+Never send epoch time, a timezone-less date, duration or internal countdown
+items. Follow the shared title, Appearance and Layout rules; width is 2..6 and
+manual height is at least 50.
+
+## updatePortalBpmnDiagramBlock
+
+Updates title, content.diagramHeight, appearance or layout of an existing BPMN
+Diagram block. diagramHeight is the canvas height from 150 to 5000 pixels;
+layout.height is the separate outer block height.
+
+This operation cannot accept BPMN XML, import a .bpmn file or edit process
+elements and links. Follow the shared Appearance and Layout rules.
+
+## updatePortalDynamicTableBlock
+
+Updates title, appearance or layout of an existing Dynamic Table block. It does
+not configure or replace the integration provider, OAuth connection, data
+source, columns or rows. Follow the shared Appearance and Layout rules; width is
+2..6 and manual height is at least 50.
+
+## updatePortalRecentFilesBlock
+
+Updates title, source or layout of an existing Recent files block. source is
+either {type:"entirePortal"} or {type:"portalPage",pageId}. Resolve an exact
+same-portal pageId before changing to portalPage.
+
+The operation cannot change sort order, the five-item limit, offset, file type,
+query data or appearance. Width is 3, 4, 5 or 6; manual height is at least 50.
+
+## updatePortalLinkedBlock
+
+Changes the source of an existing Linked block. First resolve the source page
+with listPortalContent, then call listPortalLinkableBlocks and use the exact
+{portalId,pageId,blockId} source it returns. Let the user choose when several
+blocks match.
+
+Both portals must belong to the same organization and be editable by the
+caller. A draft-only source is allowed only in the same portal. A Linked block
+cannot reference another Linked block or a source on its own target page. The
+operation accepts no title, content, appearance or layout because these are
+mirrored from the source.
+
+## updatePortalFormBlock
+
+Updates title, content.description, content.form, appearance or layout of an
+existing Form block.
+
+content.form.fields is the FULL desired field list in visual order. Preserve
+the fieldId returned by getPortalBlock for every existing field, omit fieldId
+only for a new field, and omit an existing field from the list only when the
+user wants to delete it. Never invent a fieldId.
+
+Once the block has response data every field must carry its fieldId, so a new
+field cannot be added; and if reusable=false, fields, submit controls and
+reusable itself cannot be changed. Never send response data, brick ids or
+field indexes.
+
+## updatePortalCardGroupBlock
+
+Updates title, content, appearance or layout of an existing Card group block.
+content.items is the FULL desired list of 1..6 cards in visual order. Each card
+has a plain title and may use built-in image calendar, book, pen or briefcase
+and a destination or null. Never send image URLs or uploads.
+
+content.description follows the shared Description rules. Card destinations
+use an exact same-portal pageId, absolute HTTPS URL or email. Follow shared
+Appearance and Layout rules; width is 2..6 and manual height is at least 50.
+
+## updatePortalInfoBlock
+
+Updates title, image, destination, openInNewTab or layout of an existing Info
+block. image is one complete variant: emoji, an exact iconId returned by
+searchPortalInfoBlockIcons, or an allowed absolute HTTPS custom-image URL.
+
+destination is one complete variant: an exact same-portal pageId or an absolute
+HTTPS URL. Never invent icon ids or send raw persisted image/link values.
+Layout width is 1, 2 or 3; manual height is at least 50.
+
+## updatePortalCustomWidgetBlock
+
+Updates title, content, appearance or layout of an existing Custom widget.
+content.bricks is the FULL desired visual-order list. Each brick is heading,
+text, image, avatar, rating, link or button and may contain only fields allowed
+for that type. Preserve all bricks the user did not ask to remove.
+
+A link requires a destination; a button may remain unlinked. Resolve internal
+destinations to exact same-portal pageIds. Images remain built in; never send an
+image URL or upload. Follow shared Appearance and Layout rules; width is 2..6
+and manual height is at least 50.
+
+## updatePortalHtmlCssBlock
+
+Updates title, content.html, content.style, content.script or layout of an
+existing HTML/CSS block. Use it only for a verified custom CNAME portal and only
+when the user explicitly asks to change raw HTML, CSS or JavaScript.
+
+Within update content is a partial patch: omitted html, style or script remains
+unchanged; send an empty string to clear one. style contains no <style> tag and
+script contains no <script> tag. Scope CSS with block-specific class names.
+Never add analytics, trackers, external scripts or network calls the user did
+not request. The operation exposes no appearance. Width is 2..6 and manual
+height is at least 50.
+
+Example — clear only JavaScript while preserving HTML and CSS:
+updatePortalHtmlCssBlock({args:{orgId:"org_123",portalId:"portal_456",
+pageId:"page_789",blockId:"block_103",body:{content:{script:""}}}})
+
+## updatePortalTimelineBlock
+
+Updates view, title, content, appearance or layout of an existing Timeline.
+view is horizontal or vertical. content.steps is the FULL desired list of 1..6
+steps in visual order. Step title is at most 25 characters; completed steps must
+form one consecutive prefix. A step destination may be a same-portal pageId,
+HTTPS URL, email or null.
+
+Image visibility, Description and Button use their documented semantic fields.
+Button and step labels support no variables. Follow shared Appearance and
+Layout rules; width is 2..6 and manual height is at least 50.
+
+## updatePortalFileUploaderBlock
+
+Updates title, description, showAuthor, showUploadDate or layout of an existing
+File uploader block. description is plain text up to 50 characters. Width is 3,
+4 or 6; height is null for Auto or at least 50 for Manual.
+
+It cannot upload files or change permissions, bucket ids, file ids, query,
+sort, limit, appearance or rows.
+
+## updatePortalChatBlock
+
+Updates title, target, membersOnly, colspan, rowspan or height of an existing
+Chat widget block. Before changing target, use listPortalChatChannels for a
+channel or listPortalChatUsers for a DM and use the exact returned id.
+
+target is one complete variant: {type:"channel",channelId} or
+{type:"dm",userId}. membersOnly is channel-only, defaults are not reapplied,
+and a private channel requires true. Do not send membersOnly for a DM. colspan
+is 3..6 and rowspan is 1..4. This is not a chats-dashboard menu item.
+
+Example — switch the widget to an exact DM target:
+updatePortalChatBlock({args:{orgId:"org_123",portalId:"portal_456",
+pageId:"page_789",blockId:"block_105",body:{target:{type:"dm",userId:42},
+title:"Chat with Alex"}}})
+
+## updatePortalAppBlock
+
+Updates the published app binding or title of an existing App block. Use exact
+productId, appId, productType and productOrgId values returned by the published
+app discovery flow; never infer ids from names.
+
+When changing the app binding, send a complete consistent identity set.
+productType is private or managed. productOrgId is required for managed and
+must not identify another owner for private. This operation edits a block on an
+existing page; it does not create or update an App page or menu item.
+
+Example — replace the complete managed app binding:
+updatePortalAppBlock({args:{orgId:"org_123",portalId:"portal_456",
+pageId:"page_789",blockId:"block_106",body:{productId:"product_1",
+appId:"app_2",productType:"managed",productOrgId:"owner_org_3",
+title:"Customer app"}}})
+
+## updatePortalAiAgentBlock
+
+Changes the AI Agent used by an existing AI Agent block. First call
+listPortalAiAgents and use the exact returned agentId. Never infer an id from an
+agent title. The service synchronizes the canonical block title with the chosen
+agent. The operation accepts no custom title, prompt, appearance or layout and
+does not edit the agent itself.
 
 ## movePortalBlock
 
@@ -1670,7 +2145,7 @@ pageId:"page_789",blockId:"block_107"}})
 
 ## Version
 
-- **Version**: 1.70.0
+- **Version**: 1.98.0
 - **Category**: specialized
-- **Last synced**: 2026-08-06
+- **Last synced**: 2026-08-11
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
