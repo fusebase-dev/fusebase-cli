@@ -79,6 +79,7 @@ describe("isolated SQL bundle helpers", () => {
     const artifact = buildSqlMigrationBundleArtifact({
       appConfig,
       appBasePath: dir,
+      cwd: dir,
       store: store!,
     });
     expect(artifact.bundle.migrations).toHaveLength(1);
@@ -86,6 +87,79 @@ describe("isolated SQL bundle helpers", () => {
     expect(artifact.bundle.bundleVersion).toBe("1");
     expect(artifact.bundle.migrations[0]!.checksum).toBe(checksum);
     expect(artifact.rlsManifest?.tables.tasks?.classification).toBe("tenant");
+    expect(artifact.warnings).toEqual([]);
+  });
+
+  it("resolves an explicit migrationsDir from cwd (repo root)", () => {
+    // Feature lives at repo-root/apps/my-feature but its migrations live in a
+    // shared, repo-root-level folder. Nothing exists under the feature folder,
+    // so a successful build proves resolution is from cwd, not appBasePath.
+    const appBasePath = join(dir, "apps", "my-feature");
+    mkdirSync(appBasePath, { recursive: true });
+    const migrationsDir = join(dir, "shared", "migrations");
+    mkdirSync(migrationsDir, { recursive: true });
+    writeFileSync(join(migrationsDir, "0001_init.sql"), "SELECT 1;\n");
+    writeFileSync(
+      join(migrationsDir, "manifest.json"),
+      JSON.stringify({
+        bundleVersion: 1,
+        migrations: [{ version: 1, name: "init", file: "0001_init.sql" }],
+      }),
+    );
+
+    const appConfig: FeatureConfig = {
+      id: "app-1",
+      path: "apps/my-feature",
+      isolatedStores: {
+        sql: [{ alias: "tasks", migrationsDir: "shared/migrations" }],
+      },
+    };
+    const store = resolveSqlStoreConfig(appConfig);
+
+    const artifact = buildSqlMigrationBundleArtifact({
+      appConfig,
+      appBasePath,
+      cwd: dir,
+      store: store!,
+    });
+    expect(artifact.migrationsDir).toBe(migrationsDir);
+    expect(artifact.bundle.migrations).toHaveLength(1);
+    expect(artifact.bundle.migrations[0]!.name).toBe("init");
+    expect(artifact.warnings).toEqual([]);
+  });
+
+  it("resolves the default path from the feature folder when migrationsDir is omitted", () => {
+    // Regression guard: with no explicit migrationsDir the default must stay
+    // relative to appBasePath (the feature folder), NOT cwd.
+    const appBasePath = join(dir, "apps", "my-feature");
+    const migrationsDir = join(appBasePath, "postgres", "migrations");
+    mkdirSync(migrationsDir, { recursive: true });
+    writeFileSync(join(migrationsDir, "0001_init.sql"), "SELECT 1;\n");
+    writeFileSync(
+      join(migrationsDir, "manifest.json"),
+      JSON.stringify({
+        bundleVersion: 1,
+        migrations: [{ version: 1, name: "init", file: "0001_init.sql" }],
+      }),
+    );
+
+    const appConfig: FeatureConfig = {
+      id: "app-1",
+      path: "apps/my-feature",
+      isolatedStores: {
+        sql: [{ alias: "tasks" }],
+      },
+    };
+    const store = resolveSqlStoreConfig(appConfig);
+
+    const artifact = buildSqlMigrationBundleArtifact({
+      appConfig,
+      appBasePath,
+      cwd: dir,
+      store: store!,
+    });
+    expect(artifact.migrationsDir).toBe(migrationsDir);
+    expect(artifact.bundle.migrations).toHaveLength(1);
     expect(artifact.warnings).toEqual([]);
   });
 
@@ -116,6 +190,7 @@ describe("isolated SQL bundle helpers", () => {
     const artifact = buildSqlMigrationBundleArtifact({
       appConfig,
       appBasePath: dir,
+      cwd: dir,
       store: appConfig.isolatedStores!.sql![0]!,
     });
     expect(artifact.bundle.migrations[0]!.name).toBe("init");
@@ -174,7 +249,6 @@ describe("isolated SQL bundle CLI flag", () => {
                 {
                   alias: "tasks",
                   storeId: "00000000-0000-0000-0000-000000000000",
-                  migrationsDir: "postgres/migrations",
                   schemaName: "public",
                 },
               ],

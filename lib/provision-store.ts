@@ -183,6 +183,7 @@ export async function provisionStoresForEnvironment(
       const artifact = buildSqlMigrationBundleArtifact({
         appConfig,
         appBasePath: join(cwd, appConfig.path ?? ""),
+        cwd,
         store,
       });
       jobs.push({

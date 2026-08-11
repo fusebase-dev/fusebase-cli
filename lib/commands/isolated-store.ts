@@ -164,6 +164,7 @@ function readArtifact(
   return buildSqlMigrationBundleArtifact({
     appConfig,
     appBasePath: join(process.cwd(), appConfig.path),
+    cwd: process.cwd(),
     store,
   });
 }

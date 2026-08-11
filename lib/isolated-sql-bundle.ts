@@ -195,12 +195,18 @@ export function resolveSqlStoreConfig(
 export function buildSqlMigrationBundleArtifact(options: {
   appConfig: FeatureConfig;
   appBasePath: string;
+  /**
+   * Repo root (cwd of the fusebase process). An explicitly-set
+   * `store.migrationsDir` is resolved relative to this so a shared/repo-level
+   * migrations folder works (e.g. "shared/postgres/migrations"). The default
+   * path stays relative to `appBasePath` for backward compatibility.
+   */
+  cwd: string;
   store: IsolatedSqlStoreConfig;
 }): SqlMigrationBundleArtifact {
-  const migrationsDir = join(
-    options.appBasePath,
-    options.store.migrationsDir ?? "postgres/migrations",
-  );
+  const migrationsDir = options.store.migrationsDir
+    ? join(options.cwd, options.store.migrationsDir)
+    : join(options.appBasePath, "postgres/migrations");
   const manifestPath = join(migrationsDir, "manifest.json");
   const manifest = parseMigrationManifest(manifestPath);
   const warnings: string[] = [];
