@@ -1,7 +1,7 @@
 ---
-version: "1.5.0"
+version: "1.6.1"
 mcp_prompt: notes
-last_synced: "2026-07-30"
+last_synced: "2026-08-12"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -10,6 +10,21 @@ category: specialized
 > **MARKER**: `mcp-notes-loaded` — When this marker is present in context, MCP prompts for this topic may skip conceptual sections and use API reference only.
 
 > **VERSION CHECK**: If operations fail unexpectedly, load MCP prompt `notes` for latest content.
+
+---
+## Table of contents
+
+- [Fusebase Gate Notes Operations](#fusebase-gate-notes-operations)
+- [Relevant Operations](#relevant-operations)
+- [Identity And Scoping Rules](#identity-and-scoping-rules)
+- [Read Flow Rules](#read-flow-rules)
+- [Create Flow Rules](#create-flow-rules)
+- [Append Flow Rules](#append-flow-rules)
+- [Attachment Flow Rules](#attachment-flow-rules)
+- [Access Model](#access-model)
+- [Markdown (v3) Note Rules](#markdown-v3-note-rules)
+- [Directive Widgets (markdown-native UI)](#directive-widgets-markdown-native-ui)
+- [Working Rules](#working-rules)
 
 ---
 ## Fusebase Gate Notes Operations
@@ -94,18 +109,56 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - Use update for full-document rewrites and append for adding to the end; do not emulate append by rewriting the whole document.
 - Attach files with `addWorkspaceMarkdownNoteAttachment`; it appends the markdown itself and returns the canonical attachment `url` plus the appended `markdown` snippet, so never hand-build the link format. To place the attachment somewhere other than the end, take that `url` and rewrite the document with `updateWorkspaceMarkdownNoteContent` using the returned `note.revision`.
 
+## Directive Widgets (markdown-native UI)
+
+Fusebase v3 notes may contain remark leaf/container directives that the Notes UI renders as widgets. Prefer these over inventing HTML or JSON blobs. The markdown string is the only widget state — there is no separate widget API.
+
+**Scope:** widgets render only in v3 markdown notes. Write them with `createWorkspaceMarkdownNote`, `updateWorkspaceMarkdownNoteContent`, or `appendWorkspaceMarkdownNoteContent`. Never use classic v2 `createWorkspaceNote` / `appendWorkspaceNoteContent` (HTML) for widgets.
+
+**How to edit:** `getWorkspaceMarkdownNote` → change the directive line's `[label]` and `{attrs}` in the markdown → `updateWorkspaceMarkdownNoteContent` with the last-read `revision`. To add widgets at the end of a note, append the directive lines with `appendWorkspaceMarkdownNoteContent`.
+
+**Pick the right widget:**
+- `::progress` — filled share toward a goal (`value` / `max`).
+- `::rating` — discrete score (stars / hearts / thumbs).
+- `::kpi` — a single metric number with optional `unit` and `trend`.
+- `::badge` — short status chip with a tone.
+- `:::collapse` — hide secondary markdown behind a title.
+
+Syntax (put each leaf directive on its own line; container = `:::name[title]` … `:::`):
+
+    ::progress[Label]{value=0 max=100 color="auto|neutral|info|success|warning|danger" thickness="thin|medium|thick"}
+    ::rating[Label]{value=1 max=5 icon="star|heart|thumbsUp"}
+    ::kpi[Label]{value=0 unit="items" trend="+1"}
+    ::badge[Label]{tone="neutral|info|success|warning|danger"}
+
+    :::collapse[Title]
+    Hidden markdown body (lists, code, nested markdown OK).
+    :::
+
+- `[Label]` / `[Title]` is human-readable text stored in the directive itself; keep it short. For collapse, set the title only via markdown (the UI does not edit the summary).
+- Keep `value` and `max` numeric. Omit attrs you do not need — do not write empty values like `unit=""`.
+- Quoted and unquoted attrs both parse (`{value=72}` and `{value="72"}`); the editor may rewrite them with quotes on save.
+- Defaults when an attr is omitted: progress `max=100`, `color`→neutral, `thickness`→medium; rating `max=5`, `icon`→star; badge `tone`→neutral. A rating `max` is capped at 10 in the UI.
+- Prefer writing attrs the UI understands; unknown attrs still round-trip, and an unknown tone/colour/icon/thickness falls back to the default above instead of breaking the note.
+- Do not convert these widgets to HTML; send the directive forms above in markdown ops only.
+- `color="auto"` on progress picks danger (<34%), warning (<67%), or success from the filled percentage.
+- kpi `unit` and `trend` are free text; `trend` reads as up when it starts with `+` and down when it starts with `-`; anything else is neutral.
+- Collapse open/closed is editor UI state only — it is not written to markdown and resets on reload.
+- Text directives (`:name`) and leaf `::name` directives other than progress/rating/kpi/badge are not widgets; leave them as literal text. Unknown `:::name` containers may render as callouts, not as collapse.
+
 ## Working Rules
 
 - Always inspect the exact contract with `tools_describe` or `sdk_describe` before integration work.
 - Before creating notes in an unspecified/default workspace, call `listWorkspaces` and use the default workspace's real `id` instead of building note URLs with `/workspaces/default`.
 - For root note creation or listing, prefer omitting `parentId` instead of inventing a folder id.
-- If the caller needs note content after create, follow `createWorkspaceNote` with `getWorkspaceNote`.
-- If the caller wants to add content to an existing note, use `appendWorkspaceNoteContent` instead of creating a replacement note.
+- For v3 markdown notes (including directive widgets), use the markdown ops (`createWorkspaceMarkdownNote` / `getWorkspaceMarkdownNote` / `updateWorkspaceMarkdownNoteContent` / `appendWorkspaceMarkdownNoteContent`), not the classic v2 create/append ops.
+- If the caller needs note content after a classic v2 create, follow `createWorkspaceNote` with `getWorkspaceNote`.
+- If the caller wants to add content to an existing classic v2 note, use `appendWorkspaceNoteContent` instead of creating a replacement note.
 ---
 
 ## Version
 
-- **Version**: 1.5.0
+- **Version**: 1.6.1
 - **Category**: specialized
-- **Last synced**: 2026-07-30
+- **Last synced**: 2026-08-12
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

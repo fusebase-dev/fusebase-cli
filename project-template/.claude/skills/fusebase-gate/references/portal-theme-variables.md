@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/portal-theme-variables.md"
-last_synced: "2026-07-10"
+last_synced: "2026-08-12"
 title: "Portal theme styling (custom CSS override contract)"
 category: specialized
 ---
@@ -34,14 +34,14 @@ the hooks below.
 Prefer these over classes; they never collide with Tailwind utilities and are the
 declared public styling surface.
 
-| Selector | Region |
-|---|---|
-| `[data-portal="sidebar"]` | Left navigation sidebar |
-| `[data-portal="footer"]` | Portal footer |
-| `[data-portal="page-card"]` | Main page column (breadcrumbs + content) |
-| `[data-portal="note-content"]` | Page/note content wrapper |
-| `[data-portal="breadcrumbs"]` | Breadcrumbs navigation |
-| `[data-portal="search"]` | Search overlay |
+| Selector                       | Region                                   |
+| ------------------------------ | ---------------------------------------- |
+| `[data-portal="sidebar"]`      | Left navigation sidebar                  |
+| `[data-portal="footer"]`       | Portal footer                            |
+| `[data-portal="page-card"]`    | Main page column (breadcrumbs + content) |
+| `[data-portal="note-content"]` | Page/note content wrapper                |
+| `[data-portal="breadcrumbs"]`  | Breadcrumbs navigation                   |
+| `[data-portal="search"]`       | Search overlay                           |
 
 ## Stable class hooks
 
@@ -76,4 +76,4 @@ nx-frontend), versioned so consumers can detect breaking changes.
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-07-10
+- **Last synced**: 2026-08-12
