@@ -14,6 +14,7 @@ import {
   getActiveEnvironment,
   getActiveEnvironmentBackend,
   writeEnvironmentAppResolution,
+  writeEnvironmentStoreId,
   type ActiveEnvironment,
 } from "./environments";
 
@@ -1809,6 +1810,30 @@ export function persistResolvedAppId(
     appConfig.subdomain,
     appId,
   );
+}
+
+/**
+ * Persist a Gate-resolved isolated-store id into the active environment's
+ * lockfile (`apps[<key>].stores[<alias>]`) — the store-id counterpart of
+ * `persistResolvedAppId` (NIM-42434). Keyed by the app's LOGICAL alias, so the
+ * runtime overlay keeps substituting the per-env storeId while app code keeps
+ * using the alias. Legacy mode (no active environment) is a no-op: storeIds
+ * there are authored in fusebase.json by hand. Returns true when something was
+ * written; an id already recorded for that alias writes nothing.
+ */
+export function persistResolvedStoreId(
+  projectRoot: string,
+  appConfig: FeatureConfig,
+  storeAlias: string,
+  storeId: string,
+): boolean {
+  const active = getActiveEnvironment(projectRoot);
+  if (!active) return false;
+  const key = environmentAppKey(appConfig);
+  if (!key) return false;
+  if (active.config.apps?.[key]?.stores?.[storeAlias] === storeId) return false;
+  writeEnvironmentStoreId(projectRoot, active.name, key, storeAlias, storeId);
+  return true;
 }
 
 /** Read-modify-write one `apps[]` entry in fusebase.json. */

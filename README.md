@@ -876,6 +876,8 @@ A matched app entry may be id-less (authored with only a `path`/`subdomain`), an
 
 Branch on `appExists` to tell "not deployed" apart from a real Gate status. Entries that already carry an `id` are used as-is with no reconcile.
 
+With an active app environment, a successful `--apply` also records the store it targeted into `environments/<name>.json` under `apps.<key>.stores.<alias>` (logical alias), so a store bound via `--store-id` or a legacy `fusebase.json` id becomes visible to `fusebase env status` and the runtime overlay. Nothing is written in legacy mode or when the lockfile already holds that id.
+
 This command is operator/CI tooling. Its `storeId` is allowed in `fusebase.json`, `--store-id`, command output, or handoff logs so migrations can target an exact Gate store/stage. Do not copy that `storeId` into app runtime secrets or env vars. Runtime app code should resolve Gate isolated stores through app scope/permissions and stable aliases, or use platform-provided bindings when available.
 
 RLS manifests are experimental and are only attached when the `postgres-rls` flag is enabled. Without the flag, the command still builds/applies the SQL migration bundle but omits `rlsManifest`.

@@ -581,6 +581,8 @@ fusebase isolated-store sql bundle --app apps/client-portal --stage dev --apply 
 
 Gate calls use `GATE_MCP_TOKEN` from `.env`. Do `--status` and `--dry-run` before any real `--apply`.
 
+With an active app environment, a successful `--apply` records the store it targeted into `environments/<name>.json` under `apps.<key>.stores.<alias>` (logical alias), so a store bound by `--store-id` shows up in `fusebase env status` and the runtime overlay. Nothing is written without an active environment.
+
 ### Gate MCP Token Scope
 
 `fusebase env create` writes `GATE_MCP_TOKEN` to `.env`. For current apps-cli projects, the Gate MCP token is created with the project `productId` as its `client` scope, not necessarily with a child `apps[].id`.
