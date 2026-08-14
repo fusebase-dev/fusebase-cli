@@ -209,6 +209,39 @@ describe("provisionStoresForEnvironment", () => {
     ).rejects.toBeInstanceOf(StoreAliasCollisionError);
   });
 
+  it("resolves an EXPLICIT migrationsDir from the repo root when the app has none", async () => {
+    const { cwd, app } = makeProject("dev");
+    // Shared, repo-level migrations folder — the case repo-relative resolution
+    // exists for. The app-relative folder must not shadow it.
+    const shared = join(cwd, "shared/postgres/migrations");
+    mkdirSync(shared, { recursive: true });
+    writeFileSync(join(shared, "0001_shared.sql"), "CREATE TABLE s (id int);");
+    writeFileSync(
+      join(shared, "manifest.json"),
+      JSON.stringify({
+        migrations: [{ version: 1, name: "0001_shared", file: "0001_shared.sql" }],
+      }),
+    );
+    app.appConfig.isolatedStores!.sql![0]!.migrationsDir = "shared/postgres/migrations";
+
+    const calls: GateCall[] = [];
+    await provisionStoresForEnvironment({
+      cwd,
+      envName: "dev",
+      backend: "dev",
+      orgId: "org1",
+      productId: "prod1",
+      apps: [app],
+      gate: fakeGate(calls),
+    });
+
+    const applied = calls.find((c) => c.path.endsWith("/migrations/apply"));
+    const bundle = (applied!.body as { bundle: { migrations: Array<{ name: string }> } })
+      .bundle;
+    expect(bundle.migrations).toHaveLength(1);
+    expect(bundle.migrations[0]!.name).toBe("0001_shared");
+  });
+
   it("rejects a local backend", async () => {
     const { cwd, app } = makeProject("dev");
     await expect(

@@ -922,6 +922,8 @@ fusebase isolated-store sql bundle --app client-portal --stage dev --dry-run
 fusebase isolated-store sql bundle --app client-portal --stage dev --apply --yes
 ```
 
+**Where `migrationsDir` points.** A declared relative path is resolved against the **app folder first** (`apps/<app>/postgres/migrations` — the historical meaning, and what the example above uses), and against the **repo root** as a fallback, so a shared migrations folder such as `"shared/postgres/migrations"` also works. If both exist, the app folder wins. An absolute path is used as given. Omit the field entirely and it defaults to `postgres/migrations` inside the app. When neither location holds a `manifest.json`, the error names both paths it tried.
+
 The migration manifest remains app-owned and environment-neutral. Stage state still lives in Gate's `fusebase_schema_migrations` journal and stage metadata.
 
 To include `rlsManifest` in Gate status/dry-run/apply calls:
