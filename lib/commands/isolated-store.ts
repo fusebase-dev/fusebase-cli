@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { join } from "path";
 import {
   getConfig,
+  getEnv,
   hasFlag,
   loadFuseConfig,
   persistResolvedAppId,
@@ -34,6 +35,22 @@ type SqlBundleOptions = {
 };
 
 const ISOLATED_SQL_RLS_FLAG = "postgres-rls";
+
+/**
+ * Gate stage for this run. An explicit `--stage` always wins; otherwise it
+ * follows the active environment's backend.
+ *
+ * This used to default to a hardcoded "dev", which silently pointed a
+ * `FUSEBASE_ENV=prod` run at the dev stage: a store that has both stages would
+ * be asserted against the wrong data and report a false OK.
+ */
+export function resolveStage(
+  explicit: string | undefined,
+  backend: string | undefined = getEnv(),
+): "dev" | "prod" {
+  if (explicit === "prod" || explicit === "dev") return explicit;
+  return backend === "prod" ? "prod" : "dev";
+}
 
 // An app entry has no platform `id` yet (it is assigned at deploy-time
 // reconcile), so `--app` is matched by local `path` only.
@@ -288,7 +305,10 @@ const sqlBundleCommand = new Command("bundle")
   .requiredOption("--app <app>", APP_OPTION_DESCRIPTION)
   .option("--alias <alias>", "SQL isolated store alias from isolatedStores.sql[]")
   .option("--store-id <storeId>", "Gate store id; overrides isolatedStores.sql[].storeId")
-  .option("--stage <stage>", "Stage for Gate status/apply: dev or prod", "dev")
+  .option(
+    "--stage <stage>",
+    "Stage for Gate status/apply: dev or prod (default: the active environment's backend)",
+  )
   .option("--schema <schemaName>", "Override schemaName sent to Gate")
   .option("--json", "Print the Gate request body as JSON")
   .option("--status", "Call Gate migration status with the built body")
@@ -297,7 +317,7 @@ const sqlBundleCommand = new Command("bundle")
   .option("--apply", "Apply pending migrations through Gate")
   .option("--yes", "Confirm --apply")
   .action(async (options: SqlBundleOptions) => {
-    const stage = options.stage === "prod" ? "prod" : "dev";
+    const stage = resolveStage(options.stage);
     const { fuseConfig, appConfig } = resolveAppConfig(options.app);
 
     // A read-only status check on a not-yet-deployed declarative app returns a

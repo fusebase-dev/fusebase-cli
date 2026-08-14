@@ -579,7 +579,7 @@ fusebase isolated-store sql bundle --app apps/client-portal --stage dev --dry-ru
 fusebase isolated-store sql bundle --app apps/client-portal --stage dev --apply --yes
 ```
 
-Gate calls use `GATE_MCP_TOKEN` from `.env`. Do `--status` and `--dry-run` before any real `--apply`.
+Gate calls use `GATE_MCP_TOKEN` from `.env`. Do `--status` and `--dry-run` before any real `--apply`. `--stage` defaults to the active environment's backend, so `FUSEBASE_ENV=prod` targets the prod stage — pass `--stage` only to override it.
 
 ### Gate MCP Token Scope
 
