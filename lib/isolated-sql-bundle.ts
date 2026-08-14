@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { existsSync, readFileSync } from "fs";
-import { join } from "path";
+import { isAbsolute, join } from "path";
 import { requireAppId } from "./config";
 import type {
   FeatureConfig,
@@ -192,21 +192,68 @@ export function resolveSqlStoreConfig(
   return found;
 }
 
+const DEFAULT_MIGRATIONS_DIR = "postgres/migrations";
+
+/**
+ * Locate an app's migrations folder.
+ *
+ * A declared `migrationsDir` has always meant "relative to the app folder"
+ * (`apps/<app>/postgres/migrations`), and that is what existing projects and
+ * the docs example already carry — so it is tried FIRST and still wins.
+ * Repo-relative resolution is the newer capability (a shared, repo-level
+ * migrations folder such as "shared/postgres/migrations") and is the fallback.
+ * An absolute path is used as given.
+ *
+ * The probe is `manifest.json`, because that is the file the caller needs next:
+ * a folder without a manifest is not a migrations folder.
+ */
+export function resolveMigrationsDir(options: {
+  appBasePath: string;
+  cwd: string;
+  migrationsDir?: string;
+}): string {
+  const declared = options.migrationsDir;
+  if (declared === undefined || declared.trim().length === 0) {
+    return join(options.appBasePath, DEFAULT_MIGRATIONS_DIR);
+  }
+  if (isAbsolute(declared)) {
+    return declared;
+  }
+
+  const appRelative = join(options.appBasePath, declared);
+  if (existsSync(join(appRelative, "manifest.json"))) {
+    return appRelative;
+  }
+  const repoRelative = join(options.cwd, declared);
+  if (existsSync(join(repoRelative, "manifest.json"))) {
+    return repoRelative;
+  }
+
+  // Neither location has a manifest — name both so the fix is obvious instead
+  // of surfacing a bare ENOENT for whichever path happened to be tried last.
+  throw new Error(
+    `No manifest.json found for isolated store migrations "${declared}". Looked in:\n` +
+      `  ${join(appRelative, "manifest.json")} (app-relative)\n` +
+      `  ${join(repoRelative, "manifest.json")} (repo-relative)`,
+  );
+}
+
 export function buildSqlMigrationBundleArtifact(options: {
   appConfig: FeatureConfig;
   appBasePath: string;
   /**
-   * Repo root (cwd of the fusebase process). An explicitly-set
-   * `store.migrationsDir` is resolved relative to this so a shared/repo-level
-   * migrations folder works (e.g. "shared/postgres/migrations"). The default
-   * path stays relative to `appBasePath` for backward compatibility.
+   * Repo root (cwd of the fusebase process). Used as the fallback base for an
+   * explicitly-declared `store.migrationsDir` so a shared/repo-level migrations
+   * folder works — see `resolveMigrationsDir`.
    */
   cwd: string;
   store: IsolatedSqlStoreConfig;
 }): SqlMigrationBundleArtifact {
-  const migrationsDir = options.store.migrationsDir
-    ? join(options.cwd, options.store.migrationsDir)
-    : join(options.appBasePath, "postgres/migrations");
+  const migrationsDir = resolveMigrationsDir({
+    appBasePath: options.appBasePath,
+    cwd: options.cwd,
+    migrationsDir: options.store.migrationsDir,
+  });
   const manifestPath = join(migrationsDir, "manifest.json");
   const manifest = parseMigrationManifest(manifestPath);
   const warnings: string[] = [];

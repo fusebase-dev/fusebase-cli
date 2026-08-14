@@ -579,7 +579,15 @@ fusebase isolated-store sql bundle --app apps/client-portal --stage dev --dry-ru
 fusebase isolated-store sql bundle --app apps/client-portal --stage dev --apply --yes
 ```
 
-Gate calls use `GATE_MCP_TOKEN` from `.env`. Do `--status` and `--dry-run` before any real `--apply`.
+Gate calls use `GATE_MCP_TOKEN` from `.env`. Do `--status` and `--dry-run` before any real `--apply`. `--stage` defaults to the active environment's backend, so `FUSEBASE_ENV=prod` targets the prod stage — pass `--stage` only to override it.
+
+**CI store contract.** `--status`/`--rls-status` report; `--assert-migrations`/`--assert-rls` fail the build:
+
+```bash
+fusebase isolated-store sql bundle --app apps/<app> --assert-migrations --assert-rls
+```
+
+`--assert-migrations` fails on pending migrations, a drifted journal, or a required baseline adoption. `--assert-rls` fails when the runtime role can bypass RLS (`bypassRls`/`superuser`) or when no data table carries a policy. Run this in CI alongside e2e: a Playwright spec cannot tell "RLS is working" from "this user has no rows", so a migration shipped without a policy would otherwise leave the suite green while the data is unprotected.
 
 ### Gate MCP Token Scope
 

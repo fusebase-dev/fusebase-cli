@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { join } from "path";
 import {
   getConfig,
+  getEnv,
   hasFlag,
   loadFuseConfig,
   persistResolvedAppId,
@@ -18,6 +19,11 @@ import {
   resolveSqlStoreConfig,
   type SqlMigrationBundleArtifact,
 } from "../isolated-sql-bundle";
+import {
+  classifyRls,
+  type RlsVerdict,
+  type SqlRlsStatusResponse as SharedRlsStatusResponse,
+} from "../provision-store";
 
 type SqlBundleOptions = {
   app: string;
@@ -28,9 +34,21 @@ type SqlBundleOptions = {
   json?: boolean;
   status?: boolean;
   rlsStatus?: boolean;
+  assertRls?: boolean;
+  assertMigrations?: boolean;
   dryRun?: boolean;
   apply?: boolean;
   yes?: boolean;
+};
+
+/** Migration status fields the `--assert-migrations` gate checks. */
+type SqlMigrationStatusResponse = {
+  appliedCount?: number;
+  pendingCount?: number;
+  currentVersion?: number | null;
+  bundleHeadVersion?: number | null;
+  isDrifted?: boolean;
+  requiresBaselineAdoption?: boolean;
 };
 
 const ISOLATED_SQL_RLS_FLAG = "postgres-rls";
@@ -66,12 +84,46 @@ function resolveAppConfig(appRef: string) {
   return { fuseConfig, appConfig };
 }
 
-type SqlRlsStatusResponse = {
-  currentUser?: string;
-  bypassRls?: boolean;
-  superuser?: boolean;
-  rlsEnabledCount?: number;
-};
+// Shared with provisioning so the CLI and `env provision-store` classify RLS
+// identically — `tableCount` matters (the migration journal is not app data).
+type SqlRlsStatusResponse = SharedRlsStatusResponse;
+
+/**
+ * Human-readable reason the `--assert-rls` gate fails, or null when RLS is fine.
+ */
+export function describeRlsFailure(
+  verdict: RlsVerdict,
+  status: SqlRlsStatusResponse,
+  dataTables: number,
+): string | null {
+  if (verdict === "unenforced") {
+    const reasons = [
+      ...(status.bypassRls === true ? ["bypassRls=true"] : []),
+      ...(status.superuser === true ? ["superuser=true"] : []),
+    ].join(", ");
+    return `RLS is NOT enforced for runtime role ${status.currentUser?.trim() || "unknown"} (${reasons}). Rows are readable regardless of policy.`;
+  }
+  if (verdict === "no-policy") {
+    return `RLS enabled on 0/${dataTables} data table(s) — the schema shipped with no row-level protection.`;
+  }
+  return null;
+}
+
+/**
+ * Gate stage for this run. An explicit `--stage` always wins; otherwise it
+ * follows the active environment's backend.
+ *
+ * This used to default to a hardcoded "dev", which silently pointed a
+ * `FUSEBASE_ENV=prod` run at the dev stage: a store that has both stages would
+ * be asserted against the wrong data and report a false OK.
+ */
+export function resolveStage(
+  explicit: string | undefined,
+  backend: string | undefined = getEnv(),
+): "dev" | "prod" {
+  if (explicit === "prod" || explicit === "dev") return explicit;
+  return backend === "prod" ? "prod" : "dev";
+}
 
 // True when an app entry has not been deployed to the platform yet. The
 // resolved `id` is written back into fusebase.json at deploy time, so an id-less
@@ -288,16 +340,27 @@ const sqlBundleCommand = new Command("bundle")
   .requiredOption("--app <app>", APP_OPTION_DESCRIPTION)
   .option("--alias <alias>", "SQL isolated store alias from isolatedStores.sql[]")
   .option("--store-id <storeId>", "Gate store id; overrides isolatedStores.sql[].storeId")
-  .option("--stage <stage>", "Stage for Gate status/apply: dev or prod", "dev")
+  .option(
+    "--stage <stage>",
+    "Stage for Gate status/apply: dev or prod (default: the active environment's backend)",
+  )
   .option("--schema <schemaName>", "Override schemaName sent to Gate")
   .option("--json", "Print the Gate request body as JSON")
   .option("--status", "Call Gate migration status with the built body")
   .option("--rls-status", "Call Gate RLS status for the selected store/stage")
+  .option(
+    "--assert-rls",
+    "CI gate: exit non-zero unless RLS is enforced (policies present, runtime role without bypass/superuser)",
+  )
+  .option(
+    "--assert-migrations",
+    "CI gate: exit non-zero unless every migration is applied and the journal is not drifted",
+  )
   .option("--dry-run", "Call Gate apply with dryRun:true")
   .option("--apply", "Apply pending migrations through Gate")
   .option("--yes", "Confirm --apply")
   .action(async (options: SqlBundleOptions) => {
-    const stage = options.stage === "prod" ? "prod" : "dev";
+    const stage = resolveStage(options.stage);
     const { fuseConfig, appConfig } = resolveAppConfig(options.app);
 
     // A read-only status check on a not-yet-deployed declarative app returns a
@@ -336,14 +399,26 @@ const sqlBundleCommand = new Command("bundle")
 
     printSummary(artifact, includeRlsManifest);
 
+    // The assert gates are the CI-facing form of the status calls: they fetch
+    // the same payload and turn "not enforced" / "not applied" into a non-zero
+    // exit instead of a warning a pipeline would scroll past.
+    const wantMigrationStatus =
+      options.status === true || options.assertMigrations === true;
+    const wantRlsStatus =
+      options.rlsStatus === true || options.assertRls === true;
+
     const shouldCallGate =
-      options.status === true ||
-      options.rlsStatus === true ||
+      wantMigrationStatus ||
+      wantRlsStatus ||
       options.dryRun === true ||
       options.apply === true;
     if (!shouldCallGate) {
       return;
     }
+
+    // Collected so every failing invariant is reported in one run, rather than
+    // making CI re-run to discover the next one.
+    const assertionFailures: string[] = [];
 
     const storeId = options.storeId ?? artifact.store.storeId;
     if (storeId === undefined || storeId.trim().length === 0) {
@@ -351,8 +426,8 @@ const sqlBundleCommand = new Command("bundle")
     }
     const token = await readAppGateTokenOrExit(process.cwd());
 
-    if (options.status === true) {
-      const status = await callGate({
+    if (wantMigrationStatus) {
+      const status = await callGate<SqlMigrationStatusResponse>({
         token,
         orgId: fuseConfig.orgId,
         storeId,
@@ -361,9 +436,28 @@ const sqlBundleCommand = new Command("bundle")
         body: requestBody,
       });
       writeStdoutLine(JSON.stringify(status, null, 2));
+
+      if (options.assertMigrations === true) {
+        const pending = status.pendingCount ?? 0;
+        if (pending > 0) {
+          assertionFailures.push(
+            `${pending} migration(s) pending — the store schema is behind postgres/migrations/.`,
+          );
+        }
+        if (status.isDrifted === true) {
+          assertionFailures.push(
+            "Migration journal is DRIFTED — an already-applied migration file changed. Do not repair checksums blindly; reconcile the file with what was applied.",
+          );
+        }
+        if (status.requiresBaselineAdoption === true) {
+          assertionFailures.push(
+            "Store requires migration baseline adoption — its schema predates the journal.",
+          );
+        }
+      }
     }
 
-    if (options.rlsStatus === true) {
+    if (wantRlsStatus) {
       const rlsStatus = await callGateRlsStatus({
         token,
         orgId: fuseConfig.orgId,
@@ -373,6 +467,18 @@ const sqlBundleCommand = new Command("bundle")
       });
       warnIfRuntimeDoesNotEnforceRls(rlsStatus);
       writeStdoutLine(JSON.stringify(rlsStatus, null, 2));
+
+      if (options.assertRls === true) {
+        const { verdict, dataTables } = classifyRls(rlsStatus);
+        const failure = describeRlsFailure(verdict, rlsStatus, dataTables);
+        if (failure !== null) {
+          assertionFailures.push(failure);
+        } else if (verdict === "unknown") {
+          assertionFailures.push(
+            "No data tables found in the store — nothing to protect, so RLS enforcement cannot be asserted.",
+          );
+        }
+      }
     }
 
     if (options.dryRun === true) {
@@ -407,6 +513,26 @@ const sqlBundleCommand = new Command("bundle")
         stage,
         schemaName: options.schema ?? artifact.schemaName ?? undefined,
       });
+    }
+
+    // Assertions decide the exit code last, so the status payloads above are
+    // always printed first — a failing CI job shows the evidence, not just the
+    // verdict.
+    if (assertionFailures.length > 0) {
+      console.error(
+        `\nFAILED: store contract violated for ${options.app} (alias ${artifact.store.alias}, stage ${stage}):`,
+      );
+      for (const failure of assertionFailures) {
+        console.error(`  ✗ ${failure}`);
+      }
+      process.exit(1);
+    }
+    if (options.assertRls === true || options.assertMigrations === true) {
+      const checked = [
+        ...(options.assertMigrations === true ? ["migrations applied, no drift"] : []),
+        ...(options.assertRls === true ? ["RLS enforced"] : []),
+      ].join("; ");
+      writeStdoutLine(`\n✓ Store contract OK for ${options.app} (${checked}).`);
     }
   });
 
