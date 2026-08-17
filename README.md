@@ -988,6 +988,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `environments` | Enables named app environments: `environments/<name>.json` + `.env.<name>`, the `fusebase env` command group, `--env <name>` on every command, per-backend auth. See [docs/proposals/APP-ENVIRONMENTS.md](docs/proposals/APP-ENVIRONMENTS.md). |
 | `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
 | `notes-markdown` | Adds `notes.markdown.read` / `notes.markdown.write` to generated Gate MCP tokens. Requires the platform flag `notes_markdown` on the target backend. |
+| `managed-integrations` | Enables managed third-party MCP integrations (`fusebase integrations list-templates` / `connect-template`) and adds `mcp_manager.*` to generated Gate MCP tokens (Gate rejects the mcp-manager endpoints without them). Enabling it marks `.env` tokens stale — re-run `fusebase env create` (or `fusebase update`) to mint a token that carries the new permissions. |
 
 Enable a flag globally, then refresh the project template:
 

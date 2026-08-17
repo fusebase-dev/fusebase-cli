@@ -278,6 +278,20 @@ export const GATE_PERMISSIONS_NOTES_MARKDOWN = [
   "notes.markdown.write",
 ] as const;
 
+/**
+ * Managed third-party MCP integrations (`fusebase integrations`). Gate rejects the
+ * mcp-manager endpoints with 403 unless the token carries these, so they ride in the
+ * Gate MCP token when the `managed-integrations` flag is on. Kept out of the legacy
+ * fingerprint baseline: enabling the flag must force an `.env` token refresh.
+ */
+export const GATE_PERMISSIONS_MCP_MANAGER = [
+  "mcp_manager.auth.write",
+  "mcp_manager.servers.write",
+  "mcp_manager.templates.read",
+  "mcp_manager.tools.execute",
+  "mcp_manager.tools.read",
+] as const;
+
 /** The MCP token policy baseline (its fingerprint is derived from this set). */
 export const KNOWN_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   ...GATE_PERMISSIONS_BASE,
@@ -301,11 +315,6 @@ const APP_API_PRIVILEGE_PREFIX = "app_api.";
 const GATE_PERMISSIONS_EXTRA_GRANTABLE = [
   "auth.restore_key.write",
   "automation.execute",
-  "mcp_manager.auth.write",
-  "mcp_manager.servers.write",
-  "mcp_manager.templates.read",
-  "mcp_manager.tools.execute",
-  "mcp_manager.tools.read",
 ] as const;
 
 /**
@@ -318,6 +327,7 @@ const GATE_PERMISSIONS_EXTRA_GRANTABLE = [
 export const ALL_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   ...KNOWN_GATE_PERMISSIONS,
   ...GATE_PERMISSIONS_MAGIC_LINKS,
+  ...GATE_PERMISSIONS_MCP_MANAGER,
   ...GATE_PERMISSIONS_EXTRA_GRANTABLE,
 ]);
 
