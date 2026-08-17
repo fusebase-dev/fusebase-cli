@@ -1,11 +1,12 @@
 import { createHash } from "crypto";
 import type { CreateTokenRequest } from "./api";
-import { hasFlag } from "./config";
+import { hasFlag, MANAGED_INTEGRATIONS_FLAG } from "./config";
 import {
   FILE_GATE_PERMISSIONS,
   GATE_PERMISSIONS_BASE,
   GATE_PERMISSIONS_ISOLATED,
   GATE_PERMISSIONS_MAGIC_LINKS,
+  GATE_PERMISSIONS_MCP_MANAGER,
   GATE_PERMISSIONS_NOTES_MARKDOWN,
   GATE_PERMISSIONS_PORTALS,
 } from "./permissions";
@@ -66,6 +67,10 @@ function notesMarkdownEnabled(): boolean {
   return hasFlag("notes-markdown");
 }
 
+function managedIntegrationsEnabled(): boolean {
+  return hasFlag(MANAGED_INTEGRATIONS_FLAG);
+}
+
 function getGateMcpPermissions(): string[] {
   const permissions = [
     ...GATE_PERMISSIONS_BASE,
@@ -74,6 +79,7 @@ function getGateMcpPermissions(): string[] {
     ...GATE_PERMISSIONS_PORTALS,
     ...GATE_PERMISSIONS_MAGIC_LINKS,
     ...(notesMarkdownEnabled() ? GATE_PERMISSIONS_NOTES_MARKDOWN : []),
+    ...(managedIntegrationsEnabled() ? GATE_PERMISSIONS_MCP_MANAGER : []),
   ];
   return permissions.sort((a, b) => a.localeCompare(b));
 }
@@ -201,7 +207,7 @@ export function matchesCurrentOrLegacyFallback(stored: {
 
   // Old projects without policy FP markers are accepted only for the legacy
   // token policy. Opt-in Gate MCP expansions must force token refresh.
-  if (notesMarkdownEnabled()) {
+  if (notesMarkdownEnabled() || managedIntegrationsEnabled()) {
     return false;
   }
 
