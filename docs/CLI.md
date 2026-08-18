@@ -111,11 +111,15 @@ fusebase auth --api-key=your-api-key --dev
 **Syntax**:
 
 ```bash
-fusebase init [--ide <presets>] [--force]
+fusebase init [--yes] [--name <name>] [--org <orgId>] [--subdomain <sub>] [--ide <presets>] [--force]
 ```
 
 **Options**:
 
+- `--name <name>`: Product title (prompted when omitted in interactive mode)
+- `--org <orgId>`: Organization ID (skips org selection)
+- `--subdomain <sub>`: Subdomain for the new product (the platform generates one when omitted)
+- `-y, --yes`: Non-interactive (agent/CI) mode — see [Non-Interactive / CI Usage](#6-non-interactive--ci-usage)
 - `--ide <presets>`: Comma-separated IDE presets to configure (e.g., `cursor,vscode`). Available: `cursor`, `vscode`, `claude-code`, `claude-desktop`, `jetbrains`, `antigravity`, `other`
 - `--force`: Overwrite existing IDE config files/folders
 
@@ -692,13 +696,13 @@ Apps use `@fusebase/dashboard-service-sdk` for runtime execution:
 **API Key**:
 
 ```bash
-fusebase auth --api-key=$API_KEY
+export FUSEBASE_API_KEY=$API_KEY   # or: fusebase auth --api-key=$API_KEY
 ```
 
-**Init with flags**:
+**Init without a TTY**:
 
 ```bash
-fusebase init --ide ""  # Skip IDE setup
+fusebase init --yes --name "My App" --org "$ORG_ID" --subdomain my-app --ide claude-code
 ```
 
 **Dev app with path**:
@@ -724,20 +728,37 @@ fusebase dev start my-app-id  # Skip app selection
 2. **Initialize project** (if needed):
 
    ```bash
-   fusebase init --ide ""  # Skip IDE setup in CI
+   fusebase init --yes --name "$APP_NAME" --org "$ORG_ID"
    ```
 
-3. **Deploy**:
+3. **Scaffold an app** (`scaffold` never prompts):
+
+   ```bash
+   fusebase scaffold --template spa --dir apps/my-app
+   ```
+
+4. **Deploy**:
    ```bash
    fusebase deploy  # Fully automated, no prompts
    ```
 
 ### Safe Defaults
 
-- **IDE selection**: If not TTY and no `--ide` flag, IDE setup is skipped (empty set)
+`init` treats `--yes` **or** a non-TTY stdin as non-interactive, and then answers
+prompts from flags only. Anything unanswered is an error, never a silent guess:
+
+| Prompt | Answered by | Missing in non-interactive mode |
+|--------|-------------|--------------------------------|
+| Authentication | `FUSEBASE_API_KEY` (or a prior `fusebase auth`) | exit 1 |
+| Product title | `--name` | exit 1 |
+| Organization | `--org` (auto-picked when the account has exactly one) | exit 1 |
+| Continue in a non-empty directory | `--yes` | exit 1 |
+| IDE config | `--ide` (all IDEs are configured when omitted) | — |
+| `NODE_ENV=production` warning | — | warning is printed, no keypress needed |
+
+- Re-running `init` where `fusebase.json` exists only refreshes agent configs — no flags needed
 - **App selection**: Auto-selects if only one app exists
-- **Organization selection**: Auto-selects if only one organization exists
-- **Template usage**: Defaults to `false` if directory is not empty
+- **Deploy / scaffold**: never prompt
 
 ---
 
