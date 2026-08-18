@@ -48,6 +48,20 @@ describe("MCP token policy", () => {
     );
   });
 
+  it("includes mcp-manager permissions when managed-integrations flag is enabled", () => {
+    seedConfig({ env: "dev", flags: ["managed-integrations"] });
+
+    expect(buildGateMcpTokenRequest("org_1", "app_1").permissions).toEqual(
+      expect.arrayContaining(["mcp_manager.templates.read", "mcp_manager.tools.execute"]),
+    );
+  });
+
+  it("requires MCP token refresh for legacy envs when managed-integrations flag is enabled", () => {
+    seedConfig({ env: "dev", flags: ["managed-integrations"] });
+
+    expect(matchesCurrentOrLegacyFallback({})).toBe(false);
+  });
+
   it("requires MCP token refresh for legacy envs when notes-markdown flag is enabled", () => {
     seedConfig({ env: "dev", flags: ["notes-markdown"] });
 

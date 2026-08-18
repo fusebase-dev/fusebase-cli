@@ -924,6 +924,27 @@ fusebase isolated-store sql bundle --app client-portal --stage dev --dry-run
 fusebase isolated-store sql bundle --app client-portal --stage dev --apply --yes
 ```
 
+#### CI gates: `--assert-migrations` / `--assert-rls`
+
+The `--status` / `--rls-status` flags *report*; the assert flags *fail*. They fetch the same payloads, print them, and then exit non-zero when an invariant is violated:
+
+| Flag | Fails when |
+|------|-----------|
+| `--assert-migrations` | migrations pending, journal drifted, or baseline adoption required |
+| `--assert-rls` | runtime role has `bypassRls`/`superuser`, **or** zero data tables carry a policy, **or** the store has no data tables at all |
+
+Both can be combined into a single store-contract job. This is the only automatic guard for the invariant browser e2e cannot see: a Playwright spec cannot distinguish "RLS is working" from "this user happens to have no rows", so a migration that ships without a policy leaves the whole suite green while the data is unprotected.
+
+```bash
+fusebase isolated-store sql bundle --app apps/store-a --assert-migrations --assert-rls
+```
+
+In CI the command needs three things: `FUSEBASE_ENV` (to resolve the env's `storeId` from the lockfile), a `.env` containing `GATE_MCP_TOKEN` (the token is read from the file, not from process env), and `~/.fusebase/config.json` declaring the `environments` flag (experimental flags have no env-var override).
+
+**Which stage is targeted.** `--stage` defaults to the **active environment's backend** (`FUSEBASE_ENV` / `env use` / global `env`), so `FUSEBASE_ENV=prod` targets the prod stage without extra flags. Pass `--stage` explicitly to override. Previously this defaulted to a hardcoded `dev`, which pointed a prod run at the dev stage — on a store carrying both stages that asserts against the wrong data and can report a false OK.
+
+**Where `migrationsDir` points.** A declared relative path is resolved against the **app folder first** (`apps/<app>/postgres/migrations` — the historical meaning, and what the example above uses), and against the **repo root** as a fallback, so a shared migrations folder such as `"shared/postgres/migrations"` also works. If both exist, the app folder wins. An absolute path is used as given. Omit the field entirely and it defaults to `postgres/migrations` inside the app. When neither location holds a `manifest.json`, the error names both paths it tried.
+
 The migration manifest remains app-owned and environment-neutral. Stage state still lives in Gate's `fusebase_schema_migrations` journal and stage metadata.
 
 To include `rlsManifest` in Gate status/dry-run/apply calls:
@@ -969,6 +990,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `environments` | Enables named app environments: `environments/<name>.json` + `.env.<name>`, the `fusebase env` command group, `--env <name>` on every command, per-backend auth. See [docs/proposals/APP-ENVIRONMENTS.md](docs/proposals/APP-ENVIRONMENTS.md). |
 | `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
 | `notes-markdown` | Adds `notes.markdown.read` / `notes.markdown.write` to generated Gate MCP tokens. Requires the platform flag `notes_markdown` on the target backend. |
+| `managed-integrations` | Enables managed third-party MCP integrations (`fusebase integrations list-templates` / `connect-template`) and adds `mcp_manager.*` to generated Gate MCP tokens (Gate rejects the mcp-manager endpoints without them). Enabling it marks `.env` tokens stale — re-run `fusebase env create` (or `fusebase update`) to mint a token that carries the new permissions. |
 
 Enable a flag globally, then refresh the project template:
 

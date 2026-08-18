@@ -85,7 +85,7 @@ interface SqlMigrationStatusResponse {
   isDrifted?: boolean;
 }
 
-interface SqlRlsStatusResponse {
+export interface SqlRlsStatusResponse {
   currentUser?: string;
   bypassRls?: boolean;
   superuser?: boolean;
