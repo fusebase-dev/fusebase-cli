@@ -525,8 +525,12 @@ const sqlBundleCommand = new Command("bundle")
             `✓ Recorded store ${artifact.store.alias} → ${storeId} in the active environment`,
           );
         }
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn(
+          `Warning: could not record store ${artifact.store.alias} → ${storeId} in the active environment lockfile: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
       }
 
       await warnRuntimeRlsStatus({
