@@ -11,6 +11,7 @@ import {
   invalidateFuseConfigCache,
   loadFuseConfig,
   persistResolvedAppId,
+  persistResolvedStoreId,
   type FeatureConfig,
 } from "../lib/config";
 import {
@@ -158,7 +159,60 @@ describe("environment overlay on fusebase.json", () => {
       );
       expect(onDisk.apps[1].id).toBeUndefined();
     });
+  });
 
+  // NIM-42434: a store bound outside provisioning (`isolated-store sql bundle
+  // --apply` with --store-id / a legacy fusebase.json id) must land in the
+  // active env lockfile, like persistResolvedAppId does for the app id.
+  describe("persistResolvedStoreId", () => {
+    const readLockfile = () =>
+      JSON.parse(
+        readFileSync(join(dir, "environments", "prod-beta.json"), "utf-8"),
+      );
+
+    it("records the store id under the logical alias", () => {
+      writeEnvironmentConfig(dir, "prod-beta", { ...prodEnv, apps: {} });
+      const portal = loadFuseConfig()!.apps![0]!; // key stamped by the overlay
+      expect(persistResolvedStoreId(dir, portal, "portal", "bound-uuid")).toBe(
+        true,
+      );
+      expect(readLockfile().apps.portal.stores.portal).toBe("bound-uuid");
+      // fusebase.json untouched — storeIds never leak across environments.
+      const onDisk = JSON.parse(
+        readFileSync(join(dir, "fusebase.json"), "utf-8"),
+      );
+      expect(onDisk.apps[0].isolatedStores.sql[0].storeId).toBe(
+        "dev-store-uuid",
+      );
+    });
+
+    it("keeps other lockfile state on the app entry", () => {
+      writeEnvironmentConfig(dir, "prod-beta", prodEnv);
+      const portal = loadFuseConfig()!.apps![0]!;
+      persistResolvedStoreId(dir, portal, "other", "other-uuid");
+      const entry = readLockfile().apps.portal;
+      expect(entry.id).toBe("app-prod-1");
+      expect(entry.stores).toEqual({
+        portal: "prod-store-uuid",
+        other: "other-uuid",
+      });
+    });
+
+    it("writes nothing when the alias already resolves to that store", () => {
+      writeEnvironmentConfig(dir, "prod-beta", prodEnv);
+      const portal = loadFuseConfig()!.apps![0]!;
+      expect(
+        persistResolvedStoreId(dir, portal, "portal", "prod-store-uuid"),
+      ).toBe(false);
+    });
+
+    it("is a no-op in legacy mode (no active environment)", () => {
+      const portal = loadFuseConfig()!.apps![0]!;
+      expect(persistResolvedStoreId(dir, portal, "portal", "x")).toBe(false);
+    });
+  });
+
+  describe("env-info payload", () => {
     it("builds the env-info payload with counterparts", () => {
       writeEnvironmentConfig(dir, "prod-beta", prodEnv);
       writeEnvironmentConfig(dir, "dev", {

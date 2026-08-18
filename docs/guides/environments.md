@@ -240,6 +240,13 @@ store-less environment is impossible to ship. Opt out with
 `fusebase deploy --skip-store-provision`, or provision by hand with the command
 above.
 
+`fusebase isolated-store sql bundle --apply --yes` records the same way: the
+store it applied migrations against (from the overlay, `--store-id`, or a legacy
+`fusebase.json` id) is written into the active environment's lockfile under the
+logical alias, so a store bound outside `provision-store` still shows up in
+`env status` and operator tooling. In legacy mode (no `environments/`) nothing is
+written — storeIds there stay hand-authored in `fusebase.json`.
+
 ### One org, many environments
 
 Managed store aliases are **unique per org**. Environments that share a backend

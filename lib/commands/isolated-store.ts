@@ -6,6 +6,7 @@ import {
   hasFlag,
   loadFuseConfig,
   persistResolvedAppId,
+  persistResolvedStoreId,
   type FeatureConfig,
   type FuseConfig,
 } from "../config";
@@ -506,6 +507,28 @@ const sqlBundleCommand = new Command("bundle")
         body: requestBody,
       });
       writeStdoutLine(JSON.stringify(apply, null, 2));
+
+      // The store this apply bound to belongs in the active env lockfile, the
+      // store-id counterpart of the app-id write-back in `ensureAppExists` —
+      // `--store-id` and legacy fusebase.json ids are otherwise invisible to
+      // `env status` and operator tooling. Best-effort: the migrations are
+      // already applied, the lockfile is only bookkeeping.
+      try {
+        const recorded = persistResolvedStoreId(
+          process.cwd(),
+          resolvedAppConfig,
+          artifact.store.alias,
+          storeId,
+        );
+        if (recorded) {
+          writeStdoutLine(
+            `✓ Recorded store ${artifact.store.alias} → ${storeId} in the active environment`,
+          );
+        }
+      } catch {
+        // ignore
+      }
+
       await warnRuntimeRlsStatus({
         token,
         orgId: fuseConfig.orgId,

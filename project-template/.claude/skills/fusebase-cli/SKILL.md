@@ -589,6 +589,8 @@ fusebase isolated-store sql bundle --app apps/<app> --assert-migrations --assert
 
 `--assert-migrations` fails on pending migrations, a drifted journal, or a required baseline adoption. `--assert-rls` fails when the runtime role can bypass RLS (`bypassRls`/`superuser`) or when no data table carries a policy. Run this in CI alongside e2e: a Playwright spec cannot tell "RLS is working" from "this user has no rows", so a migration shipped without a policy would otherwise leave the suite green while the data is unprotected.
 
+With an active app environment, a successful `--apply` records the store it targeted into `environments/<name>.json` under `apps.<key>.stores.<alias>` (logical alias), so a store bound by `--store-id` shows up in `fusebase env status` and the runtime overlay. Nothing is written without an active environment.
+
 ### Gate MCP Token Scope
 
 `fusebase env create` writes `GATE_MCP_TOKEN` to `.env`. For current apps-cli projects, the Gate MCP token is created with the project `productId` as its `client` scope, not necessarily with a child `apps[].id`.
