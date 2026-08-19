@@ -38,7 +38,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@fusebase/fusebase-gate-sdk": "^2.2.21-sdk.12",
+    "@fusebase/fusebase-gate-sdk": "^v2.7.2-sdk.2",
     "@iarna/toml": "^2.2.5",
     "@inquirer/prompts": "^8.2.0",
     "@types/cli-progress": "^3.11.6",
