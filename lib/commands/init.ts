@@ -268,10 +268,12 @@ async function warnIfProductionNodeEnv(): Promise<void> {
     }
     console.log();
 
-    await select({
-      message: "Press Enter to continue",
-      choices: [{ name: "Continue", value: true }],
-    });
+    if (process.stdin.isTTY) {
+      await select({
+        message: "Press Enter to continue",
+        choices: [{ name: "Continue", value: true }],
+      });
+    }
   }
 }
 
@@ -507,6 +509,11 @@ export const initCommand = new Command("init")
     "IDE preset: claude-code, cursor, vscode, opencode, codex, or other (single choice)",
   )
   .option("--force", "Overwrite existing IDE config files/folders", false)
+  .option(
+    "--force-dirty",
+    "Continue even though the current directory is not empty",
+    false,
+  )
   .addOption(
     new Option(
       "--managed",
@@ -534,6 +541,7 @@ export const initCommand = new Command("init")
       org?: string;
       ide?: string;
       force: boolean;
+      forceDirty: boolean;
       managed?: boolean;
       git?: boolean;
       skipGit?: boolean;
@@ -599,12 +607,18 @@ export const initCommand = new Command("init")
       const dirEmpty = await isDirectoryEmpty(cwd);
       const needToCopyTemplate = dirEmpty;
 
-      if (!dirEmpty) {
+      if (!dirEmpty && !options.forceDirty) {
         console.log();
         console.log(
           "⚠️  Directory is not empty. We recommend using empty folders for new apps.",
         );
         console.log();
+        if (!process.stdin.isTTY) {
+          console.error(
+            "Create an empty folder and run init there, or pass --force-dirty to continue here.",
+          );
+          process.exit(1);
+        }
         const shouldContinue = await confirm({
           message: "Would you still like to continue in the current one?",
           default: false,
@@ -662,6 +676,10 @@ export const initCommand = new Command("init")
       } else if (orgs.length === 1 && orgs[0]) {
         selectedOrg = orgs[0];
         console.log(`Using organization: ${formatOrgLabel(selectedOrg)}`);
+      } else if (!process.stdin.isTTY) {
+        console.error("Multiple organizations found. Pass --org <orgId> to choose one:");
+        for (const org of orgs) console.error(`  ${formatOrgLabel(org)}`);
+        process.exit(1);
       } else {
         selectedOrg = await promptSelect(
           "Select an organization:",
@@ -671,6 +689,10 @@ export const initCommand = new Command("init")
       }
 
       // Always create a new app
+      if (!options.name && !process.stdin.isTTY) {
+        console.error("Pass --name <name> to set the product title.");
+        process.exit(1);
+      }
       const appTitle =
         options.name ??
         (await input({
