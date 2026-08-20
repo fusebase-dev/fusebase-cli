@@ -114,6 +114,7 @@ Initialize a new Fusebase app in the current directory. This command will:
 - `--name <name>` - App title/name (if not provided, prompted)
 - `--subdomain <subdomain>` - App subdomain (e.g. `my-app`)
 - `--org <orgId>` - Organization ID (skips org selection)
+- `-y, --yes` - Non-interactive (agent/CI) mode: never prompt, fail on anything a flag has not answered
 - `--ide <preset>` - IDE preset: `claude-code`, `cursor`, `vscode`, `opencode`, `codex`, or `other` (single choice; generates all IDE configs by default)
 - `--force` - Overwrite existing IDE config files/folders
 - `--git` - After setup, initialize local Git and sync with configured GitLab remote (creates/uses repo in `<gitlabGroup>/<dev|prod>/...`, sets `origin`, pushes current branch)
@@ -130,6 +131,33 @@ Initialize a new Fusebase app in the current directory. This command will:
 - **Project template** - If directory is empty, the template is used automatically. If not empty, you'll be asked whether to continue in the current folder.
 - **IDE configuration** - MCP config is generated for all supported IDEs by default (unless `--ide` is provided); **required** MCP servers from the catalog (respecting flags) are written automatically. Optional servers are **not** configured during init — run `fusebase integrations` later.
 - **App name** - Name for `package.json` (if using template)
+
+**Non-interactive (agent / CI) mode:**
+
+`init` never prompts when `--yes` is passed or when stdin is not a TTY (a CI job,
+an agent shell). Everything a prompt would have asked for must then come from a
+flag — a missing one exits with code `1` instead of hanging:
+
+| Prompt | Answered by | Missing in non-interactive mode |
+|--------|-------------|--------------------------------|
+| Authentication | `FUSEBASE_API_KEY` env var (or a prior `fusebase auth --api-key`) | exit 1 |
+| Product title | `--name` | exit 1 |
+| Organization | `--org` (auto-picked when the account has exactly one) | exit 1 |
+| Continue in a non-empty directory | `--yes` | exit 1 |
+| IDE config | `--ide` (all IDEs are configured when omitted) | — |
+| `NODE_ENV=production` warning | — | warning is printed, no keypress needed |
+
+Re-running `init` in a directory that already has `fusebase.json` only refreshes
+the agent configs, and needs no flags.
+
+`fusebase scaffold` is non-interactive by design — it takes `--template` and
+`--dir` and exits non-zero when either is missing or files would be overwritten.
+
+```bash
+export FUSEBASE_API_KEY=...
+fusebase init --yes --name "My App" --org <orgId> --subdomain my-app --ide claude-code
+fusebase scaffold --template spa --dir apps/my-app
+```
 
 **Example:**
 
@@ -1176,6 +1204,7 @@ The CLI automatically detects common frameworks and suggests appropriate dev/bui
 | Variable | Description |
 |----------|-------------|
 | `ENV` | Set to `dev` to use the development environment |
+| `FUSEBASE_API_KEY` | API key used instead of the stored credentials — the way CI and agents authenticate |
 
 ---
 
