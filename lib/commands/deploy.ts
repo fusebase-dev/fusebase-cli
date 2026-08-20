@@ -417,7 +417,7 @@ async function pollDeployStatus(
     // Print any new log output
     if (deploy.log && deploy.log.length > printedLogLength) {
       const newContent = deploy.log.slice(printedLogLength);
-      process.stdout.write(newContent);
+      progressStream().write(newContent);
       printedLogLength = deploy.log.length;
     }
 
@@ -600,6 +600,87 @@ function persistResolvedId(
   }
 }
 
+// `--json` (NIM-43466): one machine-readable document on stdout so CI and
+// agents read the deploy result without parsing the human log. While it is on,
+// every progress line is re-routed to stderr and stdout stays a single JSON
+// value.
+export type DeployReportErrorKind = "validation" | "network" | "deploy";
+
+export interface DeployReportApp {
+  appId: string;
+  subdomain?: string;
+  url?: string;
+  versionId?: string;
+  deployId?: string;
+  status: "deployed" | "skipped" | "reconciled" | "failed";
+  error?: string;
+}
+
+export interface DeployReport {
+  ok: boolean;
+  orgId?: string;
+  productId?: string;
+  environment?: string;
+  apps: DeployReportApp[];
+  error?: { kind: DeployReportErrorKind; message: string };
+}
+
+export interface DeployResultEntry {
+  appId: string;
+  versionId: string;
+  url: string;
+  success: boolean;
+  skipped?: boolean;
+  subdomain?: string;
+  deployId?: string;
+  error?: string;
+}
+
+export function buildDeployReport(params: {
+  orgId?: string;
+  productId?: string;
+  environment?: string;
+  results: DeployResultEntry[];
+}): DeployReport {
+  const apps: DeployReportApp[] = params.results.map((result) => ({
+    appId: result.appId,
+    subdomain: result.subdomain || undefined,
+    url: result.url || undefined,
+    versionId: result.versionId || undefined,
+    deployId: result.deployId,
+    status: !result.success
+      ? "failed"
+      : result.skipped
+        ? "skipped"
+        : "deployed",
+    error: result.error,
+  }));
+  const failed = apps.filter((app) => app.status === "failed");
+  return {
+    ok: failed.length === 0,
+    orgId: params.orgId,
+    productId: params.productId,
+    environment: params.environment,
+    apps,
+    error: failed.length
+      ? { kind: "deploy", message: `${failed.length} app(s) failed to deploy` }
+      : undefined,
+  };
+}
+
+export function emitDeployReport(report: DeployReport): void {
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+}
+
+// While `--json` is on, stdout must carry the report and nothing else, so the
+// two writers that bypass console.log (backend log stream, upload progress bar)
+// read this instead of taking a flag through every call in between.
+let jsonMode = false;
+
+function progressStream(): NodeJS.WriteStream {
+  return jsonMode ? process.stderr : process.stdout;
+}
+
 export const deployCommand = new Command("deploy")
   .description("Deploy apps to Fusebase")
   .option(
@@ -618,33 +699,56 @@ export const deployCommand = new Command("deploy")
     "--skip-store-provision",
     "Skip auto-provisioning of isolated stores in the target environment",
   )
+  .option(
+    "--json",
+    "Emit a machine-readable deploy report on stdout (progress goes to stderr)",
+  )
   .action(
     async (opts: {
       force?: boolean;
       nocode?: boolean;
       app?: string;
       skipStoreProvision?: boolean;
+      json?: boolean;
     }) => {
     const force = opts.force ?? false;
     const nocode = opts.nocode ?? false;
+    const json = opts.json ?? false;
+    // Progress is printed by this action and by helpers several calls deep, so
+    // redirect console.log once instead of threading a writer through them.
+    if (json) {
+      jsonMode = true;
+      console.log = (...args: unknown[]) => console.error(...args);
+    }
+    // Annotated on the variable, not just the arrow: TS only applies
+    // never-returning control-flow narrowing to explicitly typed consts.
+    const failJson: (
+      kind: DeployReportErrorKind,
+      message: string,
+    ) => never = (kind, message) => {
+      if (json) {
+        emitDeployReport({ ok: false, apps: [], error: { kind, message } });
+      }
+      process.exit(1);
+    };
     // Check if app is initialized
     const fuseConfig = await loadFuseConfig();
     if (!fuseConfig) {
       console.error("Error: App not initialized. Run 'fusebase init' first.");
-      process.exit(1);
+      failJson("validation", "App not initialized. Run 'fusebase init' first.");
     }
 
     const activeEnvironment = getActiveEnvironment();
     if (!fuseConfig.orgId || (!fuseConfig.productId && !activeEnvironment)) {
       console.error("Error: Invalid fusebase.json. Missing orgId or productId.");
-      process.exit(1);
+      failJson("validation", "Invalid fusebase.json. Missing orgId or productId.");
     }
 
     // Load API key from config
     const config = await getConfig();
     if (!config.apiKey) {
       console.error("Error: No API key configured. Run 'fusebase auth' first.");
-      process.exit(1);
+      failJson("validation", "No API key configured. Run 'fusebase auth' first.");
     }
 
     // Target-env vars for build subprocesses: builds must see the deployed
@@ -688,7 +792,7 @@ export const deployCommand = new Command("deploy")
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`Error: Failed to create product: ${message}`);
-        process.exit(1);
+        failJson("network", `Failed to create product: ${message}`);
       }
     }
 
@@ -705,7 +809,7 @@ export const deployCommand = new Command("deploy")
       console.error(
         "Use 'fusebase app create' to configure a path for deployment.",
       );
-      process.exit(1);
+      failJson("validation", "No apps with path configured in fusebase.json.");
     }
 
     // `--app` narrows the deploy to a single app; match on any stable
@@ -721,7 +825,7 @@ export const deployCommand = new Command("deploy")
             .map((f) => f.subdomain ?? f.id ?? f.path)
             .join(", ")}`,
         );
-        process.exit(1);
+        failJson("validation", `No app matching "${selector}" in fusebase.json.`);
       }
       deployableApps = selected;
     }
@@ -749,7 +853,7 @@ export const deployCommand = new Command("deploy")
       console.error(
         `   (org: ${fuseConfig.orgId}, product: ${fuseConfig.productId}, backend: ${getEnv()})`,
       );
-      process.exit(1);
+      failJson("network", `Failed to fetch product or apps from API: ${message}`);
     }
 
     logger.debug("Fetched product: %j", app);
@@ -792,7 +896,7 @@ export const deployCommand = new Command("deploy")
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Error: Failed to reconcile apps: ${message}`);
-      process.exit(1);
+      failJson("network", `Failed to reconcile apps: ${message}`);
     }
 
     // Provision each app's isolated store in this environment before serving.
@@ -836,7 +940,10 @@ export const deployCommand = new Command("deploy")
           console.error(
             "(Deploy aborted before code deployment. Fix the store, or pass --skip-store-provision to deploy code without it.)",
           );
-          process.exit(1);
+          failJson(
+            error instanceof StoreAliasCollisionError ? "validation" : "network",
+            `Failed to provision isolated stores: ${message}`,
+          );
         }
       }
     }
@@ -854,23 +961,30 @@ export const deployCommand = new Command("deploy")
       console.log(
         `\n✓ Reconciled ${deployTargets.length} app(s) (--nocode: code deployment skipped).`,
       );
+      if (json) {
+        emitDeployReport({
+          ok: true,
+          orgId: fuseConfig.orgId,
+          productId: fuseConfig.productId,
+          environment: activeEnvironment?.name,
+          apps: deployTargets.map(({ appConfig, appId }) => ({
+            appId,
+            subdomain: appConfig.subdomain,
+            status: "reconciled",
+          })),
+        });
+      }
       return;
     }
 
     // Determine domain based on environment (same as FUSEBASE_APP_HOST)
     const domain = getFusebaseAppHost();
 
-    const results: Array<{
-      appId: string;
-      versionId: string;
-      url: string;
-      success: boolean;
-      skipped?: boolean;
-      error?: string;
-    }> = [];
+    const results: DeployResultEntry[] = [];
 
     for (const { appConfig, appId, action } of deployTargets) {
       const featureBasePath = join(process.cwd(), appConfig.path!);
+      let backendDeployId: string | undefined;
 
       console.log(`📦 App: ${appId}`);
       console.log(`   Source: ${appConfig.path}`);
@@ -989,6 +1103,7 @@ export const deployCommand = new Command("deploy")
             appId,
             versionId: activeVersion?.globalId ?? "",
             url: featureUrl,
+            subdomain: sub,
             success: true,
             skipped: true,
           });
@@ -1121,6 +1236,7 @@ export const deployCommand = new Command("deploy")
             barCompleteChar: "█",
             barIncompleteChar: "░",
             hideCursor: true,
+            stream: progressStream(),
           });
           progressBar.start(totalBytes, 0, { files: 0, totalFiles });
 
@@ -1285,6 +1401,7 @@ export const deployCommand = new Command("deploy")
               sidecars,
               appConfig.backend?.minReplicas,
             );
+            backendDeployId = deploy.id;
             console.log(`   Deploy ID: ${deploy.id}`);
             console.log(`   Waiting for backend deploy to complete...\n`);
 
@@ -1332,6 +1449,8 @@ export const deployCommand = new Command("deploy")
           appId,
           versionId: version.id,
           url: featureUrl,
+          subdomain: sub,
+          deployId: backendDeployId,
           success: true,
         });
       } catch (error) {
@@ -1342,6 +1461,8 @@ export const deployCommand = new Command("deploy")
           appId,
           versionId: "",
           url: "",
+          subdomain: appConfig.subdomain,
+          deployId: backendDeployId,
           success: false,
           error: errorMessage,
         });
@@ -1379,6 +1500,17 @@ export const deployCommand = new Command("deploy")
     console.log(
       `\nTotal: ${successful.length} succeeded, ${failed.length} failed`,
     );
+
+    if (json) {
+      emitDeployReport(
+        buildDeployReport({
+          orgId: fuseConfig.orgId,
+          productId: fuseConfig.productId,
+          environment: activeEnvironment?.name,
+          results,
+        }),
+      );
+    }
 
     if (failed.length > 0) {
       process.exit(1);
