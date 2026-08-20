@@ -1,7 +1,7 @@
 ---
-version: "1.10.0"
+version: "1.11.0"
 mcp_prompt: isolatedSql
-last_synced: "2026-08-07"
+last_synced: "2026-08-20"
 title: "FuseBase PostgreSQL Database"
 category: specialized
 ---
@@ -24,6 +24,7 @@ category: specialized
   - [MCP bundle size](#mcp-bundle-size)
   - [Tokens](#tokens)
   - [PostgreSQL RLS native mode](#postgresql-rls-native-mode)
+  - [RLS manifest (app-owned, required by CLI / status / apply)](#rls-manifest-app-owned-required-by-cli--status--apply)
   - [Troubleshooting (user-facing — no operator commands)](#troubleshooting-user-facing--no-operator-commands)
   - [RLS app-design pitfalls from QA](#rls-app-design-pitfalls-from-qa)
   - [After a failed apply](#after-a-failed-apply)
@@ -103,6 +104,47 @@ Wire-protocol token names still use legacy `feature` spelling for compatibility:
 
 RLS context alone does not filter rows. For native PostgreSQL enforcement, **`getIsolatedStoreSqlRlsStatus`** must report **`bypassRls=false`** and **`superuser=false`**. If **`bypassRls=true`**, policies may exist but Postgres will not enforce them for runtime reads/writes — label the environment accordingly and do not claim row-level security works.
 
+### RLS manifest (app-owned, required by CLI / status / apply)
+
+Gate does **not** infer table security from SQL. Each app-owned table must be classified in an **`IsolatedStoreSqlRlsManifest`**: `{ "tables": { "<table>": { … } } }`. There is **no** wrapping `{ "rls": … }` object. CLI default file: **`postgres/migrations/rls-manifest.json`** (or `isolatedStores.sql[].rlsManifestFile` / inline `rlsManifest`). Status and apply send it as **`rlsManifest`**. Validation is **warn-only** today (`mode: "warn"`) but treat warnings as blockers before shipping.
+
+Do **not** use operator runbook `isolated-sql-rls-plan.md` as the app contract — this section is the sanctioned shape.
+
+| `classification` | Declare | Indexes Gate expects | Notes |
+|---|---|---|---|
+| `tenant` | **`orgColumn`** | index covering `orgColumn` | Org-wide rows. |
+| `user` | **`orgColumn`** + **`userColumn`** | `orgColumn`; composite `(orgColumn, userColumn)` | Per-user inside the org. |
+| `owner_collaborator` | **`orgColumn`** + **`ownerColumn`**; optional **`collaboratorTable`** | `orgColumn` | Collaborator table must exist in the stage schema if named. |
+| `scoped` | **`orgColumn`** + **`scopes[]`** | `orgColumn`; composite `(orgColumn, scope.column)` per scope | Each scope needs **`name`** + **`column`** on **this** table. Optional **`setting`** (e.g. `app.workspace_id`). |
+| `none` | **`reason`** (required) | — | Explicit exemption (global catalog, etc.). |
+| `technical` | classification only | — | Journal / infra tables; column checks skipped. |
+
+Optional per table: **`schemaName`** (defaults to the store schema, usually `public`).
+
+**Scopes need a real column on that table.** The validator (`rls_manifest_column_missing`) requires `scopes[].column` to exist locally. There is **no** `predicate` / `functionBased` form and **no** "scoped via parent subquery" form.
+- Policy uses a **SQL function** with no column (`app_is_staff()`, etc.): **omit** that scope from `scopes`. Do **not** invent a stand-in column (that makes the manifest green while describing the wrong key).
+- Child table has **no local FK**; RLS is `EXISTS (SELECT … parent)`: **omit** that scope. Classify as `tenant` (or whatever matches the local `orgColumn`) and keep the parent-join **only in policy SQL**.
+- Same rule for any other USING/WITH CHECK predicate that is not `column = current_setting(...)`.
+
+Other warning codes: **`rls_manifest_table_missing`**, **`rls_manifest_index_missing`**, **`rls_manifest_policy_missing`**, **`rls_manifest_rls_not_enabled`**, **`rls_manifest_rls_not_forced`**, **`rls_manifest_exemption_reason_missing`**, **`rls_manifest_collaborator_table_missing`**. Add covering indexes in a **new** migration version; do not rewrite applied SQL.
+
+Example (`postgres/migrations/rls-manifest.json`):
+
+```json
+{
+  "tables": {
+    "orders": { "classification": "tenant", "orgColumn": "org_id" },
+    "draft_carts": { "classification": "user", "orgColumn": "org_id", "userColumn": "user_id" },
+    "workspace_members": {
+      "classification": "scoped",
+      "orgColumn": "org_id",
+      "scopes": [{ "name": "workspace", "column": "workspace_id", "setting": "app.workspace_id" }]
+    },
+    "visual_themes_catalog": { "classification": "none", "reason": "global immutable catalog" }
+  }
+}
+```
+
 ### Troubleshooting (user-facing — no operator commands)
 
 | Symptom | Check in the app | Escalate to Fusebase support with `storeId` + `stage` when |
@@ -121,7 +163,8 @@ Studio/support view-all rows must use the separate read-only RLS-bypass path, no
 
 - Treat **`app.client_id`** as token/client scope, not app identity. In managed product flows sibling apps may share the same product-level client id. Do not use `app.client_id` to distinguish sibling apps unless the platform explicitly confirms that the token scope is app-unique.
 - Treat standard **`app.*`** RLS settings as **text platform ids**, not UUIDs. Values such as `app.org_id`, `app.user_id`, `app.client_id`, `app.portal_id`, and `app.workspace_id` may be strings like `u37o` or `4164`; scope columns that compare to them should normally be `text` unless a specific custom id is truly UUID-shaped.
-- Reserved settings such as **`org_id`**, **`user_id`**, **`client_id`**, **`auth_type`**, **`portal_id`**, **`workspace_id`**, and **`rls_admin`** cannot be supplied through caller-controlled `rlsContext`. They must come from Gate auth/runtime context. For **portal iframe embeds**, browser app tokens do **not** auto-inject `app.portal_id`; verify `portalFeatureContextToken` on the backend ([portal-embed-context.md](./portal-embed-context.md)) before using `trustedRuntimeContext`.
+- **`app.identity_email`** is the caller's platform account email, resolved by Gate from the authenticated user id (magic-link and session app tokens included) and always **lowercased**. Use it for rows keyed by email that have no user id yet — invitations, contact records — as an `OR` branch next to the `app.user_id` predicate, comparing against `lower(email)`. It is empty when the token has no user scope, so never make it the only predicate.
+- Reserved settings such as **`org_id`**, **`user_id`**, **`identity_email`**, **`client_id`**, **`auth_type`**, **`portal_id`**, **`workspace_id`**, and **`rls_admin`** cannot be supplied through caller-controlled `rlsContext`. They must come from Gate auth/runtime context. For **portal iframe embeds**, browser app tokens do **not** auto-inject `app.portal_id`; verify `portalFeatureContextToken` on the backend ([portal-embed-context.md](./portal-embed-context.md)) before using `trustedRuntimeContext`.
 - Visitor tokens normally do not receive isolated-store permissions. If a backend service token reads/writes on behalf of a visitor, the portal/workspace RLS dimension must be derived from trusted platform auth context, not from arbitrary request body/query data. Use **`trustedRuntimeContext.portalId`** / **`trustedRuntimeContext.workspaceId`** for backend-delegated portal/workspace context; it requires **`isolated_store.rls.delegate`** and normal client/runtime tokens must not receive that permission. Treat app-specific settings such as **`app.req_portal_id`** as legacy/temporary workarounds only. See [portal-embed-context.md](./portal-embed-context.md) for iframe handoff tokens.
 - RLS policy subqueries are also evaluated under RLS. If a policy uses `EXISTS (select ... from another_table ...)`, make sure the current context can see the referenced rows or use a deliberately reviewed helper pattern.
 - Admin/moderation flows need a complete policy matrix. If an admin must delete or update a row, that context must first match the table's `USING` policy for the target row; otherwise `DELETE` / `UPDATE` may affect zero rows even though the admin is allowed in application code.
@@ -174,7 +217,7 @@ Per migration: **`version`**, **`name`**, **`checksum`** — prefer SDK helpers 
 
 ## Version
 
-- **Version**: 1.10.0
+- **Version**: 1.11.0
 - **Category**: specialized
-- **Last synced**: 2026-08-07
+- **Last synced**: 2026-08-20
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
