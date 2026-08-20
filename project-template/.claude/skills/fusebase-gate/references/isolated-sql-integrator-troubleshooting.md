@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/isolated-sql-integrator-troubleshooting.md"
-last_synced: "2026-07-01"
+last_synced: "2026-08-20"
 title: "FuseBase PostgreSQL Database — integrator troubleshooting"
 category: specialized
 ---
@@ -46,6 +46,8 @@ Collect (no secrets):
 | `getIsolatedStoreSqlRlsStatus`: **`bypassRls=true`** or **`superuser=true`** | Runtime DB role not subject to RLS on this environment                   | Label env **“policies not enforced”**; use explicit filters in backend until native RLS is active; do not claim row-level security works                                | Product requires enforced RLS on this stage and status stays `bypassRls=true` after platform confirms readiness |
 | `INSERT … RETURNING` / structured insert with `returning` returns nothing    | RLS `SELECT` policy hides new row until follow-up insert                 | Generate id in app; insert without `returning`; fix policy matrix                                                                                                       | —                                                                                                               |
 | Policies exist but admin cannot `DELETE`/`UPDATE`                            | Admin context does not satisfy table `USING`                             | Add explicit admin branch to policies                                                                                                                                   | —                                                                                                               |
+| `rls_manifest_column_missing` on status/apply/CLI bundle                     | Manifest names a column that is not on that table, or a function/parent-join was declared as a scope | See MCP prompt **`isolatedSql`** → **RLS manifest**. Omit scopes with no local column; do not invent a stand-in `scopes[].column` | — |
+| `rls_manifest_index_missing`                                                 | Declared org/user/scope columns lack a covering index                    | Add the index in a **new** migration version; re-run status                                                                 | — |
 | `Invalid token resourceScope` (dashboard, not SQL)                           | Unrelated to SQL store — token scope mismatch                            | See Gate authz / feature permissions                                                                                                                                    | —                                                                                                               |
 
 ---
@@ -90,4 +92,4 @@ Operator runbooks (`isolated-sql-stores.md`, `isolated-postgres-azure-operations
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-07-01
+- **Last synced**: 2026-08-20

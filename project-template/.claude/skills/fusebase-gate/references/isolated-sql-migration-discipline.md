@@ -1,7 +1,7 @@
 ---
-version: "1.1.5"
+version: "1.1.6"
 mcp_prompt: isolatedSqlMigrationDiscipline
-last_synced: "2026-07-01"
+last_synced: "2026-08-20"
 title: "Fusebase Gate — Isolated SQL migration discipline"
 category: specialized
 ---
@@ -36,6 +36,7 @@ On apply: **HTTP 409**, **`data.errorCode`** **`isolated_sql_migration_drift`**,
 8. **Final gate** — do not mark work done when schema changed but no new/updated migration file or manifest entry exists under **`postgres/migrations/`**.
 9. **Manifest is app-owned, not environment state** — do not store `storeId`, `stageDevApplied`, `stageProdApplied`, or similar per-stage apply markers in the migration manifest. Stage state belongs to Gate journals and deployment logs.
 10. **Browser runtime is not the source of truth** — do not ship raw migration SQL into the browser just to compute bundle status. Assemble bundles in scripts / backend / CI and let runtime UI read Gate-owned migration status.
+11. **RLS manifest is part of the bundle, not guessed from SQL** — keep **`postgres/migrations/rls-manifest.json`** (shape `{ "tables": { … } }`, no wrapping `rls` key). Contract, classifications, and "no fake column" rules: MCP prompt **`isolatedSql`** section **RLS manifest**. Fix `rls_manifest_*` warnings with a new migration tail (indexes) or by correcting the JSON — never by inventing a stand-in `scopes[].column`.
 
 ## Required artifact after schema ops
 
@@ -73,7 +74,7 @@ Avoid **`CREATE EXTENSION pgcrypto`** on locked-down hosts; prefer **`gen_random
 
 ## Version
 
-- **Version**: 1.1.5
+- **Version**: 1.1.6
 - **Category**: specialized
-- **Last synced**: 2026-07-01
+- **Last synced**: 2026-08-20
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

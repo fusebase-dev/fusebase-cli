@@ -17,10 +17,12 @@ const RESOURCE_PERMISSION_TYPES = ["dashboardView", "database"];
  * intersection of what nimbus-ai stores and what Gate can mint into a token, so a
  * grant that would be silently dropped at mint is rejected here instead.
  * Covers both 2-segment built-ins (`notes.read`) and app API capabilities
- * (`app_api.<namespace>.<capability>.<action>`).
+ * (`app_api.<namespace>.<capability>.<action>`). The action set is not purely CRUD:
+ * Gate also mints flow-specific actions such as `client_invite`, so keep this
+ * alternation in step with the Gate permission catalog.
  */
 const GATE_PRIVILEGE_PATTERN =
-  /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*\.(?:read|write|delete|execute|create|manage|delegate|bypass)$/;
+  /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*\.(?:read|write|delete|execute|create|manage|delegate|bypass|client_invite)$/;
 
 // Portal-scoped, context-relative principals. They match against the portal the
 // app is embedded in (the platform resolves them from the verified portal context),
@@ -108,7 +110,7 @@ export function parsePermissions(permissionsStr: string): AppPermissions {
         throw new Error(
           `Invalid permission "${part}". Expected a ${RESOURCE_PERMISSION_TYPES.join('/')} resource permission, ` +
             `or a Gate privilege such as "org.members.read" / "app_api.<namespace>.<capability>.<action>" ` +
-            `ending in one of: read, write, delete, execute, create, manage, delegate, bypass.`,
+            `ending in one of: read, write, delete, execute, create, manage, delegate, bypass, client_invite.`,
         );
       }
       assertGrantableGatePrivilege(part);
@@ -309,10 +311,13 @@ const APP_API_PRIVILEGE_PREFIX = "app_api.";
  * Real Gate permissions (`GatePermission` in fusebase-gate) that the sets above omit
  * because those feed the MCP token policy — adding to them would bump the token
  * fingerprint. They are grantable, so they belong in the `--permissions` vocabulary.
- * `app_magic_link.client_invite` is deliberately absent: its action is not one Gate can
- * mint into an app token.
+ * `app_magic_link.client_invite` was excluded while Gate rejected its action outright.
+ * Gate now parses and enforces it, and the flow is self-limiting — only a client caller
+ * may use it and the invitee merely inherits the inviter's own app scope — so unlike
+ * `app_magic_link.write` it is not browser-sensitive and is grantable here.
  */
 const GATE_PERMISSIONS_EXTRA_GRANTABLE = [
+  "app_magic_link.client_invite",
   "auth.restore_key.write",
   "automation.execute",
 ] as const;

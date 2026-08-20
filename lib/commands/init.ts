@@ -535,6 +535,11 @@ export const initCommand = new Command("init")
     "IDE preset: claude-code, cursor, vscode, opencode, codex, or other (single choice)",
   )
   .option("--force", "Overwrite existing IDE config files/folders", false)
+  .option(
+    "--force-dirty",
+    "Continue even though the current directory is not empty",
+    false,
+  )
   .addOption(
     new Option(
       "--managed",
@@ -564,6 +569,7 @@ export const initCommand = new Command("init")
       yes?: boolean;
       ide?: string;
       force: boolean;
+      forceDirty: boolean;
       managed?: boolean;
       git?: boolean;
       skipGit?: boolean;
@@ -647,7 +653,7 @@ export const initCommand = new Command("init")
       const dirEmpty = await isDirectoryEmpty(cwd);
       const needToCopyTemplate = dirEmpty;
 
-      if (!dirEmpty) {
+      if (!dirEmpty && !options.forceDirty) {
         console.log();
         console.log(
           "⚠️  Directory is not empty. We recommend using empty folders for new apps.",
@@ -665,7 +671,7 @@ export const initCommand = new Command("init")
           );
           if (nonInteractive) {
             console.error(
-              "Pass --yes to initialize in a non-empty directory without prompting.",
+              "Pass --yes (or --force-dirty) to initialize in a non-empty directory without prompting.",
             );
             process.exit(1);
           }
@@ -734,6 +740,10 @@ export const initCommand = new Command("init")
       }
 
       // Always create a new app
+      if (!options.name && !process.stdin.isTTY) {
+        console.error("Pass --name <name> to set the product title.");
+        process.exit(1);
+      }
       const appTitle =
         options.name ??
         (await input({
