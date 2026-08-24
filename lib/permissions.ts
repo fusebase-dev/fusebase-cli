@@ -315,11 +315,14 @@ const APP_API_PRIVILEGE_PREFIX = "app_api.";
  * Gate now parses and enforces it, and the flow is self-limiting — only a client caller
  * may use it and the invitee merely inherits the inviter's own app scope — so unlike
  * `app_magic_link.write` it is not browser-sensitive and is grantable here.
+ * `notes.share.manage` is the markdown share/unshare capability: kept out of the MCP
+ * token baseline so editing tokens do not automatically get publish rights.
  */
 const GATE_PERMISSIONS_EXTRA_GRANTABLE = [
   "app_magic_link.client_invite",
   "auth.restore_key.write",
   "automation.execute",
+  "notes.share.manage",
 ] as const;
 
 /**
