@@ -425,9 +425,9 @@ See [Configuration Files](#appendix-config-file-locations) for details.
 - **Port**: Auto-finds available port starting from 4173
 - **Output**: `"🚀 Dev UI server running at http://localhost:{port}"`
 
-#### Step 10: Open Browser
+#### Step 10: Open Browser (only with `--open`)
 
-- **Action**: Open browser to `http://localhost:{vite-port}`
+- **Action**: Open browser to `http://localhost:{vite-port}` (skipped unless `--open` was passed)
 - **Platform-specific**:
   - macOS: `open`
   - Windows: `cmd /c start`

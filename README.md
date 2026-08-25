@@ -643,7 +643,7 @@ Start the development server for an app. This command:
 2. Starts the Fusebase dev server UI (port 4173)
 3. Starts the API proxy server (port 4174)
 4. Creates a per-session debug log folder under the selected app directory at `logs/dev-<timestamp>/`
-5. Opens the dev UI in your browser
+5. Opens the dev UI in your browser only when `--open` is passed (by default it just prints the URL)
 
 > If the selected app has no platform `id` yet, `dev start` first **reconciles** it — binds the
 > `subdomain` to an existing platform app or **creates** one — then runs the dev server against
@@ -655,7 +655,11 @@ Start the development server for an app. This command:
 |----------|----------|-------------|
 | `app` | No | App ID or path (from fusebase.json apps). If not provided, you'll be prompted to select one. |
 
-**Options:** None
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--open` | Open the dev server UI in the browser. Without it, the CLI only prints the local URL. |
 
 **Prerequisites:**
 
@@ -674,6 +678,9 @@ fusebase dev start my-app-id
 
 # Start specific app by path
 fusebase dev start apps/dashboard
+
+# Start and open the dev UI in the browser
+fusebase dev start --open
 ```
 
 **Dev Server Components:**

@@ -211,10 +211,12 @@ Use `fusebase init --git` to run the same flow automatically after app setup.
 #### Start the Dev Server
 
 ```bash
-fusebase dev start [FEATURE_ID_OR_PATH]
+fusebase dev start [FEATURE_ID_OR_PATH] [--open]
 ```
 
 FEATURE_ID_OR_PATH - id of the app of relative path to it, for example if an app is in `apps/my-app`, you can pass `my-app` or `apps/my-app`.
+
+`--open` opens the dev UI in the browser. By default the CLI only prints the local URL and does not open a browser.
 
 Starts the development environment:
 

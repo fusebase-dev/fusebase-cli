@@ -389,7 +389,9 @@ fusebase dev start [app]
 
 - `[app]` (optional): App ID or path (from `fusebase.json` apps). If not provided, prompts to select.
 
-**Options**: None
+**Options**:
+
+- `--open`: Open the dev server UI in the browser. Without it, the CLI only prints the local URL.
 
 **Prerequisites**:
 
@@ -412,7 +414,7 @@ fusebase dev start [app]
 3. Starts app's dev server (if `dev.command` configured) and detects URL from stdout/stderr
 4. Starts API proxy server (port 4174, auto-finds available port)
 5. Starts frontend dev UI server (port 4173, auto-finds available port)
-6. Opens browser to dev UI
+6. Opens browser to dev UI (only with `--open`)
 7. Handles SIGINT/SIGTERM to cleanly shutdown all servers
 
 **Output**:
@@ -420,7 +422,7 @@ fusebase dev start [app]
 - Prints CLI version
 - Shows selected app
 - Shows detected dev server URL (if auto-detected)
-- Opens browser to `http://localhost:{vite-port}`
+- Opens browser to `http://localhost:{vite-port}` when `--open` is passed
 
 **Examples**:
 

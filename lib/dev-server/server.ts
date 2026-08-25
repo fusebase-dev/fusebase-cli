@@ -102,25 +102,224 @@ interface ProxyRequestOptions {
   proxyAgent: Agent;
 }
 
-function createWaitingForFeatureResponse(): Response {
-  return new Response(
-    `<!DOCTYPE html>
-<html>
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+interface DevShellPageOptions {
+  title: string;
+  tone: "waiting" | "error";
+  badge: string;
+  heading: string;
+  lede: string;
+  note?: string;
+}
+
+/**
+ * Renders the standalone HTML shell used by the dev proxy for its own
+ * status pages (waiting for the app dev server, connection errors).
+ * Styling follows the FuseBase marketing look: light canvas, heavy
+ * tight-tracked headline, single accent per state, dark-mode aware.
+ */
+function renderDevShellPage({
+  title,
+  tone,
+  badge,
+  heading,
+  lede,
+  note,
+}: DevShellPageOptions): string {
+  return `<!DOCTYPE html>
+<html lang="en"${tone === "error" ? ' class="is-error"' : ""}>
 <head>
-  <title>Fusebase Dev Server</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center; }
-    h1 { color: #333; }
-    p { color: #666; }
+    :root {
+      --ink: #0a1524;
+      --ink-soft: #556579;
+      --canvas: #f4f7fa;
+      --card: #ffffff;
+      --line: rgba(13, 27, 42, 0.09);
+      --grid: rgba(13, 27, 42, 0.055);
+      --chip: rgba(13, 27, 42, 0.05);
+      --accent: #f0972a;
+      --accent-soft: rgba(240, 151, 42, 0.12);
+      --shadow: 0 1px 2px rgba(13, 27, 42, 0.04), 0 24px 60px -28px rgba(13, 27, 42, 0.35);
+    }
+    :root.is-error {
+      --accent: #e0503d;
+      --accent-soft: rgba(224, 80, 61, 0.12);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #f2f6fa;
+        --ink-soft: #98a8b8;
+        --canvas: #0a1420;
+        --card: #101d2b;
+        --line: rgba(255, 255, 255, 0.09);
+        --grid: rgba(255, 255, 255, 0.05);
+        --chip: rgba(255, 255, 255, 0.07);
+        --shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.9);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      color: var(--ink);
+      background-color: var(--canvas);
+      background-image:
+        radial-gradient(760px 420px at 50% -8%, var(--accent-soft), transparent 70%),
+        radial-gradient(circle at 1px 1px, var(--grid) 1px, transparent 0);
+      background-size: auto, 24px 24px;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      width: min(620px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 44px 44px 36px;
+      box-shadow: var(--shadow);
+      animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .brand-mark {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.22em;
+      color: var(--ink);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 14px 7px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: var(--ink-soft);
+      background: var(--card);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 0 var(--accent-soft);
+      animation: pulse 1.8s ease-out infinite;
+    }
+    h1 {
+      margin: 22px 0 0;
+      font-size: clamp(28px, 5vw, 38px);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      font-weight: 800;
+    }
+    .lede {
+      margin: 14px 0 0;
+      font-size: 16px;
+      line-height: 1.55;
+      color: var(--ink-soft);
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.9em;
+      color: var(--ink);
+      background: var(--chip);
+      padding: 2px 6px;
+      border-radius: 6px;
+      word-break: break-all;
+    }
+    .track {
+      position: relative;
+      height: 3px;
+      margin-top: 28px;
+      border-radius: 999px;
+      background: var(--chip);
+      overflow: hidden;
+    }
+    .track span {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 38%;
+      border-radius: inherit;
+      background: var(--accent);
+      animation: slide 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+    }
+    .foot {
+      margin: 14px 0 0;
+      font-size: 12.5px;
+      letter-spacing: 0.01em;
+      color: var(--ink-soft);
+      opacity: 0.8;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: none; }
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 var(--accent-soft); }
+      70% { box-shadow: 0 0 0 9px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+    @keyframes slide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(265%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+      .track span { transform: none; width: 100%; opacity: 0.5; }
+    }
+    @media (max-width: 520px) {
+      body { padding: 16px; }
+      .card { padding: 30px 24px 26px; border-radius: 20px; }
+    }
   </style>
 </head>
 <body>
-  <h1>⏳ Waiting for app dev server...</h1>
-  <p>The app's dev server URL has not been detected yet.</p>
-  <p>Make sure your app has a <code>dev.command</code> in fusebase.json.</p>
+  <main class="card">
+    <div class="brand">
+      <span class="brand-mark">FUSEBASE</span>
+    </div>
+    <span class="badge"><span class="dot"></span>${escapeHtml(badge)}</span>
+    <h1>${escapeHtml(heading)}</h1>
+    <p class="lede">${lede}</p>
+    <div class="track"><span></span></div>
+    <p class="foot">This page reloads automatically every 2 seconds.${note ? ` · ${note}` : ""}</p>
+  </main>
   <script>setTimeout(() => location.reload(), 2000);</script>
 </body>
-</html>`,
+</html>`;
+}
+
+function createWaitingForFeatureResponse(): Response {
+  return new Response(
+    renderDevShellPage({
+      title: "Fusebase Dev Server",
+      tone: "waiting",
+      badge: "Starting up",
+      heading: "Waiting for your app",
+      lede: "Your app has not come up yet. As soon as it is ready, it shows up right here — no need to refresh.",
+    }),
     {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     },
@@ -132,24 +331,14 @@ function createProxyErrorResponse(
   requestId: string | null,
 ): Response {
   return new Response(
-    `<!DOCTYPE html>
-<html>
-<head>
-  <title>Fusebase Dev Server - Error</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center; }
-    h1 { color: #c00; }
-    p { color: #666; }
-    code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; }
-  </style>
-</head>
-<body>
-  <h1>❌ Connection Error</h1>
-  <p>Could not connect to app dev server at <code>${featureUrl}</code></p>
-  <p>Make sure your app's dev server is running.</p>
-  <script>setTimeout(() => location.reload(), 2000);</script>
-</body>
-</html>`,
+    renderDevShellPage({
+      title: "Fusebase Dev Server — Connection Error",
+      tone: "error",
+      badge: "Connection error",
+      heading: "Can't reach your app dev server",
+      lede: `Retrying automatically — nothing is answering at <code>${escapeHtml(featureUrl)}</code>`,
+      ...(requestId ? { note: `Request id <code>${escapeHtml(requestId)}</code>` } : {}),
+    }),
     {
       status: 502,
       headers: {
@@ -587,7 +776,7 @@ export async function startDevServer(
     websocket: websocketHandler,
   });
 
-  console.log(`🚀 Dev server running at http://localhost:${server.port} (proxying to feature dev server)`);
+  console.log(`🚀 Local server running at http://localhost:${server.port}`);
 
   return {
     port: server.port!,

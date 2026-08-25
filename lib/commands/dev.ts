@@ -266,7 +266,8 @@ devCommand
   .command("start")
   .description("Start the development server for an app")
   .argument("[feature]", "Feature ID or path (from fusebase.json features)")
-  .action(async (featureIdOrPath?: string) => {
+  .option("--open", "Open app in the browser automatically. Avoid using this option if you are an automatic coding agent.")
+  .action(async (featureIdOrPath: string | undefined, options: { open?: boolean }) => {
     // Print version
     console.log(`Fusebase CLI v${packageJson.version}\n`);
 
@@ -481,8 +482,10 @@ devCommand
       backendPort,
     );
 
-    // Open browser
-    openBrowser(`http://localhost:${devServer.port}`);
+    // Open browser only when explicitly requested
+    if (options.open) {
+      openBrowser(`http://localhost:${devServer.port}`);
+    }
 
     // Handle process termination
     const cleanup = async () => {
