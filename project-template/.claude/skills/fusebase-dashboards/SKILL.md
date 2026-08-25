@@ -82,6 +82,21 @@ For requests like “seed demo companies and deals”, “fill CRM with sample d
 If a managed database is missing: use `getOrCreateDatabase` only when exposed in the session; otherwise report that the managed DB was not found.
 
 
+## Finding a dashboard (compact mode caveat)
+
+`getDashboards({ compact: true })` **without** `database_id` is **not** the org-wide list of tables. It returns only the dashboards usable as a portal Database-block source — standalone/shared dashboards plus **Companies**. Tables that live inside a database (Meetings, Trackers, every user-created table) are absent by design.
+
+An empty or short result from that call means *"nothing is offered as a portal source"*, **never** *"the organization has no such data"*. Never answer the user from it.
+
+**Discovery that sees every table:**
+
+1. `getAllDatabases({ scope_type, scope_id })` — add `alias` (e.g. `meetings`) when you already know it.
+2. `getDashboards({ database_id: "<db global_id>", compact: true })` — that database's tables and views; compact is safe once `database_id` is set.
+3. `getDashboardView` / `getDashboardViewData` for structure and rows.
+
+Looking for one known table? Filter instead of listing: `getDashboards({ name: "Meetings" })` or `getDashboards({ alias: "meetings" })`, or resolve several aliases in one `resolveAliases` call.
+
+
 ## When NOT To Use This Skill
 
 - Do not use this skill for multipart upload details, temp-file endpoints, stored-file endpoints, or display URL construction. Load `file-upload/references/upload-lifecycle.md` for the canonical lifecycle.

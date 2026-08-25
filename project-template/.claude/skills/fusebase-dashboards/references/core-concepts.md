@@ -1,7 +1,7 @@
 ---
-version: "1.8.0"
+version: "1.9.0"
 mcp_prompt: domain.overview
-last_synced: "2026-06-27"
+last_synced: "2026-08-25"
 title: "Domain Overview"
 category: core
 ---
@@ -24,6 +24,7 @@ category: core
 - [Rules of thumb](#rules-of-thumb)
 - [Critical Invariants](#critical-invariants)
   - [INVARIANT: Use UUID (global_id) for all byId operations](#invariant-use-uuid-globalid-for-all-byid-operations)
+- [Finding a dashboard](#finding-a-dashboard)
 - [Working with the System](#working-with-the-system)
 - [Loading Prompts for Dashboard Operations](#loading-prompts-for-dashboard-operations)
   - [Intent-Based Workflow (MANDATORY for Dashboards/Views)](#intent-based-workflow-mandatory-for-dashboardsviews)
@@ -146,6 +147,20 @@ Use the **resolveAliases** operation to resolve human-readable aliases (or exist
   - Get view by ID → use `viewId: '<uuid>'`, NOT `viewId: 789`
 - If unsure whether an ID is a UUID, check format: UUIDs are strings like `'550e8400-e29b-41d4-a716-446655440000'`.
 
+## Finding a dashboard
+
+`getDashboards` is the discovery call, but **compact mode is not an org-wide catalogue**:
+- `getDashboards({ compact: true })` **without** `database_id` returns only the dashboards usable as a portal Database-block source — standalone/shared dashboards plus **Companies**. Tables that live inside a database (Meetings, Trackers, and every user-created table) are absent by design.
+- An empty or short result from that call therefore means "nothing is offered as a portal source", **never** "the organization has no such data". Do not answer the user from it, and do not conclude a table is missing until you have looked inside the databases.
+
+**Discovery that sees every table:**
+1. `getAllDatabases({ scope_type, scope_id })` — or `getAllDatabases({ alias: "meetings" })` when you already know the alias.
+2. `getDashboards({ database_id: "<db global_id>", compact: true })` — that database's tables and their views; compact is safe once `database_id` is set.
+3. Then read structure and rows via `getDashboardView` / `getDashboardViewData`.
+
+- Hunting for one known table? Filter instead of listing: `getDashboards({ name: "Meetings" })` or `getDashboards({ alias: "meetings" })`, or resolve several aliases at once with `resolveAliases`.
+- Managed databases (Companies, Deals, Meetings) always follow this path — load their prompt first (group `managedDatabases`).
+
 ## Working with the System
 
 - Discover operations via `tools_search`.
@@ -221,7 +236,7 @@ erDiagram
 
 ## Version
 
-- **Version**: 1.8.0
+- **Version**: 1.9.0
 - **Category**: core
-- **Last synced**: 2026-06-27
+- **Last synced**: 2026-08-25
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
