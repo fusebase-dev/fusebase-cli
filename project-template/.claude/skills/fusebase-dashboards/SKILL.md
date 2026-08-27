@@ -36,11 +36,15 @@ Each reference is in a separate file under `references/`. Load the file when you
 **specialized**
 
 - [Child Tables](references/child-tables.md)
+- [Companies (managed database)](references/companies.md)
 - [Dashboard Relations](references/relations-guide.md)
 - [Dashboard Rows](references/rows.md)
 - [Dashboard View Filters](references/filters.md)
 - [Dashboard View Representations](references/representations.md)
+- [Deals (managed database)](references/deals.md)
+- [Meetings (managed database)](references/meetings.md)
 - [Members (system dashboard)](references/members.md)
+- [Templates](references/templates.md)
 
 ---
 
@@ -53,6 +57,9 @@ When the user mentions any of the intents below, load the matching reference **b
 
 | User intent (examples)                                           | Load reference / MCP prompt                                     |
 | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| companies, accounts, B2B, CRM company, organization records      | `references/companies.md` / `domain.companies`                  |
+| deals, pipeline, kanban, CRM, opportunities, sales stages        | `references/deals.md` / `domain.deals`                          |
+| meetings, trackers, transcripts, call notes                      | `references/meetings.md` / `domain.meetings`                    |
 | clients (`root_entity: client`) — no dedicated managed-DB prompt | `references/core-concepts.md` + `references/relations-guide.md` |
 
 **Alias-only discovery rule:** Never hardcode database/dashboard/view UUIDs. Resolve by stable aliases within org scope from bootstrap `defaults.toolArgs`:
@@ -82,19 +89,25 @@ For requests like “seed demo companies and deals”, “fill CRM with sample d
 If a managed database is missing: use `getOrCreateDatabase` only when exposed in the session; otherwise report that the managed DB was not found.
 
 
-## Finding a dashboard (compact mode caveat)
+## Finding a dashboard
 
-`getDashboards({ compact: true })` **without** `database_id` is **not** the org-wide list of tables. It returns only the dashboards usable as a portal Database-block source — standalone/shared dashboards plus **Companies**. Tables that live inside a database (Meetings, Trackers, every user-created table) are absent by design.
+**Always start with `getDashboards({ scope_type, scope_id, compact: true })` and no other filter.** It behaves differently depending on how this connection was created:
 
-An empty or short result from that call means *"nothing is offered as a portal source"*, **never** *"the organization has no such data"*. Never answer the user from it.
+- **Connection scoped to chosen dashboards** (the usual AI-agent setup): the reply is exactly the dashboards someone granted, whether or not they live inside a database. This list _is_ the catalogue — trust it.
+- **Unscoped connection**: the reply is narrowed to the dashboards usable as a portal Database-block source — standalone/shared dashboards plus **Companies**. Tables living inside a database (Meetings, Trackers, every user-created table) are absent by design, so widen with the database walk below.
 
-**Discovery that sees every table:**
+**Widening an unscoped connection:**
 
-1. `getAllDatabases({ scope_type, scope_id })` — add `alias` (e.g. `meetings`) when you already know it.
-2. `getDashboards({ database_id: "<db global_id>", compact: true })` — that database's tables and views; compact is safe once `database_id` is set.
+1. `getAllDatabases({ scope_type, scope_id })` — or `getAllDatabases({ query: "meet" })` to search titles and aliases.
+2. `getDashboards({ database_id: "<db global_id>", compact: true })` — that database's tables and views.
 3. `getDashboardView` / `getDashboardViewData` for structure and rows.
 
-Looking for one known table? Filter instead of listing: `getDashboards({ name: "Meetings" })` or `getDashboards({ alias: "meetings" })`, or resolve several aliases in one `resolveAliases` call.
+**Empty results never mean the data is missing.** Two traps in particular:
+
+- `getAllDatabases` returns `[]` on a dashboard-scoped connection — such a token grants dashboards, not databases. That is an access boundary, not an empty organization. Go back to the plain `getDashboards` list; the dashboard you want is in it.
+- `root_entities: ["meeting"]` (likewise `"tracker"`, `"tracker-result"`) always returns `[]`. The query enum accepts those words but no dashboard is ever stored with them — Meetings, Trackers and every user-created table are stored as `root_entity: "custom"`. Never filter discovery by them.
+
+Looking for one known table? `getDashboards({ name: "Meetings" })` and `getDashboards({ alias: "meetings" })` are **exact matches**, not searches — a near miss returns `[]`, so fall back to the unfiltered list rather than trusting the empty one. `resolveAliases` resolves several aliases at once.
 
 
 ## When NOT To Use This Skill
