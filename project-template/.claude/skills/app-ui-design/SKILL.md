@@ -184,6 +184,58 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 
 ---
 
+## Embedded in a FuseBase site
+
+An app can be framed by a site built in Web Studio. When it is, the site offers its
+palette so the app reads as part of that page rather than as a window onto another
+product. The wrapper applies it — the app does not have to listen for anything — but it
+only lands if the app is themed the way this section describes.
+
+### What the wrapper sets at runtime
+
+On `<html>`, as inline custom properties, plus the `dark` class when the site is dark:
+
+`--background` · `--foreground` · `--card` · `--card-foreground` · `--popover` ·
+`--muted` · `--muted-foreground` · `--border` · `--input` · `--primary` · `--ring` ·
+`--primary-foreground` · `--accent` · `--destructive` · `--radius` · `--font-sans` ·
+`--font-mono`
+
+### What that requires of the app
+
+**Use the token utilities, not fixed colours.** `bg-background text-foreground`,
+`bg-primary text-primary-foreground`, `border-border`. An app painted with
+`bg-slate-900` ignores the site entirely and will look pasted in.
+
+**Register the tokens through `@theme inline`**, which is what a standard shadcn/ui
+setup already does:
+
+```css
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+}
+```
+
+`inline` matters. Without it Tailwind resolves the variable once at build time and a
+runtime override changes nothing — the utility keeps the value the app shipped with.
+
+**Never hard-code the contrast colour on an accent.** Use `text-primary-foreground`.
+A site's accent can be light or dark, and `text-white` on a pale accent is the one
+failure a theme must never produce.
+
+**Do not fight the `dark` class.** The wrapper toggles it to match the site. An app that
+sets its own theme on load will flicker and then disagree.
+
+### Testing it
+
+Nothing special: a themed app looks right on its own, because the wrapper sets nothing
+until a site frames it and the app's own `:root` values are the defaults. If it looks
+right standalone and uses token utilities throughout, it will follow a site.
+
+---
+
 ## References
 
 - **shadcn/ui**: https://ui.shadcn.com — components, theming, and CLI usage.
