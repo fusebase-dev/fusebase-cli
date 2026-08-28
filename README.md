@@ -1036,6 +1036,7 @@ fusebase config set-flag mcp-gate-debug      # Gate MCP debug / improvement summ
 fusebase config set-flag isolated-stores     # Isolated stores functionality (SQL/NoSQL)
 fusebase config set-flag postgres-rls        # PostgreSQL RLS manifest helpers for isolated SQL stores
 fusebase config set-flag portal-specific-apps # Portal-specific apps prompts/guidance
+fusebase config set-flag site-embed-theme    # Embedded-in-site theming guidance in app-ui-design
 fusebase config set-flag cross-app-api-calls-analysis # Cross-app AppApisApi dependency analysis command/guidance
 fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit  # Refresh agent assets only
 ```
