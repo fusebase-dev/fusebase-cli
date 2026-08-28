@@ -184,6 +184,7 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 
 ---
 
+<% if (it.flags?.includes("site-embed-theme")) { %>
 ## Embedded in a FuseBase site
 
 An app can be framed by a site built in Web Studio. When it is, the site offers its
@@ -234,6 +235,7 @@ Nothing special: a themed app looks right on its own, because the wrapper sets n
 until a site frames it and the app's own `:root` values are the defaults. If it looks
 right standalone and uses token utilities throughout, it will follow a site.
 
+<% } %>
 ---
 
 ## References
