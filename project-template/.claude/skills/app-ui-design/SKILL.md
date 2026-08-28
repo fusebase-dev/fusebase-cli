@@ -1,6 +1,6 @@
 ---
 name: app-ui-design
-description: "Guidance for visual design, UI and UX in Fusebase-generated apps. Use when building or refining app UIs: pages, components, layouts, forms, feedback states, theming, or accessibility. Ensures consistent, clear, and distinctive interfaces using shadcn/ui.<% if (it.flags?.includes("site-embed-theme")) { %> Also covers theming an app framed by a FuseBase site (token utilities so the wrapper's palette lands).<% } %>"
+description: "Guidance for visual design, UI and UX in Fusebase-generated apps. Use when building or refining app UIs: pages, components, layouts, forms, feedback states, theming, or accessibility. Ensures consistent, clear, and distinctive interfaces using shadcn/ui."
 ---
 
 # App UI Design
