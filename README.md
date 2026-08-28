@@ -1026,6 +1026,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
 | `notes-markdown` | Adds `notes.markdown.read` / `notes.markdown.write` to generated Gate MCP tokens. Requires the platform flag `notes_markdown` on the target backend. |
 | `site-embed-theme` | Adds the **Embedded in a FuseBase site** section to the `app-ui-design` skill: which custom properties the wrapper sets on `<html>` when a Web Studio site frames the app, and what the app has to do to follow them. Off → an app is themed for standalone use only. |
+| `session-start-update` | Adds a session-start rule to the generated `AGENTS.md` and `fusebase-cli` skill: run `fusebase update` before any other fusebase command, and stop for an agent restart when it rewrites agent assets or MCP config. Off → the command is documented but the agent is never told when to run it. |
 | `managed-integrations` | Enables managed third-party MCP integrations (`fusebase integrations list-templates` / `connect-template`) and adds `mcp_manager.*` to generated Gate MCP tokens (Gate rejects the mcp-manager endpoints without them). Enabling it marks `.env` tokens stale — re-run `fusebase env create` (or `fusebase update`) to mint a token that carries the new permissions. |
 
 Enable a flag globally, then refresh the project template:

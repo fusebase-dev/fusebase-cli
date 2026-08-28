@@ -385,6 +385,10 @@ app record is reverted by the next `fusebase deploy`.
 fusebase update
 ```
 
+<% if (it.flags?.includes("session-start-update")) { %>
+Run it once at the start of every session in an app directory, before any other `fusebase` command. It is fast when nothing changed. When it does change agent assets or MCP config, stop and ask the user to restart the agent before continuing.
+<% } %>
+
 Single update command for both CLI and app:
 
 - in app directory (`fusebase.json` exists): runs CLI self-update first (skip with `--skip-cli-update`; local linked/source mode auto-skips), then optional pre-update Git checkpoint, then refreshes agent assets (`AGENTS.md`, `.claude/skills`, `.claude/agents`, `.claude/hooks`, `.claude/settings.json`), then runs selective MCP token refresh + IDE MCP config refresh, then syncs managed SDK deps and runs targeted `npm install`, then optional post-update Git commit when the tree is dirty (always prints changed paths);
