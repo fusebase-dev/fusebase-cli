@@ -124,6 +124,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
 | `notes-markdown` | Adds markdown (v3) note permissions to generated Gate MCP tokens. Requires the platform flag `notes_markdown` on the target backend. |
 | `site-embed-theme` | Adds the **Embedded in a FuseBase site** section to the `app-ui-design` skill: which custom properties the wrapper sets on `<html>` when a Web Studio site frames the app, and what the app has to do to follow them. Off → an app is themed for standalone use only. |
+| `session-start-update` | Adds a session-start rule to the generated `AGENTS.md` and `fusebase-cli` skill: run `fusebase update` before any other fusebase command, and stop for an agent restart when it rewrites agent assets or MCP config. Off → the command is documented but the agent is never told when to run it. |
 | `managed-integrations` | Enables managed third-party MCP integrations (`fusebase integrations list-templates/connect-template`) and adds `mcp_manager.*` to generated Gate MCP tokens; enabling it forces an `.env` token refresh. |
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.

@@ -2,6 +2,10 @@
 
 This file is the **definitive guide** for AI agents and LLMs working with Fusebase Apps apps.
 
+<% if (it.flags?.includes("session-start-update")) { %>
+**Invariant — start of session:** Before any other `fusebase` command or any app work, run `fusebase update`. It self-updates the CLI, then rewrites this file and `.claude/skills`, refreshes MCP tokens and IDE MCP config, and syncs app dependencies. When it reports changes to agent assets or MCP config, stop and ask the user to restart the agent, because what you loaded no longer matches disk and the MCP servers need to reconnect. Run it once per session, at the start, never in the middle of a task.
+<% } %>
+
 **Invariant — MCP unavailable:** If MCP is not connected (tools not visible or `tools_list()` fails), **STOP**. Do not invent workarounds, scripts, or fake calls. Inform the user and follow troubleshooting; do not continue with dashboard/backend work until MCP is available.
 
 ## Golden Rule
