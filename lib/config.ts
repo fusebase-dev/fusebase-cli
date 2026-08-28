@@ -449,6 +449,7 @@ export const KNOWN_FLAGS = [
   "environments",
   "dev-backend",
   "notes-markdown",
+  "site-embed-theme",
   MANAGED_INTEGRATIONS_FLAG,
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
@@ -470,6 +471,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
   environments:
     "Enable named app environments (`environments/<name>.json` + `.env.<name>`, `fusebase env` commands, per-env backend/org). Off → legacy single-env behavior. See docs/proposals/APP-ENVIRONMENTS.md.",
+  "site-embed-theme":
+    "Include the app-ui-design guidance for apps framed by a FuseBase site: which custom properties the wrapper sets at runtime, and what an app has to do to follow them. Off → the section is left out and a generated app is themed only for standalone use.",
   "dev-backend":
     "Internal: show the dev/prod platform-backend choice in interactive env prompts. Off (default) → interactive flows assume prod; explicit --backend still works.",
   "notes-markdown":
