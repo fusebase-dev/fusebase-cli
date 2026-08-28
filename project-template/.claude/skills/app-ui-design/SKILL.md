@@ -1,6 +1,6 @@
 ---
 name: app-ui-design
-description: "Guidance for visual design, UI and UX in Fusebase-generated apps. Use when building or refining app UIs: pages, components, layouts, forms, feedback states, theming, or accessibility. Ensures consistent, clear, and distinctive interfaces using shadcn/ui."
+description: "Guidance for visual design, UI and UX in Fusebase-generated apps. Use when building or refining app UIs: pages, components, layouts, forms, feedback states, theming, or accessibility. Ensures consistent, clear, and distinctive interfaces using shadcn/ui.<% if (it.flags?.includes("site-embed-theme")) { %> Also covers theming an app framed by a FuseBase site (token utilities so the wrapper's palette lands).<% } %>"
 ---
 
 # App UI Design
@@ -187,25 +187,45 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 <% if (it.flags?.includes("site-embed-theme")) { %>
 ## Embedded in a FuseBase site
 
-An app can be framed by a site built in Web Studio. When it is, the site offers its
-palette so the app reads as part of that page rather than as a window onto another
-product. The wrapper applies it — the app does not have to listen for anything — but it
-only lands if the app is themed the way this section describes.
+The slate/white palette guidance above does **not** apply while this flag is on.
+Those classes ignore the site. Use shadcn token utilities throughout.
 
-### What the wrapper sets at runtime
+An app can be framed by a site built in Web Studio. The site posts
+`{ type: 'fb:embed:hello', v: 1, theme, colorScheme }` into the frame. **app-wrapper**
+is the receiver: it validates each value, maps the fourteen site tokens onto shadcn
+variables on `<html>`, and toggles the `dark` class from `colorScheme`. The app does
+not listen, validate, or call `setProperty` — a second listener would race the wrapper.
 
-On `<html>`, as inline custom properties, plus the `dark` class when the site is dark:
+### What the wrapper sets (site token → shadcn variables)
 
-`--background` · `--foreground` · `--card` · `--card-foreground` · `--popover` ·
-`--muted` · `--muted-foreground` · `--border` · `--input` · `--primary` · `--ring` ·
-`--primary-foreground` · `--accent` · `--destructive` · `--radius` · `--font-sans` ·
-`--font-mono`
+| Site token       | Lands on `<html>` as                                      | Use in the app                         |
+| ---------------- | --------------------------------------------------------- | -------------------------------------- |
+| `background`     | `--background`                                            | `bg-background`                        |
+| `foreground`     | `--foreground`, `--card-foreground`                       | `text-foreground`                      |
+| `surface`        | `--card`, `--popover`, `--muted`                          | `bg-card`, `bg-muted`                  |
+| `muted`          | `--muted-foreground`                                      | `text-muted-foreground`                |
+| `line`           | `--border`, `--input`                                     | `border-border`                        |
+| `accent`         | `--primary`, `--ring`                                     | `bg-primary`, `ring-ring`              |
+| `accentContrast` | `--primary-foreground`                                    | `text-primary-foreground`              |
+| `hover`          | `--accent`                                                | hover/selection fill, **not** brand    |
+| `danger`         | `--destructive`                                           | error / destructive                    |
+| `radius`         | `--radius`                                                | `rounded-*`                            |
+| `fontBody`       | `--font-sans`                                             | body and headings                      |
+| `fontMono`       | `--font-mono`                                             | `font-mono`                            |
+
+Not forwarded: `fontHeading` (headings use `--font-sans`), `codeSurface`. Also unset:
+`--popover-foreground`, `--accent-foreground`, `--secondary-foreground`,
+`--destructive-foreground`. Prefer `text-foreground` / `text-primary-foreground`.
+
+Success green and warning amber stay the app's own values. A site's palette is
+appearance, not meaning. Use `--destructive` for error and destructive text.
 
 ### What that requires of the app
 
-**Use the token utilities, not fixed colours.** `bg-background text-foreground`,
-`bg-primary text-primary-foreground`, `border-border`. An app painted with
-`bg-slate-900` ignores the site entirely and will look pasted in.
+**Every visible surface has to be expressed in these tokens.** Body, headings, links,
+tables, cards, inputs, badges, hover/focus/disabled, scrollbars, sticky chrome. A
+component left as `bg-slate-900` or `text-white` stays that colour while the rest of
+the page follows the site — unreadable if the site went the other way.
 
 **Register the tokens through `@theme inline`**, which is what a standard shadcn/ui
 setup already does:
@@ -226,14 +246,21 @@ runtime override changes nothing — the utility keeps the value the app shipped
 A site's accent can be light or dark, and `text-white` on a pale accent is the one
 failure a theme must never produce.
 
-**Do not fight the `dark` class.** The wrapper toggles it to match the site. An app that
-sets its own theme on load will flicker and then disagree.
+**Do not fight the `dark` class or `color-scheme`.** The wrapper sets both from
+`colorScheme`. An app that applies its own theme on load will flicker and then disagree.
+
+**Do not add a height reporter.** The wrapper already posts `fbs-iframe-resize` and
+`fb:embed:height`. A second producer of height for the same frame is a resize loop.
 
 ### Testing it
 
-Nothing special: a themed app looks right on its own, because the wrapper sets nothing
-until a site frames it and the app's own `:root` values are the defaults. If it looks
-right standalone and uses token utilities throughout, it will follow a site.
+Standalone, the wrapper sets nothing — the app's `:root` values are the defaults, so a
+token-themed app still looks right on its own. That is necessary, not sufficient.
+
+Hunt leftover fixed colours (`bg-white`, `bg-slate-*`, `text-white` on buttons, hex in
+`style=`). A palette close to the app's defaults proves nothing; those classes would
+also look fine against a near-default site and fail against a loud one. Absence of a
+theme is a supported state: with no greeting the page must be exactly as it is unframed.
 
 <% } %>
 ---
