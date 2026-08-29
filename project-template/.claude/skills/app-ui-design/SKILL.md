@@ -203,26 +203,28 @@ and ignores the rest sits in the old palette while the site around it moves.
 {
   type: 'fb:embed:hello',
   v: 1,                              // stays 1 as fields are added — feature-detect, never bump-check
-  theme: { /* fourteen tokens */ },
+  theme: { /* colour, type, focus, elevation — see tables */ },
   colorScheme: 'light' | 'dark',
   scale: { /* optional — see Scale */ }
 }
 ```
 
-Check `type` and `v === 1` before reading anything. A missing `scale` means the
-site is older or has no opinion — keep your own sizes. **Every value is a finished
-CSS string** (colour, length, font stack). Assign it; do not parse, convert, or
-re-derive ramps from a single step.
+Check `type` and `v === 1` before reading anything. A missing `scale`, `focus`, or
+`shadow*` means the site is older or has no opinion — keep your own defaults.
+**Every value is a finished CSS string** (colour, length, font stack, full
+`box-shadow`). Assign it; do not parse, convert, or re-derive ramps from a single
+step.
 
-**app-wrapper** is the colour receiver in deployed apps: it validates each theme
-value, maps the fourteen site tokens onto shadcn variables on `<html>`, sets
-`color-scheme`, and toggles the `dark` class — **on every greeting**, not only the
-first. It also dispatches a `fb:theme` `CustomEvent` with `{ theme, colorScheme, scale }`
-so components that need the raw payload (charts, canvases, pixels not CSS) can
-react when the site re-greets. The app does **not** listen for colours or call
-`setProperty` for the palette — a second applier races the wrapper.
+**app-wrapper** is the receiver in deployed apps: it validates each theme value,
+maps site tokens onto shadcn/Tailwind variables on `<html>`, sets `color-scheme`,
+toggles the `dark` class, and applies `scale` when present — **on every greeting**,
+not only the first. It also dispatches a `fb:theme` `CustomEvent` with
+`{ theme, colorScheme, scale }` so components that need the raw payload (charts,
+canvases, pixels not CSS) can react when the site re-greets. The app does **not**
+listen for colours/scale or call `setProperty` for them — a second applier races
+the wrapper.
 
-### Colour: site token → shadcn variables
+### Colour / type: site token → variables
 
 | Site token       | Lands on `<html>` as                                      | Use in the app                         |
 | ---------------- | --------------------------------------------------------- | -------------------------------------- |
@@ -231,15 +233,35 @@ react when the site re-greets. The app does **not** listen for colours or call
 | `surface`        | `--card`, `--popover`, `--muted`                          | `bg-card`, `bg-muted`                  |
 | `muted`          | `--muted-foreground`                                      | `text-muted-foreground`                |
 | `line`           | `--border`, `--input`                                     | `border-border`                        |
-| `accent`         | `--primary`, `--ring`                                     | `bg-primary`, `ring-ring`              |
+| `accent`         | `--primary`, and `--ring` if `focus` is absent            | `bg-primary`                           |
 | `accentContrast` | `--primary-foreground`                                    | `text-primary-foreground`              |
 | `hover`          | `--accent`                                                | hover/selection fill, **not** brand    |
 | `danger`         | `--destructive`                                           | error / destructive                    |
 | `radius`         | `--radius`                                                | `rounded-*`                            |
 | `fontBody`       | `--font-sans`                                             | body text                              |
-| `fontHeading`    | `--font-heading`                                          | headings (`font-heading` / base styles) |
+| `fontHeading`    | `--font-heading`                                          | headings                               |
 | `fontMono`       | `--font-mono`                                             | `font-mono`, code                      |
-| `codeSurface`    | `--code-surface`                                          | inline `code` background (`bg-code-surface`) |
+| `codeSurface`    | `--code-surface`                                          | inline `code` (`bg-code-surface`)      |
+
+### Focus and elevation
+
+_Added after scale. Older sites send neither; keep your own._
+
+| Site token | Lands on `<html>` as | Use in the app |
+| ---------- | -------------------- | -------------- |
+| `focus`    | `--ring` (overwrites the accent fallback) | `:focus-visible` / `ring-ring` / `outline-ring` |
+| `shadow1`  | `--shadow-sm` | raised card — `shadow-sm` |
+| `shadow2`  | `--shadow-md` | menu / popover — `shadow-md` |
+| `shadow3`  | `--shadow-lg` | dialog — `shadow-lg` |
+
+**`focus` is the ring colour.** It cannot be derived safely from accent alone —
+it must hold contrast against the page *and* the accent. A frame that keeps its
+own ring looks like leaving the site when you tab.
+
+**`shadow1`–`shadow3` are complete `box-shadow` values**, low to high. Assign
+them; do not take them apart. They move with the palette (a black shadow on a
+dark page is invisible). Prefer `shadow-sm` / `shadow-md` / `shadow-lg` over
+hand-rolled shadows.
 
 Also unset by wrapper: `--popover-foreground`, `--accent-foreground`,
 `--secondary-foreground`, `--destructive-foreground`. Prefer `text-foreground` /
@@ -248,7 +270,7 @@ Also unset by wrapper: `--popover-foreground`, `--accent-foreground`,
 Success green and warning amber stay the app's own values. A site's palette is
 appearance, not meaning. Use `--destructive` for error and destructive text.
 
-**Register colour tokens through `@theme inline`** (standard shadcn setup):
+**Register tokens through `@theme inline`** (standard shadcn setup):
 
 ```css
 @theme inline {
@@ -318,10 +340,10 @@ at the same specificity in a rule that loads last, or drop the local colour over
 ### Surface checklist
 
 Work the whole UI, not the obvious parts: text, lists, tables, cards, inputs,
-badges, hover/focus/selection/disabled, scrollbars, sticky chrome, code blocks.
-Anything left as `bg-slate-*`, `text-white`, fixed `text-base` / `p-6`, or hex in
-`style=` keeps its own look while the site changes — unreadable when the site flips
-dark or dense.
+badges, hover/focus/selection/disabled, scrollbars, sticky chrome, code blocks,
+raised surfaces (`shadow-*`). Anything left as `bg-slate-*`, `text-white`, fixed
+`text-base` / `p-6`, a private focus colour, or hex in `style=` keeps its own look
+while the site changes — unreadable when the site flips dark or dense.
 
 **Do not add a height reporter.** app-wrapper already posts `fbs-iframe-resize` and
 `fb:embed:height`. A second height producer is a resize loop.
@@ -335,14 +357,19 @@ missed. A palette close to your defaults proves nothing.
 **No theme:** Send nothing (or omit fields) and confirm the page is exactly as
 unframed. Absence of a theme is a supported state, not degraded.
 
+**Focus / elevation:** Send a ring colour nothing in your design uses and tab
+through — anything that highlights differently is drawing its own. Then send
+`shadow2: '0 0 0 4px red'` — every raised surface should gain it; any that does
+not has a shadow of its own.
+
 **Scale:** Send `text.md: '24px'` with `space` at defaults — every piece of text
 should grow and the layout should not fall apart; anything still at 16px is a
 hard-coded size. Then send `space.7: '16px'` with text unchanged — the page should
 tighten without type moving. Test text and space separately; changing both at once
 hides which a component ignored.
 
-**Theme switch:** Send a second greeting with a different `colorScheme` (and scale if
-wired). The app must follow — not stay on the first palette.
+**Theme switch:** Send a second greeting with a different `colorScheme` (and scale /
+focus if wired). The app must follow — not stay on the first palette.
 
 <% } %>
 ---
