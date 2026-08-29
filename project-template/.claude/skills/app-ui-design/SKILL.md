@@ -187,16 +187,42 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 <% if (it.flags?.includes("site-embed-theme")) { %>
 ## Embedded in a FuseBase site
 
-The slate/white palette guidance above does **not** apply while this flag is on.
-Those classes ignore the site. Use shadcn token utilities throughout.
+The slate/white palette guidance and generic Tailwind spacing/type scales above do
+**not** apply while this flag is on. Fixed colours and hard-coded `text-*` / `p-*`
+steps ignore the site. Use shadcn token utilities for colour and wire layout from
+the embed contract below.
 
-An app can be framed by a site built in Web Studio. The site posts
-`{ type: 'fb:embed:hello', v: 1, theme, colorScheme }` into the frame. **app-wrapper**
-is the receiver: it validates each value, maps the fourteen site tokens onto shadcn
-variables on `<html>`, and toggles the `dark` class from `colorScheme`. The app does
-not listen, validate, or call `setProperty` — a second listener would race the wrapper.
+An app can be framed by a site built in Web Studio. The site posts `fb:embed:hello`
+into the frame — on load, a few times after, and **again whenever the site's theme
+or scale changes** (e.g. a theme switcher). A page that applies the first greeting
+and ignores the rest sits in the old palette while the site around it moves.
 
-### What the wrapper sets (site token → shadcn variables)
+### The greeting
+
+```js
+{
+  type: 'fb:embed:hello',
+  v: 1,                              // stays 1 as fields are added — feature-detect, never bump-check
+  theme: { /* fourteen tokens */ },
+  colorScheme: 'light' | 'dark',
+  scale: { /* optional — see Scale */ }
+}
+```
+
+Check `type` and `v === 1` before reading anything. A missing `scale` means the
+site is older or has no opinion — keep your own sizes. **Every value is a finished
+CSS string** (colour, length, font stack). Assign it; do not parse, convert, or
+re-derive ramps from a single step.
+
+**app-wrapper** is the colour receiver in deployed apps: it validates each theme
+value, maps the fourteen site tokens onto shadcn variables on `<html>`, sets
+`color-scheme`, and toggles the `dark` class — **on every greeting**, not only the
+first. It also dispatches a `fb:theme` `CustomEvent` with `{ theme, colorScheme, scale }`
+so components that need the raw payload (charts, canvases, pixels not CSS) can
+react when the site re-greets. The app does **not** listen for colours or call
+`setProperty` for the palette — a second applier races the wrapper.
+
+### Colour: site token → shadcn variables
 
 | Site token       | Lands on `<html>` as                                      | Use in the app                         |
 | ---------------- | --------------------------------------------------------- | -------------------------------------- |
@@ -210,25 +236,19 @@ not listen, validate, or call `setProperty` — a second listener would race the
 | `hover`          | `--accent`                                                | hover/selection fill, **not** brand    |
 | `danger`         | `--destructive`                                           | error / destructive                    |
 | `radius`         | `--radius`                                                | `rounded-*`                            |
-| `fontBody`       | `--font-sans`                                             | body and headings                      |
-| `fontMono`       | `--font-mono`                                             | `font-mono`                            |
+| `fontBody`       | `--font-sans`                                             | body text                              |
+| `fontHeading`    | `--font-heading`                                          | headings (`font-heading` / base styles) |
+| `fontMono`       | `--font-mono`                                             | `font-mono`, code                      |
+| `codeSurface`    | `--code-surface`                                          | inline `code` background (`bg-code-surface`) |
 
-Not forwarded: `fontHeading` (headings use `--font-sans`), `codeSurface`. Also unset:
-`--popover-foreground`, `--accent-foreground`, `--secondary-foreground`,
-`--destructive-foreground`. Prefer `text-foreground` / `text-primary-foreground`.
+Also unset by wrapper: `--popover-foreground`, `--accent-foreground`,
+`--secondary-foreground`, `--destructive-foreground`. Prefer `text-foreground` /
+`text-primary-foreground`.
 
 Success green and warning amber stay the app's own values. A site's palette is
 appearance, not meaning. Use `--destructive` for error and destructive text.
 
-### What that requires of the app
-
-**Every visible surface has to be expressed in these tokens.** Body, headings, links,
-tables, cards, inputs, badges, hover/focus/disabled, scrollbars, sticky chrome. A
-component left as `bg-slate-900` or `text-white` stays that colour while the rest of
-the page follows the site — unreadable if the site went the other way.
-
-**Register the tokens through `@theme inline`**, which is what a standard shadcn/ui
-setup already does:
+**Register colour tokens through `@theme inline`** (standard shadcn setup):
 
 ```css
 @theme inline {
@@ -236,31 +256,93 @@ setup already does:
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-code-surface: var(--code-surface);
+  --font-heading: var(--font-heading);
 }
 ```
 
-`inline` matters. Without it Tailwind resolves the variable once at build time and a
-runtime override changes nothing — the utility keeps the value the app shipped with.
+`inline` matters. Without it Tailwind resolves the variable once at build time and
+a runtime override changes nothing.
 
 **Never hard-code the contrast colour on an accent.** Use `text-primary-foreground`.
-A site's accent can be light or dark, and `text-white` on a pale accent is the one
-failure a theme must never produce.
 
-**Do not fight the `dark` class or `color-scheme`.** The wrapper sets both from
-`colorScheme`. An app that applies its own theme on load will flicker and then disagree.
+**Do not fight `dark` or `color-scheme`.** The wrapper sets both from `colorScheme`.
 
-**Do not add a height reporter.** The wrapper already posts `fbs-iframe-resize` and
-`fb:embed:height`. A second producer of height for the same frame is a resize loop.
+### Scale (optional)
+
+Sites may send a third field — finished size ramps, not multipliers:
+
+```js
+scale: {
+  text:  { xs, sm, md, lg, xl, '2xl', '3xl' },   // e.g. md: '18px'
+  space: { 1, 2, 3, 4, 5, 6, 7, 8 },             // e.g. 5: '24px'
+  measure: '68ch',
+}
+```
+
+| Group | Use for |
+| ----- | ------- |
+| `text.md` | Body — paragraphs, list items, table cells |
+| `text.sm` | Captions, metadata, dense UI |
+| `text.xs` | Footnotes, badge labels |
+| `text.lg` → `text.3xl` | h4 → h1 |
+| `space.1`–`space.3` | Small gaps — **fixed at every density** (icon-to-label, tight rows) |
+| `space.4`–`space.8` | Card padding, block spacing, section rhythm |
+| `measure` | `max-width` on prose columns — the one most often skipped and most visible |
+
+**Read the step you need.** Do not derive your own type or spacing ramp from
+`text.md` or multiply steps — that drifts from the page the same way re-deriving
+the palette from `background` would.
+
+**This is not browser zoom.** Scale type and the space around it. Do not scale
+borders, hairlines, or images — the browser's zoom already does that better.
+
+app-wrapper maps `scale` onto Tailwind theme variables on `<html>` on every
+greeting when the field is present: `scale.text.*` → `--text-xs` … `--text-3xl`
+(and `font-size` from `text.md` for rem-based layouts), `scale.space.*` →
+`--spacing-1` … `--spacing-8`, `scale.measure` → `--embed-measure`. Use
+`text-sm` / `p-5` / similar utilities (with `@theme inline`) — not hard-coded
+pixel classes. For prose width, cap columns with `max-w-[var(--embed-measure)]`
+when the variable is set. A missing `scale` field means keep your own defaults;
+do not listen for `hello` to re-apply colours or scale — the wrapper owns that.
+Listen to `fb:theme` only when you need the raw payload (charts, canvases).
+
+### Specificity: where you set a variable matters
+
+A rule on a component (e.g. `.card { --background: … }`) beats a variable set on
+`<html>`, however specific the root rule looks — so wrapper tokens can silently
+fail to reach a subtree. Prefer token utilities (`bg-background`) over per-component
+`:root`-style overrides. If a component must participate in embed theming, override
+at the same specificity in a rule that loads last, or drop the local colour override.
+
+### Surface checklist
+
+Work the whole UI, not the obvious parts: text, lists, tables, cards, inputs,
+badges, hover/focus/selection/disabled, scrollbars, sticky chrome, code blocks.
+Anything left as `bg-slate-*`, `text-white`, fixed `text-base` / `p-6`, or hex in
+`style=` keeps its own look while the site changes — unreadable when the site flips
+dark or dense.
+
+**Do not add a height reporter.** app-wrapper already posts `fbs-iframe-resize` and
+`fb:embed:height`. A second height producer is a resize loop.
 
 ### Testing it
 
-Standalone, the wrapper sets nothing — the app's `:root` values are the defaults, so a
-token-themed app still looks right on its own. That is necessary, not sufficient.
+**Colours:** Frame the app and send a deliberately loud palette — a background and
+foreground nothing in your design uses. Anything that keeps its old colour was
+missed. A palette close to your defaults proves nothing.
 
-Hunt leftover fixed colours (`bg-white`, `bg-slate-*`, `text-white` on buttons, hex in
-`style=`). A palette close to the app's defaults proves nothing; those classes would
-also look fine against a near-default site and fail against a loud one. Absence of a
-theme is a supported state: with no greeting the page must be exactly as it is unframed.
+**No theme:** Send nothing (or omit fields) and confirm the page is exactly as
+unframed. Absence of a theme is a supported state, not degraded.
+
+**Scale:** Send `text.md: '24px'` with `space` at defaults — every piece of text
+should grow and the layout should not fall apart; anything still at 16px is a
+hard-coded size. Then send `space.7: '16px'` with text unchanged — the page should
+tighten without type moving. Test text and space separately; changing both at once
+hides which a component ignored.
+
+**Theme switch:** Send a second greeting with a different `colorScheme` (and scale if
+wired). The app must follow — not stay on the first palette.
 
 <% } %>
 ---
