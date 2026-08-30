@@ -8,6 +8,7 @@ import cliProgress from "cli-progress";
 import { spawn } from "child_process";
 import * as tar from "tar";
 import {
+  ApiError,
   createAppVersion,
   initUpload,
   initSourceUpload,
@@ -634,6 +635,8 @@ export interface DeployResultEntry {
   subdomain?: string;
   deployId?: string;
   error?: string;
+  /** The API rejected the call with 401/403 — wrong account, not a server fault. */
+  permissionDenied?: boolean;
 }
 
 export function buildDeployReport(params: {
@@ -1456,7 +1459,19 @@ export const deployCommand = new Command("deploy")
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
-        console.log(`   ✗ Failed: ${errorMessage}\n`);
+        const permissionDenied =
+          error instanceof ApiError &&
+          (error.status === 401 || error.status === 403);
+        console.log(`   ✗ Failed: ${errorMessage}`);
+        if (permissionDenied) {
+          console.log(
+            `   → Your account is not allowed to manage apps in this organization.`,
+          );
+          console.log(
+            `   → Run \`fusebase auth\` with an account that has app management rights.`,
+          );
+        }
+        console.log("");
         results.push({
           appId,
           versionId: "",
@@ -1465,6 +1480,7 @@ export const deployCommand = new Command("deploy")
           deployId: backendDeployId,
           success: false,
           error: errorMessage,
+          permissionDenied,
         });
       }
     }
@@ -1513,6 +1529,8 @@ export const deployCommand = new Command("deploy")
     }
 
     if (failed.length > 0) {
-      process.exit(1);
+      // Exit 3 = auth/permission failure, 1 = anything else, so a human or CI can
+      // tell "re-authenticate" apart from "the platform failed" (NIM-43992).
+      process.exit(failed.some((r) => r.permissionDenied) ? 3 : 1);
     }
   });

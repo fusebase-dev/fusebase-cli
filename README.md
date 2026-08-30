@@ -385,6 +385,14 @@ first-deploy gap where an app shipped without a database (Gate `listIsolatedStor
 It is idempotent; a failure aborts before code is shipped. Opt out with `--skip-store-provision`.
 See [`fusebase env provision-store`](#fusebase-env) for the standalone command.
 
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | All apps deployed (or skipped as unchanged) |
+| `1` | At least one app failed to deploy |
+| `3` | At least one app failed because the account is not allowed to manage apps in the organization (401/403) — re-run `fusebase auth` with an account that has app management rights |
+
 **Prerequisites:**
 
 - App must be initialized (`fusebase init`)
