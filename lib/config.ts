@@ -493,6 +493,39 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
  */
 const IMPLIED_FLAGS: Record<string, readonly string[]> = {};
 
+/**
+ * Env var carrying a comma-separated list of experimental flags to enable for
+ * a single CLI invocation (e.g. `FUSEBASE_FLAGS=git-init,mcp-beta`). Used by
+ * headless/ephemeral execution environments (Paperclip execution workspaces)
+ * where `~/.fusebase/config.json` is empty on every run and `fusebase config
+ * set-flag` cannot be used. Env-sourced flags are merged into the active flags
+ * list at read time and are never written to disk. Unknown flags are ignored
+ * with a warning rather than being fatal.
+ */
+export const FUSEBASE_FLAGS_ENV = "FUSEBASE_FLAGS";
+
+/** Parse and validate flags from the FUSEBASE_FLAGS env var. */
+function parseEnvFlags(): string[] {
+  const raw = process.env[FUSEBASE_FLAGS_ENV];
+  if (!raw) return [];
+  const known = KNOWN_FLAGS as readonly string[];
+  const result: string[] = [];
+  for (const entry of raw.split(",")) {
+    const flag = entry.trim();
+    if (!flag) continue;
+    if (!known.includes(flag)) {
+      console.warn(
+        `⚠️  ${FUSEBASE_FLAGS_ENV}: "${flag}" is not a known flag, ignoring. Known flags: ${known.join(", ")}`,
+      );
+      continue;
+    }
+    if (!result.includes(flag)) {
+      result.push(flag);
+    }
+  }
+  return result;
+}
+
 export function getFlags(): string[] {
   // Raw read: getConfig() resolves the effective apiKey via getEnv(), which
   // consults the environments feature flag — going through getConfig() here
@@ -500,6 +533,11 @@ export function getFlags(): string[] {
   // Copy: the cached raw config's array must never be mutated (implied
   // entries would leak into setConfig merges and get persisted).
   const flags = [...(getRawConfig().flags ?? [])];
+  for (const flag of parseEnvFlags()) {
+    if (!flags.includes(flag)) {
+      flags.push(flag);
+    }
+  }
   for (const flag of ALWAYS_ON_FLAGS) {
     if (!flags.includes(flag)) {
       flags.push(flag);
