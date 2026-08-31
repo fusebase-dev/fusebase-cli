@@ -1,7 +1,7 @@
 ---
-version: "1.9.0"
+version: "1.10.0"
 mcp_prompt: domain.overview
-last_synced: "2026-08-25"
+last_synced: "2026-08-27"
 title: "Domain Overview"
 category: core
 ---
@@ -149,17 +149,21 @@ Use the **resolveAliases** operation to resolve human-readable aliases (or exist
 
 ## Finding a dashboard
 
-`getDashboards` is the discovery call, but **compact mode is not an org-wide catalogue**:
-- `getDashboards({ compact: true })` **without** `database_id` returns only the dashboards usable as a portal Database-block source — standalone/shared dashboards plus **Companies**. Tables that live inside a database (Meetings, Trackers, and every user-created table) are absent by design.
-- An empty or short result from that call therefore means "nothing is offered as a portal source", **never** "the organization has no such data". Do not answer the user from it, and do not conclude a table is missing until you have looked inside the databases.
+**Always start with `getDashboards({ scope_type, scope_id, compact: true })` and no other filter.** It is the one call that cannot hide data from you, and it behaves differently depending on how this connection was created:
+- **Connection scoped to chosen dashboards** (the usual AI-agent setup): the reply is exactly the dashboards someone granted, whether or not they live inside a database. This list *is* the catalogue — trust it.
+- **Unscoped connection**: the reply is narrowed to the dashboards usable as a portal Database-block source — standalone/shared dashboards plus **Companies**. Tables living inside a database are absent by design, so widen with the database walk below before concluding anything.
 
-**Discovery that sees every table:**
-1. `getAllDatabases({ scope_type, scope_id })` — or `getAllDatabases({ alias: "meetings" })` when you already know the alias.
-2. `getDashboards({ database_id: "<db global_id>", compact: true })` — that database's tables and their views; compact is safe once `database_id` is set.
+**Widening an unscoped connection:**
+1. `getAllDatabases({ scope_type, scope_id })` — or `getAllDatabases({ query: "meet" })` to search titles and aliases.
+2. `getDashboards({ database_id: "<db global_id>", compact: true })` — that database's tables and their views.
 3. Then read structure and rows via `getDashboardView` / `getDashboardViewData`.
 
-- Hunting for one known table? Filter instead of listing: `getDashboards({ name: "Meetings" })` or `getDashboards({ alias: "meetings" })`, or resolve several aliases at once with `resolveAliases`.
-- Managed databases (Companies, Deals, Meetings) always follow this path — load their prompt first (group `managedDatabases`).
+**Empty results never mean the data is missing.** Two traps in particular:
+- `getAllDatabases` returns `[]` on a dashboard-scoped connection — such a token grants dashboards, not databases. That is an access boundary, not an empty organization. Go back to the plain `getDashboards` list above; the dashboard you want is in it.
+- `root_entities: ["meeting"]` (likewise `"tracker"`, `"tracker-result"`) always returns `[]`. The query enum accepts those words but no dashboard is ever stored with them — Meetings, Trackers and every user-created table are stored as `root_entity: "custom"`. Never filter discovery by them.
+
+- Hunting for one known table? `getDashboards({ name: "Meetings" })` and `getDashboards({ alias: "meetings" })` are **exact matches**, not searches — a near miss returns `[]`, so fall back to the unfiltered list rather than trusting the empty one. `resolveAliases` resolves several aliases at once.
+- Managed databases (Companies, Deals, Meetings) — load their prompt first (group `managedDatabases`).
 
 ## Working with the System
 
@@ -236,7 +240,7 @@ erDiagram
 
 ## Version
 
-- **Version**: 1.9.0
+- **Version**: 1.10.0
 - **Category**: core
-- **Last synced**: 2026-08-25
+- **Last synced**: 2026-08-27
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
