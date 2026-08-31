@@ -91,12 +91,9 @@ If a managed database is missing: use `getOrCreateDatabase` only when exposed in
 
 ## Finding a dashboard
 
-**Always start with `getDashboards({ scope_type, scope_id, compact: true })` and no other filter.** It behaves differently depending on how this connection was created:
+**Always start with `getDashboards({ scope_type, scope_id, compact: true })` and no other filter.** That is every dashboard this connection can read — standalone ones and tables living inside a database (Meetings, Trackers, every user-created table) alike. `compact` only shrinks each entry to id, name and views; it never drops entries. This list _is_ the catalogue, so read it before reaching for any filter.
 
-- **Connection scoped to chosen dashboards** (the usual AI-agent setup): the reply is exactly the dashboards someone granted, whether or not they live inside a database. This list _is_ the catalogue — trust it.
-- **Unscoped connection**: the reply is narrowed to the dashboards usable as a portal Database-block source — standalone/shared dashboards plus **Companies**. Tables living inside a database (Meetings, Trackers, every user-created table) are absent by design, so widen with the database walk below.
-
-**Widening an unscoped connection:**
+**Walking one database instead:**
 
 1. `getAllDatabases({ scope_type, scope_id })` — or `getAllDatabases({ query: "meet" })` to search titles and aliases.
 2. `getDashboards({ database_id: "<db global_id>", compact: true })` — that database's tables and views.
