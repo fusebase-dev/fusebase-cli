@@ -126,6 +126,7 @@ Flags enable experimental features across all projects. Managed via `config set-
 | `site-embed-theme` | Adds the **Embedded in a FuseBase site** section to the `app-ui-design` skill: the `fb:embed:hello` contract (theme tokens including focus/elevation, `colorScheme`, optional `scale` ramps), what app-wrapper applies on every greeting, and what the app must wire (token utilities, scale when present). Off → an app is themed for standalone use only. |
 | `session-start-update` | Adds a session-start rule to the generated `AGENTS.md` and `fusebase-cli` skill: run `fusebase update` before any other fusebase command, and stop for an agent restart when it rewrites agent assets or MCP config. Off → the command is documented but the agent is never told when to run it. |
 | `managed-integrations` | Enables managed third-party MCP integrations (`fusebase integrations list-templates/connect-template`) and adds `mcp_manager.*` to generated Gate MCP tokens; enabling it forces an `.env` token refresh. |
+| `managed-integrations-personal-auth` | Adds the personal (per-user) authorization guidance to the `managed-integrations` skill: the `personal-auth-flow` reference and the per-user server sections in `SKILL.md` / `calling-server-tool`. Off → only shared authorization is documented. |
 
 After changing flags, run `fusebase update --skip-mcp --skip-deps --skip-cli-update --skip-commit` to regenerate template-driven project files. For `mcp-beta`, enable the flag and re-run `fusebase config ide` and/or `fusebase integrations` to refresh MCP configs.
 

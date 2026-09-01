@@ -1,4 +1,3 @@
-<% if (it.flags?.includes("managed-integrations-personal-auth")) { %>
 Personal (user-specific) auth is needed when each user needs to see their own information from a third-party service.
 
 Creating a personal authorization from the frontend involves several steps:
@@ -21,7 +20,6 @@ After the integration server ID is obtained and saved, you can use it for commun
 
 # Important cases
 - If the server ID for some template is already present on the frontend, do not start the initialization flow and do not prompt the user to do it. Just use the existing server.
-<% } %>
 - The `McpManagerApi` client must have `credentials: 'include'` for the authorized server to work properly, for example:
 
 ```ts

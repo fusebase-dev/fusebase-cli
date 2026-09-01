@@ -1028,6 +1028,7 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `site-embed-theme` | Adds the **Embedded in a FuseBase site** section to the `app-ui-design` skill: the `fb:embed:hello` contract (theme tokens including focus/elevation, `colorScheme`, optional `scale` ramps), what app-wrapper applies on every greeting, and what the app must wire (token utilities, scale when present). Off → an app is themed for standalone use only. |
 | `session-start-update` | Adds a session-start rule to the generated `AGENTS.md` and `fusebase-cli` skill: run `fusebase update` before any other fusebase command, and stop for an agent restart when it rewrites agent assets or MCP config. Off → the command is documented but the agent is never told when to run it. |
 | `managed-integrations` | Enables managed third-party MCP integrations (`fusebase integrations list-templates` / `connect-template`) and adds `mcp_manager.*` to generated Gate MCP tokens (Gate rejects the mcp-manager endpoints without them). Enabling it marks `.env` tokens stale — re-run `fusebase env create` (or `fusebase update`) to mint a token that carries the new permissions. |
+| `managed-integrations-personal-auth` | Adds personal (per-user) authorization guidance to the `managed-integrations` skill: the `personal-auth-flow` reference file plus the per-user server sections in `SKILL.md` and `calling-server-tool`. Off → generated projects document shared authorization only. |
 
 Enable a flag globally, then refresh the project template:
 

@@ -452,6 +452,7 @@ export const KNOWN_FLAGS = [
   "site-embed-theme",
   "session-start-update",
   MANAGED_INTEGRATIONS_FLAG,
+  PERSONAL_MANAGED_INTEGRATIONS_FLAG,
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
@@ -482,8 +483,8 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include markdown (v3) note Gate permissions in generated MCP tokens. Requires the platform flag `notes_markdown` on the target backend.",
   [MANAGED_INTEGRATIONS_FLAG]:
     "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
-  // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
-    // "Enable personal authorization for managed integrations.",
+  [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
+    "Enable personal (per-user) authorization for managed integrations.",
 };
 
 /**
