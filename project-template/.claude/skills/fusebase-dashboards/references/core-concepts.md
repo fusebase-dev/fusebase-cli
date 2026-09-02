@@ -1,7 +1,7 @@
 ---
-version: "1.10.0"
+version: "1.11.0"
 mcp_prompt: domain.overview
-last_synced: "2026-08-27"
+last_synced: "2026-08-31"
 title: "Domain Overview"
 category: core
 ---
@@ -149,14 +149,9 @@ Use the **resolveAliases** operation to resolve human-readable aliases (or exist
 
 ## Finding a dashboard
 
-**Always start with `getDashboards({ scope_type, scope_id, compact: true })` and no other filter.** It is the one call that cannot hide data from you, and it behaves differently depending on how this connection was created:
-- **Connection scoped to chosen dashboards** (the usual AI-agent setup): the reply is exactly the dashboards someone granted, whether or not they live inside a database. This list *is* the catalogue — trust it.
-- **Unscoped connection**: the reply is narrowed to the dashboards usable as a portal Database-block source — standalone/shared dashboards plus **Companies**. Tables living inside a database are absent by design, so widen with the database walk below before concluding anything.
+**Always start with `getDashboards({ scope_type, scope_id, compact: true })` and no other filter.** That is every dashboard this connection can read — standalone ones and tables living inside a database alike. `compact` only shrinks each entry to id, name and views; it never drops entries. This list *is* the catalogue, so read it before reaching for any filter.
 
-**Widening an unscoped connection:**
-1. `getAllDatabases({ scope_type, scope_id })` — or `getAllDatabases({ query: "meet" })` to search titles and aliases.
-2. `getDashboards({ database_id: "<db global_id>", compact: true })` — that database's tables and their views.
-3. Then read structure and rows via `getDashboardView` / `getDashboardViewData`.
+Then read structure and rows via `getDashboardView` / `getDashboardViewData`. To walk one database instead, use `getAllDatabases({ scope_type, scope_id })` — or `getAllDatabases({ query: "meet" })` to search titles and aliases — then `getDashboards({ database_id: "<db global_id>", compact: true })`.
 
 **Empty results never mean the data is missing.** Two traps in particular:
 - `getAllDatabases` returns `[]` on a dashboard-scoped connection — such a token grants dashboards, not databases. That is an access boundary, not an empty organization. Go back to the plain `getDashboards` list above; the dashboard you want is in it.
@@ -240,7 +235,7 @@ erDiagram
 
 ## Version
 
-- **Version**: 1.10.0
+- **Version**: 1.11.0
 - **Category**: core
-- **Last synced**: 2026-08-27
+- **Last synced**: 2026-08-31
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
