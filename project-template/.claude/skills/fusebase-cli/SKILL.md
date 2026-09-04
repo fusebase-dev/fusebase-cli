@@ -573,6 +573,10 @@ Options:
 - `--nocode` — only reconcile infrastructure (bind/create apps on the platform), skip code deployment
 - `--skip-store-provision` — skip automatic isolated-store provisioning (env mode)
 
+Exit codes: `0` success, `1` a deploy failed, `3` a deploy failed because the
+authenticated account may not manage apps in this organization — re-run
+`fusebase auth` with an account that has app management rights.
+
 The project template includes ESLint (`npm run lint`) and root `npm run typecheck` (TypeScript across apps — catches errors ESLint does not). Run both before saying "Done" so deploy succeeds; see AGENTS.md "Final Gate". Claude Code runs lint and typecheck on Stop via `.claude/settings.json` hooks.
 
 ### Isolated SQL Bundle / RLS Manifest
