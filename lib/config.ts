@@ -450,7 +450,6 @@ export const KNOWN_FLAGS = [
   "dev-backend",
   "notes-markdown",
   "site-embed-theme",
-  "session-start-update",
   MANAGED_INTEGRATIONS_FLAG,
   PERSONAL_MANAGED_INTEGRATIONS_FLAG,
 ] as const;
@@ -477,8 +476,6 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include the app-ui-design guidance for apps framed by a FuseBase site: embed greeting (theme incl. focus/elevation, colorScheme, optional scale), token utilities, and what an app must wire. Off → themed for standalone use only.",
   "dev-backend":
     "Internal: show the dev/prod platform-backend choice in interactive env prompts. Off (default) → interactive flows assume prod; explicit --backend still works.",
-  "session-start-update":
-    "Tell the agent to run `fusebase update` once at the start of every session in an app directory, before any other fusebase command. Off → the generated prompts document the command but never say when to run it.",
   "notes-markdown":
     "Include markdown (v3) note Gate permissions in generated MCP tokens. Requires the platform flag `notes_markdown` on the target backend.",
   [MANAGED_INTEGRATIONS_FLAG]:
