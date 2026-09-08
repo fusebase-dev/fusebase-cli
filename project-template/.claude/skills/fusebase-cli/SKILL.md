@@ -385,9 +385,7 @@ app record is reverted by the next `fusebase deploy`.
 fusebase update
 ```
 
-<% if (it.flags?.includes("session-start-update")) { %>
 Run it once at the start of every session in an app directory, before any other `fusebase` command. It is fast when nothing changed. When it does change agent assets or MCP config, stop and ask the user to restart the agent before continuing.
-<% } %>
 
 Single update command for both CLI and app:
 
