@@ -1,15 +1,15 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "bun:test";
 
-const templateRoot = resolve(
-  import.meta.dir,
-  "..",
-  "project-template/.claude/skills/fusebase-gate",
-);
+const projectRoot = resolve(import.meta.dir, "..", "project-template");
+
+function read(...parts: string[]): string {
+  return readFileSync(join(projectRoot, ...parts), "utf8");
+}
 
 function readTemplateFile(...parts: string[]): string {
-  return readFileSync(join(templateRoot, ...parts), "utf8");
+  return read(".claude/skills/fusebase-gate", ...parts);
 }
 
 describe("fusebase-gate template guidance", () => {
@@ -32,5 +32,137 @@ describe("fusebase-gate template guidance", () => {
 
     expect(users).toContain("A 201 from addOrgUser is not proof that the current session or target user already has org access.");
     expect(users).toContain("For access gating after provisioning, verify with getMyOrgAccess instead of inferring from addOrgUser success.");
+  });
+});
+
+describe("app login handoff guidance", () => {
+  // The handoff wording is security wording: it tells an app author what the
+  // exchange token actually is. Most of these files are re-synced from
+  // fusebase-gate, so pin the durable claims rather than whole sentences.
+  const reference = () => readTemplateFile("references", "fusebase-auth.md");
+  const agents = () => read("AGENTS.md");
+  const inviteSkill = () => read(".claude/skills/invite-with-password/SKILL.md");
+
+  // The criterion is written over the directory, not over a file list: rounds 3
+  // to 6 each found one more file a hand-kept list had missed. Walk it instead,
+  // and strip backticks so a phrase is caught however it is marked up.
+  // Skipped: what project-template/.gitignore ignores, so a local build does
+  // not add compiled copies the CI walk never sees.
+  const notCommitted = new Set(["node_modules", "dist", "build", "out", "coverage"]);
+
+  function everyTemplateFile(): { path: string; text: string }[] {
+    const files: { path: string; text: string }[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!notCommitted.has(entry.name)) walk(full);
+        } else files.push({ path: full, text: readFileSync(full, "utf8").replaceAll("`", "") });
+      }
+    };
+    walk(projectRoot);
+    return files;
+  }
+
+  // Report the offending paths, so a failure names the file to fix.
+  function expectNowhere(pattern: RegExp) {
+    const offenders = everyTemplateFile()
+      .filter(({ text }) => pattern.test(text))
+      .map(({ path }) => path);
+    expect(offenders).toEqual([]);
+  }
+
+  // "single-use" is also how the portals reference describes a publish
+  // confirmation, so that one ban is scoped to files that discuss the handoff
+  // at all. Scoping it to the sentence was too narrow — a claim one sentence
+  // away from the word "appAuth" walked straight through.
+  function expectNowhereAboutTheToken(pattern: RegExp) {
+    const offenders = everyTemplateFile()
+      .filter(({ text }) => /appAuth|exchange ?[Tt]oken/.test(text) && pattern.test(text))
+      .map(({ path }) => path);
+    expect(offenders).toEqual([]);
+  }
+
+  it("reads the whole template, so an absence check cannot pass vacuously", () => {
+    const paths = everyTemplateFile().map(({ path }) => path);
+    expect(paths.length).toBeGreaterThan(60);
+    // The three files where the defects this suite bans actually lived.
+    for (const tail of [
+      ".claude/skills/fusebase-gate/references/fusebase-auth.md",
+      ".claude/skills/invite-with-password/SKILL.md",
+      "AGENTS.md",
+    ]) {
+      expect(paths.some((path) => path.endsWith(tail))).toBe(true);
+    }
+  });
+
+  it("never calls the exchange token single-use", () => {
+    // It is not: user-api-service resolves it with a bare redis.get and never
+    // deletes the key, so it is replayable for its whole 300s TTL.
+    expectNowhereAboutTheToken(/single-use|already spent|or spent/i);
+  });
+
+  it("never claims the exchange token is bound to one app", () => {
+    // app-wrapper resolves the token by value alone and takes the app identity
+    // from the request Host, so it mints on any app host that user can open.
+    expectNowhere(/can only be spent/i);
+  });
+
+  it("never tells an app to hold a session id as a cookie", () => {
+    // This subtask's first criterion, asked of the directory it is written about.
+    // Two shapes: naming the cookie, and the imperative form the original defect
+    // used ("set login.session.sessionId as the app-domain cookie") which names
+    // no cookie at all. The prohibitions have to stay sayable — the reference
+    // says "Never put a FuseBase session id in a cookie" — so the imperative ban
+    // is judged per sentence and skips the negated ones.
+    expectNowhere(/session (id|token)[^.]{0,60}eversessionid/i);
+
+    const storesASessionId =
+      /\b(set|store|keep|save|put|persist|write)\b.{0,80}\bsession[ .]?(id|sessionId|token)\b.{0,80}\b(cookie|localStorage|local storage|sessionStorage)/i;
+    const prohibition = /\b(never|not|n't|no longer|avoid|instead of)\b/i;
+    const offenders = everyTemplateFile()
+      .filter(({ text }) =>
+        text
+          .split(/(?<=[.!?:])\s+|\n/)
+          .some((sentence) => storesASessionId.test(sentence) && !prohibition.test(sentence)),
+      )
+      .map(({ path }) => path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("says the token is replayable, on every surface an app author reads", () => {
+    expect(reference()).toContain("replayable until it expires");
+    expect(inviteSkill()).toContain("replayable until it expires");
+    expect(agents()).toContain("Spending does not invalidate the token");
+    // The token is not app-scoped either.
+    expect(reference()).toContain("carries no binding to your app");
+  });
+
+  it("keeps the app token cookie as the only credential on an app host", () => {
+    // Asserted on AGENTS.md only. The same claim used to be pinned as two exact
+    // sentences in the synced reference, and a gate reword deleted both — the
+    // ban above is what actually guards the criterion, and it reads the whole
+    // directory rather than one upstream phrasing.
+    expect(agents()).toContain(
+      "**`fbsfeaturetoken` is the only credential on an app host.** The app never sets `eversessionid`",
+    );
+  });
+
+  it("guards the worked example against a mint failure", () => {
+    // appAuth is optional: with app_login_no_session_id off, a failed mint is a
+    // 200 with the field absent, so an unguarded snippet throws on authPath.
+    expect(inviteSkill()).toContain("if (!login.appAuth)");
+    // app-wrapper's JSON errors always carry message and only sometimes reason.
+    expect(inviteSkill()).toContain("showError(mint.message ?? mint.reason)");
+  });
+
+  it("makes the same-origin fetch the standard way to spend authPath", () => {
+    // Navigation stays a documented fallback; what must not come back is the
+    // SDK and the reference giving two different standard answers.
+    // Case-insensitive: these files are regenerated from upstream prose, where
+    // capitalising a sentence's first word is the smallest possible reword.
+    expectNowhere(/navigate the browser/i);
+    expect(agents()).toContain("same-origin `fetch(authPath");
+    expect(inviteSkill()).toContain("Accept: 'application/json'");
   });
 });
