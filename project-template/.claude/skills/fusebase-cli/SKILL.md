@@ -235,6 +235,10 @@ The dev server automatically:
   - `backend-logs.jsonl`
   - `frontend-dev-server-logs.jsonl`
 
+The dev server also answers `/_auth/` locally, the endpoint a deployed app gets from the platform, so an app login form completes its flow in local development. It answers the same two shapes: JSON when the request sends `Accept: application/json`, a redirect to the `url` query param otherwise.
+
+**Local development does not switch identity.** The dev server does not resolve the exchange token — it returns the app token minted from your own API key, whoever the app logged in as. So a local login form finishes and lands on its post-login route, but the app keeps running as you. Verify the identity part of a login flow on a deployed app.
+
 When debugging local runtime issues after starting the dev server, load skill **dev-debug-logs**. It explains which file to inspect for browser errors, proxied API traffic, frontend dev server output, and backend output.
 
 #### Create and Configure App

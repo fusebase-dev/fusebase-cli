@@ -715,8 +715,9 @@ Each `fusebase dev start` run creates a session folder inside the selected app d
 The dev server automatically handles app token delivery:
 1. Fetches app tokens from the Fusebase API
 2. Sends tokens to the app iframe via `postMessage`
-3. Sets cookie `fbsapptoken` so same-origin app backend requests can authenticate without relying on a custom header
-4. Your app receives the token:
+3. Sets cookie `fbsfeaturetoken` so same-origin app backend requests can authenticate without relying on a custom header
+4. Answers `/_auth/` the way app-wrapper does on a deployed host, so an app that signs a person in through the Gate login flow reaches its post-login route locally: JSON for `Accept: application/json`, a redirect to the `url` query param otherwise
+5. Your app receives the token:
 
 ```javascript
 window.addEventListener('message', (event) => {
@@ -726,7 +727,9 @@ window.addEventListener('message', (event) => {
 });
 ```
 
-For custom app backends (`/api/*`), treat `x-app-feature-token` as optional in deployed mode and read `x-app-feature-token` or cookie `fbsapptoken` on the server.
+For custom app backends (`/api/*`), treat `x-app-feature-token` as optional in deployed mode and read `x-app-feature-token` or cookie `fbsfeaturetoken` on the server.
+
+**Local development does not switch identity.** The dev server never resolves the `se` exchange token — user-service is not reachable from a developer machine — so the token it hands back is always minted from your own API key. A local login form completes its whole flow, but the app keeps running as you. Test who the app runs as on a deployed app, not under `fusebase dev`.
 
 ---
 
