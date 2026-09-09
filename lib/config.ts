@@ -449,7 +449,9 @@ export const KNOWN_FLAGS = [
   "environments",
   "dev-backend",
   "notes-markdown",
+  "site-embed-theme",
   MANAGED_INTEGRATIONS_FLAG,
+  PERSONAL_MANAGED_INTEGRATIONS_FLAG,
 ] as const;
 export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
@@ -470,14 +472,16 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
   environments:
     "Enable named app environments (`environments/<name>.json` + `.env.<name>`, `fusebase env` commands, per-env backend/org). Off → legacy single-env behavior. See docs/proposals/APP-ENVIRONMENTS.md.",
+  "site-embed-theme":
+    "Include the app-ui-design guidance for apps framed by a FuseBase site: embed greeting (theme incl. focus/elevation, colorScheme, optional scale), token utilities, and what an app must wire. Off → themed for standalone use only.",
   "dev-backend":
     "Internal: show the dev/prod platform-backend choice in interactive env prompts. Off (default) → interactive flows assume prod; explicit --backend still works.",
   "notes-markdown":
     "Include markdown (v3) note Gate permissions in generated MCP tokens. Requires the platform flag `notes_markdown` on the target backend.",
   [MANAGED_INTEGRATIONS_FLAG]:
     "Enable managed third-party MCP integrations (`fusebase integrations list-templates/connect`).",
-  // [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
-    // "Enable personal authorization for managed integrations.",
+  [PERSONAL_MANAGED_INTEGRATIONS_FLAG]:
+    "Enable personal (per-user) authorization for managed integrations.",
 };
 
 /**
@@ -487,6 +491,39 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
  */
 const IMPLIED_FLAGS: Record<string, readonly string[]> = {};
 
+/**
+ * Env var carrying a comma-separated list of experimental flags to enable for
+ * a single CLI invocation (e.g. `FUSEBASE_FLAGS=git-init,mcp-beta`). Used by
+ * headless/ephemeral execution environments (Paperclip execution workspaces)
+ * where `~/.fusebase/config.json` is empty on every run and `fusebase config
+ * set-flag` cannot be used. Env-sourced flags are merged into the active flags
+ * list at read time and are never written to disk. Unknown flags are ignored
+ * with a warning rather than being fatal.
+ */
+export const FUSEBASE_FLAGS_ENV = "FUSEBASE_FLAGS";
+
+/** Parse and validate flags from the FUSEBASE_FLAGS env var. */
+function parseEnvFlags(): string[] {
+  const raw = process.env[FUSEBASE_FLAGS_ENV];
+  if (!raw) return [];
+  const known = KNOWN_FLAGS as readonly string[];
+  const result: string[] = [];
+  for (const entry of raw.split(",")) {
+    const flag = entry.trim();
+    if (!flag) continue;
+    if (!known.includes(flag)) {
+      console.warn(
+        `⚠️  ${FUSEBASE_FLAGS_ENV}: "${flag}" is not a known flag, ignoring. Known flags: ${known.join(", ")}`,
+      );
+      continue;
+    }
+    if (!result.includes(flag)) {
+      result.push(flag);
+    }
+  }
+  return result;
+}
+
 export function getFlags(): string[] {
   // Raw read: getConfig() resolves the effective apiKey via getEnv(), which
   // consults the environments feature flag — going through getConfig() here
@@ -494,6 +531,11 @@ export function getFlags(): string[] {
   // Copy: the cached raw config's array must never be mutated (implied
   // entries would leak into setConfig merges and get persisted).
   const flags = [...(getRawConfig().flags ?? [])];
+  for (const flag of parseEnvFlags()) {
+    if (!flags.includes(flag)) {
+      flags.push(flag);
+    }
+  }
   for (const flag of ALWAYS_ON_FLAGS) {
     if (!flags.includes(flag)) {
       flags.push(flag);

@@ -5,6 +5,7 @@ import {
   resolveManifestUrl,
   resolveLatestVersion,
   fetchManifest,
+  getBinaryUrl,
   type Manifest,
 } from "../lib/remote-version";
 
@@ -86,5 +87,42 @@ describe("manifest parsing", () => {
     } finally {
       globalThis.fetch = realFetch;
     }
+  });
+});
+
+describe("getBinaryUrl per architecture", () => {
+  // process.platform / process.arch are read at call time, so the test swaps
+  // them in place and restores the real values afterwards.
+  function withHost(platform: string, arch: string, fn: () => void) {
+    const real = { platform: process.platform, arch: process.arch };
+    Object.defineProperty(process, "platform", { value: platform, configurable: true });
+    Object.defineProperty(process, "arch", { value: arch, configurable: true });
+    try {
+      fn();
+    } finally {
+      Object.defineProperty(process, "platform", { value: real.platform, configurable: true });
+      Object.defineProperty(process, "arch", { value: real.arch, configurable: true });
+    }
+  }
+
+  it("picks the arm64 asset on aarch64 linux and the unsuffixed one on x64", () => {
+    withHost("linux", "arm64", () => {
+      expect(getBinaryUrl("1.2.3")).toBe(`${PROD_BASE}/1.2.3/fusebase-1.2.3-linux-arm64`);
+    });
+    withHost("linux", "x64", () => {
+      expect(getBinaryUrl("1.2.3")).toBe(`${PROD_BASE}/1.2.3/fusebase-1.2.3`);
+    });
+  });
+
+  it("keeps the macOS and Windows names unchanged", () => {
+    withHost("darwin", "arm64", () => {
+      expect(getBinaryUrl("1.2.3")).toBe(`${PROD_BASE}/1.2.3/fusebase-1.2.3-macos`);
+    });
+    withHost("darwin", "x64", () => {
+      expect(getBinaryUrl("1.2.3")).toBe(`${PROD_BASE}/1.2.3/fusebase-1.2.3-macos-x64`);
+    });
+    withHost("win32", "arm64", () => {
+      expect(getBinaryUrl("1.2.3")).toBe(`${PROD_BASE}/1.2.3/fusebase-1.2.3.exe`);
+    });
   });
 });

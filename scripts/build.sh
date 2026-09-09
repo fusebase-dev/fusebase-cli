@@ -37,9 +37,16 @@ mkdir -p build
 
 ASSETS=(./index.ts ./dev-server-dist.zip ./project-template.zip ./feature-templates.zip ./ide-configs.zip ./managed-template.zip)
 
+# Asset naming convention (consumers derive URLs from it, see lib/remote-version.ts):
+#   fusebase-<version>              linux x64   (no suffix, kept for compatibility)
+#   fusebase-<version>-linux-arm64  linux arm64
+#   fusebase-<version>-macos        macOS arm64
+#   fusebase-<version>-macos-x64    macOS x64
+#   fusebase-<version>.exe          windows x64
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}-macos" --target=bun-darwin-arm64
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}-macos-x64" --target=bun-darwin-x64
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}" --target=bun-linux-x64
+bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}-linux-arm64" --target=bun-linux-arm64
 bun build "${ASSETS[@]}" --compile --outfile "build/fusebase-${VERSION}.exe" --target=bun-windows-x64
 
 # Stable Windows launcher (fusebase.exe). Generate its auto-derived version

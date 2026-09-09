@@ -2,7 +2,7 @@
 version: "1.0.0"
 mcp_prompt: none
 source: "docs/portal-theme-variables.md"
-last_synced: "2026-08-12"
+last_synced: "2026-08-16"
 title: "Portal theme styling (custom CSS override contract)"
 category: specialized
 ---
@@ -67,13 +67,21 @@ Also part of the contract: `header.header`, `.header-wrapper`,
 - Tailwind utility classes (`.flex`, `.bg-white`, …) — implementation detail.
 - Hashed / generated class names (e.g. `icon__icon___x`) — unstable between builds.
 
-The machine-readable source of truth for these hooks is
-`PORTAL_STYLE_CONTRACT` (`libs/pages/portal-client/src/lib/style-contract.ts` in
-nx-frontend), versioned so consumers can detect breaking changes.
+## Machine-readable contract
+
+Call `getPortalStyleContract` (`GET /:orgId/portal-style-contract`) to pull all
+of the above as JSON at runtime instead of hard-coding it: `version`,
+`structuralHooks`, `classHooks`, `usage`, `canonicalOverride`, `antiContract`.
+`getPortal` returns the same `version` as `style.styleContractVersion`, so a
+consumer can cache the contract and refetch only when the version changes.
+
+The hooks originate in `PORTAL_STYLE_CONTRACT`
+(`libs/pages/portal-client/src/lib/style-contract.ts` in nx-frontend), where a CI
+guard fails the portal build if one of them disappears from the source.
 ---
 
 ## Version
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-08-12
+- **Last synced**: 2026-08-16

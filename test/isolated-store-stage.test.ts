@@ -15,8 +15,12 @@ describe("resolveStage", () => {
     expect(resolveStage("prod", "dev")).toBe("prod");
   });
 
-  it("falls back to dev for an unknown or missing backend", () => {
-    expect(resolveStage(undefined, undefined)).toBe("dev");
+  it("falls back to dev for an unknown backend", () => {
+    // Both arguments are passed explicitly: omitting `backend` defaults it to
+    // getEnv(), which reads the ambient global config and returns "prod" when
+    // there is none (a CI container). That made this case pass or fail on the
+    // machine rather than on resolveStage.
+    expect(resolveStage(undefined, "nonsense")).toBe("dev");
     expect(resolveStage("nonsense", "prod")).toBe("prod");
   });
 });

@@ -106,16 +106,28 @@ function resolveGitLabConfig(): {
   ok: false;
 } {
   const config = getConfig();
-  const host = String(config.gitlabHost ?? "").trim();
-  const token = String(config.gitlabToken ?? "").trim();
-  const group = String(config.gitlabGroup ?? "")
-    .trim()
+
+  // Config file values take precedence; env vars are a headless fallback
+  // for execution workspaces where ~/.fusebase/config.json is empty.
+  // FUSEBASE_GITLAB_TOKEN is never written to disk.
+  const host =
+    String(config.gitlabHost ?? "").trim() ||
+    String(process.env.FUSEBASE_GITLAB_HOST ?? "").trim();
+  const token =
+    String(config.gitlabToken ?? "").trim() ||
+    String(process.env.FUSEBASE_GITLAB_TOKEN ?? "").trim();
+  const group = (
+    String(config.gitlabGroup ?? "").trim() ||
+    String(process.env.FUSEBASE_GITLAB_GROUP ?? "").trim()
+  )
     .replace(/\\/g, "/")
     .replace(/^\/+|\/+$/g, "");
 
   if (!host || !token || !group) {
-    console.log(chalk.yellow("GitLab sync skipped: missing global GitLab config."));
-    console.log("Add these fields to ~/.fusebase/config.json:");
+    console.log(chalk.yellow("GitLab sync skipped: missing GitLab config."));
+    console.log(
+      "Set via ~/.fusebase/config.json or env vars FUSEBASE_GITLAB_TOKEN, FUSEBASE_GITLAB_HOST, FUSEBASE_GITLAB_GROUP:",
+    );
     console.log(
       chalk.dim(
         `  "gitlabHost": "gl.nimbusweb.co", "gitlabToken": "<token>", "gitlabGroup": "vibecode"`,

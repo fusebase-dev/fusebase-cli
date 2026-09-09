@@ -140,6 +140,7 @@ Options:
 - Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; isolated stores emphasis)
 - Global flag `isolated-stores` enables isolated stores functionality (SQL/NoSQL), including required Fusebase Gate references and `isolated_store.*` permissions in `fusebase env create`
 - Global flag `portal-specific-apps` includes portal-specific prompts/guidance (`fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` filter references, and `/auth/context` portal runtime context notes)
+- Global flag `site-embed-theme` includes the **Embedded in a FuseBase site** section in the `app-ui-design` skill (`fb:embed:hello`: theme incl. focus/elevation, `colorScheme`, optional `scale`; token utilities + scale wiring). Off → standalone theming only (`fusebase config set-flag site-embed-theme`)
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 
@@ -233,6 +234,10 @@ The dev server automatically:
   - `access-logs.jsonl`
   - `backend-logs.jsonl`
   - `frontend-dev-server-logs.jsonl`
+
+The dev server also answers `/_auth/` locally, the endpoint a deployed app gets from the platform, so an app login form completes its flow in local development. It answers the same two shapes: JSON when the request sends `Accept: application/json`, a redirect to the `url` query param otherwise.
+
+**Local development does not switch identity.** The dev server does not resolve the exchange token — it returns the app token minted from your own API key, whoever the app logged in as. So a local login form finishes and lands on its post-login route, but the app keeps running as you. Verify the identity part of a login flow on a deployed app.
 
 When debugging local runtime issues after starting the dev server, load skill **dev-debug-logs**. It explains which file to inspect for browser errors, proxied API traffic, frontend dev server output, and backend output.
 
@@ -383,6 +388,8 @@ app record is reverted by the next `fusebase deploy`.
 ```bash
 fusebase update
 ```
+
+Run it once at the start of every session in an app directory, before any other `fusebase` command. It is fast when nothing changed. When it does change agent assets or MCP config, stop and ask the user to restart the agent before continuing.
 
 Single update command for both CLI and app:
 
@@ -567,6 +574,10 @@ Options:
 - `--app <subdomain|id|name|path>` — deploy only the matching app
 - `--nocode` — only reconcile infrastructure (bind/create apps on the platform), skip code deployment
 - `--skip-store-provision` — skip automatic isolated-store provisioning (env mode)
+
+Exit codes: `0` success, `1` a deploy failed, `3` a deploy failed because the
+authenticated account may not manage apps in this organization — re-run
+`fusebase auth` with an account that has app management rights.
 
 The project template includes ESLint (`npm run lint`) and root `npm run typecheck` (TypeScript across apps — catches errors ESLint does not). Run both before saying "Done" so deploy succeeds; see AGENTS.md "Final Gate". Claude Code runs lint and typecheck on Stop via `.claude/settings.json` hooks.
 

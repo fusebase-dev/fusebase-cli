@@ -20,6 +20,9 @@ import { handleWebSocketUpgrade, websocketHandler, type WebSocketProxyData } fro
 
 // Cookie name for feature token
 const FEATURE_TOKEN_COOKIE = "fbsfeaturetoken";
+// app-wrapper mints the cookie with a one day lifetime; mirror it so the JSON
+// body an app reads locally matches the one it gets when deployed.
+const FEATURE_TOKEN_TTL_SECONDS = 86400;
 type ProxyResponse = Awaited<ReturnType<typeof fetch>>;
 
 // Wrapper type for dev server
@@ -534,17 +537,9 @@ async function appendApiResponseLog(
   });
 }
 
-async function maybeRewriteHtmlResponse(
-  req: Request,
-  proxyResponse: ProxyResponse,
-  responseHeaders: Headers,
+async function fetchDevFeatureToken(
   selectedFeatureId?: string,
-): Promise<Response | null> {
-  const contentType = proxyResponse.headers.get("content-type") || "";
-  if (!contentType.includes("text/html")) {
-    return null;
-  }
-
+): Promise<string> {
   const config = await getConfig();
   const fuseConfig = await loadFuseConfig();
 
@@ -568,11 +563,108 @@ async function maybeRewriteHtmlResponse(
     logger.warn(`⚠️  Slow response from fetchAppToken: ${tokenDurationMs}ms`);
   }
 
-  if (tokenResponse.token) {
-    responseHeaders.set(
-      "Set-Cookie",
-      `${FEATURE_TOKEN_COOKIE}=${tokenResponse.token}; Path=/; SameSite=Lax`,
+  return tokenResponse.token;
+}
+
+export function isDevAuthPath(pathname: string): boolean {
+  return pathname === "/_auth" || pathname === "/_auth/";
+}
+
+function buildFeatureTokenCookie(token: string): string {
+  return `${FEATURE_TOKEN_COOKIE}=${token}; Path=/; SameSite=Lax`;
+}
+
+/**
+ * Local stand-in for the `/_auth/` endpoint app-wrapper serves on deployed app
+ * hosts, so an app that follows the login flow works unchanged under
+ * `fusebase dev`. Answers the same two shapes: JSON when the caller asks for it,
+ * a redirect to the `url` query param otherwise.
+ *
+ * ponytail: the `se` exchange token is never resolved. User-service is not
+ * reachable from a developer machine, and the local token is minted from the
+ * developer's API key whoever the app logged in as.
+ */
+export function buildDevAuthResponse(req: Request, token: string): Response {
+  const url = new URL(req.url);
+  const wantsJson = (req.headers.get("accept") || "").includes(
+    "application/json",
+  );
+  const redirectPath = url.searchParams.get("url") || "/";
+
+  // First gate is app-wrapper's own `isRelativeAppPath`, so a value that passes
+  // here passes there too. Then resolve, because Bun writes the Location header
+  // raw where express runs `encodeurl` over it, and a smuggled control character
+  // would otherwise reach the browser as `//host`. The resolved path needs the
+  // same check: `/..//host` normalizes back into a protocol-relative reference.
+  let safePath: string | null = null;
+  if (/^\/(?![/\\])/.test(redirectPath)) {
+    const target = new URL(redirectPath, url.origin);
+    const candidate = target.pathname + target.search + target.hash;
+    if (target.origin === url.origin && !candidate.startsWith("//")) {
+      safePath = candidate;
+    }
+  }
+
+  if (safePath === null) {
+    const message = "The url query param must be a relative path.";
+    return wantsJson
+      ? new Response(
+          JSON.stringify({
+            status: "error",
+            reason: "invalid_redirect_url",
+            message,
+          }),
+          { status: 400, headers: { "content-type": "application/json" } },
+        )
+      : new Response(message, { status: 400 });
+  }
+
+  if (!token) {
+    throw new Error("The local app token is empty.");
+  }
+
+  console.log(
+    "\ud83d\udd13 /_auth/ answered by the dev server. Local development does not switch identity: " +
+      "the token stays the developer's, so the login form completes its flow but the app still runs as you.",
+  );
+
+  const headers = new Headers({
+    "Set-Cookie": buildFeatureTokenCookie(token),
+    "Cache-Control": "private, no-store",
+  });
+
+  if (wantsJson) {
+    headers.set("content-type", "application/json");
+    return new Response(
+      JSON.stringify({
+        status: "ok",
+        redirectPath: safePath,
+        token,
+        expiresInSeconds: FEATURE_TOKEN_TTL_SECONDS,
+      }),
+      { status: 200, headers },
     );
+  }
+
+  headers.set("Location", safePath);
+  return new Response(null, { status: 302, headers });
+}
+
+async function maybeRewriteHtmlResponse(
+  req: Request,
+  proxyResponse: ProxyResponse,
+  responseHeaders: Headers,
+  selectedFeatureId?: string,
+): Promise<Response | null> {
+  const contentType = proxyResponse.headers.get("content-type") || "";
+  if (!contentType.includes("text/html")) {
+    return null;
+  }
+
+  const token = await fetchDevFeatureToken(selectedFeatureId);
+
+  if (token) {
+    responseHeaders.set("Set-Cookie", buildFeatureTokenCookie(token));
   }
 
   if (req.method === "HEAD") {
@@ -707,6 +799,25 @@ export async function startDevServer(
       );
       if (browserDebugResponse) {
         return browserDebugResponse;
+      }
+
+      if (isDevAuthPath(url.pathname)) {
+        try {
+          return buildDevAuthResponse(
+            req,
+            await fetchDevFeatureToken(selectedFeatureId),
+          );
+        } catch (error) {
+          console.error("Failed to mint a local app token for /_auth/:", error);
+          return new Response(
+            JSON.stringify({
+              status: "error",
+              reason: "local_token_unavailable",
+              message: String(error),
+            }),
+            { status: 500, headers: { "content-type": "application/json" } },
+          );
+        }
       }
 
       // Proxy /api requests to the backend when a backend is configured

@@ -56,6 +56,11 @@ export function resolveLatestVersion(
     : manifest.version;
 }
 
+/**
+ * Asset URL for the running platform. The published names are (see
+ * scripts/build.sh): `fusebase-<version>` linux x64, `-linux-arm64` linux
+ * arm64, `-macos` macOS arm64, `-macos-x64` macOS x64, `.exe` windows x64.
+ */
 export function getBinaryUrl(version: string): string {
   const platform = process.platform;
   if (platform === "win32") {
@@ -68,6 +73,8 @@ export function getBinaryUrl(version: string): string {
       return `${BASE_URL}/${version}/fusebase-${version}-macos-x64`;
     }
     return `${BASE_URL}/${version}/fusebase-${version}-macos`;
+  } else if (process.arch === "arm64") {
+    return `${BASE_URL}/${version}/fusebase-${version}-linux-arm64`;
   } else {
     return `${BASE_URL}/${version}/fusebase-${version}`;
   }

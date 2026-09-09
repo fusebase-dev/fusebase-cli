@@ -32,6 +32,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 
 **specialized**
 
+- [FuseBase Apps And Work Agents](references/apps.md)
 - [Fusebase Auth For AI Apps](references/fusebase-auth.md)
 - [Fusebase Gate — Isolated SQL migration discipline](references/isolated-sql-migration-discipline.md)
 - [Fusebase Gate App Magic Link Operations](references/app-magic-links.md)
@@ -46,6 +47,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 - [Fusebase Gate Portals Operations](references/portals.md)
 - [Fusebase Gate Stripe App And Agent Integration](references/stripe-apps.md)
 - [Fusebase Gate Users Operations](references/users.md)
+- [Fusebase Gate Web Studio Operations](references/web-studio.md)
 - [FuseBase PostgreSQL Database](references/isolated.md)
 - [FuseBase PostgreSQL Database](references/isolated-sql.md)
 - [FuseBase PostgreSQL Database — integrator troubleshooting](references/isolated-sql-integrator-troubleshooting.md)

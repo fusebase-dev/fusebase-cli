@@ -1,7 +1,7 @@
 ---
-version: "1.98.0"
+version: "1.101.0"
 mcp_prompt: portals
-last_synced: "2026-08-11"
+last_synced: "2026-09-04"
 title: "Fusebase Gate Portals Operations"
 category: specialized
 ---
@@ -147,8 +147,9 @@ Content & settings (all STAGED in the customizer draft — see Draft Staging Rul
 - deletePortalItem: delete a menu item (a folder deletes its whole subtree).
 - updatePortalAccess: set who may open the portal (access mode).
 - updatePortalCustomCode: set custom CSS/JS (CNAME-domain portals only).
+- updatePortalHeader: set the header bar (background image, sticky, search button) and the homepage greeting.
 - updatePortalHomepage: set the homepage settings (title, sidebar toggles).
-- updatePortalStyle: set the portal branding (color theme, logo, favicon).
+- updatePortalStyle: set the portal branding (color theme, semantic colors, font, logo, favicon).
 
 Applied immediately (NOT staged in the draft):
 - setDashboardViewReadonly: allow or restrict editing of a Dashboard View. A global View setting.
@@ -280,6 +281,7 @@ The operation contract is authoritative: it defines whether Appearance, Layout o
   addPortalCustomWidgetBlock, addPortalHtmlCssBlock,
   addPortalAppBlock, updatePortalItem, deletePortalItem,
   updatePortalAccess, updatePortalHomepage, updatePortalStyle,
+  updatePortalHeader,
   updatePortalCustomCode) is STAGED in the
   portal's customizer draft. It is NOT published immediately and is NOT yet visible
   on the live portal.
@@ -438,6 +440,12 @@ customizer immediately but on the live portal only after a manager publishes.
       (omit to create the page in the root sidebar).
     `positionType` — 'sidebar' (default), 'top' (topbar) or 'footer'. When
       `parentId` is set the page inherits the parent's bar and this is ignored.
+    `slug` — explicit page URL segment, e.g. 'pricing' → '/pricing'. Normalized
+      to lowercase latin letters, digits and hyphens (max 90); a taken slug still
+      gets a '-N' suffix. Omit it to derive the slug from the title. PASS IT when
+      the title is in a script that does not transliterate (Japanese, Chinese,
+      Arabic, …) — those titles otherwise land on '/page', '/page-1', '/page-2'.
+      A slug with no latin letter or digit left after normalization is rejected.
   The service assigns the standard page icon; the caller does not choose it.
   The operation creates only the page node and sidebar menu item. It does NOT
   create a Fusebase note and does NOT add any block. Use createPortalPageWithNote
@@ -494,6 +502,9 @@ customizer immediately but on the live portal only after a manager publishes.
     `icon` — icon key for the menu item (default 'page').
     `content` — initial text or html appended to the note after creation.
     `format` — format of `content`: 'text' (default) or 'html'.
+    `slug` — explicit page URL segment, same rules as createPortalPage: omit to
+      derive it from the title, pass it for titles in scripts that do not
+      transliterate (Japanese, Chinese, Arabic, …) to avoid '/page', '/page-1'.
   The note is created in the portal's workspace and shared into the portal, then the
   page (page node + note menu item + note content block) is STAGED in the draft.
   Returns: noteId, menuItemId, pageId, url, branchId, seqs, staged (always true).
@@ -520,13 +531,13 @@ customizer immediately but on the live portal only after a manager publishes.
 
 - addPortalNoteBlock: embeds an EXISTING portal note as a content block on an
   EXISTING page (no new page or sidebar item is created).
-  Required path params: `orgId`, `portalId`.
+  Required path params: `orgId`, `portalId`, `pageId` (the target page node id,
+    from `listPortalContent`, the `pageId` field).
   Required body:
-    `pageId` — the target page node id (from `listPortalContent`, the `pageId` field).
     `noteId` — the Fusebase note to embed. The note must already exist in the portal's
       workspace and be shared into the portal (e.g. created via createPortalPageWithNote).
-  Optional body: `title` — block title (defaults to the page's current title; keep the
-    default to avoid renaming the page).
+  Optional body: `title` — the block header (defaults to the page's current title).
+    Renaming the note's sidebar item afterwards overwrites it.
   The block is STAGED in the draft. Returns: blockId, pageId, branchId, seqs, staged.
 
 - addPortalBlankNoteBlock: creates a new empty Fusebase note and adds it as a
@@ -1636,7 +1647,19 @@ customizer immediately but on the live portal only after a manager publishes.
   "page-card"|"note-content"|"breadcrumbs"|"search"]`. Write RELATIVE selectors
   in `css` (Gate auto-nests under `#main-scrolling-container`; no manual prefix),
   e.g. `[data-portal="sidebar"] { background: #101828; }`. Full contract:
-  reference `portal-theme-variables`.
+  call getPortalStyleContract (do not hard-code the hook list).
+
+- getPortalStyleContract: returns the portal styling contract as JSON — the
+  hooks custom CSS may target, and how to target them.
+  Required path params: `orgId`. No body. The contract is the same for every
+  portal in every org, so one call covers all of them.
+  Returns: `version`, `structuralHooks` (the `data-portal` values), `classHooks`,
+  `usage` (selector rules), `canonicalOverride` (a working example) and
+  `antiContract` (what looks styleable but is not).
+  Call this before writing `css` for updatePortalCustomCode rather than relying
+  on hooks memorised from an older build. `version` is the same value getPortal
+  returns as `style.styleContractVersion`: cache the contract and refetch when
+  the version changes.
 
 - updatePortalHomepage: sets the portal Homepage settings — the same panel the
   customizer shows under Homepage settings.
@@ -1666,18 +1689,76 @@ customizer immediately but on the live portal only after a manager publishes.
                  space_gray, carbon, oxford, ultramarine, milky_blue,
                  shades_of_green, savvy_red, light_orange, light_blue,
                  lemon_drop. Recolors the whole portal consistently.
+    `colors`   — semantic color roles applied on top of the theme:
+                 `primary` (buttons and links), `background` (the page),
+                 `surface` (cards and panels), `text` (body text on a surface),
+                 `accent` (secondary highlights). Each value is ONE Tailwind
+                 palette token: `transparent`, `white`, `black` or
+                 `<hue>-<shade>`, e.g. `indigo-600`. Hues: slate, gray, zinc,
+                 neutral, red, orange, amber, yellow, lime, green, emerald,
+                 teal, cyan, sky, blue, indigo, purple, fuchsia, pink, rose.
+                 Shades: 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950.
+                 NEVER send HEX, rgb(), CSS variables, `bg-*` classes or
+                 opacity — the portal paints the token as a class, so anything
+                 else is rejected. `stone` and `violet` are NOT in the portal
+                 palette. A bare hue such as `red` is ambiguous: ask for the
+                 shade; normalize `red 600` to `red-600`. Convert a hex the user
+                 gives you to the nearest token and say which one you picked.
+    `font`     — `{ family, source: "google" }`, e.g. `{ family: "Fraunces" }`.
+                 The family is spelled as Google Fonts spells it; letters,
+                 digits and spaces only. Delivered as portal custom code, so it
+                 renders wherever custom code does. The family is imported from
+                 Google Fonts, so every portal visitor's browser requests it from
+                 fonts.googleapis.com — tell the user before setting a font, it
+                 is a third-party request from their own domain.
     `logo`     — `{ storedFileUUID }` of an uploaded image, shown in the header.
     `favicon`  — `{ storedFileUUID }` of an uploaded image, the browser tab icon.
   Upload images first with the files operations (see MCP prompt `files`) and pass
   the returned `storedFileUUID`.
-  Colors are named themes, NOT arbitrary values: the portal theme model has no
-  hex-color and no web-font fields, so a request like "make the buttons #2563eb"
-  or "use the Fraunces font" cannot be served by this operation. Pick the closest
-  theme, then use updatePortalCustomCode for anything more specific (CNAME-domain
-  portals only; see reference `portal-theme-variables`).
+  Prefer a named `theme` for a whole-portal look and `colors` to adjust it. For
+  anything the roles do not cover, use updatePortalCustomCode (CNAME-domain
+  portals only; call getPortalStyleContract for the hooks it may target).
   Read the current branding back from `getPortal` → `style`
-  (`theme`, `logoUrl`, `faviconUrl`).
-  The change is STAGED in the draft. Returns: branchId, seq, staged (always true).
+  (`theme`, `colors`, `fontFamily`, `logoUrl`, `faviconUrl`).
+  The change is STAGED in the draft. A body touching both the theme fields and
+  `font` stages two events; `seq` is the first. Returns: branchId, seq, staged
+  (always true).
+
+- updatePortalHeader: sets the portal header bar and the homepage hero greeting.
+  Required path params: `orgId`, `portalId`.
+  Body (at least one field required; only provided fields change):
+    `backgroundImage`   — `{ storedFileUUID }` of an uploaded image, used as the
+                          header background. Pass `null` to drop the override and
+                          fall back to the portal theme's own header image or
+                          color. It shows on the homepage under every theme, but
+                          only four themes keep it on the INNER pages:
+                          light_purple, space_gray, light_orange, light_blue.
+                          The other nine (soft_light, quite_green, carbon, oxford,
+                          ultramarine, milky_blue, shades_of_green, savvy_red,
+                          lemon_drop) replace it with a flat color off the
+                          homepage. Switch the theme with updatePortalStyle when
+                          the user wants the image portal-wide.
+    `sticky`            — pin the header to the top while the visitor scrolls.
+    `showSearchButton`  — show the search button in the header bar.
+    `greeting`          — greeting text on the homepage hero (e.g. "Hello, Acme").
+                          Pass an empty string to clear it.
+    `showGreeting`      — show that greeting.
+    `showHeroSearch`    — show the large search box on the homepage hero.
+  Backgrounds are an uploaded image or the theme's color: the portal theme model
+  has no hex-color and no gradient field for the header, so a request like
+  "make the header a green gradient" cannot be served here — upload an image, or
+  use updatePortalCustomCode (CNAME-domain portals only).
+  The greeting and the hero search render only while the block-based hero is off.
+  Once the owner turns the hero on, that area shows blocks instead and both
+  fields stop appearing — add blocks with the addPortal*Block operations then.
+  Social links are NOT a header field: they are a block on the page, added with
+  the block operations.
+  Upload images first with the files operations (see MCP prompt `files`) and pass
+  the returned `storedFileUUID`.
+  Read the current values back from `getPortal` → `header`.
+  One call stages up to two events (header theme, homepage hero) in a single
+  draft write, so a mixed update is all-or-nothing.
+  The change is STAGED in the draft. Returns: branchId, seqs, staged (always true).
 
 - publishPortalDraft: publishes the portal's staged draft to the live portal.
   Required path params: `orgId`, `portalId`. No body.
@@ -1738,8 +1819,9 @@ customizer immediately but on the live portal only after a manager publishes.
 ## Read Flow Rules
 
 - Use `listPortals` to discover available portals when you do not yet have a `portalId`.
-- Use `getPortal` when you already have the `portalId` and need full portal details including CNAME info, status, version, publish timestamps, and the published branding (`style`: `theme`, `logoUrl`, `faviconUrl`).
+- Use `getPortal` when you already have the `portalId` and need full portal details including CNAME info, status, version, publish timestamps, the portal `name`, the published branding (`style`: `theme`, `colors`, `fontFamily`, `logoUrl`, `faviconUrl`, plus `styleContractVersion` — the version of the styling contract, not of the portal) and the published header (`header`: `backgroundImageUrl`, `sticky`, `showSearchButton`, `greeting`, `showGreeting`, `showHeroSearch`).
 - `getPortal` returns 404 when the portal does not exist or is not accessible.
+- Use `getPortalStyleContract` before writing custom CSS: it returns the current styling hooks as JSON, so you never style against a hook a newer portal build removed.
 
 ## listPortalContent Flow Rules
 
@@ -2145,7 +2227,7 @@ pageId:"page_789",blockId:"block_107"}})
 
 ## Version
 
-- **Version**: 1.98.0
+- **Version**: 1.101.0
 - **Category**: specialized
-- **Last synced**: 2026-08-11
+- **Last synced**: 2026-09-04
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -1,6 +1,20 @@
 import { getEnv } from "./config";
 import { logger } from "./logger";
 
+/**
+ * API failure that keeps the HTTP status, so callers can tell a permission
+ * problem (401/403) from a server failure instead of just reading a message.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 /** Public API base URL (Fusebase HTTP API). */
 export const getBaseUrl = (): string => {
   const env = getEnv();
@@ -573,8 +587,9 @@ export async function createAppVersion(
       timestamp: new Date().toISOString(),
     });
 
-    throw new Error(
+    throw new ApiError(
       `Failed to create app version: ${response.status} ${response.statusText}${errorBody.message ? ` - ${errorBody.message}` : ""}`,
+      response.status,
     );
   }
 

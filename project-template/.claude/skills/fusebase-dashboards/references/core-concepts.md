@@ -1,7 +1,7 @@
 ---
-version: "1.8.0"
+version: "1.11.0"
 mcp_prompt: domain.overview
-last_synced: "2026-06-27"
+last_synced: "2026-08-31"
 title: "Domain Overview"
 category: core
 ---
@@ -24,6 +24,7 @@ category: core
 - [Rules of thumb](#rules-of-thumb)
 - [Critical Invariants](#critical-invariants)
   - [INVARIANT: Use UUID (global_id) for all byId operations](#invariant-use-uuid-globalid-for-all-byid-operations)
+- [Finding a dashboard](#finding-a-dashboard)
 - [Working with the System](#working-with-the-system)
 - [Loading Prompts for Dashboard Operations](#loading-prompts-for-dashboard-operations)
   - [Intent-Based Workflow (MANDATORY for Dashboards/Views)](#intent-based-workflow-mandatory-for-dashboardsviews)
@@ -146,6 +147,19 @@ Use the **resolveAliases** operation to resolve human-readable aliases (or exist
   - Get view by ID → use `viewId: '<uuid>'`, NOT `viewId: 789`
 - If unsure whether an ID is a UUID, check format: UUIDs are strings like `'550e8400-e29b-41d4-a716-446655440000'`.
 
+## Finding a dashboard
+
+**Always start with `getDashboards({ scope_type, scope_id, compact: true })` and no other filter.** That is every dashboard this connection can read — standalone ones and tables living inside a database alike. `compact` only shrinks each entry to id, name and views; it never drops entries. This list *is* the catalogue, so read it before reaching for any filter.
+
+Then read structure and rows via `getDashboardView` / `getDashboardViewData`. To walk one database instead, use `getAllDatabases({ scope_type, scope_id })` — or `getAllDatabases({ query: "meet" })` to search titles and aliases — then `getDashboards({ database_id: "<db global_id>", compact: true })`.
+
+**Empty results never mean the data is missing.** Two traps in particular:
+- `getAllDatabases` returns `[]` on a dashboard-scoped connection — such a token grants dashboards, not databases. That is an access boundary, not an empty organization. Go back to the plain `getDashboards` list above; the dashboard you want is in it.
+- `root_entities: ["meeting"]` (likewise `"tracker"`, `"tracker-result"`) always returns `[]`. The query enum accepts those words but no dashboard is ever stored with them — Meetings, Trackers and every user-created table are stored as `root_entity: "custom"`. Never filter discovery by them.
+
+- Hunting for one known table? `getDashboards({ name: "Meetings" })` and `getDashboards({ alias: "meetings" })` are **exact matches**, not searches — a near miss returns `[]`, so fall back to the unfiltered list rather than trusting the empty one. `resolveAliases` resolves several aliases at once.
+- Managed databases (Companies, Deals, Meetings) — load their prompt first (group `managedDatabases`).
+
 ## Working with the System
 
 - Discover operations via `tools_search`.
@@ -221,7 +235,7 @@ erDiagram
 
 ## Version
 
-- **Version**: 1.8.0
+- **Version**: 1.11.0
 - **Category**: core
-- **Last synced**: 2026-06-27
+- **Last synced**: 2026-08-31
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
