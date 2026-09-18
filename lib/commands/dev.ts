@@ -35,6 +35,7 @@ import {
   sendCodingStatsForCreatedApp,
 } from "../api";
 import { reconcileApps } from "../reconcile";
+import { reconcileAppSecrets } from "../reconcile-secrets";
 import packageJson from "../../package.json";
 import { logger } from "../logger";
 import assert from "assert";
@@ -403,6 +404,20 @@ devCommand
 
     // Check for package.json and run npm install if exists
     await checkAndInstallDependencies(featureDir);
+
+    // Register declared-but-missing secret keys on the platform. Runs on every
+    // start, not only when the app is created here: an app that already has an
+    // id skips reconcileApps above, so a key added by `secret create` later
+    // would otherwise never reach the platform (NIM-44700). Additive-only and
+    // non-fatal — see reconcileAppSecrets.
+    await reconcileAppSecrets({
+      apiKey: config.apiKey,
+      orgId: fuseConfig.orgId,
+      productId: fuseConfig.productId,
+      appId: requireAppId(selectedFeature),
+      declared: selectedFeature.secrets ?? [],
+      label: selectedFeature.path ?? selectedFeature.subdomain,
+    });
 
     // Fetch feature secrets from backend and build env vars
     let secretsEnv: Record<string, string> = {};
