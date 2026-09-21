@@ -12,13 +12,25 @@ Use the same terminology everywhere: `tempStoredFileName`, `storedFileUUID`, `re
    - `relative url` is a stored file path that must be prefixed before display.
 4. Pass a file descriptor to the next layer.
 
+## Flow Selection
+
+Three upload flows. Pick by what the file is for:
+
+1. **Presigned single PUT** — Gate `createTempStoredFileUpload`, then one `PUT` carrying the whole file.
+   The default for app uploads. Send the bytes as the body and exactly the headers the operation returns
+   in `headers` — `content-type` alone — and nothing else. The URL signs `host`, so `content-type` rides
+   unsigned, but it is still required: it is the media type the stored object keeps.
+2. **Multipart** — Gate `startMultipartFileUpload`, one `PUT` per part, then `completeMultipartFileUpload`.
+   Only when the file is too large for a single request.
+3. **Note attachments** — app-api `web-editor/file/v2-upload`, then `bucket-files/create-relative`.
+   Only for files attached to a note. When a note needs a readable image/file URL after upload, keep it
+   on this flow and use the file descriptor or URL that flow returns.
+
+Both Gate flows give you a `tempStoredFileName`. To put the file in the organization file list, hand
+that name to `createBucketAttachment`, which creates the stored-file record itself — so on flow 2 finish
+with `saveStoredFile: false` and let the attachment do it. Flow 1 never creates a stored file on its own.
+
 <!-- CUSTOM:SKILL:BEGIN -->
-## Flow Selection Rule
-
-- Use the `web-editor/file/v2-upload` -> `bucket-files/create-relative` flow for files uploaded as note attachments.
-- Use the Gate `startMultipartFileUpload` -> direct `PUT` -> `completeMultipartFileUpload` flow for non-note file uploads.
-- When a note needs a readable image/file URL after upload, keep the note attachment lifecycle on the web-editor flow and use the resulting file descriptor or URL returned by that flow.
-
 ## App attachment storage (non-negotiable)
 
 - After upload, apps persist **`storedFileUUID` + `readUrl`** (and small metadata) in dashboards or isolated SQL — **never** the file bytes.
@@ -28,16 +40,24 @@ Use the same terminology everywhere: `tempStoredFileName`, `storedFileUUID`, `re
 
 ## Presigned PUT Headers
 
-For every direct `PUT` to a presigned S3 URL, inspect `X-Amz-SignedHeaders` in the URL before adding request headers.
+The `headers` the upload operation returns are authoritative: send exactly those, and never a header it did not return.
 
-- If the URL has `X-Amz-SignedHeaders=host`, send a bare `PUT` with no custom headers:
+- `createTempStoredFileUpload` returns `{"content-type": "..."}`. Send it:
+
+  ```typescript
+  await fetch(uploadUrl, { method: "PUT", headers, body: bytes });
+  ```
+
+  The signature covers `host` only, so `content-type` is unsigned and does not break it. Dropping it stores the file under the wrong media type, and the type cannot be recovered afterwards.
+
+- When an operation returns no headers — the multipart `uploadUrl` and `partsUrls`, signed as `X-Amz-SignedHeaders=host` — send a bare `PUT`:
 
   ```typescript
   await fetch(uploadUrl, { method: "PUT", body: bytes });
   ```
 
-- Do not add `Content-Type`, storage-provider headers, or other custom headers unless they are explicitly listed in `X-Amz-SignedHeaders` or returned by the upload API as required headers.
-- In browser code, prefer `ArrayBuffer`/raw bytes for the body. A typed `Blob` or an explicit `Content-Type` can cause the browser to include `Content-Type` in the CORS preflight request; if the bucket CORS rules do not allow that header, `fetch` may fail with a generic network error before the `PUT` response is visible.
+- Never add storage-provider headers or anything else that is neither returned by the upload API nor listed in `X-Amz-SignedHeaders`.
+- In browser code, pass `ArrayBuffer`/raw bytes for the body rather than a typed `Blob`, so the browser sends only the `content-type` you set. The bucket CORS rules allow `content-type`; any other header fails the `PUT` as a generic network error before the response is visible.
 - A cross-origin browser `PUT` can still preflight because `PUT` is not a CORS simple method. The important rule is to keep the requested headers aligned with the presigned URL and bucket CORS policy.
 
 ## Create A Temp File
@@ -263,6 +283,64 @@ Stored-file response shape:
 }
 ```
 
+## Bucket Attachments
+
+A file manager style app reaches the organization's files through Gate, which forwards to bucket-service.
+App uploads land in the organization `app` bucket next to the note and portal files.
+
+- `createBucketAttachment` — `{tempStoredFileName, attributes?, accessPrincipals?, folder?}`. Creates the
+  stored-file record and the attachment. The token must be one issued for an app.
+- `updateBucketAttachment` — `{filename?, attributes?, accessPrincipals?}`. `attributes` replaces the whole
+  object when present, `accessPrincipals: null` clears every restriction, and omitted fields stay as they are.
+- `listBucketAttachments` — returns `{items, total}` across every source. Narrow it with `targets`
+  (`app`, `note`, portal targets), `sizeFrom` and `attributes`; page it with `limit` (max 100) and
+  `offset`.
+
+Each item carries `target` (the source), `userId` (the uploader), `size`, `attributes`, `accessPrincipals`
+and, for organization members, the bucket `permissions`. Resolve the uploader email and role from
+`userId` with the Gate org-users operations; bucket-service stores only the id.
+
+### Attributes
+
+Free string-to-string metadata, at most 50 keys, 255 characters per key and per value. Record at least:
+
+| Key | Value |
+|-----|-------|
+| `source` | where the file came from, for example the app name |
+| `uploaderEmail` | resolved from `userId` at upload time |
+| `uploaderRole` | the uploader's organization role at upload time |
+
+### Filtering by attributes
+
+`listBucketAttachments` takes an `attributes` filter: a JSON object of strings, sent as a string.
+Every pair must match the file exactly, and `total` counts the same filtered set. A malformed
+string is a 400.
+
+```typescript
+// Files whose `source` attribute is exactly "app".
+const filesApi = new FilesApi(createClient({ baseUrl, auth: { token } }));
+const { items, total } = await filesApi.listBucketAttachments({
+  path: { orgId },
+  query: { attributes: JSON.stringify({ source: "app" }), limit: 50 },
+});
+```
+
+### Access principals
+
+`accessPrincipals` is `{roles?, userIds?, groupIds?}` and only applies to `app` files. Note and portal files
+keep their own bucket permissions. Gate filters the listing for the caller, so a client never sees a
+file its access principals exclude, and the uploader always sees their own file.
+
+| Visibility | `accessPrincipals` |
+|------------|--------------|
+| Team only | `{roles: ["owner", "manager", "member", "guest"]}` |
+| All clients and team | omit it, or send `null` |
+| Specific clients and groups, plus team | `{roles: ["owner", "manager", "member", "guest"], userIds: [...], groupIds: [...]}` |
+
+Organization roles are `owner`, `manager`, `member` and `guest` for the team, and `client` for portal
+clients. Leaving `guest` out of a team role list hides the file from guests. Listing every role,
+`client` included, is the same as sending no access principals at all.
+
 ## Display URLs
 
 If the upload API returns a `relative url` or a `file.url` that starts with `/`, prepend:
@@ -304,4 +382,4 @@ The dashboard adapter uses this descriptor inside a `files` column value. Gate a
 ## Handoffs
 
 - Dashboard `files` column: use `fusebase-dashboards`; pass the file descriptor to `batchPutDashboardData`.
-- Gate MCP/SDK upload operations: use `fusebase-gate`; it owns `startMultipartFileUpload`, `completeMultipartFileUpload`, `deleteFile`, and their auth/scope rules.
+- Gate MCP/SDK upload operations: use `fusebase-gate`; it owns `createTempStoredFileUpload`, `startMultipartFileUpload`, `completeMultipartFileUpload`, `deleteFile`, `createBucketAttachment`, `updateBucketAttachment`, `listBucketAttachments`, and their auth/scope rules.
