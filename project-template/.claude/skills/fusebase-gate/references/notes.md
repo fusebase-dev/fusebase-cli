@@ -1,7 +1,7 @@
 ---
-version: "1.9.0"
+version: "1.10.0"
 mcp_prompt: notes
-last_synced: "2026-08-21"
+last_synced: "2026-09-14"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -142,6 +142,7 @@ Fusebase v3 notes may contain remark leaf/container directives that the Notes UI
 - `:::quote` — a pull quote attributed to a person (`[Author]` plus an optional `role`).
 - `:::steps` — ordered stages with a status each (a plan, an onboarding, a rollout). Prefer it over `::progress` when the stages have names, and over a checklist when their order matters; `::progress` stays the choice for a single percentage.
 - `:::dl` — group several `::kv` rows under an optional title.
+- `::::tabs` — panes behind a strip of names, for a note that says the same thing several ways (one pane per environment, per plan, per platform). Note the **four** colons on the container: a container inside a container needs the longer fence.
 
 Syntax (put each leaf directive on its own line; badge is inline and goes inside a paragraph; container = `:::name[title]` … `:::`):
 
@@ -179,6 +180,16 @@ Syntax (put each leaf directive on its own line; badge is inline and goes inside
     ::step[Ship]{status="todo"}
     :::
 
+    ::::tabs
+    :::tab[Overview]
+    Any block markdown; each pane's content is its own.
+    :::
+
+    :::tab[Details]
+    Second pane.
+    :::
+    ::::
+
     :::dl[Service meta]
     ::kv[Owner]{value="Dmitriy"}
     ::kv[On-call]{value="#platform"}
@@ -209,6 +220,7 @@ Syntax (put each leaf directive on its own line; badge is inline and goes inside
 - `:::dl` groups `::kv` rows written on their own lines between the fences; its `[Title]` is optional, and other markdown blocks are allowed inside the group. Setting the title is markdown-only (the UI does not edit it), same as collapse.
 - `::check` vs a GFM task list: use `::check` when the status is data you or another agent will read and update later — `done` is a stable attribute you can flip in place. Use an ordinary markdown task list (`- [ ] item`) for casual, prose-level lists. Never rewrite existing `- [ ]` lists into `::check`; the UI leaves them as markdown lists on purpose.
 - `done` is `true` or `false`, and only a literal `true` renders as ticked. Omit it entirely for a new unchecked row (`::check[Label]`); write `{done="true"}` to tick it.
+- Tabs: `::::tabs` accepts only `:::tab` panes between its fences — anything else written there is dropped when the note opens, as with `:::steps`. A pane's name is its `[Label]`, so renaming one means rewriting that label; a pane holds ordinary block markdown. Which pane is open is not stored in the note: a reader always starts on the first one.
 - `:::checklist[Title]` groups `::check` rows under one optional title. Keep it to a single level — a checklist inside a checklist is not rendered specially. Its title, like collapse's, is set only via markdown.
 - Text directives (`:name`) other than `:badge` and `:avatar`, and leaf `::name` directives other than progress/rating/stat/divider/step/kv/check/person, are not widgets; leave them as literal text. A `:::name` container that is neither `collapse` nor `quote` nor `steps` nor `dl` nor `stats` nor `checklist` renders as a callout.
 
@@ -224,7 +236,7 @@ Syntax (put each leaf directive on its own line; badge is inline and goes inside
 
 ## Version
 
-- **Version**: 1.9.0
+- **Version**: 1.10.0
 - **Category**: specialized
-- **Last synced**: 2026-08-21
+- **Last synced**: 2026-09-14
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
