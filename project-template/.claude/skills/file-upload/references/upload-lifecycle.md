@@ -30,13 +30,11 @@ Both Gate flows give you a `tempStoredFileName`. To put the file in the organiza
 that name to `createBucketAttachment`, which creates the stored-file record itself — so on flow 2 finish
 with `saveStoredFile: false` and let the attachment do it. Flow 1 never creates a stored file on its own.
 
-<!-- CUSTOM:SKILL:BEGIN -->
 ## App attachment storage (non-negotiable)
 
 - After upload, apps persist **`storedFileUUID` + `readUrl`** (and small metadata) in dashboards or isolated SQL — **never** the file bytes.
 - Do **not** store base64/`bytea`/data URLs in isolated SQL as an MVP. The ordinary SQL write path is only reliable around ~100–150 KB; the 64MiB figure applies only to `importIsolatedStoreSqlRows` (CSV/TSV seeds).
 - **Visitor / public apps:** call Gate file ops from the **feature backend** with `FBS_FEATURE_TOKEN` (`files.write`), not from a visitor browser token. Return refs to the client.
-<!-- CUSTOM:SKILL:END -->
 
 ## Presigned PUT Headers
 
