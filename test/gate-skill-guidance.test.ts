@@ -35,6 +35,79 @@ describe("fusebase-gate template guidance", () => {
   });
 });
 
+describe("file upload guidance", () => {
+  const lifecycle = () => read(".claude/skills/file-upload/references/upload-lifecycle.md");
+  const gateFiles = () => readTemplateFile("references", "files.md");
+
+  it("names all three upload flows and when each applies", () => {
+    const text = lifecycle();
+    expect(text).toContain("createTempStoredFileUpload");
+    expect(text).toContain("startMultipartFileUpload");
+    expect(text).toContain("web-editor/file/v2-upload");
+    // The presigned PUT carries exactly the headers the operation returns —
+    // `content-type` and nothing else. Both halves are easy to get wrong and
+    // neither is debuggable from the browser: dropping it stores the wrong media
+    // type, adding anything else fails as an opaque CORS/network error.
+    expect(text).toContain("exactly the headers the operation returns");
+    expect(text).toContain("saveStoredFile: false");
+    expect(text).not.toContain("Do not add `Content-Type`");
+  });
+
+  it("documents the bucket attachment operations and the accessPrincipals mapping", () => {
+    const text = lifecycle();
+    for (const op of ["createBucketAttachment", "updateBucketAttachment", "listBucketAttachments"]) {
+      expect(text).toContain(op);
+    }
+    // The three visibility choices from the story, as accessPrincipals payloads.
+    // The team is every org role except `client`, so `guest` belongs in the list.
+    expect(text).toContain('{roles: ["owner", "manager", "member", "guest"]}');
+    expect(text).toContain("All clients and team");
+    expect(text).toContain("groupIds");
+    // The field is `accessPrincipals`; the old bare `principals` name never
+    // existed on a released gate, so no app should ever see it.
+    expect(text).toContain("accessPrincipals");
+    expect(text).not.toMatch(/(?<![A-Za-z])`principals`/);
+  });
+
+  it("documents the listBucketAttachments attributes filter with an example", () => {
+    const text = lifecycle();
+    // A JSON object sent as a string, every pair matched exactly — an app that
+    // passes the object itself gets a 400 it cannot read from the skill.
+    expect(text).toContain("a JSON object of strings, sent as a string");
+    expect(text).toContain("Every pair must match the file exactly");
+    expect(text).toContain('JSON.stringify({ source: "app" })');
+    // The SDK takes the org in `path` and the filter in `query`; a top-level
+    // `attributes` is a TS error and a client-side 400 before any HTTP call.
+    expect(text).toContain("path: { orgId }");
+    expect(text).toContain(
+      'query: { attributes: JSON.stringify({ source: "app" }), limit: 50 }',
+    );
+  });
+
+  it("keeps the synced gate reference in step with the new operations", () => {
+    // The reference is regenerated from the gate MCP prompt; if a regen drops
+    // an operation, the skill above would point at something apps cannot call.
+    const text = gateFiles();
+    for (const op of [
+      "createTempStoredFileUpload",
+      "createBucketAttachment",
+      "updateBucketAttachment",
+      "listBucketAttachments",
+    ]) {
+      expect(text).toContain(op);
+    }
+    // The presigned flow needs `content-type`; the reference must not still ban it
+    // as an unsigned header, or an app has two rules and follows the wrong one.
+    expect(text).toContain("the `headers` the upload operation returns are authoritative");
+    expect(text).not.toContain("unsigned `Content-Type`");
+    // The synced reference and the skill must agree on the field name and on
+    // the listing filter, or an app follows whichever it read last.
+    expect(text).toContain("accessPrincipals");
+    expect(text).not.toMatch(/(?<![A-Za-z])`principals`/);
+    expect(text).toContain("`attributes` is a JSON object of strings sent as a string");
+  });
+});
+
 describe("app login handoff guidance", () => {
   // The handoff wording is security wording: it tells an app author what the
   // exchange token actually is. Most of these files are re-synced from

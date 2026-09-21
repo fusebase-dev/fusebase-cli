@@ -101,14 +101,41 @@ export type CapturedCustomBlock = {
   afterLine: string | null;
 };
 
-export function extractCustomBlocks(content: string): CapturedCustomBlock[] {
+
+/**
+ * Sections the template itself once shipped inside a custom block and that managed
+ * guidance has since replaced. Dropped on update only when the app's block still holds
+ * the shipped text verbatim, so app-authored edits and additions survive untouched.
+ */
+const SUPERSEDED_TEMPLATE_SECTIONS = [
+  // Replaced by the "Flow Selection" section of file-upload/references/upload-lifecycle.md,
+  // which makes the presigned single PUT the default for non-note uploads (NIM-43290).
+  [
+    "## Flow Selection Rule",
+    "",
+    "- Use the `web-editor/file/v2-upload` -> `bucket-files/create-relative` flow for files uploaded as note attachments.",
+    "- Use the Gate `startMultipartFileUpload` -> direct `PUT` -> `completeMultipartFileUpload` flow for non-note file uploads.",
+    "- When a note needs a readable image/file URL after upload, keep the note attachment lifecycle on the web-editor flow and use the resulting file descriptor or URL returned by that flow.",
+  ].join("\n"),
+];
+
+function dropSupersededTemplateSections(block: string): string {
+  const normalized = block.replace(/\r\n/g, "\n");
+  let next = normalized;
+  for (const section of SUPERSEDED_TEMPLATE_SECTIONS) {
+    next = next.replace(`${section}\n\n`, "").replace(section, "");
+  }
+  return next === normalized ? block : next;
+}
+
+function extractCustomBlocks(content: string): CapturedCustomBlock[] {
   const matches = [...content.matchAll(CUSTOM_BLOCK_REGEX)];
   return matches.map((match) => {
     const start = match.index ?? 0;
     const block = match[0];
     const end = start + block.length;
     return {
-      content: block,
+      content: dropSupersededTemplateSections(block),
       beforeLine: nonEmptyLineBefore(content, start),
       afterLine: nonEmptyLineAfter(content, end),
     };
