@@ -43,6 +43,38 @@ function stripAllCustomBlocks(content: string): string {
   return content.replace(CUSTOM_BLOCK_REGEX, "").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
 }
 
+/** Content between the custom markers, without the markers themselves. */
+function customBlockBody(block: string): string {
+  const start = block.indexOf(CUSTOM_BLOCK_BEGIN);
+  const end = block.lastIndexOf(CUSTOM_BLOCK_END);
+  if (start < 0 || end < 0) return block;
+  return block.slice(start + CUSTOM_BLOCK_BEGIN.length, end);
+}
+
+function normalizeForComparison(text: string): string {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Whether the block's content is already present in `content`.
+ *
+ * A project's custom block often gets promoted into the skill template itself,
+ * where it ships as plain markdown without the custom markers. Restoring the
+ * captured block on top of that would duplicate the text, so compare bodies
+ * rather than whole marker-delimited blocks.
+ */
+function containsCustomBlockContent(content: string, block: string): boolean {
+  const body = normalizeForComparison(customBlockBody(block));
+  if (!body) return false;
+  return normalizeForComparison(content).includes(body);
+}
+
 function nonEmptyLineBefore(content: string, index: number): string | null {
   const before = content.slice(0, index);
   const lines = before.split("\n");
@@ -63,13 +95,13 @@ function nonEmptyLineAfter(content: string, index: number): string | null {
   return null;
 }
 
-type CapturedCustomBlock = {
+export type CapturedCustomBlock = {
   content: string;
   beforeLine: string | null;
   afterLine: string | null;
 };
 
-function extractCustomBlocks(content: string): CapturedCustomBlock[] {
+export function extractCustomBlocks(content: string): CapturedCustomBlock[] {
   const matches = [...content.matchAll(CUSTOM_BLOCK_REGEX)];
   return matches.map((match) => {
     const start = match.index ?? 0;
@@ -122,9 +154,12 @@ function insertBlockBetweenAnchors(
   return { content: baseContent, inserted: false };
 }
 
-function mergeCustomBlocks(content: string, blocks: CapturedCustomBlock[]): string {
+export function mergeCustomBlocks(content: string, blocks: CapturedCustomBlock[]): string {
   let merged = stripAllCustomBlocks(content).trimEnd();
   for (const block of blocks) {
+    // The template may already ship this text (as plain markdown, or because an
+    // earlier captured block carried the same content) — don't restore a copy.
+    if (containsCustomBlockContent(merged, block.content)) continue;
     const attempt = insertBlockBetweenAnchors(merged, block);
     if (attempt.inserted) {
       merged = attempt.content.trimEnd();
