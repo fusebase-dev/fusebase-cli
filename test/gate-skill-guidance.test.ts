@@ -67,6 +67,10 @@ describe("file upload guidance", () => {
     // existed on a released gate, so no app should ever see it.
     expect(text).toContain("accessPrincipals");
     expect(text).not.toMatch(/(?<![A-Za-z])`principals`/);
+    // NIM-44834: the frontend may create an attachment through the Gate proxy,
+    // and it records a different uploader than the backend path.
+    expect(text).toContain("app frontend can call it directly through the app-api Gate proxy");
+    expect(text).toContain("recorded uploader is the signed-in");
   });
 
   it("documents the listBucketAttachments attributes filter with an example", () => {
