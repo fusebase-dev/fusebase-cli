@@ -128,7 +128,7 @@ function dropSupersededTemplateSections(block: string): string {
   return next === normalized ? block : next;
 }
 
-function extractCustomBlocks(content: string): CapturedCustomBlock[] {
+export function extractCustomBlocks(content: string): CapturedCustomBlock[] {
   const matches = [...content.matchAll(CUSTOM_BLOCK_REGEX)];
   return matches.map((match) => {
     const start = match.index ?? 0;

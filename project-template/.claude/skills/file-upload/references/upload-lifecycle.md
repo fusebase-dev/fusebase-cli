@@ -287,7 +287,10 @@ A file manager style app reaches the organization's files through Gate, which fo
 App uploads land in the organization `app` bucket next to the note and portal files.
 
 - `createBucketAttachment` — `{tempStoredFileName, attributes?, accessPrincipals?, folder?}`. Creates the
-  stored-file record and the attachment. The token must be one issued for an app.
+  stored-file record and the attachment. Needs an app token: the app backend calls it with
+  `FBS_FEATURE_TOKEN`, and the app frontend can call it directly through the app-api Gate proxy,
+  which forwards the app's scopes. On the frontend path the recorded uploader is the signed-in
+  user rather than the backend service user.
 - `updateBucketAttachment` — `{filename?, attributes?, accessPrincipals?}`. `attributes` replaces the whole
   object when present, `accessPrincipals: null` clears every restriction, and omitted fields stay as they are.
 - `listBucketAttachments` — returns `{items, total}` across every source. Narrow it with `targets`

@@ -1,7 +1,7 @@
 ---
-version: "1.14.0"
+version: "1.14.1"
 mcp_prompt: files
-last_synced: "2026-09-17"
+last_synced: "2026-09-21"
 title: "Fusebase Gate Files Flows"
 category: specialized
 ---
@@ -22,7 +22,7 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 - startMultipartFileUpload: start a public file-service multipart upload and return direct PUT metadata.
 - completeMultipartFileUpload: finish the file-service multipart upload from ETags and create the stored-file record. Gate maps file-service `storedFile.uuid` to response `storedFileUUID`; `fileId` is the same stored-file id alias. Use `storedFileUUID` for notes attachments. The returned `readUrl` is the public file URL.
 - deleteFile: delete a file-service stored file by `storedFileUUID`.
-- createBucketAttachment: turn an uploaded temp stored file into a bucket-service attachment in the organization's `app` bucket, so the file shows up in the organization file listing next to note and portal files. Needs a token issued for an app.
+- createBucketAttachment: turn an uploaded temp stored file into a bucket-service attachment in the organization's `app` bucket, so the file shows up in the organization file listing next to note and portal files. Needs an app token, from an app backend or from an app frontend through the app-api gate proxy.
 - updateBucketAttachment: rename a bucket attachment or replace its `attributes` and `accessPrincipals`.
 - listBucketAttachments: list the organization's files from every source in one list — app uploads, note attachments and portal files — with their source, uploader, size, attributes and access.
 
@@ -62,7 +62,7 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 
 ## Version
 
-- **Version**: 1.14.0
+- **Version**: 1.14.1
 - **Category**: specialized
-- **Last synced**: 2026-09-17
+- **Last synced**: 2026-09-21
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -1,7 +1,7 @@
 ---
-version: "1.10.0"
+version: "1.11.0"
 mcp_prompt: webStudio
-last_synced: "2026-09-08"
+last_synced: "2026-09-18"
 title: "Fusebase Gate Web Studio Operations"
 category: specialized
 ---
@@ -171,6 +171,23 @@ environment; do not invent an image URL or a plausible-looking `data:`
 payload as a substitute. Prefer typography, layout, and SVG for
 anything that is not backed by a real asset or a successful
 generateWebStudioImage call.
+
+**Motion.** Web Studio has three safe compiler-owned behaviours, shared
+with Studio Chat. Never add a script, inline handler, animation library,
+or custom runtime. Instead add one declared behaviour to a stable HTML
+element: `data-fb-motion="reveal"` for one section entering when
+visible; `data-fb-motion="count"` for one static number such as
+`82%` or `1,240`; or `data-fb-motion="parallax"` for a decorative
+background wrapper only. Do not reveal every card or navigation item,
+do not count a live data island, and do not put text, forms, navigation,
+or a critical action in a parallax layer. Optional attributes are
+`data-fb-motion-speed="slow|normal|fast"`,
+`data-fb-motion-distance="8|16|28"`, and
+`data-fb-motion-delay="0|120|240|400"`. Default to normal, 16, and
+0; prefer slow or normal, 8 or 16px, and no delay unless a small 120ms
+sequence helps orientation. The compiler clamps values, respects
+`prefers-reduced-motion`, and keeps content visible if motion is reduced
+or unsupported.
 
 ## Relevant Operations
 
@@ -380,7 +397,7 @@ add_palette, set_style_sets, set_site_identity.
 
 ## Version
 
-- **Version**: 1.10.0
+- **Version**: 1.11.0
 - **Category**: specialized
-- **Last synced**: 2026-09-08
+- **Last synced**: 2026-09-18
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
