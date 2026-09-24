@@ -184,11 +184,10 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 
 ---
 
-<% if (it.flags?.includes("site-embed-theme")) { %>
 ## Embedded in a FuseBase site
 
 The slate/white palette guidance and generic Tailwind spacing/type scales above do
-**not** apply while this flag is on. Fixed colours and hard-coded `text-*` / `p-*`
+**not** apply when the app is framed by a FuseBase site. Fixed colours and hard-coded `text-*` / `p-*`
 steps ignore the site. Use shadcn token utilities for colour and wire layout from
 the embed contract below.
 
@@ -371,7 +370,6 @@ hides which a component ignored.
 **Theme switch:** Send a second greeting with a different `colorScheme` (and scale /
 focus if wired). The app must follow — not stay on the first palette.
 
-<% } %>
 ---
 
 ## References

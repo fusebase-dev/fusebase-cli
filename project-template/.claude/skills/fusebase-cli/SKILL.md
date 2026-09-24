@@ -140,7 +140,7 @@ Options:
 - Global flag `mcp-gate-debug` includes the `mcp-gate-debug` skill (post–Gate MCP debug summary; isolated stores emphasis)
 - Global flag `isolated-stores` enables isolated stores functionality (SQL/NoSQL), including required Fusebase Gate references and `isolated_store.*` permissions in `fusebase env create`
 - Global flag `portal-specific-apps` includes portal-specific prompts/guidance (`fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` filter references, and `/auth/context` portal runtime context notes)
-- Global flag `site-embed-theme` includes the **Embedded in a FuseBase site** section in the `app-ui-design` skill (`fb:embed:hello`: theme incl. focus/elevation, `colorScheme`, optional `scale`; token utilities + scale wiring). Off → standalone theming only (`fusebase config set-flag site-embed-theme`)
+- The `app-ui-design` skill always includes **Embedded in a FuseBase site** (`fb:embed:hello`: theme incl. focus/elevation, `colorScheme`, optional `scale`; token utilities + scale wiring)
 
 This command **always creates a new app** on Fusebase and initializes the project. It will:
 
