@@ -47,12 +47,13 @@ className="bg-[var(--card)] text-[var(--foreground)]"
 
 **Instead, use one of these approaches:**
 
-1. **Use Tailwind's built-in color palette** (preferred for most apps):
+1. **Use shadcn semantic tokens** (default for new apps):
    ```tsx
-   // ✅ Works — uses Tailwind's first-class utility classes
-   className="bg-white text-slate-900 border-slate-200"
-   className="text-indigo-500 bg-indigo-50"
+   // ✅ Works — and follows a FuseBase site theme when the app is embedded
+   className="bg-background text-foreground border-border"
+   className="bg-primary text-primary-foreground"
    ```
+   New apps ship with shadcn/ui. Theme colour this way so a site can restyle the app. A fixed Tailwind palette (`bg-white`, `text-slate-900`) is only for an app that has no shadcn theme.
 
 2. **Register custom tokens via `@theme`** (only if you need custom colors):
    ```css
@@ -111,14 +112,13 @@ Do **NOT** add `* { margin: 0; padding: 0; box-sizing: border-box; }` in `global
 
 - **Typography**: Use Tailwind's typography scale (`text-sm`, `text-base`, `text-lg`, `font-semibold`, etc.) and keep heading/body consistent throughout the app.
 - **Radius**: Use consistent rounding from the theme (`rounded-md` for cards and inputs; `rounded-full` for pills/avatars).
-- **Colors**: Choose ONE approach based on whether shadcn/ui theming is set up:
-  - **With shadcn/ui**: Use its semantic tokens (`bg-background`, `text-foreground`, `bg-muted`, `text-muted-foreground`, `border`) — these are pre-registered and work out of the box.
-  - **Without shadcn/ui**: Use Tailwind's built-in palette (`bg-white`, `text-slate-900`, `bg-slate-100`, `text-slate-500`, `border-slate-200`).
+- **Colors**: New apps use shadcn semantic tokens (`bg-background`, `text-foreground`, `bg-muted`, `text-muted-foreground`, `border-border`). That is the default: the same classes follow a FuseBase site theme when the app is embedded, and look correct when it is not. Do not start a new app on `bg-white` / `text-slate-*`.
+  - **Without shadcn/ui** (an existing app that was not scaffolded with it): use Tailwind's built-in palette (`bg-white`, `text-slate-900`, `bg-slate-100`, `text-slate-500`, `border-slate-200`).
   - **Never mix**: Don't use `bg-background` in an app without shadcn/ui theming — it won't resolve. Reserve inline `style` for dynamic/computed colors only.
 
 ### Hierarchy
 
-Establish clear text hierarchy using the same approach as Colors above:
+Establish clear text hierarchy. New apps use the shadcn column:
 
 | Level | With shadcn/ui | Without shadcn/ui |
 |-------|----------------|-------------------|
@@ -178,7 +178,7 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 
 ## Dark mode
 
-**With shadcn/ui**: Dark mode is toggled by adding/removing the `dark` class on `<html>`. Use CSS variable-based tokens (`bg-background`, `text-foreground`, etc.) which are registered through shadcn/ui's theme system.
+**New apps (shadcn/ui)**: Dark mode is the `dark` class on `<html>`. Use CSS variable tokens (`bg-background`, `text-foreground`). When a site embeds the app, app-wrapper toggles that class from `colorScheme` — do not add a separate theme toggle that fights it.
 
 **Without shadcn/ui**: Use Tailwind's `dark:` variant with the built-in palette: `bg-white dark:bg-slate-900`, `text-slate-900 dark:text-slate-100`. Do NOT create raw `:root` CSS variables and reference them via `bg-[var(--name)]` — this does not work in Tailwind v4 (see Tailwind CSS v4 section above).
 
@@ -186,10 +186,10 @@ Reserve accent/brand color for CTAs and key UI, not body text.
 
 ## Embedded in a FuseBase site
 
-The slate/white palette guidance and generic Tailwind spacing/type scales above do
-**not** apply when the app is framed by a FuseBase site. Fixed colours and hard-coded `text-*` / `p-*`
-steps ignore the site. Use shadcn token utilities for colour and wire layout from
-the embed contract below.
+This is the default theming path for new apps. Colour with shadcn token utilities
+(`bg-background`, `text-foreground`, `border-border`, and the table below) and let
+spacing and type come from Tailwind utilities that the wrapper can rescale. Fixed
+colours (`bg-white`, `text-slate-*`, hex in `style`) ignore a site theme.
 
 An app can be framed by a site built in Web Studio. The site posts `fb:embed:hello`
 into the frame — on load, a few times after, and **again whenever the site's theme
