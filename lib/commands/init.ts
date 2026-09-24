@@ -22,7 +22,7 @@ import {
   type Organization,
   type Product,
 } from "../api";
-import { copyAgentsAndSkills } from "../copy-template";
+import { copyAgentsAndSkills, replaceFusebaseHostPlaceholder } from "../copy-template";
 import { buildTemplateContext, renderTemplatesInDir } from "../template-engine";
 import {
   type IdePreset,
@@ -34,8 +34,6 @@ import { createEnvFile, printCreateEnvResult } from "./steps/create-env";
 import { checkAuthentication, runAuthFlow } from "./steps/auth-flow";
 import {
   getEnv,
-  getFusebaseHost,
-  getFusebaseAppHost,
   hasFlag,
 } from "../config";
 import { MCP_SERVERS_CATALOG, type McpServerCatalogEntry } from "../../ide-configs/mcp-servers";
@@ -397,66 +395,6 @@ async function copyProjectTemplate(
   renderTemplatesInDir(targetDir, templateContext);
 
   await replaceFusebaseHostPlaceholder(targetDir);
-}
-
-/** Replaces placeholders and literal dev/prod host strings. host/appHost are without protocol (for subdomains). */
-function applyFusebaseHostReplacements(
-  content: string,
-  host: string,
-  appHost: string,
-): string {
-  const fullHost = "https://" + host;
-  const fullAppHost = "https://" + appHost;
-  return (
-    content
-      .replace(/\{FUSEBASE_HOST\}/g, host)
-      .replace(/\{FUSEBASE_APP_HOST\}/g, appHost)
-      .replace(/https:\/\/dev-thefusebase\.com/g, fullHost)
-      .replace(/https:\/\/thefusebase\.com/g, fullHost)
-      .replace(/https:\/\/dev-thefusebase-app\.com/g, fullAppHost)
-      .replace(/https:\/\/thefusebase\.app/g, fullAppHost)
-      .replace(/dev-thefusebase\.com/g, host)
-      // Only replace bare thefusebase.com (not already part of {FUSEBASE_HOST}) to avoid dev-dev-...
-      .replace(/(?<!dev-)thefusebase\.com/g, host)
-      .replace(/dev-thefusebase-app\.com/g, appHost)
-      .replace(/(?<!dev-)thefusebase-app\.com/g, appHost)
-      .replace(/dev-thefusebase\.app/g, appHost)
-      // Only replace bare thefusebase.app (not already part of dev-thefusebase.app) to avoid dev-dev-...
-      .replace(/(?<!dev-)thefusebase\.app/g, appHost)
-  );
-}
-
-/** Replaces {FUSEBASE_HOST}, {FUSEBASE_APP_HOST} and literal dev/prod URLs/domains in .md and .env under targetDir. */
-export async function replaceFusebaseHostPlaceholder(
-  targetDir: string,
-): Promise<void> {
-  const host = getFusebaseHost();
-  const appHost = getFusebaseAppHost();
-  async function replaceInDir(dir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name);
-      if (entry.name === "node_modules" || entry.name === ".git") continue;
-      if (entry.isDirectory()) {
-        await replaceInDir(fullPath);
-        continue;
-      }
-      if (!entry.isFile()) continue;
-      const isMd = entry.name.endsWith(".md");
-      const isEnv = entry.name === ".env";
-      if (!isMd && !isEnv) continue;
-      try {
-        const content = await readFile(fullPath, "utf-8");
-        const replaced = applyFusebaseHostReplacements(content, host, appHost);
-        if (replaced !== content) {
-          await writeFile(fullPath, replaced, "utf-8");
-        }
-      } catch {
-        // Skip files we can't read/write
-      }
-    }
-  }
-  await replaceInDir(targetDir);
 }
 
 async function runNpmInstall(cwd: string): Promise<void> {

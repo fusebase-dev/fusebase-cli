@@ -3,7 +3,7 @@ import { join, dirname, relative } from "path";
 import { fileURLToPath } from "url";
 import { embeddedFiles } from "bun";
 import AdmZip from "adm-zip";
-import { hasFlag } from "./config";
+import { getFusebaseAppHost, getFusebaseHost, hasFlag } from "./config";
 import { buildTemplateContext, renderTemplateFile, renderTemplatesInDir } from "./template-engine";
 
 // @ts-ignore
@@ -395,6 +395,103 @@ async function pruneDisabledOptionalDashboardRefs(skillsDest: string): Promise<v
   await writeFile(skillPath, filteredSkillContent, "utf-8");
 }
 
+/** Replaces placeholders and literal dev/prod host strings. host/appHost are without protocol (for subdomains). */
+function applyFusebaseHostReplacements(
+  content: string,
+  host: string,
+  appHost: string,
+): string {
+  const fullHost = "https://" + host;
+  const fullAppHost = "https://" + appHost;
+  return (
+    content
+      .replace(/\{FUSEBASE_HOST\}/g, host)
+      .replace(/\{FUSEBASE_APP_HOST\}/g, appHost)
+      .replace(/https:\/\/dev-thefusebase\.com/g, fullHost)
+      .replace(/https:\/\/thefusebase\.com/g, fullHost)
+      .replace(/https:\/\/dev-thefusebase-app\.com/g, fullAppHost)
+      .replace(/https:\/\/thefusebase\.app/g, fullAppHost)
+      .replace(/dev-thefusebase\.com/g, host)
+      // Only replace bare thefusebase.com (not already part of {FUSEBASE_HOST}) to avoid dev-dev-...
+      .replace(/(?<!dev-)thefusebase\.com/g, host)
+      .replace(/dev-thefusebase-app\.com/g, appHost)
+      .replace(/(?<!dev-)thefusebase-app\.com/g, appHost)
+      .replace(/dev-thefusebase\.app/g, appHost)
+      // Only replace bare thefusebase.app (not already part of dev-thefusebase.app) to avoid dev-dev-...
+      .replace(/(?<!dev-)thefusebase\.app/g, appHost)
+  );
+}
+
+/** Replaces {FUSEBASE_HOST}, {FUSEBASE_APP_HOST} and literal dev/prod URLs/domains in .md and .env under targetDir. */
+export async function replaceFusebaseHostPlaceholder(
+  targetDir: string,
+): Promise<void> {
+  const host = getFusebaseHost();
+  const appHost = getFusebaseAppHost();
+  async function replaceInDir(dir: string): Promise<void> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.name === "node_modules" || entry.name === ".git") continue;
+      if (entry.isDirectory()) {
+        await replaceInDir(fullPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const isMd = entry.name.endsWith(".md");
+      const isEnv = entry.name === ".env";
+      if (!isMd && !isEnv) continue;
+      try {
+        const content = await readFile(fullPath, "utf-8");
+        const replaced = applyFusebaseHostReplacements(content, host, appHost);
+        if (replaced !== content) {
+          await writeFile(fullPath, replaced, "utf-8");
+        }
+      } catch {
+        // Skip files we can't read/write
+      }
+    }
+  }
+  await replaceInDir(targetDir);
+}
+
+/**
+ * Resolves host placeholders in the Markdown assets copyAgentsAndSkills writes.
+ * The template ships `{FUSEBASE_HOST}` / `{FUSEBASE_APP_HOST}`, so a refresh that
+ * skips this step leaves them unresolved in the app docs.
+ */
+async function replaceHostsInAgentAssets(targetDir: string): Promise<void> {
+  const host = getFusebaseHost();
+  const appHost = getFusebaseAppHost();
+  async function replaceInFile(path: string): Promise<void> {
+    try {
+      const content = await readFile(path, "utf-8");
+      const replaced = applyFusebaseHostReplacements(content, host, appHost);
+      if (replaced !== content) await writeFile(path, replaced, "utf-8");
+    } catch {
+      // Missing or unreadable file
+    }
+  }
+  async function replaceInDir(dir: string): Promise<void> {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) await replaceInDir(fullPath);
+      else if (entry.isFile() && entry.name.endsWith(".md")) await replaceInFile(fullPath);
+    }
+  }
+  await replaceInFile(join(targetDir, "AGENTS.md"));
+  await replaceInFile(join(targetDir, "CLAUDE.md"));
+  for (const sub of ["skills", "agents", "hooks"]) {
+    await replaceInDir(join(targetDir, ".claude", sub));
+  }
+}
+
 /**
  * Copy AGENTS.md, .claude/skills/, .claude/agents/, .claude/hooks/ and .claude/settings.json from project-template to targetDir.
  * Works in both development (copy from disk) and binary (extract from embedded zip) modes.
@@ -469,6 +566,8 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
   renderTemplatesInDir(join(targetDir, ".claude", "skills"), context);
   renderTemplatesInDir(join(targetDir, ".claude", "agents"), context);
   renderTemplatesInDir(join(targetDir, ".claude", "hooks"), context);
+
+  await replaceHostsInAgentAssets(targetDir);
 
   if (customBlocks.size > 0) {
     await restoreCustomBlocks(targetDir, customBlocks);
