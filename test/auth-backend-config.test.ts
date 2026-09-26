@@ -13,7 +13,6 @@ import {
   type Config,
 } from "../lib/config";
 import {
-  overrideEnvironmentsFeatureForTests,
   resetEnvironmentsStateForTests,
   writeEnvironmentConfig,
 } from "../lib/environments";
@@ -105,7 +104,6 @@ describe("per-backend auth config", () => {
       apiKey: "legacy-key",
       auth: { dev: { apiKey: "dev-key" }, prod: { apiKey: "prod-key" } },
     });
-    overrideEnvironmentsFeatureForTests(true);
     writeEnvironmentConfig(dir, "prod-test", {
       backend: "prod",
       orgId: "org-qa",
@@ -183,12 +181,12 @@ describe("per-backend auth config", () => {
 
   it("getFlags never mutates the cached raw flags array via implied/always-on entries", async () => {
     const { getFlags } = await import("../lib/config");
-    seedConfig({ env: "prod", flags: ["environments"] });
+    seedConfig({ env: "prod", flags: ["mcp-beta"] });
     getFlags();
     // Unrelated writes persist only the user's own flags.
     setConfig({ gitlabHost: "x" });
     const raw = JSON.parse(readFileSync(configPath, "utf-8")) as Config;
-    expect(raw.flags).toEqual(["environments"]);
+    expect(raw.flags).toEqual(["mcp-beta"]);
   });
 
   it("getConfig returns a fresh copy — mutations do not leak into the cache", () => {

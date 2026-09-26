@@ -1,6 +1,6 @@
 # App Environments (Design)
 
-**Status:** implemented behind the `environments` flag (branch `feature/app-environments`).
+**Status:** always on. `fusebase init` creates one environment; projects without `environments/` stay in legacy mode until `env init`.
 **Parent:** [MULTI-ENV-APPS-AND-PLATFORM-TESTING.md](./MULTI-ENV-APPS-AND-PLATFORM-TESTING.md) — Workstream A, detailed design.
 
 **Implementation map:** core — `lib/environments.ts` (+ overlay in

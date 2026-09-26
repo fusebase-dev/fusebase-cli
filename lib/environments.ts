@@ -13,7 +13,7 @@
  *   .fusebase/state.json > fusebase.json "defaultEnvironment" >
  *   single existing environment (auto-pick) > none (legacy mode).
  *
- * Legacy mode (no `environments/` dir, or the `environments` flag off) keeps
+ * Legacy mode (no `environments/` dir) keeps
  * every pre-existing behavior: global env in ~/.fusebase/config.json, ids in
  * fusebase.json, single `.env`.
  */
@@ -27,9 +27,6 @@ import {
   appendFileSync,
 } from "fs";
 import { join, basename } from "path";
-import { hasFlag } from "./config";
-
-export const ENVIRONMENTS_FLAG = "environments";
 export const ENVIRONMENTS_DIR = "environments";
 export const PROJECT_STATE_DIR = ".fusebase";
 export const PROJECT_STATE_FILE = "state.json";
@@ -97,22 +94,6 @@ export type ActiveEnvironmentSource =
   | "state"
   | "default"
   | "single";
-
-// --- feature gate -----------------------------------------------------------
-
-let featureOverrideForTests: boolean | null = null;
-
-/** Test-only: force the `environments` feature on/off (null restores real flag). */
-export function overrideEnvironmentsFeatureForTests(
-  value: boolean | null,
-): void {
-  featureOverrideForTests = value;
-}
-
-export function environmentsFeatureEnabled(): boolean {
-  if (featureOverrideForTests !== null) return featureOverrideForTests;
-  return hasFlag(ENVIRONMENTS_FLAG);
-}
 
 // --- filesystem layout ------------------------------------------------------
 
@@ -358,7 +339,6 @@ let environmentOverride: string | undefined;
 let activeEnvCache: { key: string; value: ActiveEnvironment | null } | null =
   null;
 let noSelectionWarningPrinted = false;
-let flagOffHintPrinted = false;
 
 /**
  * Set the per-command environment override (from a `--env <name>` option).
@@ -378,8 +358,6 @@ export function resetEnvironmentsStateForTests(): void {
   environmentOverride = undefined;
   activeEnvCache = null;
   noSelectionWarningPrinted = false;
-  flagOffHintPrinted = false;
-  featureOverrideForTests = null;
 }
 
 function readDefaultEnvironmentFromFusebaseJson(
@@ -432,9 +410,9 @@ export function resolveActiveEnvironmentName(
 /**
  * Resolve and load the active environment for a project.
  *
- * Returns null (= legacy mode) when the feature flag is off, `environments/`
- * does not exist, or nothing selects an environment (with a one-time warning
- * in the ambiguous multiple-envs case). Explicitly selected names
+ * Returns null (= legacy mode) when `environments/` does not exist, or
+ * nothing selects an environment (with a one-time warning in the ambiguous
+ * multiple-envs case). Explicitly selected names
  * (--env / FUSEBASE_ENV / state / defaultEnvironment) that are missing or
  * invalid throw with guidance — a wrong explicit selection must never fall
  * back silently to a different backend.
@@ -443,15 +421,6 @@ export function getActiveEnvironment(
   projectRoot: string = process.cwd(),
 ): ActiveEnvironment | null {
   if (!hasEnvironmentsDir(projectRoot)) {
-    return null;
-  }
-  if (!environmentsFeatureEnabled()) {
-    if (!flagOffHintPrinted) {
-      flagOffHintPrinted = true;
-      console.warn(
-        `fusebase: this project has an ${ENVIRONMENTS_DIR}/ directory, but the "${ENVIRONMENTS_FLAG}" flag is off — using legacy single-env behavior. Enable with: fusebase config set-flag ${ENVIRONMENTS_FLAG}`,
-      );
-    }
     return null;
   }
 

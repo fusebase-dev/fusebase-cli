@@ -8,7 +8,6 @@ import {
 } from "../lib/config.ts";
 import {
   ENVIRONMENTS_DIR,
-  overrideEnvironmentsFeatureForTests,
   resetEnvironmentsStateForTests,
   setEnvironmentOverride,
   writeActiveEnvironmentState,
@@ -306,7 +305,6 @@ describe("writeGateSdkOperationsToFusebaseJson with env-stripped ids", () => {
 
     try {
       resetEnvironmentsStateForTests();
-      overrideEnvironmentsFeatureForTests(true);
       mkdirSync(join(dir, ENVIRONMENTS_DIR), { recursive: true });
       writeEnvironmentConfig(dir, "beta", {
         backend: "prod",

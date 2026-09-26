@@ -3,7 +3,7 @@
  *
  * Legacy: `env create` — create/update `.env` with MCP tokens.
  *
- * App environments (flag `environments`, design docs/proposals/APP-ENVIRONMENTS.md):
+ * App environments (design docs/proposals/APP-ENVIRONMENTS.md):
  * `env init|add|clone|use|list|status|tokens` manage named environment
  * profiles in `environments/<name>.json` with per-env dotenv files
  * (`.env.<name>`). The active env's dotenv is materialized into `.env` so
@@ -40,8 +40,6 @@ import {
   type ProvisionAppInput,
 } from "../provision-store";
 import {
-  ENVIRONMENTS_FLAG,
-  environmentsFeatureEnabled,
   ensureEnvGitignoreEntries,
   getActiveEnvironment,
   getEnvironmentEnvFilePath,
@@ -114,14 +112,6 @@ async function loadFuseConfig(cwd: string): Promise<FuseConfig> {
   } catch {
     return {};
   }
-}
-
-function requireEnvironmentsFlag(): void {
-  if (environmentsFeatureEnabled()) return;
-  console.error(
-    `Error: app environments are experimental. Enable them first with:\n  fusebase config set-flag ${ENVIRONMENTS_FLAG}`,
-  );
-  process.exit(1);
 }
 
 function isTty(): boolean {
@@ -321,12 +311,15 @@ export async function runEnvCreate(force: boolean = true): Promise<void> {
 interface EnvInitOptions {
   name?: string;
   strip?: boolean;
+  /** `fusebase init` path: one env, no follow-up instructions. */
+  forInit?: boolean;
 }
 
-async function runEnvInit(options: EnvInitOptions): Promise<void> {
-  requireEnvironmentsFlag();
-  const cwd = process.cwd();
-
+/** Create the first environment from the current fusebase.json context. */
+export async function adoptCurrentProjectAsEnvironment(
+  cwd: string,
+  options: EnvInitOptions = {},
+): Promise<void> {
   if (!(await fileExists(join(cwd, FUSE_JSON)))) {
     console.error("Error: fusebase.json not found. Run 'fusebase init' first.");
     process.exit(1);
@@ -408,15 +401,21 @@ async function runEnvInit(options: EnvInitOptions): Promise<void> {
     console.log(
       "✓ Stripped apps[].id and isolated store storeId values from fusebase.json (now owned by the environment lockfile)",
     );
-  } else {
+  } else if (!options.forInit) {
     console.log(
       "Note: ids left in fusebase.json are harmless — the environment file wins. Re-run with --strip for a clean manifest.",
     );
   }
 
-  console.log(
-    `\nNext: add another environment with \`fusebase env add <name> --backend <dev|prod> --org <orgId>\` and switch with \`fusebase env use <name>\`.`,
-  );
+  if (!options.forInit) {
+    console.log(
+      `\nNext: add another environment with \`fusebase env add <name> --backend <dev|prod> --org <orgId>\` and switch with \`fusebase env use <name>\`.`,
+    );
+  }
+}
+
+async function runEnvInit(options: EnvInitOptions): Promise<void> {
+  await adoptCurrentProjectAsEnvironment(process.cwd(), options);
 }
 
 function stripEnvSpecificIdsFromFusebaseJson(projectRoot: string): void {
@@ -468,7 +467,6 @@ async function runEnvAdd(
   name: string | undefined,
   options: EnvAddOptions,
 ): Promise<void> {
-  requireEnvironmentsFlag();
   const cwd = process.cwd();
   const interactive = isTty();
 
@@ -634,7 +632,6 @@ async function runEnvClone(
   to: string,
   options: EnvCloneOptions,
 ): Promise<void> {
-  requireEnvironmentsFlag();
   const cwd = process.cwd();
 
   if (!isValidEnvironmentName(to)) {
@@ -685,7 +682,6 @@ async function runEnvClone(
 // --- env use -------------------------------------------------------------------
 
 async function runEnvUse(name: string, options: { tokens?: boolean }): Promise<void> {
-  requireEnvironmentsFlag();
   const cwd = process.cwd();
 
   const config = loadEnvironmentConfig(cwd, name); // throws with guidance
@@ -782,7 +778,6 @@ async function runEnvUse(name: string, options: { tokens?: boolean }): Promise<v
  * or `--into <name>`), so nothing is orphaned.
  */
 async function runEnvStrip(options: { into?: string }): Promise<void> {
-  requireEnvironmentsFlag();
   const cwd = process.cwd();
 
   if (!hasEnvironmentsDir(cwd)) {
@@ -896,7 +891,6 @@ async function runEnvRemove(
   name: string,
   options: { yes?: boolean },
 ): Promise<void> {
-  requireEnvironmentsFlag();
   const cwd = process.cwd();
 
   const filePath = getEnvironmentFilePath(cwd, name);
@@ -970,7 +964,6 @@ async function runEnvRemove(
 // --- env list / status ----------------------------------------------------------
 
 async function runEnvList(): Promise<void> {
-  requireEnvironmentsFlag();
   const cwd = process.cwd();
   const names = listEnvironmentNames(cwd);
   if (names.length === 0) {
@@ -998,7 +991,6 @@ async function runEnvList(): Promise<void> {
 }
 
 async function runEnvStatus(): Promise<void> {
-  requireEnvironmentsFlag();
   const cwd = process.cwd();
 
   const resolved = resolveActiveEnvironmentName(cwd);
@@ -1089,7 +1081,6 @@ async function runEnvStatus(): Promise<void> {
 // --- env tokens ------------------------------------------------------------------
 
 async function runEnvTokens(options: { env?: string; force?: boolean }): Promise<void> {
-  requireEnvironmentsFlag();
   const cwd = process.cwd();
   if (options.env) {
     setEnvironmentOverride(options.env);
@@ -1126,7 +1117,6 @@ type ProvisionStoreCliOptions = {
  * core lives in ../provision-store and is also invoked from `fusebase deploy`.
  */
 async function runProvisionStore(options: ProvisionStoreCliOptions): Promise<void> {
-  requireEnvironmentsFlag();
   const cwd = process.cwd();
   if (options.env) setEnvironmentOverride(options.env);
 

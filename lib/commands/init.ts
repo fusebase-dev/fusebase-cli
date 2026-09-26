@@ -31,6 +31,7 @@ import {
   printIdeSetupResults,
 } from "./steps/ide-setup";
 import { createEnvFile, printCreateEnvResult } from "./steps/create-env";
+import { adoptCurrentProjectAsEnvironment } from "./env";
 import { checkAuthentication, runAuthFlow } from "./steps/auth-flow";
 import {
   getEnv,
@@ -836,6 +837,8 @@ export const initCommand = new Command("init")
       console.log("✓ Product initialized successfully");
       console.log(`  Organization: ${formatOrgLabel(selectedOrg)}`);
       console.log(`  Product: ${selectedApp.title}`);
+
+      await adoptCurrentProjectAsEnvironment(cwd, { forInit: true });
 
       // Run npm install if template was used
       if (needToCopyTemplate) {

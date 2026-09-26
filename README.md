@@ -16,7 +16,7 @@ See:
 - [Architecture Documentation](docs/ARCHITECTURE.md)
 - [CLI Flows](docs/CLI-FLOWS.md)
 - [Git Configuration Guide](docs/guides/git-config.md)
-- [App Environments Guide](docs/guides/environments.md) — one project targeting dev/prod/beta platform contexts (`fusebase env`, experimental)
+- [App Environments Guide](docs/guides/environments.md) — one project targeting dev/prod/beta platform contexts (`fusebase env`; `init` creates one environment)
 - [App Environment Migration Guide](docs/guides/environment-migration.md) — checklist for converting existing apps to env lockfiles, env-safe runtime config, readonly e2e, and CI
 - [E2E Playwright Setup Guide](docs/guides/e2e-playwright-setup.md) — add the CLI e2e template, choose safe env targets, and wire GitLab CI
 - [Conceptual Model](docs/CONCEPTS.md)
@@ -852,7 +852,7 @@ fusebase env create
 
 ---
 
-### `fusebase env …` — app environments (experimental, flag `environments`)
+### `fusebase env …` — app environments
 
 Named environment profiles let one project target several platform contexts —
 e.g. `prod` (customer org), `prod-beta` (beta stage on the prod platform),
@@ -874,7 +874,8 @@ Design rationale: [docs/proposals/APP-ENVIRONMENTS.md](docs/proposals/APP-ENVIRO
 - Active env: `--env <name>` on any command > `FUSEBASE_ENV` >
   `.fusebase/state.json` (set by `env use`) > `defaultEnvironment` in
   fusebase.json > single-env auto-pick. Without an `environments/` dir
-  everything behaves exactly as before (legacy mode).
+  everything behaves exactly as before (legacy mode). `fusebase init` creates
+  one environment named after the current backend and marks it active.
 - Auth is per backend: `auth.dev` / `auth.prod` in `~/.fusebase/config.json`
   (`fusebase auth [--dev]` binds a key to that backend; `FUSEBASE_API_KEY`
   overrides in CI).
@@ -985,7 +986,7 @@ Both can be combined into a single store-contract job. This is the only automati
 fusebase isolated-store sql bundle --app apps/store-a --assert-migrations --assert-rls
 ```
 
-In CI the command needs three things: `FUSEBASE_ENV` (to resolve the env's `storeId` from the lockfile), a `.env` containing `GATE_MCP_TOKEN` (the token is read from the file, not from process env), and `~/.fusebase/config.json` declaring the `environments` flag (experimental flags have no env-var override).
+In CI the command needs `FUSEBASE_ENV` (to resolve the env's `storeId` from the lockfile) and a `.env` containing `GATE_MCP_TOKEN` (the token is read from the file, not from process env).
 
 **Which stage is targeted.** `--stage` defaults to the **active environment's backend** (`FUSEBASE_ENV` / `env use` / global `env`), so `FUSEBASE_ENV=prod` targets the prod stage without extra flags. Pass `--stage` explicitly to override. Previously this defaulted to a hardcoded `dev`, which pointed a prod run at the dev stage — on a store carrying both stages that asserts against the wrong data and can report a false OK.
 
@@ -1033,7 +1034,6 @@ Flags gate experimental features. The `update` command uses flags to conditional
 | `postgres-rls` | Enables experimental RLS manifest helpers for isolated SQL stores |
 | `portal-specific-apps` | Includes portal-specific app guidance in prompts: `fusebase-portal-specific-apps` skill, `{{CurrentPortal}}` dashboard filter reference, and portal auth-context handling notes |
 | `cross-app-api-calls-analysis` | Enables hidden `fusebase analyze app-apis` command and cross-app API dependency guidance in generated prompts/skills. |
-| `environments` | Enables named app environments: `environments/<name>.json` + `.env.<name>`, the `fusebase env` command group, `--env <name>` on every command, per-backend auth. See [docs/proposals/APP-ENVIRONMENTS.md](docs/proposals/APP-ENVIRONMENTS.md). |
 | `dev-backend` | Internal: shows the dev/prod platform-backend choice in interactive env prompts (`fusebase env add`). Off (default): interactive flows assume prod; explicit `--backend` always works. |
 | `notes-markdown` | Adds `notes.markdown.read` / `notes.markdown.write` to generated Gate MCP tokens. Requires the platform flag `notes_markdown` on the target backend. |
 | `managed-integrations` | Enables managed third-party MCP integrations (`fusebase integrations list-templates` / `connect-template`) and adds `mcp_manager.*` to generated Gate MCP tokens (Gate rejects the mcp-manager endpoints without them). Enabling it marks `.env` tokens stale — re-run `fusebase env create` (or `fusebase update`) to mint a token that carries the new permissions. |

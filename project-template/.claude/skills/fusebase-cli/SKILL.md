@@ -417,7 +417,7 @@ On successful create/update, CLI refreshes both Dashboards and Gate MCP tokens. 
 
 Default Dashboards MCP grants (see `lib/mcp-token-policy.ts`): discover/read existing dashboards, write row data (`data.write`), write relations (`relation.write`), and mutate existing view schema (`view.write`). It does **not** create or delete dashboard DBs/dashboards unless the global flag `legacy-dashboards-db` is enabled.
 
-### App environments (experimental, flag `environments`)
+### App environments
 
 Named environment profiles let one project target several platform contexts
 (e.g. `prod` customer org, `prod-beta` beta stage, `dev` org on the dev
@@ -425,6 +425,8 @@ platform). Per environment: `environments/<name>.json` (committed lockfile —
 backend, org, product, resolved app ids, per-env subdomains, store ids,
 test-user fixtures, `protected` marker) plus a gitignored `.env.<name>`
 (MCP tokens/secrets); the active env's dotenv is materialized into `.env`.
+
+`fusebase init` creates one environment named after the current backend (`prod`, or `dev` when that is the global config env) and marks it active. Existing projects adopt with `env init`.
 
 ```bash
 fusebase env init                 # adopt: current context becomes the first env

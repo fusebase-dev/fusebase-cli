@@ -4,10 +4,8 @@ import {
   CONFIG_DIR,
   getEnv,
   setBackendApiKey,
-  setConfig,
   setProcessEnvOverride,
 } from "../config";
-import { environmentsFeatureEnabled } from "../environments";
 import { runAuthFlow } from "./steps/auth-flow";
 import { flushReport } from "../error-reporter";
 
@@ -52,12 +50,6 @@ export const authCommand = new Command("auth")
       process.exit(1);
     }
     setBackendApiKey(backend, apiKey);
-    if (isDev && !environmentsFeatureEnabled()) {
-      // Legacy behavior: `auth --dev` also switches the machine-global env.
-      // With environments enabled the backend comes from the active
-      // environment, so auth no longer flips it.
-      setConfig({ env: "dev" });
-    }
 
     console.log("✓ API key saved successfully");
   });

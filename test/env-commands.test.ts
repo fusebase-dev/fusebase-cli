@@ -348,28 +348,4 @@ describe("fusebase env commands", () => {
     expect(missing.stderr).toContain("not found");
   });
 
-  it("env subcommands require the environments flag", async () => {
-    const bareHome = join(dir, "home-noflag");
-    mkdirSync(join(bareHome, ".fusebase"), { recursive: true });
-    writeFileSync(
-      join(bareHome, ".fusebase", "config.json"),
-      JSON.stringify({ env: "dev", apiKey: "k" }),
-      "utf-8",
-    );
-    const proc = Bun.spawn(["bun", CLI_ENTRY, "env", "list"], {
-      cwd: project,
-      env: {
-        ...process.env,
-        HOME: bareHome,
-        USERPROFILE: bareHome,
-        FUSEBASE_DISABLE_ANALYTICS: "1",
-      },
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const stderr = await new Response(proc.stderr).text();
-    const exitCode = await proc.exited;
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain("config set-flag environments");
-  });
 });

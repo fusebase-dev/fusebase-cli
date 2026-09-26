@@ -4,14 +4,9 @@ One project, several platform contexts: `prod` (customer org), `prod-beta`
 (beta stage on the prod platform), `dev` (org on the dev platform). Each
 environment owns its platform ids; the code tree stays shared.
 
-Experimental — enable once per machine:
-
-```bash
-fusebase config set-flag environments
-```
-
-(Declarative deploy reconcile — binding/creating products and apps and
-filling the env lockfile — is default CLI behavior.)
+`fusebase init` creates one environment named after the current backend
+(`prod`, or `dev` when the global config env is `dev`) and marks it active.
+Existing projects stay in legacy mode until `fusebase env init`.
 
 Design rationale: [APP-ENVIRONMENTS.md](../proposals/APP-ENVIRONMENTS.md).
 Migrating an existing app? Use
@@ -53,6 +48,13 @@ targets and wire CI.
 | `.fusebase/state.json` | **no** | per-checkout active environment |
 
 ## Getting started
+
+### New project
+
+`fusebase init` writes `environments/<backend>.json` from the org and product
+it just created, copies `.env` to `.env.<backend>`, and records that
+environment as active. One environment is auto-selected, so later commands
+do not ask for `--env`.
 
 ### Adopt an existing project
 
@@ -296,7 +298,7 @@ org) rather than touching someone else's database.
 
 | Task | Command |
 |------|---------|
-| Enable feature | `fusebase config set-flag environments` |
+| New project | `fusebase init` (creates one active environment) |
 | Adopt project | `fusebase env init --strip` |
 | New env | `fusebase env add` (interactive) or `fusebase env add <name> --backend <dev\|prod> --org <orgId>` |
 | Copy env | `fusebase env clone <from> <to> --org <orgId> [--subdomain-suffix <s>]` |

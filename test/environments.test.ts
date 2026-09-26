@@ -28,7 +28,6 @@ import {
   isValidEnvironmentName,
   listEnvironmentNames,
   loadEnvironmentConfig,
-  overrideEnvironmentsFeatureForTests,
   readActiveEnvironmentState,
   requireActiveEnvironment,
   resetEnvironmentsStateForTests,
@@ -66,7 +65,6 @@ describe("app environments", () => {
     dir = mkdtempSync(join(tmpdir(), "fuse-environments-"));
     process.chdir(dir);
     resetEnvironmentsStateForTests();
-    overrideEnvironmentsFeatureForTests(true);
     warnSpy = spyOn(console, "warn").mockImplementation(() => {});
   });
 
@@ -163,15 +161,6 @@ describe("app environments", () => {
     it("returns null in legacy mode (no environments dir)", () => {
       expect(getActiveEnvironment(dir)).toBeNull();
       expect(getActiveEnvironmentBackend()).toBeUndefined();
-    });
-
-    it("returns null with one-time hint when flag is off", () => {
-      writeEnv("dev", devEnv);
-      overrideEnvironmentsFeatureForTests(false);
-      expect(getActiveEnvironment(dir)).toBeNull();
-      expect(getActiveEnvironment(dir)).toBeNull();
-      expect(warnSpy!.mock.calls.length).toBe(1);
-      expect(String(warnSpy!.mock.calls[0]![0])).toContain("set-flag");
     });
 
     it("auto-picks a single environment", () => {

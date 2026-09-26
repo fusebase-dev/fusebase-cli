@@ -446,7 +446,6 @@ export const KNOWN_FLAGS = [
   "legacy-dashboards-db",
   "portal-specific-apps",
   "cross-app-api-calls-analysis",
-  "environments",
   "dev-backend",
   "notes-markdown",
   MANAGED_INTEGRATIONS_FLAG,
@@ -469,8 +468,6 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Include portal-specific app prompts and guidance (`{{CurrentPortal}}`, portal auth context).",
   "cross-app-api-calls-analysis":
     "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
-  environments:
-    "Enable named app environments (`environments/<name>.json` + `.env.<name>`, `fusebase env` commands, per-env backend/org). Off → legacy single-env behavior. See docs/proposals/APP-ENVIRONMENTS.md.",
   "dev-backend":
     "Internal: show the dev/prod platform-backend choice in interactive env prompts. Off (default) → interactive flows assume prod; explicit --backend still works.",
   "notes-markdown":

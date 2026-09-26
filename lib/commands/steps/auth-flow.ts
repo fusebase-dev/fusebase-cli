@@ -1,10 +1,8 @@
 import {
   getConfig,
   setBackendApiKey,
-  setConfig,
   setProcessEnvOverride,
 } from "../../config";
-import { environmentsFeatureEnabled } from "../../environments";
 import { fetchOrgs } from "../../api";
 import { logger } from "../../logger";
 import { openBrowser } from "../utils/open-browser";
@@ -173,12 +171,6 @@ export async function runAuthFlow(
     await fetchOrgs(apiKey);
 
     setBackendApiKey(backend, apiKey);
-    if (!environmentsFeatureEnabled()) {
-      // Legacy behavior: auth also switches the machine-global env. With
-      // environments enabled the backend comes from the active environment,
-      // so auth no longer flips it.
-      setConfig({ env: backend });
-    }
 
     console.log("✓ Authentication successful");
     return apiKey;

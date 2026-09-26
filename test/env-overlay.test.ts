@@ -18,7 +18,6 @@ import {
   buildEnvInfoPayload,
   getActiveEnvironment,
   injectEnvInfoIntoIndexHtml,
-  overrideEnvironmentsFeatureForTests,
   resetEnvironmentsStateForTests,
   writeEnvironmentConfig,
   type EnvInfoPayload,
@@ -77,7 +76,6 @@ describe("environment overlay on fusebase.json", () => {
       "utf-8",
     );
     resetEnvironmentsStateForTests();
-    overrideEnvironmentsFeatureForTests(true);
     invalidateFuseConfigCache();
   });
 
