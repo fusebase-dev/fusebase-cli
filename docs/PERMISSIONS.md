@@ -455,6 +455,16 @@ requires `--sync-gate-permissions`.
 `deploy` preserves `manifest.backendOnlyGatePermissions` when it republishes the
 OpenAPI manifest, so app-declared store perms are not clobbered by a later deploy.
 
+The platform enforces the declaration for signed-in users too (NIM-45120). Once
+`isolated_store.read` or `isolated_store.data.write` is backend-only, the app-api
+gate proxy sends the app's isolated-store calls from a browser token with the
+browser `gst`, which lacks those permissions, so Gate returns 403. Before this, a
+signed-in member or client went through with their org role, which grants both.
+Other Gate calls from the browser, and apps that did not opt in, are unchanged.
+Calls with a backend `/_token` token keep the full permission set. Browser tokens
+minted before the platform change keep the old behaviour until they expire (1 day
+at most).
+
 #### Clearing app-declared non-store extras (NIM-42223)
 
 `apps[].backendOnlyGatePermissions` in `fusebase.json` is the declarative source of
