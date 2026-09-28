@@ -1,7 +1,5 @@
 # Fusebase Apps CLI
 
-UPD 1
-
 A command-line tool for managing Fusebase applications. Build, develop, and deploy apps to the Fusebase platform.
 
 ## Architecture

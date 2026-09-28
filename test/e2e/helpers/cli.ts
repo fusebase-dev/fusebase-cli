@@ -9,7 +9,15 @@
  *   matches a caller-supplied pattern.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { FusebaseEnv } from "./env";
@@ -228,6 +236,74 @@ export function runCliStreaming(
     waitForReady,
     kill,
   };
+}
+
+function environmentLockPaths(cwd: string): string[] {
+  const dir = join(cwd, "environments");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => join(dir, name));
+}
+
+/** Resolved platform app id: env lockfile when `init` created one, else fusebase.json. */
+export function readResolvedAppId(cwd: string): string | undefined {
+  for (const path of environmentLockPaths(cwd)) {
+    const raw = JSON.parse(readFileSync(path, "utf-8")) as {
+      apps?: Record<string, { id?: string }>;
+    };
+    for (const entry of Object.values(raw.apps ?? {})) {
+      if (entry?.id) return entry.id;
+    }
+  }
+  const fuse = JSON.parse(readFileSync(join(cwd, "fusebase.json"), "utf-8")) as {
+    apps?: Array<{ id?: string }>;
+  };
+  return fuse.apps?.[0]?.id;
+}
+
+/** Drop a reconcile-written app id so the next deploy takes the id-less bind path. */
+export function clearResolvedAppId(cwd: string): void {
+  const fusePath = join(cwd, "fusebase.json");
+  const fuse = JSON.parse(readFileSync(fusePath, "utf-8")) as {
+    apps?: Array<{ id?: string }>;
+  };
+  if (fuse.apps?.[0]) delete fuse.apps[0].id;
+  writeFileSync(fusePath, JSON.stringify(fuse, null, 2) + "\n", "utf-8");
+  for (const path of environmentLockPaths(cwd)) {
+    const raw = JSON.parse(readFileSync(path, "utf-8")) as {
+      apps?: Record<string, { id?: string }>;
+    };
+    for (const entry of Object.values(raw.apps ?? {})) {
+      if (entry) delete entry.id;
+    }
+    writeFileSync(path, JSON.stringify(raw, null, 2) + "\n", "utf-8");
+  }
+}
+
+/** Put the resolved id where deploy reads it (env lockfile, and fusebase.json in legacy mode). */
+export function setResolvedAppId(cwd: string, appId: string): void {
+  const locks = environmentLockPaths(cwd);
+  if (locks.length === 0) {
+    const fusePath = join(cwd, "fusebase.json");
+    const fuse = JSON.parse(readFileSync(fusePath, "utf-8")) as {
+      apps?: Array<{ id?: string }>;
+    };
+    if (fuse.apps?.[0]) fuse.apps[0].id = appId;
+    writeFileSync(fusePath, JSON.stringify(fuse, null, 2) + "\n", "utf-8");
+    return;
+  }
+  for (const path of locks) {
+    const raw = JSON.parse(readFileSync(path, "utf-8")) as {
+      apps?: Record<string, { id?: string }>;
+    };
+    const apps = raw.apps ?? {};
+    const keys = Object.keys(apps);
+    if (keys.length === 0) continue;
+    apps[keys[0]!] = { ...apps[keys[0]!], id: appId };
+    raw.apps = apps;
+    writeFileSync(path, JSON.stringify(raw, null, 2) + "\n", "utf-8");
+  }
 }
 
 async function pumpStream(

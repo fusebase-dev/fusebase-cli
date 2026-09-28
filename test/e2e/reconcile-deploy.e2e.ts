@@ -11,7 +11,7 @@
  *
  *   1. create-missing — declarative entry, new subdomain → reconcile CREATES the
  *      platform app and deploys to it. The resolved id is written back into
- *      fusebase.json.
+ *      the active environment lockfile (`environments/<name>.json`).
  *   2. bind-existing  — reset the entry to id-less, deploy again → reconcile
  *      BINDS to the app created in (1); no duplicate feature appears; the id is
  *      written back again.
@@ -31,11 +31,14 @@ import { join } from "node:path";
 import {
   type CliWorkspace,
   createApiClient,
+  clearResolvedAppId,
   createCliWorkspace,
   e2eEnvAvailable,
   e2eEnvMissing,
   getE2eEnv,
+  readResolvedAppId,
   runCli,
+  setResolvedAppId,
 } from "./helpers";
 
 if (!e2eEnvAvailable) {
@@ -154,18 +157,17 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli declarative deploy reconcile", () =>
       const createdId = created[0]!.id;
       expect(createdId).toBeTruthy();
 
-      // Id write-back (NIM-41875): the resolved id is persisted into the entry.
+      // Id write-back (NIM-41875): init created an environment, so the
+      // resolved id is persisted into that lockfile, not fusebase.json.
       expect(
-        readFuseJson(fuseJsonPath).apps?.[0]?.id,
-        "deploy must write the resolved id back into fusebase.json",
+        readResolvedAppId(workspace.cwd),
+        "deploy must write the resolved id back into the environment lockfile",
       ).toBe(createdId);
 
       // ── Case 2: bind-existing ────────────────────────────────────────────
       // Reset to an id-less declarative entry so reconcile takes the bind path
       // (an existing platform app matched by its immutable path), not a create.
-      const rebind = readFuseJson(fuseJsonPath);
-      delete rebind.apps![0]!.id;
-      writeFuseJson(fuseJsonPath, rebind);
+      clearResolvedAppId(workspace.cwd);
 
       const deploy2 = await runCli(["deploy"], {
         cwd: workspace.cwd,
@@ -185,8 +187,8 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli declarative deploy reconcile", () =>
       ).toBe(1);
       // Bind also writes the resolved id back (NIM-41875).
       expect(
-        readFuseJson(fuseJsonPath).apps?.[0]?.id,
-        "bind must write the resolved id back into fusebase.json",
+        readResolvedAppId(workspace.cwd),
+        "bind must write the resolved id back into the environment lockfile",
       ).toBe(createdId);
 
       // ── Case 3: id present → idempotent bind ─────────────────────────────
@@ -194,9 +196,7 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli declarative deploy reconcile", () =>
       // Reconcile still matches it (by immutable path, then by stored id) and
       // binds to the SAME app — a stored id must not trigger a duplicate or a
       // re-create. (Set the id explicitly so the case is self-contained.)
-      const withId = readFuseJson(fuseJsonPath);
-      withId.apps![0]!.id = createdId;
-      writeFuseJson(fuseJsonPath, withId);
+      setResolvedAppId(workspace.cwd, createdId);
 
       const deploy3 = await runCli(["deploy"], {
         cwd: workspace.cwd,

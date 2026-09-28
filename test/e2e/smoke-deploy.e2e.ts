@@ -30,6 +30,7 @@ import {
   e2eEnvMissing,
   getAppHost,
   getE2eEnv,
+  readResolvedAppId,
   runCli,
 } from "./helpers";
 
@@ -214,19 +215,19 @@ describe.skipIf(!e2eEnvAvailable)("apps-cli smoke deploy", () => {
       expect(afterApp.apps?.[0]?.id).toBeFalsy();
 
       // 5b. Reconcile infrastructure only (`deploy --nocode`) to create the
-      //     platform app and write its resolved id back into fusebase.json.
-      //     The secret + token API calls below need a real platform app id
-      //     before the code deploy runs.
+      //     platform app and write its resolved id back into the environment
+      //     lockfile. The secret + token API calls below need a real platform
+      //     app id before the code deploy runs.
       const nocode = await runCli(["deploy", "--nocode"], {
         cwd: workspace.cwd,
         home: workspace.home,
       });
       expect(nocode.exitCode, debugOutput("deploy --nocode", nocode)).toBe(0);
 
-      const appId = readFuseJson(fuseJsonPath).apps?.[0]?.id;
+      const appId = readResolvedAppId(workspace.cwd);
       expect(
         appId,
-        `deploy --nocode must write the resolved app id back into ${fuseJsonPath}`,
+        "deploy --nocode must write the resolved app id back into the environment lockfile",
       ).toBeTruthy();
 
       // 6. Sidecar — verification is just "deploy succeeds with sidecar
