@@ -1,7 +1,7 @@
 ---
-version: "1.4.0"
+version: "1.5.0"
 mcp_prompt: users
-last_synced: "2026-07-23"
+last_synced: "2026-09-28"
 title: "Fusebase Gate Users Operations"
 category: specialized
 ---
@@ -18,7 +18,7 @@ These operations manage organization membership flows and safe member removal ex
 
 ## Scope
 
-- listOrgUsers returns organization members for a specific org.
+- listOrgUsers returns organization users for a specific org. Clients and members are both users (`role`). `metadata.clients.columns` and `metadata.members.columns` are the user-added custom columns of those dashboards. System columns are omitted. A missing dashboard yields an empty `columns` list.
 - listWorkspaceMembers returns members of a single workspace scoped to the org (not the whole-org roster).
 - listPortalMembers is a portal-named alias for listing the underlying workspace members by `workspaceId` (same semantics as removePortalMember).
 - addOrgUser can create an org invite, workspace invite, or portal invite depending on payload shape.
@@ -63,7 +63,7 @@ These operations manage organization membership flows and safe member removal ex
 
 ## Version
 
-- **Version**: 1.4.0
+- **Version**: 1.5.0
 - **Category**: specialized
-- **Last synced**: 2026-07-23
+- **Last synced**: 2026-09-28
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

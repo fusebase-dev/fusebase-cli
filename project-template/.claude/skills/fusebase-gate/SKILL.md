@@ -27,6 +27,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 
 - [Authorization and Scopes](references/authz.md)
 - [Bootstrap](references/bootstrap.md)
+- [Fusebase Gate Irreversible Operations](references/dangerous-ops.md)
 - [Fusebase Gate SDK](references/sdk.md)
 - [Tooling](references/tooling.md)
 

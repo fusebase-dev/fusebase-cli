@@ -1,7 +1,7 @@
 ---
-version: "1.11.0"
+version: "1.13.0"
 mcp_prompt: webStudio
-last_synced: "2026-09-18"
+last_synced: "2026-09-27"
 title: "Fusebase Gate Web Studio Operations"
 category: specialized
 ---
@@ -24,6 +24,7 @@ category: specialized
 - [Choosing an edit operation](#choosing-an-edit-operation)
 - [Grouping edits](#grouping-edits)
 - [The sequence that works](#the-sequence-that-works)
+- [The site's own instructions](#the-sites-own-instructions)
 - [Rules no single operation can state](#rules-no-single-operation-can-state)
 - [Working Rules](#working-rules)
 
@@ -189,16 +190,26 @@ sequence helps orientation. The compiler clamps values, respects
 `prefers-reduced-motion`, and keeps content visible if motion is reduced
 or unsupported.
 
+**Repeatable content.** When a person may need to add another timeline
+step, FAQ, feature card, metric, or agenda row, make it an opt-in Studio
+collection: put `data-fb-collection="<kind>"` and a stable `data-fb-id`
+on the direct container, and put `data-fb-item` plus a distinct stable
+`data-fb-id` on each repeated child. Do not write a plus button, hover
+control, script, or editor UI into page HTML. Studio supplies an
+editor-only Add item control and published pages remain static.
+
 ## Relevant Operations
 
 Read:
 - listWebStudioSites: sites in the organization the caller may open, each with the `branchId` every other operation needs.
-- getWebStudioSiteContext: the whole shape in one call — routes depth-first with access and source file, menus with their settings, palettes by name, a file inventory with sizes, recent changesets, and how far the published site is behind the draft.
-- readWebStudioFile: the exact current text of one HTML or CSS file, including its `data-fb-id` attributes.
+- getWebStudioSiteContext: the whole shape in one call — routes depth-first with access and source file, menus with their settings, palettes by name, a file inventory with sizes, recent changesets, how far the published site is behind the draft, and the site's own instructions for the AI (`instructions`: AGENTS.md, DESIGN.md and skills).
+- readWebStudioFile: the exact current text of one project file — HTML and CSS with their `data-fb-id` attributes, or one of the site's Markdown instruction files.
+- listWebStudioFuseBaseWorkspaces: FuseBase workspaces the current user may use in this site.
+- listWebStudioFuseBasePages: one page of at most 15 accessible V3 notes, with folder paths and an opaque next cursor.
 
 Start a site:
 - listWebStudioTemplates: the catalog `createWebStudioSite` accepts as `templateKey`, each with a page count and a gallery description. Call this before naming a template — an unrecognized key does not error, it falls back silently to the demo project, so a guessed key produces the wrong site with no warning.
-- createWebStudioSite: a new site, owned by the caller, in the organization named by `orgId` — never a default picked for you. Omit `templateKey` for the platform's demo project, or pass "blank" for an empty single page site, or a key from `listWebStudioTemplates`.
+- createWebStudioSite: a new site, owned by the caller, in the organization named by `orgId` — never a default picked for you. Omit `templateKey` for the platform's demo project, or pass "blank" for a single page site in the neutral Clean style (with a DESIGN.md describing it), or a key from `listWebStudioTemplates`.
 
 Edit the draft (none of these publish anything):
 - Markup and styles: writeWebStudioFile, patchWebStudioFile, patchWebStudioBlock, insertWebStudioHtml.
@@ -206,6 +217,7 @@ Edit the draft (none of these publish anything):
 - Navigation: addWebStudioMenu, updateWebStudioMenu.
 - Look: setWebStudioTheme, addWebStudioPalette, setWebStudioStyleSets.
 - The site itself: setWebStudioSiteIdentity.
+- FuseBase content: insertWebStudioFuseBasePage adds a maintained FuseBase Page block; replaceWebStudioFuseBasePage changes an existing binding without rewriting its HTML.
 - applyWebStudioEdits: several of the above as one change.
 
 Generate imagery (a real paid call, its own permission, not part of
@@ -266,37 +278,22 @@ share the site — the site is shared by publishing it.
 A question about the editor, not the site — "how do I add a custom
 domain", "where do I see AI usage", "how do I edit the raw HTML" —
 is answered with a link into Studio, not a description of menus to
-click through. `getWebStudioSiteContext`'s `publish.studioUrl` names
-this site and branch already; append `&goto=<id>` to land on one
-section instead of the site list. Ids that exist today:
-`settings.site` (name and defaults), `settings.address` (custom
-domain / CNAME — NOT "who can see this", despite the similar
-spelling to "access"), `settings.sharing` (who can enter, invite
-links), `settings.pages` (per-page access rules), `settings.menus` (navigation), `settings.groups`
-(audiences for gated pages), `settings.seo` (search visibility),
-`settings.usage` (AI token usage and cost), `components` (the block
-library), `page` (the current page's own settings), `files` (raw
-HTML/CSS source), `styles` (theme tokens and palettes), `history`
-(past changesets and undo). This list is short on purpose and lives
-in `DEEP_LINKS` in sites-codex's
-apps/studio/src/App.tsx — never invent an id that is not in it. Check
-that the id actually matches what you are telling the person, not
-just that it exists — a color palette or theme question is
-`styles`, never `settings.address`; an id that contradicts the rest
-of the answer is worse than no link. The link text is human words
+click through. Call listRoutes and resolveRoute with a `studio.*`
+location, passing this site's `siteId` and draft `branchId`. Do not
+append `&goto=` yourself and do not invent an id: the allowlist is
+DEEP_LINKS in sites-codex apps/studio/src/App.tsx, exposed by
+listRoutes. A color palette or theme question is `studio.styles`,
+never `studio.settings.address`. The link text is human words
 describing the destination ("Styles", "Settings → Sharing"),
 never the id itself.
 
 Also never fall back to describing a generic "Account settings" or
 "Billing" menu: Studio has no such section, and a caller with no
 screen has no way to check that guess before handing it over. If
-the place someone is asking about has no id yet, link to bare
-`studioUrl` (the site itself) and say plainly that you don't have a
-direct link to that one section — that is a better answer than a
-plausible-sounding path that is wrong.
-
-`studioUrl` is absent when the environment has not configured a
-Studio origin. Do not construct one by guessing a hostname.
+the place someone is asking about has no id yet, resolve `studio.open`
+and say plainly that you don't have a direct link to that one
+section. resolveRoute answers `unsupported` when the Studio origin
+is not configured. Do not guess a hostname.
 
 ## Choosing an edit operation
 
@@ -319,6 +316,18 @@ replacing all of one. Rewriting a whole file to change one rule means
 reproducing the rest of it correctly, and losing anything a person
 changed since you read it.
 
+For FuseBase notes, never assemble `data-fb-content-binding` HTML or
+manifest data with generic edits. Resolve names with
+listWebStudioFuseBaseWorkspaces and listWebStudioFuseBasePages, then
+use insertWebStudioFuseBasePage or replaceWebStudioFuseBasePage.
+Duplicate page titles are normal: use folderPath to ask which one.
+A pasted FuseBase /space/{workspaceId}/page/{noteId} URL may be passed
+directly to insertWebStudioFuseBasePage; do not trust or reuse ids
+parsed from it yourself. The sites service verifies the organization
+host and the current user's access again. MCP has no current page or
+selection, so insertion requires pageId and replacement requires
+bindingId. afterNodeId is optional; without it insertion appends.
+
 ## Grouping edits
 
 **applyWebStudioEdits** applies a list in order as one entry in the
@@ -339,11 +348,43 @@ add_palette, set_style_sets, set_site_identity.
 1. `listWebStudioSites` — a request naming a site by title has to be
    resolved to an id first. Do not guess an id.
 2. `getWebStudioSiteContext` — one call, not four. It is what replaces
-   the screen a human editor is looking at.
+   the screen a human editor is looking at, and it carries the site's
+   own instructions: read them before you change anything.
 3. `readWebStudioFile` — before changing anything in a file. A patch
    built from memory of what a page probably says does not apply.
 4. Edit, then say what you changed. Check `getWebStudioSiteContext`
    again if a later edit depends on the shape you just altered.
+
+## The site's own instructions
+
+A site can carry instructions for the AI as files: `AGENTS.md` (the
+author's standing instructions — who the site is for, words to use,
+what not to touch), `DESIGN.md` (its design direction: colour roles,
+type, shape, components) and `skills/<name>.md` (the steps for one kind
+of request). `getWebStudioSiteContext` returns them as `instructions`,
+each skill by name and description.
+
+- Follow them as Studio Chat does. The platform's rules come first,
+  then the request in front of you, then `AGENTS.md` and a matching
+  skill, then `DESIGN.md` as the default for whatever the request
+  leaves open. Where a request explicitly contradicts one of them, do
+  what the request asks and say so in one line.
+- A filled-in `DESIGN.md` has already made the design decisions. Where
+  it differs from the design-taste rules above — a cream page, a
+  grid-paper background, a typeface — the site's own direction wins;
+  the rules above cover only what it leaves open.
+- When a skill's description matches the request, read the skill with
+  readWebStudioFile before acting, and follow it.
+- `DESIGN.md` names roles and theme tokens, never colour values: the
+  values live in the theme and palettes. When the author changes the
+  direction on purpose, update `DESIGN.md` in the same set of edits.
+  Never edit `AGENTS.md` unless the author asks.
+- Instruction files are Markdown, written with writeWebStudioFile and
+  `mediaType` `text/markdown`. Nothing compiles or serves them.
+- A site started from a style has a shared set of classes in
+  `styles/site.css` (`.hero`, `.section`, `.card`, `.btn`, `.band-dark`
+  and more, listed at the top of the file). Build with them, and add
+  rules to the stylesheet rather than rewriting it.
 
 ## Rules no single operation can state
 
@@ -397,7 +438,7 @@ add_palette, set_style_sets, set_site_identity.
 
 ## Version
 
-- **Version**: 1.11.0
+- **Version**: 1.13.0
 - **Category**: specialized
-- **Last synced**: 2026-09-18
+- **Last synced**: 2026-09-27
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

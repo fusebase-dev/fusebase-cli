@@ -1,7 +1,7 @@
 ---
 version: "1.10.0"
 mcp_prompt: notes
-last_synced: "2026-09-14"
+last_synced: "2026-09-18"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -238,5 +238,5 @@ Syntax (put each leaf directive on its own line; badge is inline and goes inside
 
 - **Version**: 1.10.0
 - **Category**: specialized
-- **Last synced**: 2026-09-14
+- **Last synced**: 2026-09-18
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -55,8 +55,17 @@ describe("file upload guidance", () => {
 
   it("documents the bucket attachment operations and the accessPrincipals mapping", () => {
     const text = lifecycle();
-    for (const op of ["createBucketAttachment", "updateBucketAttachment", "listBucketAttachments"]) {
+    for (const op of [
+      "createBucketAttachment",
+      "updateBucketAttachment",
+      "removeBucketAttachment",
+      "listBucketAttachments",
+    ]) {
       expect(text).toContain(op);
+    }
+    // NIM-45139: the listing filters and the field the gate SDK 2.12.0 ships.
+    for (const filter of ["`uploaderId`", "`kinds`", "`kind`"]) {
+      expect(text).toContain(filter);
     }
     // The three visibility choices from the story, as accessPrincipals payloads.
     // The team is every org role except `client`, so `guest` belongs in the list.
@@ -96,6 +105,7 @@ describe("file upload guidance", () => {
       "createTempStoredFileUpload",
       "createBucketAttachment",
       "updateBucketAttachment",
+      "removeBucketAttachment",
       "listBucketAttachments",
     ]) {
       expect(text).toContain(op);
