@@ -291,14 +291,20 @@ App uploads land in the organization `app` bucket next to the note and portal fi
   `FBS_FEATURE_TOKEN`, and the app frontend can call it directly through the app-api Gate proxy,
   which forwards the app's scopes. On the frontend path the recorded uploader is the signed-in
   user rather than the backend service user.
-- `updateBucketAttachment` — `{filename?, attributes?, accessPrincipals?}`. `attributes` replaces the whole
-  object when present, `accessPrincipals: null` clears every restriction, and omitted fields stay as they are.
+- `updateBucketAttachment` — `{filename?, attributes?, accessPrincipals?}`. Works on any file of the
+  organization; `accessPrincipals` only on `app` files. `attributes` replaces the whole object when present,
+  `accessPrincipals: null` clears every restriction, and omitted fields stay as they are. Only the uploader
+  or an organization manager or owner may change `attributes` or `accessPrincipals` (others get 403).
+- `removeBucketAttachment` — `path: { orgId, globalId }`. Removes any file of the organization, whatever its
+  source, and returns the removed attachment. Same rule: only the uploader or an organization manager or owner.
 - `listBucketAttachments` — returns `{items, total}` across every source. Narrow it with `targets`
-  (`app`, `note`, portal targets), `sizeFrom` and `attributes`; page it with `limit` (max 100) and
-  `offset`.
+  (`app`, `note`, portal targets), `sizeFrom`, `uploaderId` (only that user's uploads), `kinds`
+  (`image`, `video`, `audio`, `doc`, `archive`, `file`) and `attributes`; page it with `limit` (max 100)
+  and `offset`. A bad `uploaderId` or an unknown kind is a 400.
 
-Each item carries `target` (the source), `userId` (the uploader), `size`, `attributes`, `accessPrincipals`
-and, for organization members, the bucket `permissions`. Resolve the uploader email and role from
+Each item carries `target` (the source), `userId` (the uploader), `kind`, `size`, `attributes`,
+`accessPrincipals` and, for organization members, the bucket `permissions`. `type` holds the same value
+as `kind` and is deprecated; read `kind`. Resolve the uploader email and role from
 `userId` with the Gate org-users operations; bucket-service stores only the id.
 
 ### Attributes
@@ -383,4 +389,4 @@ The dashboard adapter uses this descriptor inside a `files` column value. Gate a
 ## Handoffs
 
 - Dashboard `files` column: use `fusebase-dashboards`; pass the file descriptor to `batchPutDashboardData`.
-- Gate MCP/SDK upload operations: use `fusebase-gate`; it owns `createTempStoredFileUpload`, `startMultipartFileUpload`, `completeMultipartFileUpload`, `deleteFile`, `createBucketAttachment`, `updateBucketAttachment`, `listBucketAttachments`, and their auth/scope rules.
+- Gate MCP/SDK upload operations: use `fusebase-gate`; it owns `createTempStoredFileUpload`, `startMultipartFileUpload`, `completeMultipartFileUpload`, `deleteFile`, `createBucketAttachment`, `updateBucketAttachment`, `removeBucketAttachment`, `listBucketAttachments`, and their auth/scope rules.

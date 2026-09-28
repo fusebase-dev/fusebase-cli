@@ -1,7 +1,7 @@
 ---
-version: "1.101.0"
+version: "1.102.0"
 mcp_prompt: portals
-last_synced: "2026-09-04"
+last_synced: "2026-09-28"
 title: "Fusebase Gate Portals Operations"
 category: specialized
 ---
@@ -68,7 +68,7 @@ end-user view of that content.
 ## Relevant Operations
 
 Read:
-- listPortals: returns all portals visible to the caller in the organization.
+- listPortals: returns all portals visible to the caller in the organization. `metadata.columns` are the user-added custom columns of the portals dashboard; empty when that dashboard does not exist.
 - getPortal: returns detailed information for a single portal by its ID.
 - listPortalContent: returns the menu tree of a portal (folders, pages, system items), each with its full `path`.
 - listPortalAiAgents: search or browse the org's AI agents for the AI Agent block picker.
@@ -2227,7 +2227,7 @@ pageId:"page_789",blockId:"block_107"}})
 
 ## Version
 
-- **Version**: 1.101.0
+- **Version**: 1.102.0
 - **Category**: specialized
-- **Last synced**: 2026-09-04
+- **Last synced**: 2026-09-28
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
