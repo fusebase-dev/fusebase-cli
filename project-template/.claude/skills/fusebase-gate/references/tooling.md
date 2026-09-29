@@ -1,7 +1,7 @@
 ---
 version: "1.2.0"
 mcp_prompt: tooling
-last_synced: "2026-09-28"
+last_synced: "2026-09-29"
 title: "Tooling"
 category: meta
 ---
@@ -78,5 +78,5 @@ Response format for direct calls and tool.call:
 
 - **Version**: 1.2.0
 - **Category**: meta
-- **Last synced**: 2026-09-28
+- **Last synced**: 2026-09-29
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

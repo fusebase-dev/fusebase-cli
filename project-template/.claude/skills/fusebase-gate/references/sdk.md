@@ -1,7 +1,7 @@
 ---
 version: "1.6.8"
 mcp_prompt: sdk
-last_synced: "2026-09-28"
+last_synced: "2026-09-29"
 title: "Fusebase Gate SDK"
 category: meta
 ---
@@ -106,5 +106,5 @@ Always handle SDK operation failures explicitly.
 
 - **Version**: 1.6.8
 - **Category**: meta
-- **Last synced**: 2026-09-28
+- **Last synced**: 2026-09-29
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
