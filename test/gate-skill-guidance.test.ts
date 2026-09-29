@@ -67,6 +67,9 @@ describe("file upload guidance", () => {
     for (const filter of ["`uploaderId`", "`kinds`", "`kind`"]) {
       expect(text).toContain(filter);
     }
+    // NIM-45201: date added filter from gate SDK 2.13.1, unix seconds, presets in the app.
+    expect(text).toContain("query: { createdFrom, createdTo, limit: 50 }");
+    expect(text).toContain("the same unit as each item `createdAt`");
     // The three visibility choices from the story, as accessPrincipals payloads.
     // The team is every org role except `client`, so `guest` belongs in the list.
     expect(text).toContain('{roles: ["owner", "manager", "member", "guest"]}');
@@ -117,6 +120,7 @@ describe("file upload guidance", () => {
     // The synced reference and the skill must agree on the field name and on
     // the listing filter, or an app follows whichever it read last.
     expect(text).toContain("accessPrincipals");
+    expect(text).toContain("`createdFrom` and `createdTo`");
     expect(text).not.toMatch(/(?<![A-Za-z])`principals`/);
     expect(text).toContain("`attributes` is a JSON object of strings sent as a string");
   });
