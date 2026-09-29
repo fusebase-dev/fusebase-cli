@@ -1,7 +1,7 @@
 ---
-version: "1.10.0"
+version: "1.11.0"
 mcp_prompt: notes
-last_synced: "2026-09-18"
+last_synced: "2026-09-29"
 title: "Fusebase Gate Notes Operations"
 category: specialized
 ---
@@ -36,6 +36,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 
 - listWorkspaceNoteFolders lists visible non-portal note folders for a workspace.
 - listWorkspaceNotes lists visible non-portal notes for a workspace folder.
+- searchWorkspaceNotes finds v2 and v3 notes by words in their title or text and returns matching note ids with snippets.
 - getWorkspaceNote returns one workspace note together with markdown content.
 - createWorkspaceNoteFolder creates a workspace note folder.
 - createWorkspaceNote creates a workspace note and can optionally append initial content after creation.
@@ -63,6 +64,8 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - `getWorkspaceNote` is the operation that returns note body content through `note.md`.
 - Workspace attachment image links inside `note.md` remain editor attachment paths; use the files completion `readUrl` when you need the public object URL.
 - Portal-shared and trashed notes are filtered out from these workspace note list operations.
+- To find a note by its content, call `searchWorkspaceNotes` with `query` (optional `parentId` to search one folder subtree, `limit` up to 100). It is keyword full-text search, not semantic: pass the distinctive words, not a question.
+- Each search hit has `contentVersion`: read `v2` hits with `getWorkspaceNote` and `markdown_v3` hits with `getWorkspaceMarkdownNote`. v3 hits appear only when the token also holds `notes.markdown.read`.
 
 ## Create Flow Rules
 
@@ -236,7 +239,7 @@ Syntax (put each leaf directive on its own line; badge is inline and goes inside
 
 ## Version
 
-- **Version**: 1.10.0
+- **Version**: 1.11.0
 - **Category**: specialized
-- **Last synced**: 2026-09-18
+- **Last synced**: 2026-09-29
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

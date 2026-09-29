@@ -1,7 +1,7 @@
 ---
-version: "1.14.1"
+version: "1.15.0"
 mcp_prompt: files
-last_synced: "2026-09-25"
+last_synced: "2026-09-29"
 title: "Fusebase Gate Files Flows"
 category: specialized
 ---
@@ -21,7 +21,7 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 - createTempStoredFileUpload: presign one PUT that uploads a whole file. Use it for anything small enough to send in a single request; use the multipart pair only when the file needs parts.
 - startMultipartFileUpload: start a public file-service multipart upload and return direct PUT metadata.
 - completeMultipartFileUpload: finish the file-service multipart upload from ETags and create the stored-file record. Gate maps file-service `storedFile.uuid` to response `storedFileUUID`; `fileId` is the same stored-file id alias. Use `storedFileUUID` for notes attachments. The returned `readUrl` is the public file URL.
-- deleteFile: delete a file-service stored file by `storedFileUUID`.
+- deleteFile: delete a file-service stored file by `storedFileUUID`. Not available to organization clients.
 - createBucketAttachment: turn an uploaded temp stored file into a bucket-service attachment in the organization's `app` bucket, so the file shows up in the organization file listing next to note and portal files. Needs an app token, from an app backend or from an app frontend through the app-api gate proxy.
 - updateBucketAttachment: rename a bucket attachment or replace its `attributes` and `accessPrincipals`.
 - removeBucketAttachment: remove a file of the organization, whatever its source. Only the uploader or an organization manager or owner may remove it.
@@ -52,6 +52,7 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 ## Access Model
 
 - Upload, multipart, and delete flows require `files.write` and org access.
+- An organization client holds `files.write`: it may upload and create bucket attachments, and may rename, change or remove only the files it uploaded (bucket-service answers 403 for anyone else's). `deleteFile` answers 403 to a client, so a client-facing app removes files with `removeBucketAttachment`.
 - Gate delegates upload URLs to file-service and returns `readUrl` from the completion flow; actual bytes never flow through Gate.
 
 ## Hard rules (attachments / app storage)
@@ -63,7 +64,7 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 
 ## Version
 
-- **Version**: 1.14.1
+- **Version**: 1.15.0
 - **Category**: specialized
-- **Last synced**: 2026-09-25
+- **Last synced**: 2026-09-29
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
