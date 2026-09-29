@@ -298,9 +298,10 @@ App uploads land in the organization `app` bucket next to the note and portal fi
 - `removeBucketAttachment` — `path: { orgId, globalId }`. Removes any file of the organization, whatever its
   source, and returns the removed attachment. Same rule: only the uploader or an organization manager or owner.
 - `listBucketAttachments` — returns `{items, total}` across every source. Narrow it with `targets`
-  (`app`, `note`, portal targets), `sizeFrom`, `uploaderId` (only that user's uploads), `kinds`
-  (`image`, `video`, `audio`, `doc`, `archive`, `file`) and `attributes`; page it with `limit` (max 100)
-  and `offset`. A bad `uploaderId` or an unknown kind is a 400.
+  (`app`, `note`, portal targets), `sizeFrom`, `createdFrom` and `createdTo` (date added, see below),
+  `uploaderId` (only that user's uploads), `kinds` (`image`, `video`, `audio`, `doc`, `archive`, `file`)
+  and `attributes`; page it with `limit` (max 100) and `offset`. A bad `uploaderId`, an unknown kind or
+  `createdFrom` greater than `createdTo` is a 400.
 
 Each item carries `target` (the source), `userId` (the uploader), `kind`, `size`, `attributes`,
 `accessPrincipals` and, for organization members, the bucket `permissions`. `type` holds the same value
@@ -329,6 +330,24 @@ const filesApi = new FilesApi(createClient({ baseUrl, auth: { token } }));
 const { items, total } = await filesApi.listBucketAttachments({
   path: { orgId },
   query: { attributes: JSON.stringify({ source: "app" }), limit: 50 },
+});
+```
+
+### Filtering by date added
+
+`createdFrom` and `createdTo` are unix seconds, the same unit as each item `createdAt`. Both bounds are
+inclusive and either one can be sent alone. There are no server-side presets: compute Today, Last 7 days
+or Last 30 days in the app from the user's local time and send the two numbers.
+
+```typescript
+// Files added in the last 7 days, counted from the start of today in the user's time zone.
+const startOfToday = new Date();
+startOfToday.setHours(0, 0, 0, 0);
+const createdFrom = Math.floor(startOfToday.getTime() / 1000) - 6 * 24 * 60 * 60;
+const createdTo = Math.floor(Date.now() / 1000);
+const { items, total } = await filesApi.listBucketAttachments({
+  path: { orgId },
+  query: { createdFrom, createdTo, limit: 50 },
 });
 ```
 
