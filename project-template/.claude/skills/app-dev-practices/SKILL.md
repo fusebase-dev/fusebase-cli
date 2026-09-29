@@ -203,15 +203,19 @@ access mode never cause it to go missing.
    portal context token (April 2026) carry no token, so the fields are absent even though the app
    *is* embedded in a portal — for every viewer. Fixable per block, see below.
 
-**Possibly stale** — if the block was **copied from another portal**, the stored token still carries
-the **source** portal's id, so `portalId` can name a different portal than the one the app is
-currently displayed in. All of these copy the block verbatim, and nothing re-mints the token:
+**Possibly stale (legacy tokens only)** — a legacy token (no `blockId`) is stored in the block. If
+the block was **copied from another portal**, the stored token still carries the **source**
+portal's id, so `portalId` can name a different portal than the one the app is currently displayed
+in. All of these copy the block verbatim, and nothing re-mints a stored token:
 
 - block copy-paste,
 - duplicating a page or folder from another portal ("Create from another portal"),
 - duplicating a whole portal, or creating a portal from a template — **every** app block in the new
   portal carries the source/template portal's id,
 - synced-copy propagation into a page that lives in another portal.
+
+A token that has `blockId` is minted when the block is rendered, for the place where it is shown,
+so it is never stale.
 
 **Fixing a block** (cases 3 and stale) — in the portal customizer, the block's app selection has to
 actually **change** for a token to be minted: pick a different app in that block, then the intended
@@ -228,6 +232,14 @@ user on a legacy embed stuck.
 grants access to portal data must still be authorized server-side by verifying the
 `portalFeatureContextToken` — which is also what protects you from the stale-token case above. Do
 not derive permissions from `runtimeContext`.
+
+**Per-block data.** One app can be placed in several blocks of a portal. The verify response of
+Gate `verifyPortalFeatureContextToken` may carry `pageId`, `blockId`, `brickId` and `linkedBlockId`
+(not `runtimeContext`, which holds only `portalId` / `workspaceId`). Key per-block data as
+`block:<blockId>`, or `block:<blockId>:brick:<brickId>` when `brickId` is present; never by `brickId`
+alone, because copies keep it. A linked block reports the `blockId` of its source, so it shares the
+source's data. The fields are optional and legacy tokens have none of them: without `blockId`, keep
+one portal-wide state, as before. See `fusebase-portal-specific-apps` for details.
 
 Important for public apps:
 

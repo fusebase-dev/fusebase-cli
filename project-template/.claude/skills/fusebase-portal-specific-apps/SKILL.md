@@ -29,11 +29,13 @@ signal — no server round-trip needed to decide what to render.
 - Opened directly by the app's own URL, or run locally via `fusebase dev start` → both absent.
 - **Legacy portal blocks** added before April 2026 carry no portal context token, so the fields
   are absent even inside a portal. Fixable per block in the portal customizer — see below.
-- A block **copied from another portal** keeps the source portal's token, so `portalId` can name a
+- A **legacy token** (one without `blockId`, see below) is stored in the block when the app is
+  picked. A block **copied from another portal** keeps that stored token, so `portalId` can name a
   different portal than the one displaying the app. That covers block copy-paste, duplicating a
   page from another portal ("Create from another portal"), duplicating a whole portal or creating
   one from a template (then *every* app block carries the template portal's id), and synced-copy
-  propagation into another portal's page. Same fix.
+  propagation into another portal's page. Same fix. A token that has `blockId` is minted when the
+  block is rendered, so it always names the portal that displays the app.
 
 Both are fixed by making the block's app selection actually **change**: pick a different app in
 that block and then the intended one again. Re-picking the *same* app does nothing — the App
@@ -42,6 +44,27 @@ the app block and add it again.
 
 Because of the last two cases, do not turn a missing `portalId` into an unrecoverable dead end —
 degrade to the standalone UI rather than a hard "open me from a portal" wall.
+
+## Keeping separate data per block
+
+One app can sit in several blocks of one portal. To keep a separate state per block (a file list,
+settings, a form), key the data by the block instance from the verified token.
+
+- The ids come **only** from Gate `verifyPortalFeatureContextToken`, called by the app backend with
+  the `portalFeatureContextToken` from the iframe URL. The response may hold `pageId`, `blockId`,
+  `brickId` and `linkedBlockId`. They are **not** in `/auth/context` `runtimeContext`.
+- Build the key as `block:<blockId>`, or `block:<blockId>:brick:<brickId>` when `brickId` is present.
+  **Never use `brickId` alone** — copied blocks keep the brick id.
+- A duplicated block, page or portal gets a new `blockId`, so the copy starts with its own data.
+  Moving, renaming or republishing a block keeps its `blockId`.
+- A **linked block** shows its source: `blockId` and `brickId` are the source's, `linkedBlockId` is
+  the link, `pageId` and `portalId` are where it is shown. Keyed by `blockId`, a link shares the
+  data of its source — that is the intended behaviour.
+- All four fields are **optional**. Legacy tokens have none of them. When `blockId` is absent,
+  fall back to the portal-wide behaviour the app had before (one shared state per portal), and do
+  not hide data that was saved without a block key.
+
+See `fusebase-gate/references/portal-embed-context.md` for the full claim table.
 
 See "Portal context contract" in the `app-dev-practices` skill for the full contract.
 
