@@ -1,7 +1,7 @@
 ---
 version: "1.103.0"
 mcp_prompt: portals
-last_synced: "2026-09-29"
+last_synced: "2026-09-30"
 title: "Fusebase Gate Portals Operations"
 category: specialized
 ---
@@ -2229,5 +2229,5 @@ pageId:"page_789",blockId:"block_107"}})
 
 - **Version**: 1.103.0
 - **Category**: specialized
-- **Last synced**: 2026-09-29
+- **Last synced**: 2026-09-30
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

@@ -1,7 +1,7 @@
 ---
 version: "1.15.0"
 mcp_prompt: files
-last_synced: "2026-09-29"
+last_synced: "2026-09-30"
 title: "Fusebase Gate Files Flows"
 category: specialized
 ---
@@ -66,5 +66,5 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 
 - **Version**: 1.15.0
 - **Category**: specialized
-- **Last synced**: 2026-09-29
+- **Last synced**: 2026-09-30
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

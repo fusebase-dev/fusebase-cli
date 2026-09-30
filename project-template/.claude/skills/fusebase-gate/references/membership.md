@@ -1,7 +1,7 @@
 ---
-version: "1.6.0"
+version: "1.7.0"
 mcp_prompt: membership
-last_synced: "2026-09-29"
+last_synced: "2026-09-30"
 title: "Fusebase Gate Membership And Portal Flows"
 category: specialized
 ---
@@ -92,7 +92,7 @@ These prompts cover organization member invites/removal, workspace selection, po
 - scheduleClientAccountDeletion takes numeric `userId` in the body and is allowed only for Client-role users in the requested org.
 - Client account deletion is scheduled/delayed by user-service; do not promise immediate permanent deletion.
 - The default for "delete" or "remove" clients is removeOrgMember (leave the organization). scheduleClientAccountDeletion is only for an explicit request to delete the client's account.
-- Read client and member custom fields from listOrgUsers `metadataValues`. Do not look them up through Dashboards MCP.
+- Read client and member custom fields from listOrgUsers `metadataValues` (`includeMetadata` defaults to true). Pass `includeMetadata=false` when you only need the roster. Do not look custom fields up through Dashboards MCP.
 
 ## Working Rules
 
@@ -103,7 +103,7 @@ These prompts cover organization member invites/removal, workspace selection, po
 
 ## Version
 
-- **Version**: 1.6.0
+- **Version**: 1.7.0
 - **Category**: specialized
-- **Last synced**: 2026-09-29
+- **Last synced**: 2026-09-30
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

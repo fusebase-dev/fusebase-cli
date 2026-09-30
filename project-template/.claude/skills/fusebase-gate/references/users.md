@@ -1,7 +1,7 @@
 ---
-version: "1.7.0"
+version: "1.8.0"
 mcp_prompt: users
-last_synced: "2026-09-29"
+last_synced: "2026-09-30"
 title: "Fusebase Gate Users Operations"
 category: specialized
 ---
@@ -18,7 +18,7 @@ These operations manage organization membership flows and safe member removal ex
 
 ## Scope
 
-- listOrgUsers returns organization users for a specific org. Clients and members are both users (`role`). `metadata.clients.columns` and `metadata.members.columns` are the user-added custom columns of those dashboards. System columns are omitted. A missing dashboard yields an empty `columns` list. Each user has `metadataValues`: those columns' cell values, keyed by column `key`. Clients read the clients dashboard; other roles read the members dashboard. A missing cell is null.
+- listOrgUsers returns organization users for a specific org. Clients and members are both users (`role`). `includeMetadata` defaults to true: `metadata.clients.columns` and `metadata.members.columns` are the user-added custom columns, and each user has `metadataValues` keyed by column `key`. A missing cell is null. Pass `includeMetadata=false` when you only need id, name, email, username, and role — that skips dashboards and stays fast on large orgs.
 - For organization clients, members, or their custom fields (department, next step, and the like), call listOrgUsers and read `metadataValues`. Do not switch to Dashboards MCP to find the same roster or the same cell values.
 - listWorkspaceMembers returns members of a single workspace scoped to the org (not the whole-org roster).
 - listPortalMembers is a portal-named alias for listing the underlying workspace members by `workspaceId` (same semantics as removePortalMember).
@@ -65,7 +65,7 @@ These operations manage organization membership flows and safe member removal ex
 
 ## Version
 
-- **Version**: 1.7.0
+- **Version**: 1.8.0
 - **Category**: specialized
-- **Last synced**: 2026-09-29
+- **Last synced**: 2026-09-30
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
