@@ -12,7 +12,7 @@ For MCP refresh decisions, source of truth is `.env` fingerprints:
 These are SHA-256 fingerprints for canonical token policy descriptors from `lib/mcp-token-policy.ts`:
 
 - Dashboards: permissions + resource scope. Default dashboards token can inspect existing dashboards, write row data (`data.write`), write relations (`relation.write`), and mutate existing view schema (`view.write`, e.g. add custom columns), but cannot create new dashboard DBs or dashboards. `legacy-dashboards-db` expands it with dashboard DB/dashboard management writes.
-- Gate: permissions + resource scope, including FuseBase PostgreSQL Database (`isolated_store.*`) permissions by default.
+- Gate: permissions + resource scope, including FuseBase PostgreSQL Database (`isolated_store.*`) and Web Studio (`sites.read`, `sites.write`, `sites.create`, `sites.delete`, `sites.release.write`, `sites.image.create`) permissions by default.
 
 ## When `update` refreshes MCP tokens
 

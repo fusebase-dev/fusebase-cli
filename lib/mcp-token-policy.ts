@@ -9,6 +9,7 @@ import {
   GATE_PERMISSIONS_MCP_MANAGER,
   GATE_PERMISSIONS_NOTES_MARKDOWN,
   GATE_PERMISSIONS_PORTALS,
+  GATE_PERMISSIONS_WEB_STUDIO,
 } from "./permissions";
 
 /** Bump when fingerprint inputs change so old .env values force refresh once. */
@@ -77,6 +78,7 @@ function getGateMcpPermissions(): string[] {
     ...FILE_GATE_PERMISSIONS,
     ...GATE_PERMISSIONS_ISOLATED,
     ...GATE_PERMISSIONS_PORTALS,
+    ...GATE_PERMISSIONS_WEB_STUDIO,
     ...GATE_PERMISSIONS_MAGIC_LINKS,
     ...(notesMarkdownEnabled() ? GATE_PERMISSIONS_NOTES_MARKDOWN : []),
     ...(managedIntegrationsEnabled() ? GATE_PERMISSIONS_MCP_MANAGER : []),

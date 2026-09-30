@@ -275,6 +275,21 @@ export const GATE_PERMISSIONS_PORTALS = [
   "portals.manage",
 ] as const;
 
+/**
+ * Web Studio sites (`fusebase-gate` `GatePermission`). Write covers draft edits
+ * only. Create, delete, release, and image generation are separate capabilities:
+ * release is the only one the public sees, and `sites.image.create` is a paid
+ * call per invocation.
+ */
+export const GATE_PERMISSIONS_WEB_STUDIO = [
+  "sites.read",
+  "sites.write",
+  "sites.create",
+  "sites.delete",
+  "sites.release.write",
+  "sites.image.create",
+] as const;
+
 export const GATE_PERMISSIONS_NOTES_MARKDOWN = [
   "notes.markdown.read",
   "notes.markdown.write",
@@ -300,6 +315,7 @@ export const KNOWN_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   ...FILE_GATE_PERMISSIONS,
   ...GATE_PERMISSIONS_ISOLATED,
   ...GATE_PERMISSIONS_PORTALS,
+  ...GATE_PERMISSIONS_WEB_STUDIO,
   ...GATE_PERMISSIONS_NOTES_MARKDOWN,
   ...BACKEND_ONLY_GATE_PERMISSIONS,
 ]);
