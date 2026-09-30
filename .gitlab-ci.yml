@@ -64,10 +64,12 @@ build:
     # and python3-pefile patches bun's residual IDI_MYICON resource so Windows
     # never resolves it to our 16x16 entry (see scripts/fix-windows-idi-myicon.py).
     - apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git zip unzip wget nsis default-jre-headless wine64 python3 python3-pefile
-    # Download and install the INetC NSIS plugin
-    - wget "https://nsis.sourceforge.io/mediawiki/images/c/c9/Inetc.zip" -O inetc.zip
+    # Download and install the INetC NSIS plugin.
+    # SourceForge (Cloudflare) started returning 403 for this file on 2026-09-30, including with a browser User-Agent.
+    # Pinned GitHub release of the same plugin; that zip has no Plugins/ prefix.
+    - wget "https://github.com/DigitalMediaServer/NSIS-INetC-plugin/releases/download/v1.0.5.7/InetC.zip" -O inetc.zip
     - unzip -q inetc.zip -d inetc-plugin
-    - cp inetc-plugin/Plugins/x86-unicode/INetC.dll /usr/share/nsis/Plugins/x86-unicode/
+    - cp inetc-plugin/x86-unicode/INetC.dll /usr/share/nsis/Plugins/x86-unicode/
     - rm -rf inetc.zip inetc-plugin
     # Clone release scripts
     - *clone-release-scripts
