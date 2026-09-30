@@ -460,6 +460,12 @@ The platform enforces the declaration for signed-in users too (NIM-45120). Once
 gate proxy sends the app's isolated-store calls from a browser token with the
 browser `gst`, which lacks those permissions, so Gate returns 403. Before this, a
 signed-in member or client went through with their org role, which grants both.
+The same rule covers org roster and group calls (NIM-45261): when
+`org.members.read`, `org.members.write`, `org.groups.read` or `org.groups.write`
+is backend-only, browser calls to the org user and group ops that need it
+(`listOrgUsers`, `listOrgGroups`, `listUserOrgGroups`, `addMembersToOrgGroup`, …)
+get 403 as well. Only the ops that need an opted-in permission change: marking
+`org.groups.write` backend-only still lets the browser read groups.
 Other Gate calls from the browser, and apps that did not opt in, are unchanged.
 Calls with a backend `/_token` token keep the full permission set. Browser tokens
 minted before the platform change keep the old behaviour until they expire (1 day
