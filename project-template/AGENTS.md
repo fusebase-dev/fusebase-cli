@@ -731,7 +731,7 @@ For SQL stores, keep app-owned schema files under `postgres/migrations/` and con
 }
 ```
 
-Use `fusebase isolated-store sql bundle --app <appPath> --json` to inspect the exact Gate body. Use `--status`, `--rls-status`, and `--dry-run` before `--apply --yes`. The command reads `GATE_MCP_TOKEN` from `.env` for Gate calls. `rlsManifest` is attached only when the `postgres-rls` flag is enabled; otherwise SQL migrations still work and RLS validation is skipped.
+Use `fusebase isolated-store sql bundle --app <appPath> --json` to inspect the exact Gate body. Use `--status`, `--rls-status`, and `--dry-run` before `--apply --yes`. The command reads `GATE_MCP_TOKEN` from `.env.<environment>` for the resolved environment (not the root `.env`) for Gate calls. `rlsManifest` is attached only when the `postgres-rls` flag is enabled; otherwise SQL migrations still work and RLS validation is skipped.
 
 RLS verification checklist after schema apply:
 

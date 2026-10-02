@@ -907,7 +907,7 @@ warning banner for them.
 
 ### `fusebase isolated-store sql bundle`
 
-Builds the Gate SQL migration request body from app-owned files and, when requested, calls Gate status/dry-run/apply using `GATE_MCP_TOKEN` from `.env`.
+Builds the Gate SQL migration request body from app-owned files and, when requested, calls Gate status/dry-run/apply using `GATE_MCP_TOKEN` from `.env.<environment>` for the resolved environment (no fallback to the root `.env`, which belongs to the active checkout). Before the Gate call it prints the environment name, org, app, store, and stage. With more than one environment, `--apply` refuses unless `--env` or `FUSEBASE_ENV` names the target; `--status` and `--dry-run` may use the active environment after printing its name.
 
 A matched app entry may be id-less (authored with only a `path`/`subdomain`), and its platform app may not exist yet. On **`--apply`** the command reconciles it first — exactly like `fusebase dev` start: it binds the subdomain to an existing platform app or creates one, then persists the resolved `id` back into `fusebase.json` — so migrations apply against a real app. Read-only operations never reconcile, to avoid creating/mutating the app as a side effect. In particular **`--status`** on a not-yet-deployed declarative app (no resolved `id`) returns a predefined status instead of erroring:
 
@@ -986,7 +986,7 @@ Both can be combined into a single store-contract job. This is the only automati
 fusebase isolated-store sql bundle --app apps/store-a --assert-migrations --assert-rls
 ```
 
-In CI the command needs `FUSEBASE_ENV` (to resolve the env's `storeId` from the lockfile) and a `.env` containing `GATE_MCP_TOKEN` (the token is read from the file, not from process env).
+In CI the command needs `FUSEBASE_ENV` (to resolve the env's `storeId` from the lockfile and to allow `--apply` when the project has several environments) and `.env.<name>` containing `GATE_MCP_TOKEN` (the token is read from that file, not from the root `.env` and not from process env).
 
 **Which stage is targeted.** `--stage` defaults to the **active environment's backend** (`FUSEBASE_ENV` / `env use` / global `env`), so `FUSEBASE_ENV=prod` targets the prod stage without extra flags. Pass `--stage` explicitly to override. Previously this defaulted to a hardcoded `dev`, which pointed a prod run at the dev stage — on a store carrying both stages that asserts against the wrong data and can report a false OK.
 

@@ -606,7 +606,7 @@ fusebase isolated-store sql bundle --app apps/client-portal --stage dev --dry-ru
 fusebase isolated-store sql bundle --app apps/client-portal --stage dev --apply --yes
 ```
 
-Gate calls use `GATE_MCP_TOKEN` from `.env`. Do `--status` and `--dry-run` before any real `--apply`. `--stage` defaults to the active environment's backend, so `FUSEBASE_ENV=prod` targets the prod stage — pass `--stage` only to override it.
+Gate calls use `GATE_MCP_TOKEN` from `.env.<environment>` for the resolved environment (not the root `.env`). Do `--status` and `--dry-run` before any real `--apply`. With several environments, `--apply` requires `--env <name>` or `FUSEBASE_ENV`. `--stage` defaults to that same environment's backend, so `FUSEBASE_ENV=prod` targets the prod stage — pass `--stage` only to override it.
 
 **CI store contract.** `--status`/`--rls-status` report; `--assert-migrations`/`--assert-rls` fail the build:
 

@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { existsSync } from "fs";
 import { join } from "path";
 import {
   getConfig,
@@ -15,6 +16,14 @@ import { reconcileApps } from "../reconcile";
 import assert from "assert";
 import { requestGateService } from "../gate-api";
 import { readAppGateTokenOrExit } from "../managed-integrations";
+import {
+  getActiveEnvironment,
+  getEnvironmentEnvFilePath,
+  listEnvironmentNames,
+  resolveActiveEnvironmentName,
+  type ActiveEnvironment,
+} from "../environments";
+import { readEnvFileMap } from "./steps/create-env";
 import {
   buildSqlMigrationBundleArtifact,
   resolveSqlStoreConfig,
@@ -60,6 +69,65 @@ const APP_OPTION_DESCRIPTION = "App path from fusebase.json apps[]";
 
 function writeStdoutLine(text: string): void {
   process.stdout.write(`${text}\n`);
+}
+
+/**
+ * Gate token for a resolved app environment. Reads `.env.<name>` only — the
+ * root `.env` belongs to whichever environment was last materialized and must
+ * not authenticate a different `--env`.
+ */
+async function readEnvironmentGateTokenOrExit(
+  cwd: string,
+  envName: string,
+): Promise<string> {
+  const envFileName = `.env.${envName}`;
+  const envPath = getEnvironmentEnvFilePath(cwd, envName);
+  if (!existsSync(envPath)) {
+    console.error(
+      `Error: Missing ${envFileName} for environment ${envName}. Run 'fusebase env tokens --env ${envName}' first.`,
+    );
+    process.exit(1);
+  }
+  const envMap = await readEnvFileMap(cwd, envFileName);
+  const gateToken = envMap.get("GATE_MCP_TOKEN")?.trim();
+  if (!gateToken) {
+    console.error(
+      `Error: Missing GATE_MCP_TOKEN in ${envFileName} for environment ${envName}. Run 'fusebase env tokens --env ${envName}' first.`,
+    );
+    process.exit(1);
+  }
+  return gateToken;
+}
+
+/**
+ * `--apply` mutates a store. With more than one environment, an implicit
+ * active env (state, default, or single-env is not this case) is the bug
+ * this command is fixing: beta's checkout applying prod's migrations.
+ * `--env` and `FUSEBASE_ENV` are the only explicit selections.
+ */
+function assertApplyEnvironmentIsExplicit(cwd: string): void {
+  const names = listEnvironmentNames(cwd);
+  if (names.length < 2) return;
+  const resolved = resolveActiveEnvironmentName(cwd);
+  if (resolved?.source === "override" || resolved?.source === "env-var") {
+    return;
+  }
+  console.error(
+    `Error: --apply with multiple environments (${names.join(", ")}) requires --env <name> or FUSEBASE_ENV. Refusing to use the active environment.`,
+  );
+  process.exit(1);
+}
+
+function printResolvedEnvironment(
+  active: ActiveEnvironment,
+  orgId: string,
+  appId: string | undefined,
+  storeId: string,
+  stage: "dev" | "prod",
+): void {
+  writeStdoutLine(
+    `Environment: ${active.name} (backend: ${active.config.backend}, org: ${orgId}, app: ${appId ?? ""}, store: ${storeId}, stage: ${stage})`,
+  );
 }
 
 function resolveAppConfig(appRef: string) {
@@ -361,7 +429,14 @@ const sqlBundleCommand = new Command("bundle")
   .option("--apply", "Apply pending migrations through Gate")
   .option("--yes", "Confirm --apply")
   .action(async (options: SqlBundleOptions) => {
-    const stage = resolveStage(options.stage);
+    const activeEnvironment = getActiveEnvironment();
+    if (options.apply === true) {
+      assertApplyEnvironmentIsExplicit(process.cwd());
+    }
+    const stage = resolveStage(
+      options.stage,
+      activeEnvironment?.config.backend,
+    );
     const { fuseConfig, appConfig } = resolveAppConfig(options.app);
 
     // A read-only status check on a not-yet-deployed declarative app returns a
@@ -425,7 +500,21 @@ const sqlBundleCommand = new Command("bundle")
     if (storeId === undefined || storeId.trim().length === 0) {
       throw new Error("Missing store id. Set isolatedStores.sql[].storeId or pass --store-id.");
     }
-    const token = await readAppGateTokenOrExit(process.cwd());
+    if (activeEnvironment) {
+      printResolvedEnvironment(
+        activeEnvironment,
+        fuseConfig.orgId,
+        resolvedAppConfig.id,
+        storeId,
+        stage,
+      );
+    }
+    const token = activeEnvironment
+      ? await readEnvironmentGateTokenOrExit(
+          process.cwd(),
+          activeEnvironment.name,
+        )
+      : await readAppGateTokenOrExit(process.cwd());
 
     if (wantMigrationStatus) {
       const status = await callGate<SqlMigrationStatusResponse>({
