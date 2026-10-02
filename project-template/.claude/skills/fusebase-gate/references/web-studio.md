@@ -1,7 +1,7 @@
 ---
-version: "1.13.0"
+version: "1.21.0"
 mcp_prompt: webStudio
-last_synced: "2026-09-27"
+last_synced: "2026-10-01"
 title: "Fusebase Gate Web Studio Operations"
 category: specialized
 ---
@@ -17,6 +17,7 @@ category: specialized
 - [Fusebase Gate Web Studio Operations](#fusebase-gate-web-studio-operations)
 - [Read this before anything else](#read-this-before-anything-else)
 - [Design taste](#design-taste)
+- [`<fb-embed>` contract](#fb-embed-contract)
 - [Relevant Operations](#relevant-operations)
 - [Publishing](#publishing)
 - [Look at what you made](#look-at-what-you-made)
@@ -26,6 +27,7 @@ category: specialized
 - [The sequence that works](#the-sequence-that-works)
 - [The site's own instructions](#the-sites-own-instructions)
 - [Rules no single operation can state](#rules-no-single-operation-can-state)
+- [FuseBase App runtime context](#fusebase-app-runtime-context)
 - [Working Rules](#working-rules)
 
 ---
@@ -135,6 +137,38 @@ are write-time rules; nothing renders the page to catch them later.
 Check the widest things first: tables, code blocks, long headings, nav
 rows, button rows, and card grids.
 
+## `<fb-embed>` contract
+
+Use `<fb-embed>` only for a public HTTPS page the person explicitly
+asked to frame. `url` is required; `src`, `href`, and `source` are not
+aliases. `title` is the accessible iframe label and should describe
+the framed content. A minimal generic embed is:
+`<fb-embed url="https://example.com/view" title="Project view"></fb-embed>`.
+
+Supported sizing attributes are `auto-height="true|false"`,
+`height` (CSS pixels, clamped to 120..50000, default 640), and
+`viewport-height` (20..95, rendered as `vh`; it wins over `height`).
+FuseBase notes and Apps default to auto height; other URLs opt in with
+`auto-height="true"`. Width hints are
+`data-fb-embed-width="full|fixed"` and, for fixed width only,
+`data-fb-embed-width-px` (240..2560, default 960). `data-fb-id` is the
+usual optional editor hint. Do not put an auto-height embed inside a
+fixed-height wrapper.
+
+The compiler turns the element into a sandboxed iframe and owns the
+bridge. For an auto-height frame the parent sends
+`{type: "fb:embed:hello", v: 1, theme, colorScheme, scale}`; the
+child reports `{type: "fb:embed:height", v: 1, height}` or the
+legacy App Wrapper `{type: "fbs-iframe-resize", height}`. These
+messages carry visual theme and sizing only, never identity or access
+authority. The runtime checks the sender window and origin.
+
+A bound FuseBase App is different from a generic embed:
+`data-fb-app-binding` and its launch URL are server-owned security
+metadata. Never write or copy them. Use listWebStudioFuseBaseApps plus
+insertWebStudioFuseBaseApp or replaceWebStudioFuseBaseApp; their launch
+flow supplies the verified Site context separately from postMessage.
+
 **Content pitfalls.**
 - Nothing placeholder ships: no lorem ipsum, "[Your Company]", "TODO",
   or bracketed slots. If a value is genuinely unknown, write plausible
@@ -206,6 +240,8 @@ Read:
 - readWebStudioFile: the exact current text of one project file — HTML and CSS with their `data-fb-id` attributes, or one of the site's Markdown instruction files.
 - listWebStudioFuseBaseWorkspaces: FuseBase workspaces the current user may use in this site.
 - listWebStudioFuseBasePages: one page of at most 15 accessible V3 notes, with folder paths and an opaque next cursor.
+- listWebStudioFuseBaseFolders: one page of at most 15 accessible folders, with ancestor paths and an opaque next cursor.
+- listWebStudioFuseBaseApps: accessible Your and Managed Products and Apps, including stable ids, current publicity and safe open links.
 
 Start a site:
 - listWebStudioTemplates: the catalog `createWebStudioSite` accepts as `templateKey`, each with a page count and a gallery description. Call this before naming a template — an unrecognized key does not error, it falls back silently to the demo project, so a guessed key produces the wrong site with no warning.
@@ -217,7 +253,8 @@ Edit the draft (none of these publish anything):
 - Navigation: addWebStudioMenu, updateWebStudioMenu.
 - Look: setWebStudioTheme, addWebStudioPalette, setWebStudioStyleSets.
 - The site itself: setWebStudioSiteIdentity.
-- FuseBase content: insertWebStudioFuseBasePage adds a maintained FuseBase Page block; replaceWebStudioFuseBasePage changes an existing binding without rewriting its HTML.
+- FuseBase content: insertWebStudioFuseBasePage adds one maintained FuseBase Page block; replaceWebStudioFuseBasePage changes an existing binding without rewriting its HTML; importWebStudioFuseBaseFolder creates or reuses linked pages and adds folder navigation.
+- FuseBase Apps: insertWebStudioFuseBaseApp adds one Products/Apps block; replaceWebStudioFuseBaseApp reconfigures one explicit binding without changing its identity.
 - applyWebStudioEdits: several of the above as one change.
 
 Generate imagery (a real paid call, its own permission, not part of
@@ -327,6 +364,27 @@ parsed from it yourself. The sites service verifies the organization
 host and the current user's access again. MCP has no current page or
 selection, so insertion requires pageId and replacement requires
 bindingId. afterNodeId is optional; without it insertion appends.
+For a folder request, resolve it with listWebStudioFuseBaseFolders
+and call importWebStudioFuseBaseFolder exactly once. Pass the target
+site page id and the draft version from getWebStudioSiteContext.
+The import owns preview, snapshot validation, linked page creation,
+routes, navigation and batching. Never recreate that workflow with
+generic page, menu or HTML edits.
+
+For FuseBase Apps, always call listWebStudioFuseBaseApps first and
+use only Product and App ids it returns. Never assemble an App
+`fb-embed`, binding id, embed URL or access metadata with
+insertWebStudioHtml, patchWebStudioBlock, writeWebStudioFile or
+applyWebStudioEdits. If names match more than once, distinguish Your
+and Managed Products and ask which result the person means. MCP has
+no current selection: insertion requires pageId and replacement
+requires bindingId. Omit accessPolicy for the safe Site members
+default; `public` means anyone on this site, not that the App becomes
+public everywhere. Global App publicity is intentionally unavailable
+on this surface until Gate can enforce its separate App permission.
+Pass expectedVersion after reading the draft. Insert and replace
+change only the draft. Offer a preview afterwards and publish only
+when the person explicitly asks.
 
 ## Grouping edits
 
@@ -429,6 +487,43 @@ each skill by name and description.
 - **A preview URL is authenticated.** It shows unpublished work. It is
   not a link to paste anywhere that outlives the conversation.
 
+## FuseBase App runtime context
+
+A FuseBase App embedded in a Site does receive a verified Site context.
+This is the Sites equivalent of `portalFeatureContextToken`; do not
+infer from the absence of an MCP or public SDK operation that the
+runtime context is missing.
+
+When a bound App is launched, Web Studio creates a short-lived signed
+`siteAppContextToken`. It identifies the `siteId`, `pageId`, `blockId`,
+binding, Product and App; carries the access policy, current principals
+(`visitor`, `containerMember`, `containerManager`), and the explicit
+viewer `siteRole` (`visitor`, `client`, `member`, or `manager`); and includes the
+FuseBase user subject when the visitor is authenticated.
+The verified launch surface is `studio`, `preview`, or `published`.
+Read it from `auth.runtimeContext.surface` in `whoami` or the MCP
+connection context. The same trusted object exposes `siteId`, `pageId`,
+`blockId`, `bindingId`, `accessPolicy`, `principals`, and `siteRole`; do
+not infer these values from the URL or working directory.
+`accessPolicy` says who is allowed to open the binding; it is not the
+current viewer's role. Use `siteRole` for role-aware App behavior:
+`manager` may manage the Site App, `member` is an internal organization
+participant, `client` is an external authenticated participant, and
+`visitor` is an anonymous public launch. Do not collapse `member` into
+`client`. A Site settings `Client` invitation yields `siteRole: client`,
+`Member` yields `siteRole: member`, and `Manager` yields
+`siteRole: manager`. During rollout an older session may omit
+`siteRole`; ask the
+user to reopen the App instead of guessing it from the policy.
+
+The token is a server-to-server security contract, not page data and
+not an agent tool. App Wrapper sends it to Web Studio's protected
+`POST /internal/site-app-context/verify` endpoint. Web Studio verifies
+the signature and expiry, then rechecks the current Site, page, bound
+embed, access version, organization mapping and membership before
+returning the context. Do not decode or trust the token in browser code,
+expose it in site HTML, or look for an MCP operation that verifies it.
+
 ## Working Rules
 
 - Use tools_describe before calling an operation whose input you are unsure of, rather than guessing a field name.
@@ -438,7 +533,7 @@ each skill by name and description.
 
 ## Version
 
-- **Version**: 1.13.0
+- **Version**: 1.21.0
 - **Category**: specialized
-- **Last synced**: 2026-09-27
+- **Last synced**: 2026-10-01
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

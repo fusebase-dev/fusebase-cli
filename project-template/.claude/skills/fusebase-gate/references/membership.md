@@ -1,5 +1,5 @@
 ---
-version: "1.7.0"
+version: "1.8.0"
 mcp_prompt: membership
 last_synced: "2026-09-30"
 title: "Fusebase Gate Membership And Portal Flows"
@@ -62,6 +62,7 @@ These prompts cover organization member invites/removal, workspace selection, po
 - `autoConfirmClientInvite` is only valid for org-only client onboarding with `orgRole: "client"` and no `workspaceId`.
 - Optional fields for workspace or portal invites: `orgRole`, `encryptRole`, `fullName`, `memberTTL`.
 - Do not invent workspace ids or portal domains. Discover them first or use `workspaceId: "default"` when appropriate.
+- Limit errors: a refused invite carries `data.errorCode` `member_limit_reached`, `client_limit_reached`, `workspace_member_limit_reached`, `invite_rate_limited` or `invite_too_frequent` (plus `data.limit` when known). Do not retry a limit error and do not try another role or workspace to get around it; tell the user which limit was hit.
 
 ## Response Interpretation
 
@@ -103,7 +104,7 @@ These prompts cover organization member invites/removal, workspace selection, po
 
 ## Version
 
-- **Version**: 1.7.0
+- **Version**: 1.8.0
 - **Category**: specialized
 - **Last synced**: 2026-09-30
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
