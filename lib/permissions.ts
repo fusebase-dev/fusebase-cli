@@ -258,6 +258,12 @@ export const GATE_PERMISSIONS_MAGIC_LINKS = [
   "app_magic_link.write",
 ] as const;
 
+/**
+ * Product deep links (`listRoutes` / `resolveRoute`). Outside the legacy fingerprint
+ * baseline so existing `.env`s show STALE and pick it up on refresh (NIM-44858).
+ */
+export const GATE_PERMISSIONS_ROUTES = ["route.read"] as const;
+
 export const GATE_PERMISSIONS_ISOLATED = [
   "isolated_store.control.write",
   "isolated_store.data.write",
@@ -351,6 +357,7 @@ const GATE_PERMISSIONS_EXTRA_GRANTABLE = [
 export const ALL_GATE_PERMISSIONS: ReadonlySet<string> = new Set<string>([
   ...KNOWN_GATE_PERMISSIONS,
   ...GATE_PERMISSIONS_MAGIC_LINKS,
+  ...GATE_PERMISSIONS_ROUTES,
   ...GATE_PERMISSIONS_MCP_MANAGER,
   ...GATE_PERMISSIONS_EXTRA_GRANTABLE,
 ]);

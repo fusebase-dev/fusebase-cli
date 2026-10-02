@@ -9,6 +9,7 @@ import {
   GATE_PERMISSIONS_MCP_MANAGER,
   GATE_PERMISSIONS_NOTES_MARKDOWN,
   GATE_PERMISSIONS_PORTALS,
+  GATE_PERMISSIONS_ROUTES,
   GATE_PERMISSIONS_WEB_STUDIO,
 } from "./permissions";
 
@@ -80,6 +81,7 @@ function getGateMcpPermissions(): string[] {
     ...GATE_PERMISSIONS_PORTALS,
     ...GATE_PERMISSIONS_WEB_STUDIO,
     ...GATE_PERMISSIONS_MAGIC_LINKS,
+    ...GATE_PERMISSIONS_ROUTES,
     ...(notesMarkdownEnabled() ? GATE_PERMISSIONS_NOTES_MARKDOWN : []),
     ...(managedIntegrationsEnabled() ? GATE_PERMISSIONS_MCP_MANAGER : []),
   ];
