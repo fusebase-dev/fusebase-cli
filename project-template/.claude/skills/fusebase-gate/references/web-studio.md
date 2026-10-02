@@ -1,7 +1,7 @@
 ---
-version: "1.21.0"
+version: "1.22.0"
 mcp_prompt: webStudio
-last_synced: "2026-10-01"
+last_synced: "2026-10-02"
 title: "Fusebase Gate Web Studio Operations"
 category: specialized
 ---
@@ -501,10 +501,15 @@ binding, Product and App; carries the access policy, current principals
 viewer `siteRole` (`visitor`, `client`, `member`, or `manager`); and includes the
 FuseBase user subject when the visitor is authenticated.
 The verified launch surface is `studio`, `preview`, or `published`.
-Read it from `auth.runtimeContext.surface` in `whoami` or the MCP
-connection context. The same trusted object exposes `siteId`, `pageId`,
-`blockId`, `bindingId`, `accessPolicy`, `principals`, and `siteRole`; do
+Read it from `getMe().auth.runtimeContext` in the SDK or `runtimeContext` in MCP `whoami`
+connection context. The same trusted object exposes `containerType`, `surface`,
+`productId`, `appId`, `siteId`, `pageId`, `blockId`, `bindingId`,
+`accessPolicy`, `principals`, and `siteRole`; do
 not infer these values from the URL or working directory.
+In App code, `runtimeContext?.containerType === "site"` is the
+verified signal that this request was launched inside a Site. If that
+context is absent, there is no verified Site launch; keep the App's
+standalone defaults instead of guessing from its URL.
 `accessPolicy` says who is allowed to open the binding; it is not the
 current viewer's role. Use `siteRole` for role-aware App behavior:
 `manager` may manage the Site App, `member` is an internal organization
@@ -533,7 +538,7 @@ expose it in site HTML, or look for an MCP operation that verifies it.
 
 ## Version
 
-- **Version**: 1.21.0
+- **Version**: 1.22.0
 - **Category**: specialized
-- **Last synced**: 2026-10-01
+- **Last synced**: 2026-10-02
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
