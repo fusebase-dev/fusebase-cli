@@ -1,7 +1,7 @@
 ---
 version: "1.0.0"
 mcp_prompt: apps
-last_synced: "2026-08-28"
+last_synced: "2026-10-06"
 title: "FuseBase Apps And Work Agents"
 category: specialized
 ---
@@ -25,8 +25,11 @@ Use these operations for organization-scoped integration between published FuseB
 
 ## FuseBase App Calling A Work Agent
 
-- This is an asynchronous backend workflow. An App backend lists agents, creates a task, and polls for completion; browser code must not receive the invocation credential.
+- App backends can ask a question without a task or create an execution task. Keep the invocation credential in the backend. Never expose it to browser code.
 - Call `listPaperclipCallableAgents` first and select an agent from the response. Do not guess an agent id from its display name.
+- Use `askPaperclipAgent` only for explanations, summaries, translations, and comparisons answerable from supplied context. Select an agent with `askSupported: true`. ASK has no tools: no writes, web search, live external lookups, file changes, or message sending. Route those requests directly to `createPaperclipAgentTask`.
+- For ASK, supply UUID `conversationKey` and `externalRef`. Keep the same externalRef and request contents on retry; a changed request with the same key conflicts. Poll `getPaperclipAgentAsk` with the same authenticated caller until succeeded/failed, even when POST returns HTTP 200. Send one pending question per conversation. Rotate conversationKey to clear history.
+- An ASK outcome of `requires_task` means no action was taken. Use the task operation only when the user's request authorizes execution; otherwise clarify. A question mark or @mention is not an authorization rule. Unsupported ASK agents remain usable through tasks.
 - Call `createPaperclipAgentTask` with the selected `agentId`, a concise `title`, and the full task in `description`.
 - Always supply a stable `externalRef` derived from the App's own job or request id. Retrying the same logical job with the same value is idempotent and returns `reused: true` instead of creating a duplicate task.
 - Poll `getPaperclipAgentTask` with the returned task id until the task reaches a terminal status. Read human-readable output from `comments` and structured or file output from `workProducts`; `latestRun` can be null even when the task is complete.
@@ -51,5 +54,5 @@ Use these operations for organization-scoped integration between published FuseB
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-08-28
+- **Last synced**: 2026-10-06
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
