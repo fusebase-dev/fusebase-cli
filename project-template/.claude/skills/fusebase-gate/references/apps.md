@@ -1,7 +1,7 @@
 ---
 version: "1.0.0"
 mcp_prompt: apps
-last_synced: "2026-10-06"
+last_synced: "2026-10-07"
 title: "FuseBase Apps And Work Agents"
 category: specialized
 ---
@@ -27,7 +27,7 @@ Use these operations for organization-scoped integration between published FuseB
 
 - App backends can ask a question without a task or create an execution task. Keep the invocation credential in the backend. Never expose it to browser code.
 - Call `listPaperclipCallableAgents` first and select an agent from the response. Do not guess an agent id from its display name.
-- Use `askPaperclipAgent` only for explanations, summaries, translations, and comparisons answerable from supplied context. Select an agent with `askSupported: true`. ASK has no tools: no writes, web search, live external lookups, file changes, or message sending. Route those requests directly to `createPaperclipAgentTask`.
+- Use `askPaperclipAgent` for explanations, summaries, translations, comparisons, and short read-only business-data questions. Select an agent with `askSupported: true`. ASK permits up to three approved Gate business-data reads, using the caller’s existing notes/workspace/store permissions. It cannot write, search the web, call arbitrary tools, change files, or send messages. Use `createPaperclipAgentTask` for those actions. Do not grant broad permissions just to make ASK work.
 - For ASK, supply UUID `conversationKey` and `externalRef`. Keep the same externalRef and request contents on retry; a changed request with the same key conflicts. Poll `getPaperclipAgentAsk` with the same authenticated caller until succeeded/failed, even when POST returns HTTP 200. Send one pending question per conversation. Rotate conversationKey to clear history.
 - An ASK outcome of `requires_task` means no action was taken. Use the task operation only when the user's request authorizes execution; otherwise clarify. A question mark or @mention is not an authorization rule. Unsupported ASK agents remain usable through tasks.
 - Call `createPaperclipAgentTask` with the selected `agentId`, a concise `title`, and the full task in `description`.
@@ -42,6 +42,7 @@ Use these operations for organization-scoped integration between published FuseB
 - Keep tokens carrying `paperclip_agents.execute` in the App backend or secret store. Never embed them in frontend bundles, return them from an App endpoint, or print them in logs.
 - Gate and Paperclip both enforce the organization boundary. A caller cannot select an agent or retrieve a task from another organization.
 - The reverse bridge is feature-flagged. A `404` while `app_agent_invocation` is disabled means the integration is unavailable in that environment, not that the agent id should be retried.
+- Taskless ASK additionally requires `app_agent_ask` in Gate and `PAPERCLIP_TASKLESS_ASK_ENABLED=true` in Nimbus AI and Paperclip. It defaults off, independently of ordinary tasks. When disabled, ASK returns `404` and listings report `askSupported: false`; do not retry agent IDs to bypass the switch.
 
 ## Failure Handling
 
@@ -54,5 +55,5 @@ Use these operations for organization-scoped integration between published FuseB
 
 - **Version**: 1.0.0
 - **Category**: specialized
-- **Last synced**: 2026-10-06
+- **Last synced**: 2026-10-07
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
