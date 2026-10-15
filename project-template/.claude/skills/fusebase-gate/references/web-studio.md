@@ -1,7 +1,7 @@
 ---
-version: "1.22.0"
+version: "1.28.0"
 mcp_prompt: webStudio
-last_synced: "2026-10-02"
+last_synced: "2026-10-14"
 title: "Fusebase Gate Web Studio Operations"
 category: specialized
 ---
@@ -22,6 +22,8 @@ category: specialized
 - [Publishing](#publishing)
 - [Look at what you made](#look-at-what-you-made)
 - [Pointing a person at Studio itself](#pointing-a-person-at-studio-itself)
+- [When a person asks for a new site](#when-a-person-asks-for-a-new-site)
+- [When a person asks to change a site they already have](#when-a-person-asks-to-change-a-site-they-already-have)
 - [Choosing an edit operation](#choosing-an-edit-operation)
 - [Grouping edits](#grouping-edits)
 - [The sequence that works](#the-sequence-that-works)
@@ -64,6 +66,18 @@ or a one-line CSS tweak.
 audience, vibe, and the aesthetic family this leans toward. If genuinely
 ambiguous, ask one question; otherwise commit and proceed rather than
 defaulting to the nearest generic template.
+
+**Vertical rhythm is a hard rule** — it is the defect generated pages
+ship most. A heading, its text and its actions never sit flush. The
+tight tracking and line height in a style's DESIGN.md are for a
+heading's own lines, never the space between elements. Build every
+heading-text-actions group (hero, section intro, card body, sidebar
+page header) as a flex or grid column with `gap` from the spacing
+scale: at least `var(--fb-space-3)` from a heading to its text and
+`var(--fb-space-5)` before buttons, more under a display heading with
+a line-height below 1. `margin: 0` on a heading or paragraph only when
+the parent sets that gap. The visual review reports a heading that
+overlaps the next line as an error (`text-crowded`).
 
 **Anti-default discipline.** Do not reach for: a centered hero over a
 gradient blob, three equal feature cards in a row, purple/violet
@@ -244,8 +258,12 @@ Read:
 - listWebStudioFuseBaseApps: accessible Your and Managed Products and Apps, including stable ids, current publicity and safe open links.
 
 Start a site:
-- listWebStudioTemplates: the catalog `createWebStudioSite` accepts as `templateKey`, each with a page count and a gallery description. Call this before naming a template — an unrecognized key does not error, it falls back silently to the demo project, so a guessed key produces the wrong site with no warning.
+- listWebStudioTemplates: the catalog `createWebStudioSite` accepts as `templateKey`, each with a page count and a gallery description. Call this before naming a template — an unrecognized key is refused with `template_not_found`.
 - createWebStudioSite: a new site, owned by the caller, in the organization named by `orgId` — never a default picked for you. Omit `templateKey` for the platform's demo project, or pass "blank" for a single page site in the neutral Clean style (with a DESIGN.md describing it), or a key from `listWebStudioTemplates`.
+
+Move a whole site (each needs its own permission):
+- exportWebStudioSite (`sites.export.read`): a 15-minute download link to the site as a .zip — the draft and the bytes of every Files asset. A credential; hand it to importWebStudioSite or to the person, nowhere else.
+- importWebStudioSite (`sites.import.create`): a new unpublished site in `orgId` from such a link, here or in another environment. Its Files are copied in; App bindings are not — tell the person about every entry in `appEmbedsToReplace` and do not publish until those embeds point at Apps of this environment.
 
 Edit the draft (none of these publish anything):
 - Markup and styles: writeWebStudioFile, patchWebStudioFile, patchWebStudioBlock, insertWebStudioHtml.
@@ -253,6 +271,7 @@ Edit the draft (none of these publish anything):
 - Navigation: addWebStudioMenu, updateWebStudioMenu.
 - Look: setWebStudioTheme, addWebStudioPalette, setWebStudioStyleSets.
 - The site itself: setWebStudioSiteIdentity.
+- Its public address: setWebStudioSiteAddress with the label (`acme` → `acme.<platform base>`). Owner only; replaces the current address at once and is not undoable, so ask before moving an address that may have been shared. A taken label is refused with free labels nearby — offer them, do not guess.
 - FuseBase content: insertWebStudioFuseBasePage adds one maintained FuseBase Page block; replaceWebStudioFuseBasePage changes an existing binding without rewriting its HTML; importWebStudioFuseBaseFolder creates or reuses linked pages and adds folder navigation.
 - FuseBase Apps: insertWebStudioFuseBaseApp adds one Products/Apps block; replaceWebStudioFuseBaseApp reconfigures one explicit binding without changing its identity.
 - applyWebStudioEdits: several of the above as one change.
@@ -316,7 +335,9 @@ A question about the editor, not the site — "how do I add a custom
 domain", "where do I see AI usage", "how do I edit the raw HTML" —
 is answered with a link into Studio, not a description of menus to
 click through. Call listRoutes and resolveRoute with a `studio.*`
-location, passing this site's `siteId` and draft `branchId`. Do not
+location, passing this site's `siteId`. Leave `branchId` out;
+Studio opens the current draft. Pass it only to open a different
+draft. Do not
 append `&goto=` yourself and do not invent an id: the allowlist is
 DEEP_LINKS in sites-codex apps/studio/src/App.tsx, exposed by
 listRoutes. A color palette or theme question is `studio.styles`,
@@ -331,6 +352,31 @@ the place someone is asking about has no id yet, resolve `studio.open`
 and say plainly that you don't have a direct link to that one
 section. resolveRoute answers `unsupported` when the Studio origin
 is not configured. Do not guess a hostname.
+
+## When a person asks for a new site
+
+If the person is in front of a screen and asks you to make them a
+site, hand them over to Studio rather than building it yourself:
+resolveRoute `studio.new_site` with `params.prompt` set to their
+brief in their own words (what the site is for, who it is for, what
+must be on it; up to 4000 characters), and give them the link.
+Studio opens Describe with AI with that text; they go on through the
+questions, the look and the layout, and attach files there. It needs
+`sites.create`. Use createWebStudioSite only when you are going to
+build the site yourself with the edit operations below.
+
+## When a person asks to change a site they already have
+
+If they are in front of a screen and the change should happen in
+Studio's chat rather than by you editing the files, resolveRoute
+`studio.chat` with this site's `siteId` and `params.prompt` set to
+their request in their own words (up to 4000 characters). Leave
+`branchId` out so Studio opens the current draft, with the text
+already in the
+chat box; they send it. It needs `sites.read`. The text goes in the
+URL fragment, the same way `studio.new_site` carries a brief. Edit
+the site yourself with the operations below when they asked you to
+do the change, not to hand them a box to type in.
 
 ## Choosing an edit operation
 
@@ -358,7 +404,7 @@ manifest data with generic edits. Resolve names with
 listWebStudioFuseBaseWorkspaces and listWebStudioFuseBasePages, then
 use insertWebStudioFuseBasePage or replaceWebStudioFuseBasePage.
 Duplicate page titles are normal: use folderPath to ask which one.
-A pasted FuseBase /space/{workspaceId}/page/{noteId} URL may be passed
+A pasted FuseBase /space/{workspaceId}/document/{noteId} URL may be passed
 directly to insertWebStudioFuseBasePage; do not trust or reuse ids
 parsed from it yourself. The sites service verifies the organization
 host and the current user's access again. MCP has no current page or
@@ -506,6 +552,9 @@ connection context. The same trusted object exposes `containerType`, `surface`,
 `productId`, `appId`, `siteId`, `pageId`, `blockId`, `bindingId`,
 `accessPolicy`, `principals`, and `siteRole`; do
 not infer these values from the URL or working directory.
+`pageUrl` is the public address of the Site page holding the App, nested
+pages included; use it for links in notifications and emails. It is
+absent while the Site has no public address, so do not build it yourself.
 In App code, `runtimeContext?.containerType === "site"` is the
 verified signal that this request was launched inside a Site. If that
 context is absent, there is no verified Site launch; keep the App's
@@ -538,7 +587,7 @@ expose it in site HTML, or look for an MCP operation that verifies it.
 
 ## Version
 
-- **Version**: 1.22.0
+- **Version**: 1.28.0
 - **Category**: specialized
-- **Last synced**: 2026-10-02
+- **Last synced**: 2026-10-14
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

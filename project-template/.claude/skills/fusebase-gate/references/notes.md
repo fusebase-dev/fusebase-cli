@@ -110,7 +110,7 @@ These operations manage workspace note folders, workspace notes, note reads, not
 - Markdown ops only work on notes created with `createWorkspaceMarkdownNote`. Classic (v2) notes keep using `getWorkspaceNote`, `createWorkspaceNote`, and `appendWorkspaceNoteContent`.
 - Markdown is stored literally as the source of truth; no HTML conversion is needed or supported on these ops. Send real markdown, not HTML.
 - Every markdown response includes `note.revision`. Save it: `updateWorkspaceMarkdownNoteContent` requires the last-read `revision`, and `appendWorkspaceMarkdownNoteContent` accepts it optionally.
-- On HTTP 409 (`data.errorCode` = markdown_note_revision_conflict) the stored content changed since your read. Re-read with `getWorkspaceMarkdownNote` (or use `data.currentRevision`), reconcile, and retry the write.
+- On HTTP 409 (`apiData.errorCode` = markdown_note_revision_conflict) the stored content changed since your read. Re-read with `getWorkspaceMarkdownNote` (or use `apiData.currentRevision`), reconcile, and retry the write.
 - Use update for full-document rewrites and append for adding to the end; do not emulate append by rewriting the whole document.
 - Attach files with `addWorkspaceMarkdownNoteAttachment`; it appends the markdown itself and returns the canonical attachment `url` plus the appended `markdown` snippet, so never hand-build the link format. To place the attachment somewhere other than the end, take that `url` and rewrite the document with `updateWorkspaceMarkdownNoteContent` using the returned `note.revision`.
 

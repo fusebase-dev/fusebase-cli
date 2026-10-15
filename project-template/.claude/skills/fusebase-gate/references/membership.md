@@ -1,7 +1,7 @@
 ---
 version: "1.8.0"
 mcp_prompt: membership
-last_synced: "2026-09-30"
+last_synced: "2026-10-02"
 title: "Fusebase Gate Membership And Portal Flows"
 category: specialized
 ---
@@ -26,6 +26,8 @@ These prompts cover organization member invites/removal, workspace selection, po
 - listPortalMembers: portal-named alias for listing underlying workspace members by `workspaceId`.
 - addOrgUser: create an org invite, workspace invite, or portal invite depending on payload shape.
 - removeOrgMember: remove an organization member by numeric `userId`.
+- listOrgInvites: list the org's pending (not yet accepted) org invites with their numeric `id`.
+- cancelOrgInvite: revoke a pending org invite by `inviteId` from listOrgInvites so its link stops working.
 - removeWorkspaceMember: remove a workspace member by `workspaceId` plus numeric `userId`.
 - removePortalMember: remove a portal member through the underlying `workspaceId` plus numeric `userId`.
 - scheduleClientAccountDeletion: schedule delayed deletion for a target user only when their org role is `client`.
@@ -62,7 +64,13 @@ These prompts cover organization member invites/removal, workspace selection, po
 - `autoConfirmClientInvite` is only valid for org-only client onboarding with `orgRole: "client"` and no `workspaceId`.
 - Optional fields for workspace or portal invites: `orgRole`, `encryptRole`, `fullName`, `memberTTL`.
 - Do not invent workspace ids or portal domains. Discover them first or use `workspaceId: "default"` when appropriate.
-- Limit errors: a refused invite carries `data.errorCode` `member_limit_reached`, `client_limit_reached`, `workspace_member_limit_reached`, `invite_rate_limited` or `invite_too_frequent` (plus `data.limit` when known). Do not retry a limit error and do not try another role or workspace to get around it; tell the user which limit was hit.
+- Limit errors: a refused invite carries `apiData.errorCode` `member_limit_reached`, `client_limit_reached`, `workspace_member_limit_reached`, `invite_rate_limited` or `invite_too_frequent` (plus `apiData.limit` when known). Do not retry a limit error and do not try another role or workspace to get around it; tell the user which limit was hit.
+
+## Pending Invite Rules
+
+- To clean up stale invites, call listOrgInvites, then cancelOrgInvite for each `id` to revoke. Only managers and owners may do this; others get 403.
+- cancelOrgInvite never removes a member. Someone who already accepted is not in listOrgInvites; remove them with removeOrgMember.
+- Workspace and portal invites are not covered by these operations.
 
 ## Response Interpretation
 
@@ -106,5 +114,5 @@ These prompts cover organization member invites/removal, workspace selection, po
 
 - **Version**: 1.8.0
 - **Category**: specialized
-- **Last synced**: 2026-09-30
+- **Last synced**: 2026-10-02
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

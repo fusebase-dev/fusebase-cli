@@ -1,7 +1,7 @@
 ---
 version: "1.103.0"
 mcp_prompt: portals
-last_synced: "2026-09-30"
+last_synced: "2026-10-02"
 title: "Fusebase Gate Portals Operations"
 category: specialized
 ---
@@ -515,7 +515,7 @@ customizer immediately but on the live portal only after a manager publishes.
   Required body: exactly one of
     `noteId` — global id of the existing note, or
     `noteUrl` — the Internal Space page URL the user pasted, e.g.
-      https://acme.nimbusweb.me/space/<workspaceId>/page/<noteId>.
+      https://acme.nimbusweb.me/space/<workspaceId>/document/<noteId>.
   Optional body:
     `title` — page and menu item title (defaults to the note's own title). The
       block header always shows the NOTE's title: publishing backfills it from
@@ -2229,5 +2229,5 @@ pageId:"page_789",blockId:"block_107"}})
 
 - **Version**: 1.103.0
 - **Category**: specialized
-- **Last synced**: 2026-09-30
+- **Last synced**: 2026-10-02
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
