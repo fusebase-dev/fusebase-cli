@@ -448,6 +448,7 @@ export const KNOWN_FLAGS = [
   "cross-app-api-calls-analysis",
   "dev-backend",
   "notes-markdown",
+  "uservars-search",
   MANAGED_INTEGRATIONS_FLAG,
   PERSONAL_MANAGED_INTEGRATIONS_FLAG,
 ] as const;
@@ -470,6 +471,7 @@ export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
     "Enable hidden `fusebase analyze app-apis` command and related cross-app API dependency guidance in templates.",
   "dev-backend":
     "Internal: show the dev/prod platform-backend choice in interactive env prompts. Off (default) → interactive flows assume prod; explicit --backend still works.",
+  "uservars-search": "Include restricted global uservar search guidance. Gate still requires an allowed organization-scoped token.",
   "notes-markdown":
     "Include markdown (v3) note Gate permissions in generated MCP tokens. Requires the platform flag `notes_markdown` on the target backend.",
   [MANAGED_INTEGRATIONS_FLAG]:
