@@ -774,6 +774,9 @@ export async function startDevServer(
 
   const server = Bun.serve<WebSocketProxyData>({
     port: actualPort,
+    // Bun's default is 10s with no bytes either way, which drops a slow store read
+    // as an empty response. 60s is enough for a local dev query; Bun's ceiling is 255.
+    idleTimeout: 60,
     async fetch(req, server) {
       const url = new URL(req.url);
 
