@@ -94,7 +94,7 @@ function runNpmInstall(cwd: string): Promise<number> {
   return new Promise((resolve, reject) => {
     // Windows has no bare `npm` executable (it is `npm.cmd`), so a shell-less
     // spawn fails with `ENOENT ... uv_spawn 'npm'`. Run through the shell.
-    const child = spawn("npm install", {
+    const child = spawn("npm install --no-audit --no-fund", {
       shell: true,
       cwd,
       stdio: "inherit",

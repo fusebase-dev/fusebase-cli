@@ -327,6 +327,7 @@ export async function fetchDeployedEnvInfo(
       throw new Error(
         `${baseUrl}/fusebase-env.json did not answer within ${FETCH_TIMEOUT_MS}ms ` +
           `— cold backend beyond the expected start-up, or the app is down`,
+        { cause: err },
       );
     }
     return null;
