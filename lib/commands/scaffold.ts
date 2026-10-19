@@ -13,7 +13,7 @@ import { createDefaultOpenApiSpec } from "../openapi";
 async function runNpmInstall(cwd: string): Promise<void> {
   console.log(`   Installing dependencies in ${cwd}...`);
   return new Promise((resolve, reject) => {
-    const child = spawn("npm install --include=dev", {
+    const child = spawn("npm install --include=dev --no-audit --no-fund", {
       shell: true,
       cwd,
       stdio: "inherit",
