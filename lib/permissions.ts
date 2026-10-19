@@ -686,16 +686,35 @@ export function buildDeployPermissions(args: {
   manualPermissions?: AppPermissions;
   gateMetaPermissions?: string[];
   platformPermissions?: AppPermissions;
+  /**
+   * Union of `apps[].backendOnlyGatePermissions` and
+   * `manifest.backendOnlyGatePermissions`. Deploy must not republish these into
+   * the browser runtime set. Platform-fixed delegate/bypass are always included.
+   */
+  backendOnlyGatePermissions?: string[];
 }): AppPermissions | undefined {
-  const { manualPermissions, gateMetaPermissions, platformPermissions } = args;
+  const {
+    manualPermissions,
+    gateMetaPermissions,
+    platformPermissions,
+    backendOnlyGatePermissions = [],
+  } = args;
+  const backendOnly = mergeBackendOnlyGatePermissionLists(
+    backendOnlyGatePermissions,
+    [...BACKEND_ONLY_GATE_PERMISSIONS],
+  );
 
   return mergeFeaturePermissions({
     manualPermissions,
     existingPermissions: platformPermissions,
     gatePermissions: gateMetaPermissions
       ? mergeSyncedGatePermissions({
-          analyzedGatePermissions: gateMetaPermissions,
+          analyzedGatePermissions: subtractBackendOnlyFromRuntime(
+            gateMetaPermissions,
+            backendOnly,
+          ),
           storedPermissions: platformPermissions,
+          backendOnlyGatePermissions: backendOnly,
         }).gatePermissions
       : undefined,
   });
