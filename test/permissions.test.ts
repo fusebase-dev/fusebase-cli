@@ -1022,6 +1022,35 @@ describe("buildDeployPermissions", () => {
     ]);
   });
 
+  it("drops backend-only privileges the analyzer re-emitted into the runtime set", () => {
+    const result = buildDeployPermissions({
+      gateMetaPermissions: [
+        "email.write",
+        "org.members.write",
+        "org.read",
+        "isolated_store.read",
+        "isolated_store.rls.bypass",
+      ],
+      platformPermissions: {
+        items: [
+          {
+            type: "gate",
+            privileges: ["email.write", "isolated_store.read", "org.read"],
+          },
+        ],
+      },
+      backendOnlyGatePermissions: [
+        "email.write",
+        "org.members.write",
+        "isolated_store.read",
+      ],
+    });
+
+    expect(result?.items).toEqual([
+      { type: "gate", privileges: ["org.read"] },
+    ]);
+  });
+
   it("leaves an app with no local permissions and no snapshot untouched", () => {
     expect(
       buildDeployPermissions({

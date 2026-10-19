@@ -9,9 +9,14 @@ import {
 } from "./config";
 import assert from "assert";
 import { reconcileAppSecrets } from "./reconcile-secrets";
-import { buildDeployPermissions } from "./permissions";
+import {
+  buildDeployPermissions,
+  mergeBackendOnlyGatePermissionLists,
+  readBackendOnlyGatePermissionsFromFeature,
+  readBackendOnlyGatePermissionsFromManifest,
+} from "./permissions";
 
-export type AppPlatformState = Pick<App, "title" | "accessPrincipals" | "permissions" | "path" | "id" | "sub">;
+export type AppPlatformState = Pick<App, "title" | "accessPrincipals" | "permissions" | "manifest" | "path" | "id" | "sub">;
 
 /**
  * Minimal shape `reconcileApps` needs from a platform app (from `fetchApps`).
@@ -240,6 +245,10 @@ async function applyAppUpdates(params: {
     manualPermissions: appConfig.permissions,
     gateMetaPermissions: appConfig.fusebaseGateMeta?.permissions,
     platformPermissions: platformApp?.permissions,
+    backendOnlyGatePermissions: mergeBackendOnlyGatePermissionLists(
+      readBackendOnlyGatePermissionsFromFeature(appConfig),
+      readBackendOnlyGatePermissionsFromManifest(platformApp?.manifest),
+    ),
   });
 
   const updateRequest: UpdateAppRequest = {};
