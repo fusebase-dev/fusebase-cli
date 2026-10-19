@@ -1,7 +1,7 @@
 ---
-version: "1.8.0"
+version: "1.9.0"
 mcp_prompt: users
-last_synced: "2026-09-30"
+last_synced: "2026-10-16"
 title: "Fusebase Gate Users Operations"
 category: specialized
 ---
@@ -61,11 +61,18 @@ These operations manage organization membership flows and safe member removal ex
 3. Use listOrgUsers for org-wide roster/profile fields; use listWorkspaceMembers (or listPortalMembers) when you need members of one workspace/portal only.
 4. Use listOrgUsers or listWorkspaceMembers to discover target ids before removal or client account deletion.
 5. If a write fails, debug auth context before assuming a contract mismatch.
+<% if (it.flags?.includes("uservars-search")) { %>
+## Search users by uservar
+
+Use searchUsersByVar for global uservar searches, with a token explicitly scoped to an organization enabled by the Gate server. This searches all FuseBase users, including users outside the token organization. It does not modify users or variables.
+Pass orgId and body {key: 'startupFlowOption', value: 'ai-agent', limit: 100}. value is a native JSON scalar (string, number, boolean or null), not a JSON-encoded string; arrays and objects are unsupported. Keys and string values are case-sensitive. The result contains items [{userId, value}] and nextCursor. Reuse nextCursor with the same key/value until it is null.
+The CLI flag only enables this documentation. Server authorization still requires an allowed organization scope on the token. No users.vars.read grant is needed. Keep service tokens on the backend.
+<% } %>
 ---
 
 ## Version
 
-- **Version**: 1.8.0
+- **Version**: 1.9.0
 - **Category**: specialized
-- **Last synced**: 2026-09-30
+- **Last synced**: 2026-10-16
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.
