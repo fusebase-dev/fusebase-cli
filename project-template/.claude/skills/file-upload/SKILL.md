@@ -15,6 +15,7 @@ and how an app lists and edits the organization's files through the Gate bucket-
 - **Never** store user file/binary bytes in a FuseBase PostgreSQL isolated store (`base64` / `bytea` / data URL), including “MVP” shortcuts. Upload with this skill / Gate files ops; persist only `storedFileUUID`, `readUrl`, and small metadata in SQL or dashboard cells.
 - Needing **`files.write`** is **not** a reason to put attachments in SQL. Sync Gate permissions (`fusebase app update <appId> --sync-gate-permissions`) instead.
 - **Visitor / anonymous / public-link apps:** browser visitor tokens usually cannot call `files.write`. Broker upload on the **app feature backend** with `FBS_FEATURE_TOKEN`, then return `storedFileUUID` / `readUrl` to the client.
+- **Private app files** (`createBucketAttachment` with `private: true`): store the `globalId`, never the `url`; the `url` is a signed link that expires (at most 1 day). Get fresh links with `listBucketAttachments` and `attachmentIds`, and use them as is. See [Private files](references/upload-lifecycle.md#private-files).
 - Ordinary isolated-SQL write/`execute` paths are **not** the 64MiB `importIsolatedStoreSqlRows` cap — practical bodies are ~100–150 KB. Do not design attachments against SQL payload size.
 
 ## When NOT To Use This Skill
