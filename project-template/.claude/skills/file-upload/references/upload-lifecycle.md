@@ -33,6 +33,7 @@ with `saveStoredFile: false` and let the attachment do it. Flow 1 never creates 
 ## App attachment storage (non-negotiable)
 
 - After upload, apps persist **`storedFileUUID` + `readUrl`** (and small metadata) in dashboards or isolated SQL — **never** the file bytes.
+- For a **private** bucket attachment, persist its `globalId` instead and never its `url`: the `url` expires (see [Private files](#private-files)).
 - Do **not** store base64/`bytea`/data URLs in isolated SQL as an MVP. The ordinary SQL write path is only reliable around ~100–150 KB; the 64MiB figure applies only to `importIsolatedStoreSqlRows` (CSV/TSV seeds).
 - **Visitor / public apps:** call Gate file ops from the **feature backend** with `FBS_FEATURE_TOKEN` (`files.write`), not from a visitor browser token. Return refs to the client.
 
@@ -286,8 +287,8 @@ Stored-file response shape:
 A file manager style app reaches the organization's files through Gate, which forwards to bucket-service.
 App uploads land in the organization `app` bucket next to the note and portal files.
 
-- `createBucketAttachment` — `{tempStoredFileName, attributes?, accessPrincipals?, folder?}`. Creates the
-  stored-file record and the attachment. Needs an app token: the app backend calls it with
+- `createBucketAttachment` — `{tempStoredFileName, attributes?, accessPrincipals?, folder?, private?}`. Creates the
+  stored-file record and the attachment; `private: true` makes it a [private file](#private-files). Needs an app token: the app backend calls it with
   `FBS_FEATURE_TOKEN`, and the app frontend can call it directly through the app-api Gate proxy,
   which forwards the app's scopes. On the frontend path the recorded uploader is the signed-in
   user rather than the backend service user.
@@ -300,11 +301,12 @@ App uploads land in the organization `app` bucket next to the note and portal fi
 - `listBucketAttachments` — returns `{items, total}` across every source. Narrow it with `targets`
   (`app`, `note`, portal targets), `sizeFrom`, `createdFrom` and `createdTo` (date added, see below),
   `uploaderId` (only that user's uploads), `kinds` (`image`, `video`, `audio`, `doc`, `archive`, `file`)
-  and `attributes`; page it with `limit` (max 100) and `offset`. A bad `uploaderId`, an unknown kind or
+  and `attributes`; `attachmentIds` (up to 100 `globalId`s) returns only those files and `urlExpiresIn`
+  sets the lifetime of private links; page it with `limit` (max 100) and `offset`. A bad `uploaderId`, an unknown kind or
   `createdFrom` greater than `createdTo` is a 400.
 
 Each item carries `target` (the source), `userId` (the uploader), `kind`, `size`, `attributes`,
-`accessPrincipals` and, for organization members, the bucket `permissions`. `type` holds the same value
+`accessPrincipals`, `private`, `url`, `urlExpiresAt` and, for organization members, the bucket `permissions`. `type` holds the same value
 as `kind` and is deprecated; read `kind`. Resolve the uploader email and role from
 `userId` with the Gate org-users operations; bucket-service stores only the id.
 
@@ -367,9 +369,38 @@ Organization roles are `owner`, `manager`, `member` and `guest` for the team, an
 clients. Leaving `guest` out of a team role list hides the file from guests. Listing every role,
 `client` included, is the same as sending no access principals at all.
 
+### Private files
+
+By default an app file is public: its `url` opens it for anyone, forever, and `accessPrincipals` only
+hide it from the listing. Send `private: true` to `createBucketAttachment` for files that must have no
+permanent public link (contracts, invoices, personal documents). Keep files public when visitors who are
+not signed in must open them freely, or when the link is saved into other places (dashboard `files`
+cells, notes, emails), because a private link expires.
+
+- A private file's `url` is a signed, absolute link (`https://app-api.{FUSEBASE_HOST}/box/bfile/...`) that
+  opens the file for anyone holding it, signed in or not, until `urlExpiresAt` (unix seconds, at most
+  1 day). Hand it only to people who may see the file. `urlExpiresAt` is `null` for public files, whose
+  `url` is permanent.
+- Store the file's `globalId` in app data, never its `url`.
+- To show files, use `url` from `listBucketAttachments`. For ids the app stored, call it with
+  `attachmentIds` and fetch again before `urlExpiresAt`; `urlExpiresIn` (60 to 86400 seconds, default
+  86400) gives shorter links.
+- After the link expires it still opens for a signed-in Fusebase user who sees the file in the listing.
+  Do not rely on that inside the app: browsers that block third-party cookies do not send the session.
+  A visitor who is not signed in opens a private file only through a valid link.
+
+```typescript
+// Fresh links for files the app stored by globalId.
+const { items } = await filesApi.listBucketAttachments({
+  path: { orgId },
+  query: { attachmentIds: storedIds, urlExpiresIn: 3600 },
+});
+const hrefById = new Map(items.map((item) => [item.globalId, item.url]));
+```
+
 ## Display URLs
 
-If the upload API returns a `relative url` or a `file.url` that starts with `/`, prepend:
+If the upload API returns a `relative url` or a `file.url` that starts with `/` (a `/box/file` tail), prepend:
 
 `https://app.{FUSEBASE_HOST}/box/file`
 
@@ -384,7 +415,8 @@ function buildFileHref(url: string): string {
 }
 ```
 
-If Gate returns `readUrl`, use it as-is for reads, links, or image `src`.
+If Gate returns `readUrl`, use it as-is for reads, links, or image `src`. The same goes for a private
+file's absolute `/box/bfile/` `url`: never prefix it with a host or a proxy path.
 
 ## File Descriptor
 
@@ -401,7 +433,8 @@ A file descriptor is the object passed to downstream apps after upload. Include 
 - `storedFileUUID`
 - `kind`
 
-For `url`, store a display-ready URL. If the stored-file response gives a relative `file.url`, normalize it with `buildFileHref` before saving a new descriptor, and also apply the same helper when rendering already-saved descriptors so legacy relative URLs still open correctly.
+A private file's `url` expires, so do not hand it on in a file descriptor that is saved for later; pass its
+`globalId` and let the reader fetch a fresh link. For `url`, store a display-ready URL. If the stored-file response gives a relative `file.url`, normalize it with `buildFileHref` before saving a new descriptor, and also apply the same helper when rendering already-saved descriptors so legacy relative URLs still open correctly.
 
 The dashboard adapter uses this descriptor inside a `files` column value. Gate adapters may also expose `fileId`, `publicFileName`, and `readUrl`; those are Gate operation outputs, not a separate lifecycle.
 

@@ -123,6 +123,36 @@ describe("file upload guidance", () => {
     expect(text).toContain("`createdFrom` and `createdTo`");
     expect(text).not.toMatch(/(?<![A-Za-z])`principals`/);
     expect(text).toContain("`attributes` is a JSON object of strings sent as a string");
+    // NIM-45432: the private-file fields the skill tells apps to use.
+    for (const field of ["`private: true`", "`urlExpiresAt`", "`attachmentIds`", "`urlExpiresIn`"]) {
+      expect(text).toContain(field);
+    }
+  });
+
+  it("documents private files: keep the globalId, refresh links, never prefix them", () => {
+    const text = lifecycle();
+    expect(text).toContain("### Private files");
+    expect(text).toContain("Store the file's `globalId` in app data, never its `url`.");
+    expect(text).toContain("query: { attachmentIds: storedIds, urlExpiresIn: 3600 }");
+    expect(text).toContain("never prefix it with a host or a proxy path");
+    // The public-file rule stays: a relative `/box/file` tail still gets the host.
+    expect(text).toContain("`https://app.{FUSEBASE_HOST}/box/file`");
+  });
+
+  it("calls a valid signed link what it is: it opens the file for anyone holding it", () => {
+    for (const text of [lifecycle(), readTemplateFile("references", "files.md")]) {
+      expect(text).toContain("for anyone holding it, signed in or not");
+      expect(text).not.toContain("merely has its link");
+      expect(text).not.toContain("only signed-in people");
+    }
+  });
+
+  it("requires the gate SDK that ships the private-file fields", () => {
+    // An app upgrade installs only when this spec differs from the app's own,
+    // so an older minimum leaves apps on an SDK without `private`/`attachmentIds`.
+    // 2.15.0 and 2.16.0 were published from main without them.
+    const spec = JSON.parse(read("package.json")).dependencies["@fusebase/fusebase-gate-sdk"];
+    expect(Bun.semver.order(spec.replace(/^\^/, ""), "2.17.0")).toBeGreaterThanOrEqual(0);
   });
 });
 
