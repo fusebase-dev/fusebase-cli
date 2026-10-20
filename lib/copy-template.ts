@@ -520,7 +520,7 @@ export async function copyAgentsAndSkills(targetDir: string): Promise<void> {
       const name = normalizeTemplateEntryPath(entry.entryName);
       if (shouldSkipEntry(name)) continue;
       if (name === "AGENTS.md" || name.startsWith(".claude/skills/") || name.startsWith(".claude/agents/") || name.startsWith(".claude/hooks/") || name === ".claude/settings.json") {
-        zip.extractEntryTo(entry, targetDir, true, true);
+        zip.extractEntryTo(entry, targetDir, true, true, true);
       }
     }
   } else {

@@ -43,7 +43,7 @@ async function getFeatureTemplatesDir(): Promise<{
     await mkdir(tempDir, { recursive: true });
     const zipData = await zipFile.arrayBuffer();
     const zip = new AdmZip(Buffer.from(zipData));
-    zip.extractAllTo(tempDir, true);
+    zip.extractAllTo(tempDir, true, true);
 
     return {
       path: tempDir,
