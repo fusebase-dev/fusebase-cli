@@ -372,7 +372,7 @@ async function copyProjectTemplate(
     // Binary mode - extract from embedded zip
     const zipData = await zipFile.arrayBuffer();
     const zip = new AdmZip(Buffer.from(zipData));
-    zip.extractAllTo(targetDir, true);
+    zip.extractAllTo(targetDir, true, true);
   } else {
     // Development mode - copy from template directory
     const templateDir = join(__dirname, "..", "..", templateDirName);
