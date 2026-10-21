@@ -147,6 +147,21 @@ describe("file upload guidance", () => {
     }
   });
 
+  it("says removal stops only an attachment link, a url is used as is, and `private` tells a private file", () => {
+    // NIM-46221: removal stops an attachment link, but old public links (/box/file/) still open.
+    const skill = read(".claude/skills/file-upload/SKILL.md");
+    for (const text of [lifecycle(), skill, readTemplateFile("references", "files.md")]) {
+      expect(text).toContain("Removing the file stops a link to the attachment");
+      expect(text).toContain("older public links can keep opening");
+      expect(text).not.toMatch(/forever|permanent|until the file is removed|stops working when/i);
+    }
+    for (const text of [lifecycle(), readTemplateFile("references", "files.md")]) {
+      expect(text).toContain("by its `private` field");
+      expect(text).toContain("do not read ids out of it");
+    }
+    expect(lifecycle()).not.toContain("/box/bfile/");
+  });
+
   it("requires the gate SDK that ships the private-file fields", () => {
     // An app upgrade installs only when this spec differs from the app's own,
     // so an older minimum leaves apps on an SDK without `private`/`attachmentIds`.
