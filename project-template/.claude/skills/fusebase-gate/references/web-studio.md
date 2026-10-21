@@ -55,7 +55,7 @@ deliberate: the route table (pages), menus, access rules, theme tokens
 and named palettes. Everything else is a file.
 
 ## Access, entry and notes
-Use webStudioPermissions for participants and organization Studio access. Site entryPolicy is separate: open, email, invite (Restricted); read it in getWebStudioSiteContext and change its draft with setWebStudioSiteEntryPolicy. Page access modes are public, unlisted, authenticated, grant. Never send signed-in or signedIn. Publishing is a separate explicit action.
+Use webStudioPermissions for participants and organization Studio access. Site entryPolicy is separate: open, email, invite (Restricted); read it in getWebStudioSiteContext and save it immediately with setWebStudioSiteEntryPolicy. Page access modes are public, unlisted, authenticated, grant. Never send signed-in or signedIn. Entry policy is live and independent of publishing and page Undo.
 For a note to embed on a site, createWorkspaceMarkdownNote creates V3 (notes.markdown.write); createWorkspaceNote creates classic V2 and is not interchangeable. Discover via listWebStudioFuseBasePages, then insertWebStudioFuseBasePage. Do not silently convert or duplicate an existing V2 note. App code reads getMe().auth.runtimeContext to detect Site context; /auth/context is not the Site context source.
 setWebStudioSiteAddress assigns the platform label; publishing alone does not choose an address. resolveRoute requires route.read; the configured MCP token must explicitly contain it. Return studioUrl as supplied, never append goto parameters.
 ## Design taste
