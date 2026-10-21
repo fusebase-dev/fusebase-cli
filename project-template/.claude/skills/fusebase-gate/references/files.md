@@ -1,7 +1,7 @@
 ---
-version: "1.17.0"
+version: "1.17.1"
 mcp_prompt: files
-last_synced: "2026-10-04"
+last_synced: "2026-10-21"
 title: "Fusebase Gate Files Flows"
 category: specialized
 ---
@@ -33,8 +33,9 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 - `attributes` is free key/value metadata on the file (max 50 keys, 255 chars per key and value), for example the uploader email or a category. `accessPrincipals` is who may see the file: `{roles, userIds, groupIds}`, where `groupIds` are organization group global ids (`listOrgGroups`). Leave `accessPrincipals` out to show the file to everyone who can see the organization bucket.
 - `updateBucketAttachment` works on any file of the organization, but `accessPrincipals` only on app files. It replaces the whole `attributes` object when it is present, and `accessPrincipals: null` clears every restriction. Fields you do not send stay as they are. Only the uploader or an organization manager or owner may change `attributes` or `accessPrincipals`.
 - `listBucketAttachments` returns `{items, total}`. Each item carries `target` (the source bucket), `userId` (the uploader — resolve the email and role with the org-users operations), `size` in bytes, `attributes`, `accessPrincipals` and, for organization members, the bucket `permissions`. Narrow it with `targets` (for example `app` or `note`), `sizeFrom`, `createdFrom` and `createdTo` (the date added, unix seconds like each item `createdAt`, both inclusive, either alone; the app turns presets like Last 7 days into these two numbers in the time zone of the user), `uploaderId` (only the files that user uploaded), `kinds` (`image`, `video`, `audio`, `doc`, `archive` or `file`, matched against each item `kind`) and `attributes`, page it with `limit` (max 100) and `offset`. `attributes` is a JSON object of strings sent as a string, for example `attributes: '{"source": "file-manager"}'`; every pair must match the file exactly, and `total` follows the same filter. A malformed one is a 400. Gate resolves the caller's organization role and groups itself, so an app token and a user session for the same person see the same files, and a client only sees what its access principals allow.
-- **Private files**: send `private: true` to `createBucketAttachment` when the file must have no permanent public link (contracts, invoices, personal documents). Without it the file is public and its `url` is permanent, as before. A private file's `url` is a signed, absolute link that opens the file for anyone holding it, signed in or not, until `urlExpiresAt` (unix seconds, at most 1 day): hand it only to people who may see the file. `urlExpiresAt` is null for files that are not private.
-- For a private file, store its `globalId`, never its `url`. Before showing it, or before `urlExpiresAt`, get fresh links with `listBucketAttachments` and `attachmentIds` (up to 100 ids); `urlExpiresIn` sets their lifetime, 60 to 86400 seconds, default 86400. A private `url` is already absolute: use it as is and never prefix it with a host or a proxy path.
+- **Private files**: send `private: true` to `createBucketAttachment` when only people who may see the file should open it (contracts, invoices, personal documents). Without it the file is public: its `url` does not expire (`urlExpiresAt` is null) and opens for anyone. Removing the file stops a link to the attachment (it then gives 404), but older public links can keep opening the file after removal. So do not count on removal to take back a public link saved in other places (dashboard cells, notes, emails): when a file must stop opening later, make it private. A private file's `url` is a signed link that opens the file for anyone holding it, signed in or not, until `urlExpiresAt` (unix seconds, at most 1 day): hand it only to people who may see the file.
+- Every app file `url` is absolute, public or private. Use it as is: do not build it, do not prefix it with a host or a proxy path, and do not read ids out of it. Tell a private file by its `private` field, not by its `url`.
+- For a private file, store its `globalId`, never its `url`. Before showing it, or before `urlExpiresAt`, get fresh links with `listBucketAttachments` and `attachmentIds` (up to 100 ids); `urlExpiresIn` sets their lifetime, 60 to 86400 seconds, default 86400.
 - After a private link expires, it still opens for a signed-in Fusebase user who may see the file in the listing; visitors who are not signed in to Fusebase can open a private file only with a valid link. Do not rely on the signed-in fallback inside the app, because browsers that block third-party cookies do not send the session: refresh links instead.
 - `completeMultipartFileUpload` accepts `saveStoredFile: false` to finish the upload without creating the stored-file record. The response then has `storedFileCreated: false`, null `fileId`/`storedFileUUID`, and `tempStoredFileName` to hand on.
 - `startMultipartFileUpload` requires `filename` and byte `size`; `contentType` defaults to `application/octet-stream`, and `folder` defaults to `apps`.
@@ -65,7 +66,7 @@ This reference covers only Gate file operations and their auth/scope behavior. F
 
 ## Version
 
-- **Version**: 1.17.0
+- **Version**: 1.17.1
 - **Category**: specialized
-- **Last synced**: 2026-10-04
+- **Last synced**: 2026-10-21
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

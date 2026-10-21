@@ -33,7 +33,7 @@ with `saveStoredFile: false` and let the attachment do it. Flow 1 never creates 
 ## App attachment storage (non-negotiable)
 
 - After upload, apps persist **`storedFileUUID` + `readUrl`** (and small metadata) in dashboards or isolated SQL — **never** the file bytes.
-- For a **private** bucket attachment, persist its `globalId` instead and never its `url`: the `url` expires (see [Private files](#private-files)).
+- For every bucket attachment, persist its `globalId`. A public file may also keep its `url`, but do not count on removing the file to take that link back. For a **private** file never persist the `url`: it expires (see [Private files](#private-files)).
 - Do **not** store base64/`bytea`/data URLs in isolated SQL as an MVP. The ordinary SQL write path is only reliable around ~100–150 KB; the 64MiB figure applies only to `importIsolatedStoreSqlRows` (CSV/TSV seeds).
 - **Visitor / public apps:** call Gate file ops from the **feature backend** with `FBS_FEATURE_TOKEN` (`files.write`), not from a visitor browser token. Return refs to the client.
 
@@ -371,16 +371,18 @@ clients. Leaving `guest` out of a team role list hides the file from guests. Lis
 
 ### Private files
 
-By default an app file is public: its `url` opens it for anyone, forever, and `accessPrincipals` only
-hide it from the listing. Send `private: true` to `createBucketAttachment` for files that must have no
-permanent public link (contracts, invoices, personal documents). Keep files public when visitors who are
-not signed in must open them freely, or when the link is saved into other places (dashboard `files`
-cells, notes, emails), because a private link expires.
+By default an app file is public: its `url` does not expire (`urlExpiresAt` is `null`) and opens it for
+anyone. `accessPrincipals` only hide it from the listing. Removing the file stops a link to the attachment
+(it then gives 404), but older public links can keep opening the file after removal. So do not count on
+removal to take back a public link saved in other places (dashboard `files` cells, notes, emails).
+Send `private: true` to `createBucketAttachment` for files that only people who may see them should open,
+or that must stop opening later (contracts, invoices, personal documents). Keep files public when visitors
+who are not signed in must open them freely, or when the link is saved into other places, because a
+private link expires.
 
-- A private file's `url` is a signed, absolute link (`https://app-api.{FUSEBASE_HOST}/box/bfile/...`) that
-  opens the file for anyone holding it, signed in or not, until `urlExpiresAt` (unix seconds, at most
-  1 day). Hand it only to people who may see the file. `urlExpiresAt` is `null` for public files, whose
-  `url` is permanent.
+- Tell a private file by its `private` field, not by the shape of its `url`.
+- A private file's `url` is a signed link that opens the file for anyone holding it, signed in or not,
+  until `urlExpiresAt` (unix seconds, at most 1 day). Hand it only to people who may see the file.
 - Store the file's `globalId` in app data, never its `url`.
 - To show files, use `url` from `listBucketAttachments`. For ids the app stored, call it with
   `attachmentIds` and fetch again before `urlExpiresAt`; `urlExpiresIn` (60 to 86400 seconds, default
@@ -400,7 +402,11 @@ const hrefById = new Map(items.map((item) => [item.globalId, item.url]));
 
 ## Display URLs
 
-If the upload API returns a `relative url` or a `file.url` that starts with `/` (a `/box/file` tail), prepend:
+Every bucket attachment `url` is absolute, public or private: use it as is. Do not build it, do not prefix it,
+and do not read ids out of it.
+
+The host prefix below is only for a `relative url` (the note flow) and for old saved file descriptors. If the
+upload API returns a `relative url` or a `file.url` that starts with `/` (a `/box/file` tail), prepend:
 
 `https://app.{FUSEBASE_HOST}/box/file`
 
@@ -415,8 +421,8 @@ function buildFileHref(url: string): string {
 }
 ```
 
-If Gate returns `readUrl`, use it as-is for reads, links, or image `src`. The same goes for a private
-file's absolute `/box/bfile/` `url`: never prefix it with a host or a proxy path.
+If Gate returns `readUrl`, use it as-is for reads, links, or image `src`. The same goes for every bucket
+attachment `url`: never prefix it with a host or a proxy path.
 
 ## File Descriptor
 
