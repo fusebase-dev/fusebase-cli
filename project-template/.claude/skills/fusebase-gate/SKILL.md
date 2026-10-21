@@ -57,6 +57,7 @@ Each reference is in a separate file under `references/`. Load the file when you
 - [Portal iframe embed context (Gate SQL RLS)](references/portal-embed-context.md)
 - [Portal theme styling (custom CSS override contract)](references/portal-theme-variables.md)
 - [Stripe for apps and agents (Gate)](references/stripe-for-apps-and-agents.md)
+- [Web Studio permissions](references/web-studio-permissions.md)
 
 ---
 

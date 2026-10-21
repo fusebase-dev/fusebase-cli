@@ -1059,3 +1059,12 @@ describe("buildDeployPermissions", () => {
     ).toBeUndefined();
   });
 });
+
+it("recognizes explicit site permission grants without adding them to default policy", () => {
+  expect(
+    findUnknownGatePermissions([
+      "sites.permissions.read",
+      "sites.permissions.manage",
+    ]),
+  ).toEqual([]);
+});

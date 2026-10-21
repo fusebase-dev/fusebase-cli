@@ -62,3 +62,10 @@ Non-interactive mode:
 - No prompt.
 - No automatic IDE refresh.
 - `.env` result only.
+
+Web Studio access management is opt-in: enable `site-permissions` with the CLI
+flags command, then refresh the environment MCP tokens. The resulting policy adds
+`sites.permissions.read` and `sites.permissions.manage`; the default policy does
+not change. Both permissions are also accepted as explicit app grants. Gate still
+checks the actor's actual Studio rights, and financial actions require browser
+confirmation. Never print or commit the refreshed tokens.
