@@ -1,7 +1,7 @@
 ---
 version: "1.28.1"
 mcp_prompt: webStudio
-last_synced: "2026-10-21"
+last_synced: "2026-10-22"
 title: "Fusebase Gate Web Studio Operations"
 category: specialized
 ---
@@ -55,7 +55,7 @@ deliberate: the route table (pages), menus, access rules, theme tokens
 and named palettes. Everything else is a file.
 
 ## Access, entry and notes
-Use webStudioPermissions for participants and organization Studio access. Site entryPolicy is separate: open, email, invite (Restricted); read it in getWebStudioSiteContext and save it immediately with setWebStudioSiteEntryPolicy. Page access modes are public, unlisted, authenticated, grant. Never send signed-in or signedIn. Entry policy is live and independent of publishing and page Undo.
+Use webStudioPermissions for participants and organization Studio access. Site entryPolicy is separate: open, email, invite (Restricted); read it in getWebStudioSiteContext and save it immediately with setWebStudioSiteEntryPolicy. Page access modes are public, unlisted, authenticated, grant. Never send signed-in or signedIn. Entry policy is live and independent of publishing and page Undo. Pass site.entryPolicyVersion from fresh context as expectedVersion; on 409 reload and review before saving.
 For a note to embed on a site, createWorkspaceMarkdownNote creates V3 (notes.markdown.write); createWorkspaceNote creates classic V2 and is not interchangeable. Discover via listWebStudioFuseBasePages, then insertWebStudioFuseBasePage. Do not silently convert or duplicate an existing V2 note. App code reads getMe().auth.runtimeContext to detect Site context; /auth/context is not the Site context source.
 setWebStudioSiteAddress assigns the platform label; publishing alone does not choose an address. resolveRoute requires route.read; the configured MCP token must explicitly contain it. Return studioUrl as supplied, never append goto parameters.
 ## Design taste
@@ -607,5 +607,5 @@ expose it in site HTML, or look for an MCP operation that verifies it.
 
 - **Version**: 1.28.1
 - **Category**: specialized
-- **Last synced**: 2026-10-21
+- **Last synced**: 2026-10-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

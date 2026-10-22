@@ -772,8 +772,8 @@ export async function startDevServer(
     connections: 100, // Max concurrent sockets to your target
   });
 
-  const server = Bun.serve<WebSocketProxyData>({
-    port: actualPort,
+  const startServer = (availablePort: number) => Bun.serve<WebSocketProxyData>({
+    port: availablePort,
     // Bun's default is 10s with no bytes either way, which drops a slow store read
     // as an empty response. 60s is enough for a local dev query; Bun's ceiling is 255.
     idleTimeout: 60,
@@ -889,6 +889,20 @@ export async function startDevServer(
     },
     websocket: websocketHandler,
   });
+
+  // Another CLI can bind the probed port before Bun does. Retry the bind itself.
+  const server = await (async () => {
+    let candidate = actualPort;
+    for (let attempt = 0; attempt < 1000; attempt++) {
+      try {
+        return startServer(candidate);
+      } catch (error) {
+        if ((error as { code?: string }).code !== "EADDRINUSE") throw error;
+        candidate = await findAvailablePort(candidate + 1);
+      }
+    }
+    throw new Error(`Could not bind a dev server starting from port ${actualPort}`);
+  })();
 
   console.log(`🚀 Local server running at http://localhost:${server.port}`);
 
