@@ -1,5 +1,5 @@
 ---
-version: "1.1.0"
+version: "1.2.0"
 mcp_prompt: webStudioPermissions
 last_synced: "2026-10-22"
 title: "Web Studio permissions"
@@ -12,6 +12,7 @@ category: specialized
 > **VERSION CHECK**: If operations fail unexpectedly, load MCP prompt `webStudioPermissions` for latest content.
 
 ---
+All access-management reads and changes require sites.manage. It does not imply sites.read or sites.write; site discovery still needs sites.read.
 Resolve org and site from listWebStudioSites. Read effective sources and locked before changing access. IDs come from server results, never guesses.
 Use lookupWebStudioMember for an email. organization/disabled means Grant/Restore, not existing site access: preserve the organization role, with no email or seat purchase. access means skip; pending means no implicit Resend. New people default to Client; Member/Manager require an explicit request.
 Read permissions and seats. Prepare with a UUID clientRequestId retained across retries. Execute that proposal only after any required consent has been obtained. These changes are immediate and outside page Undo or publish.
@@ -23,7 +24,7 @@ Unpublished/unaddressed sites cannot email invitations; do not publish automatic
 
 ## Version
 
-- **Version**: 1.1.0
+- **Version**: 1.2.0
 - **Category**: specialized
 - **Last synced**: 2026-10-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

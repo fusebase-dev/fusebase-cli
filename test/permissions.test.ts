@@ -1062,9 +1062,6 @@ describe("buildDeployPermissions", () => {
 
 it("recognizes explicit site permission grants without adding them to default policy", () => {
   expect(
-    findUnknownGatePermissions([
-      "sites.permissions.read",
-      "sites.permissions.manage",
-    ]),
+    findUnknownGatePermissions(["sites.manage"]),
   ).toEqual([]);
 });

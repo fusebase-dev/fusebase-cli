@@ -37,13 +37,10 @@ describe("MCP token policy", () => {
     const before = getExpectedMcpPolicyFingerprints();
     expect(
       buildGateMcpTokenRequest("org_1", "app_1").permissions,
-    ).not.toContain("sites.permissions.manage");
+    ).not.toContain("sites.manage");
     seedConfig({ env: "dev", flags: ["site-permissions"] });
     expect(buildGateMcpTokenRequest("org_1", "app_1").permissions).toEqual(
-      expect.arrayContaining([
-        "sites.permissions.read",
-        "sites.permissions.manage",
-      ]),
+      expect.arrayContaining(["sites.manage"]),
     );
     expect(getExpectedMcpPolicyFingerprints()).not.toEqual(before);
   });

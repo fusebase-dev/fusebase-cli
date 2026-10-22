@@ -81,7 +81,7 @@ function getGateMcpPermissions(): string[] {
     ...GATE_PERMISSIONS_PORTALS,
     ...GATE_PERMISSIONS_WEB_STUDIO,
     ...(hasFlag("site-permissions")
-      ? ["sites.permissions.read", "sites.permissions.manage"]
+      ? ["sites.manage"]
       : []),
     ...GATE_PERMISSIONS_MAGIC_LINKS,
     ...GATE_PERMISSIONS_ROUTES,

@@ -341,8 +341,7 @@ const APP_API_PRIVILEGE_PREFIX = "app_api.";
  * token baseline so editing tokens do not automatically get publish rights.
  */
 const GATE_PERMISSIONS_EXTRA_GRANTABLE = [
-  "sites.permissions.read",
-  "sites.permissions.manage",
+  "sites.manage",
   "app_magic_link.client_invite",
   "auth.restore_key.write",
   "automation.execute",
