@@ -67,5 +67,8 @@ Web Studio access management is opt-in: enable `site-permissions` with the CLI
 flags command, then refresh the environment MCP tokens. The resulting policy adds
 `sites.permissions.read` and `sites.permissions.manage`; the default policy does
 not change. Both permissions are also accepted as explicit app grants. Gate still
-checks the actor's actual Studio rights, and financial actions require browser
-confirmation. Never print or commit the refreshed tokens.
+checks the actor's actual Studio rights. Potential charges, plan changes and self
+lockout require explicit consent in the agent chat for the saved proposal before
+execution with `confirm: true`. Refusal cancels unstarted work; silence leaves it
+pending. The server trusts the agent to obtain the user's consent. Never print or
+commit the refreshed tokens.
