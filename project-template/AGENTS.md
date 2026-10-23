@@ -262,6 +262,7 @@ SDK token usage in app runtime:
 <% } %>
 <% if (it.flags?.includes("isolated-stores")) { %>
 - [ ] **Isolated SQL schema discipline (MUST)** — for any isolated SQL schema change, follow strict order: create/update files in `postgres/migrations/` -> compute checksum from file bytes -> run `getIsolatedStoreSqlMigrationStatus` -> then `applyIsolatedStoreSqlMigrations`
+- [ ] **Isolated SQL call budget** — one user action is one `runIsolatedStoreSqlBatch` (no parallel store calls). A shared live view reads the store once per backend process, not once per open page. An idle page does not poll every 1–2s. See `fusebase-gate/references/isolated-sql.md` (Connection budget).
 - [ ] **No persistent inline SQL for schema** — inline SQL in MCP `tool_call` is allowed only for one-off smoke/dev tests and must be explicitly marked temporary
 - [ ] **Schema ops artifact logged** — after isolated SQL schema operations, include: migration file path, `version`, `name`, `checksum`, `storeId`, `stage`
 <% } %>
