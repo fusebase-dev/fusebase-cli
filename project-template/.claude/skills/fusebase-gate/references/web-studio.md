@@ -1,7 +1,7 @@
 ---
-version: "1.28.0"
+version: "1.28.1"
 mcp_prompt: webStudio
-last_synced: "2026-10-14"
+last_synced: "2026-10-22"
 title: "Fusebase Gate Web Studio Operations"
 category: specialized
 ---
@@ -16,6 +16,7 @@ category: specialized
 
 - [Fusebase Gate Web Studio Operations](#fusebase-gate-web-studio-operations)
 - [Read this before anything else](#read-this-before-anything-else)
+- [Access, entry and notes](#access-entry-and-notes)
 - [Design taste](#design-taste)
 - [`<fb-embed>` contract](#fb-embed-contract)
 - [Relevant Operations](#relevant-operations)
@@ -53,6 +54,10 @@ Structured data does exist alongside the markup, and it is small and
 deliberate: the route table (pages), menus, access rules, theme tokens
 and named palettes. Everything else is a file.
 
+## Access, entry and notes
+Use webStudioPermissions for participants and organization Studio access. Site entryPolicy is separate: open, email, invite (Restricted); read it in getWebStudioSiteContext and save it immediately with setWebStudioSiteEntryPolicy. Page access modes are public, unlisted, authenticated, grant. Never send signed-in or signedIn. Entry policy is live and independent of publishing and page Undo. Pass site.entryPolicyVersion from fresh context as expectedVersion; on 409 reload and review before saving.
+For a note to embed on a site, createWorkspaceMarkdownNote creates V3 (notes.markdown.write); createWorkspaceNote creates classic V2 and is not interchangeable. Discover via listWebStudioFuseBasePages, then insertWebStudioFuseBasePage. Do not silently convert or duplicate an existing V2 note. App code reads getMe().auth.runtimeContext to detect Site context; /auth/context is not the Site context source.
+setWebStudioSiteAddress assigns the platform label; publishing alone does not choose an address. resolveRoute requires route.read; the configured MCP token must explicitly contain it. Return studioUrl as supplied, never append goto parameters.
 ## Design taste
 
 Editing markup and CSS here is a design act, not just a text edit.
@@ -424,10 +429,23 @@ insertWebStudioHtml, patchWebStudioBlock, writeWebStudioFile or
 applyWebStudioEdits. If names match more than once, distinguish Your
 and Managed Products and ask which result the person means. MCP has
 no current selection: insertion requires pageId and replacement
-requires bindingId. Omit accessPolicy for the safe Site members
-default; `public` means anyone on this site, not that the App becomes
+requires bindingId. Internal Team means accessPolicy `internalTeam`
+(staff, managers and organization guests with site access); External
+Team (clients) means `externalTeam`. Both teams means `containerMember`
+(the insertion default). Empty team selection is invalid. `containerManager` is
+a legacy setting; use it only to preserve existing managers-only access.
+Public access uses `public`: `public` means anyone on this site, not that the App becomes
 public everywhere. Global App publicity is intentionally unavailable
 on this surface until Gate can enforce its separate App permission.
+Use the dedicated App operations' height parameter for sizing:
+`{mode: "auto", value: ""}` fits the content;
+`{mode: "fixed", value: "720"}` sets pixels (120..5000);
+`{mode: "viewport", value: "70"}` uses screen percent (20..95).
+Omitted height means auto on insertion and preserves height
+on replacement. For height-only edits, read the existing binding and
+reuse its productId and appId; omit accessPolicy to keep its current rights.
+Omitted accessPolicy on replacement preserves access. Changing access alone
+must preserve height. Public access still respects site and page access.
 Pass expectedVersion after reading the draft. Insert and replace
 change only the draft. Offer a preview afterwards and publish only
 when the person explicitly asks.
@@ -587,7 +605,7 @@ expose it in site HTML, or look for an MCP operation that verifies it.
 
 ## Version
 
-- **Version**: 1.28.0
+- **Version**: 1.28.1
 - **Category**: specialized
-- **Last synced**: 2026-10-14
+- **Last synced**: 2026-10-22
 - **Priority rule**: If the MCP prompt has a higher version, follow the prompt's API Reference as source of truth.

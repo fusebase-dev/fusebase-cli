@@ -17,7 +17,11 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
-import { createCliWorkspace, type CliStreamHandle, runCliStreaming } from "./helpers";
+import {
+  createCliWorkspace,
+  type CliStreamHandle,
+  runCliStreaming,
+} from "./helpers";
 
 const POLL_TIMEOUT_MS = 60_000;
 
@@ -75,7 +79,9 @@ async function pollUntil200(url: string, timeoutMs: number): Promise<void> {
     await Bun.sleep(500);
   }
   const reason = lastErr instanceof Error ? lastErr.message : String(lastErr);
-  throw new Error(`Dev server at ${url} did not return 200 within ${timeoutMs}ms (last: ${reason})`);
+  throw new Error(
+    `Dev server at ${url} did not return 200 within ${timeoutMs}ms (last: ${reason})`,
+  );
 }
 
 describe("fusebase dev start — two apps in parallel", () => {
@@ -150,12 +156,23 @@ describe("fusebase dev start — two apps in parallel", () => {
         pollUntil200(`http://127.0.0.1:${portB}`, POLL_TIMEOUT_MS),
       ]);
 
+      // An app child can answer before the CLI's own proxy has bound its port.
+      await Promise.all([
+        handleA.waitForReady(/Local server running at http:\/\/localhost:\d+/),
+        handleB.waitForReady(/Local server running at http:\/\/localhost:\d+/),
+      ]);
       const codes = await Promise.all([handleA.kill(), handleB.kill()]);
       // SIGTERM triggers the CLI's `cleanup` which calls `process.exit(0)`.
       // If the cleanup path stalls, `kill()` escalates to SIGKILL after 5s
       // (exit code -1 / null). We accept either as a clean shutdown for the
       // purposes of "no leaked child process".
-      for (const code of codes) {
+      for (const [index, code] of codes.entries()) {
+        if (![0, null, -1].includes(code)) {
+          const handle = [handleA, handleB][index]!;
+          throw new Error(
+            `Unexpected CLI exit ${code}.\nstdout:\n${handle.stdout()}\nstderr:\n${handle.stderr()}`,
+          );
+        }
         expect([0, null, -1]).toContain(code);
       }
     },

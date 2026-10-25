@@ -448,6 +448,7 @@ export const KNOWN_FLAGS = [
   "cross-app-api-calls-analysis",
   "dev-backend",
   "notes-markdown",
+  "site-permissions",
   "uservars-search",
   MANAGED_INTEGRATIONS_FLAG,
   PERSONAL_MANAGED_INTEGRATIONS_FLAG,
@@ -456,6 +457,8 @@ export type KnownFlag = (typeof KNOWN_FLAGS)[number];
 
 /** Short descriptions for known experimental flags (used in interactive UX/help text). */
 export const KNOWN_FLAG_DESCRIPTIONS: Record<KnownFlag, string> = {
+  "site-permissions":
+    "Opt in to managing Web Studio participants through MCP; refresh environment tokens after enabling.",
   "mcp-beta": "Enable beta MCP servers in integrations catalog.",
   "git-init": "Run Git initialization + GitLab sync automatically during `fusebase init`.",
   "git-debug-commits": "Enable mandatory commit-per-fix and strict debug/deploy traceability in git workflow skill.",

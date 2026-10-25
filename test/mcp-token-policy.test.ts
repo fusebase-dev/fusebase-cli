@@ -32,6 +32,19 @@ describe("MCP token policy", () => {
     setConfigFilePathForTests(configPath);
   }
 
+  it("opts in to site access management without changing default grants", () => {
+    seedConfig({ env: "dev" });
+    const before = getExpectedMcpPolicyFingerprints();
+    expect(
+      buildGateMcpTokenRequest("org_1", "app_1").permissions,
+    ).not.toContain("sites.manage");
+    seedConfig({ env: "dev", flags: ["site-permissions"] });
+    expect(buildGateMcpTokenRequest("org_1", "app_1").permissions).toEqual(
+      expect.arrayContaining(["sites.manage"]),
+    );
+    expect(getExpectedMcpPolicyFingerprints()).not.toEqual(before);
+  });
+
   it("does not include markdown note permissions by default", () => {
     seedConfig({ env: "dev" });
 
