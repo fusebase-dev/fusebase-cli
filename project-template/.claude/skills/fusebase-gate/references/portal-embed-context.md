@@ -2,7 +2,7 @@
 version: "1.1.0"
 mcp_prompt: none
 source: "docs/portal-embed-context.md"
-last_synced: "2026-07-26"
+last_synced: "2026-09-29"
 title: "Portal iframe embed context (Gate SQL RLS)"
 category: specialized
 ---
@@ -22,23 +22,50 @@ https://<app-sub>.<managed-domain>/<path>?fromFrame=true&portalFeatureContextTok
 ```
 
 - `fromFrame=true` — enables iframe resize helpers in the app proxy; **does not** inject portal scope into the runtime app token by itself.
-- `portalFeatureContextToken` — platform-signed JWT minted when the brick is saved (stored as `brick.portalFeatureToken` in portal customizer).
+- `portalFeatureContextToken` — platform-signed JWT. New tokens are minted when the block is rendered, for the place where it is shown. Legacy tokens were minted once when the brick was saved (stored as `brick.portalFeatureToken`); they stay valid.
 
 ## JWT payload (verified claims)
 
 After signature verification (`HS256`, `iss: fusebase-api`, `aud: portal-app-feature`):
 
-| Claim         | Meaning                                  |
-| ------------- | ---------------------------------------- |
-| `type`        | Must be `portal-app-feature-context`     |
-| `portalId`    | Portal global id (also JWT `sub`)        |
-| `workspaceId` | Workspace bound to the portal            |
-| `appId`       | **Product** id (legacy field name)       |
-| `featureId`   | **App (feature)** id (legacy field name) |
+| Claim           | Meaning                                  |
+| --------------- | ---------------------------------------- |
+| `type`          | Must be `portal-app-feature-context`     |
+| `portalId`      | Portal global id (also JWT `sub`)        |
+| `workspaceId`   | Workspace bound to the portal            |
+| `appId`         | **Product** id (legacy field name)       |
+| `featureId`     | **App (feature)** id (legacy field name) |
+| `pageId`        | Optional. Page where the block is shown  |
+| `blockId`       | Optional. Block that owns the app        |
+| `brickId`       | Optional. App brick inside the block     |
+| `linkedBlockId` | Optional. Linked block that shows it     |
 
-There is **no end-user id** in this token. It identifies portal + product + app feature only.
+There is **no end-user id** in this token. It identifies portal + product + app feature and, in new tokens, the block instance.
 
-The token is also **static and long-lived**: it is minted once when the brick is saved, stored in `brick.portalFeatureToken`, served identically to every viewer of the portal page, and has no `exp`. Treat it as a portal-scoped artifact, never as a per-user credential.
+The token is **not per-user** and has no `exp`: every viewer of the same block gets the same claims. Treat it as a portal-scoped artifact, never as a per-user credential.
+
+## Block instance (`pageId` / `blockId` / `brickId` / `linkedBlockId`)
+
+These claims let one app keep separate data for each block it is placed in. The platform resolves them from the portal state at render time, so they always describe where the block really is — a copied block gets a new `blockId`, a normal edit or publish keeps it.
+
+| Case                         | `portalId`      | `pageId`      | `blockId`        | `brickId`              | `linkedBlockId` |
+| ---------------------------- | --------------- | ------------- | ---------------- | ---------------------- | --------------- |
+| Regular block                | current portal  | current page  | current block    | current brick          | absent          |
+| Linked block                 | portal shown on | page shown on | **source** block | brick of the source    | the link block  |
+| Block moved to another page  | same            | new           | same             | same                   | absent          |
+| Duplicate block/page/portal  | portal of copy  | page of copy  | **new**          | may equal the original | absent          |
+| App changed inside the block | same            | same          | same             | same                   | absent          |
+
+Instance key for app data:
+
+```text
+block:<blockId>                     // no brickId
+block:<blockId>:brick:<brickId>     // brickId present
+```
+
+- **Never use `brickId` alone** as a key: copies keep the brick id.
+- Do not put `portalId` into the key if a linked block must see the data of its source across portals.
+- **Legacy tokens** carry none of these four claims. Fall back to your previous portal-wide behaviour when `blockId` is absent.
 
 ## Caller identity in the verify response (`userId` / `orgRole`)
 
@@ -79,7 +106,7 @@ Do **not** assume `app.portal_id` or `CurrentPortal` RLS context without an expl
 1. **SPA (iframe):** read `portalFeatureContextToken` from `window.location.search` (not from user-editable body fields alone).
 2. **Forward** the token to your app backend on session/bootstrap calls.
 3. **Backend:** verify the token and extract trusted `portalId`:
-   - **Preferred:** Gate `verifyPortalFeatureContextToken` (`POST /{orgId}/apps/{appId}/portal-feature-context/verify`) with the app token — returns `{ portalId, workspaceId, productId, appId }`, plus `{ userId, orgRole }` for a portal-bound caller (see above).
+   - **Preferred:** Gate `verifyPortalFeatureContextToken` (`POST /{orgId}/apps/{appId}/portal-feature-context/verify`) with the app token — returns `{ portalId, workspaceId, productId, appId }`, the block instance claims when the token has them (`pageId`, `blockId`, `brickId`, `linkedBlockId`), plus `{ userId, orgRole }` for a portal-bound caller (see above).
    - Do **not** trust unsigned JWT decode in production.
 4. **Isolated store SQL:** pass trusted portal scope using one of:
    - `trustedRuntimeContext.portalId` when the backend token has `isolated_store.rls.delegate` (stored in `manifest.backendOnlyGatePermissions`, minted via `/_token` / sidecar only — **not** browser gst).
@@ -93,11 +120,11 @@ Do **not** assume `app.portal_id` or `CurrentPortal` RLS context without an expl
 
 ## Related platform paths
 
-| Component                              | Role                                                                                               |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `nx-frontend` portal customizer        | Mints token via `POST /api/portal/portal-feature-context-token`                                    |
-| `app-wrapper` `auth.ts`                | Verifies token on `/_auth/` redirect; passes `portalId`/`workspaceId` into `createAppFeatureToken` |
-| Gate `verifyPortalFeatureContextToken` | Backend verification/exchange for RLS bootstrap                                                    |
+| Component                              | Role                                                                                                               |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `nx-frontend` portal renderer          | Mints token at render time via `POST /api/portal/portal-feature-context-token` (portal-service resolves the block) |
+| `app-wrapper` `auth.ts`                | Verifies token on `/_auth/` redirect; passes `portalId`/`workspaceId` into `createAppFeatureToken`                 |
+| Gate `verifyPortalFeatureContextToken` | Backend verification/exchange for RLS bootstrap                                                                    |
 
 See also: [isolated-sql.md](./isolated-sql.md), [isolated-sql-integrator-troubleshooting.md](./isolated-sql-integrator-troubleshooting.md).
 ---
@@ -106,4 +133,4 @@ See also: [isolated-sql.md](./isolated-sql.md), [isolated-sql-integrator-trouble
 
 - **Version**: 1.1.0
 - **Category**: specialized
-- **Last synced**: 2026-07-26
+- **Last synced**: 2026-09-29
